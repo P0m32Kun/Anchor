@@ -100,7 +100,7 @@
 
 **Tag:** `v0.1.0-m2`
 
-## 2026-04-26 — M3 完成
+## 2026-04-26 — M3 完成（含指纹驱动优化）
 
 **交付：**
 - Nuclei 集成（BuildNucleiCommand，支持 light/standard 策略）
@@ -112,14 +112,21 @@
 - API 端点（工作流启动、Finding CRUD、状态变更、Evidence 添加）
 - 前端 FindingsPage（列表、筛选、详情弹窗、状态变更）
 
+**指纹驱动优化（M3 后期补充）：**
+- 新增 `internal/nuclei/tagmapper.go`：httpx fingerprint → 精确 Nuclei tag 映射
+- 按 tag 集合分组扫描：进程数 = 唯一 tag 集合数（不是 URL 数）
+- 无指纹目标自动跳过，不浪费扫描资源
+- 映射规则：Apache Druid → apache-druid（不含 apache），phpMyAdmin → phpmyadmin（不含 php）
+
 **Code Review 修复：**
 - RawArtifact 保存脱敏后数据 → 改为保存原始数据，Evidence.Excerpt 用脱敏版本
 - 重复 Finding 评分未更新 → UpdateFindingEvidence 同步刷新评分
 - PATCH 对不存在 ID 返回 200 → 增加存在性校验返回 404
 - request/response 无大小限制 → 增加 10MB 上限
+- httpx 命令行过长（37590 个参数）→ 改为文件输入 `-l hosts.txt`
 
 **验证：**
-- `go build` ✅ / `go test` 71 passed ✅ / `go vet` ✅
-- API：Findings 列表/详情/筛选/PATCH/404/Evidence 添加 全部通过
+- `go build` ✅ / `go test` 79 passed ✅ / `go vet` ✅
+- 指纹分组验证：wordpress / nginx 分别生成独立任务，无指纹站跳过
 
 **Tag:** `v0.1.0-m3`

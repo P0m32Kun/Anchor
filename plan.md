@@ -29,81 +29,61 @@
 
 ---
 
-## 当前 Sprint：M1 目标与 Scope 增强
+## 当前 Sprint：M4 报告导出
 
 ### Sprint 目标
 
-增强目标输入能力和 Scope 校验维度：支持批量导入（TXT/CSV）、时间窗口校验、速率限制配置、执行计划预览增强。
+实现从 confirmed Finding 到可交付报告的最后一步：Markdown 报告生成 + JSON 数据导出。
+
+### 前置条件
+
+M0-M3 已完成。当前已有：
+- Project / Target / Scope / Asset / WebEndpoint / Port 数据
+- Finding（pending_review / confirmed / false_positive / accepted_risk / ignored）
+- Evidence（request / response / note / raw_output）
+- RawArtifact（原始工具输出）
+- ToolInvocation（工具版本、命令参数）
 
 ### 任务清单
 
-- [x] **1. SQLite schema 定义与迁移**
-  - [x] 1.1 Project / Target / ScopeRule 表
-  - [x] 1.2 ScanPlan / ScanTask / ToolInvocation 表
-  - [x] 1.3 Asset / Port / Service / WebEndpoint 表
-  - [x] 1.4 Finding / Evidence / RawArtifact / FindingRevision 表
-  - [x] 1.5 ScopeDecision / AuditLog 表
+- [ ] **1. 报告数据聚合**
+  - [ ] 1.1 按项目 ID 拉取 confirmed + accepted_risk Finding
+  - [ ] 1.2 关联 Asset / WebEndpoint / Evidence
+  - [ ] 1.3 聚合工具版本和任务摘要
 
-- [x] **2. Project / Target / Scope API**
-  - [x] 2.1 项目 CRUD
-  - [x] 2.2 目标输入与导入（TXT/CSV）
-  - [x] 2.3 ScopeRule 配置（include/exclude）
+- [ ] **2. Markdown 报告生成**
+  - [ ] 2.1 报告模板定义（结构：概览/范围/方法/摘要/风险统计/漏洞详情/接受风险/附录）
+  - [ ] 2.2 漏洞详情渲染（资产/严重性/可信度/证据/复现摘要/修复建议）
+  - [ ] 2.3 风险统计图表（critical/high/medium/low 分布）
+  - [ ] 2.4 `GET /projects/:id/reports/export.md`
 
-- [x] **3. Scope Check 引擎**
-  - [x] 3.1 域名匹配（精确 + 子域名包含 + 通配 + 排除优先）
-  - [x] 3.2 URL 前缀匹配
-  - [x] 3.3 IP/CIDR 匹配
-  - [x] 3.4 时间窗口校验
-  - [x] 3.5 速率限制可配置性校验
-  - [x] 3.6 ScopeDecision 持久化
-  - [x] 3.7 TOCTOU 执行前重校验
-  - [x] 3.8 单元测试（边界用例）
+- [ ] **3. JSON 导出**
+  - [ ] 3.1 JSON Schema 定义（project/scope/assets/findings/evidence/tool_invocations）
+  - [ ] 3.2 `GET /projects/:id/reports/export.json`
+  - [ ] 3.3 与 DefectDojo 导入格式兼容（可选，预留字段）
 
-- [x] **4. Worker subprocess runner**
-  - [x] 4.1 goroutine 内 Worker 实现
-  - [x] 4.2 独立 workdir 管理（`<data_dir>/workdirs/<project_id>/<task_id>/`）
-  - [x] 4.3 超时控制（per-task，策略默认值）
-  - [x] 4.4 取消控制（SIGTERM→SIGKILL）
-  - [x] 4.5 输出收集（stdout/stderr/exit code）
-  - [x] 4.6 输出大小硬上限（100 MB 截断）
+- [ ] **4. 前端报告页面**
+  - [ ] 4.1 Reports 页面（报告大纲预览）
+  - [ ] 4.2 漏洞顺序调整（拖拽排序）
+  - [ ] 4.3 Markdown 预览 + 导出按钮
 
-- [x] **5. 工具健康检查**
-  - [x] 5.1 binary path + version 采集
-  - [ ] 5.2 Nuclei template 验证（`nuclei -validate`）
-  - [x] 5.3 DNS 解析可用性检查
-  - [ ] 5.4 代理可达性检查（若用户配置）
-  - [x] 5.5 writable workdir / network availability
+- [ ] **5. MVP 端到端验收**
+  - [ ] 5.1 创建项目 → 导入目标 → 资产发现 → Web 初筛 → 人工确认 → 报告导出
+  - [ ] 5.2 单项目 100 目标标准初筛稳定性测试
 
-- [x] **6. 统一错误模型 + 日志基础设施**
-  - [x] 6.1 7 种错误类型定义（ScopeDeniedError / ToolNotFoundError / ToolTimeoutError / ToolExecutionError / ParseError / TruncationWarning / WorkdirError）
-  - [ ] 6.2 脱敏过滤器（Authorization / Cookie / API Key）
-  - [x] 6.3 分级日志（debug / info / warn / error）
+### 验收标准
 
-- [x] **7. Tauri 桌面壳**
-  - [x] 7.1 Tauri 2.x 项目初始化
-  - [x] 7.2 React + TypeScript + Tailwind + shadcn/ui 配置
-  - [x] 7.3 Go sidecar / HTTP 通信层（MVP 用 HTTP API）
-  - [x] 7.4 基础路由与布局（Project / Target / Plan / Runs / Findings / Reports）
-
-- [x] **8. M0 最小闭环验收**
-  - [x] 8.1 创建项目
-  - [x] 8.2 添加目标（域名）
-  - [x] 8.3 通过 Scope Check
-  - [x] 8.4 调一次 Subfinder
-  - [x] 8.5 保存 RawArtifact
-  - [x] 8.6 Tauri UI 展示结果
+- Markdown 报告包含：项目摘要、测试范围、方法说明、漏洞列表（含证据）、修复建议、附录
+- JSON 可被外部工具解析（字段完整、类型正确）
+- 报告导出前提示敏感字段检查（redaction_status 标记）
 
 ### 风险与阻塞项
 
 | 风险 | 级别 | 应对措施 | 状态 |
 |------|------|----------|------|
-| Tauri sidecar 调用 Go 二进制在 Windows 路径处理有坑 | 中 | M0 优先在 macOS 验证，Windows 后续适配 | 🔴 待验证 |
-| 外部工具版本差异导致解析失败 | 中 | 健康检查采集版本号，解析器按版本兼容 | 🟡 已识别 |
-| SQLite WAL 模式在 Tauri 资源目录的权限问题 | 低 | 明确 data_dir 路径，初始化时检查可写 | 🟡 已识别 |
-
-### Sprint 验收标准
-
-> 能创建项目 → 添加目标 → 通过 Scope Check → 调一次 Subfinder → 保存 RawArtifact → Tauri UI 展示结果
+| Markdown 模板维护成本高 | 低 | MVP 用硬编码模板，v0.2 引入模板系统 | ⚪ 待评估 |
+| JSON 字段与外部平台不兼容 | 低 | 预留 DefectDojo 字段，v0.4 做适配 | ⚪ 待评估 |
+| 大量 Finding 时报告生成慢 | 中 | 分页生成，前端流式展示 | 🟡 待验证 |
 
 ---
 

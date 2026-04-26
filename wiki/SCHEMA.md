@@ -49,11 +49,14 @@
 │   ├── errors/                # 结构化错误模型
 │   ├── health/                # 工具健康检查
 │   ├── models/                # 数据模型
-│   ├── parser/                # 工具输出解析器（Subfinder/httpx/Naabu）
+│   ├── asset/                 # 资产归一化与去重
+│   ├── nuclei/                # Nuclei 指纹-Tag 映射
+│   ├── parser/                # 工具输出解析器（Subfinder/httpx/Naabu/Nuclei）
+│   ├── scoring/               # Finding confidence/priority 评分引擎
 │   ├── scope/                 # Scope Check 引擎
-│   ├── util/                  # 工具函数
+│   ├── util/                  # 工具函数（脱敏等）
 │   ├── worker/                # Worker subprocess runner
-│   └── workflow/              # 资产发现等工作流编排
+│   └── workflow/              # 资产发现 / Web 初筛工作流编排
 ├── frontend/                   # Tauri + React 前端
 │   ├── src/
 │   │   ├── lib/              # API 客户端 + Zustand store
@@ -98,6 +101,16 @@
 ### ADR-006: Scope Check 强制门控
 - **决策**: 所有扫描任务执行前必须通过 Scope Check，TOCTOU 防护
 - **理由**: 安全合规要求，防止授权范围外的误扫
+- **当前状态**: 已实现
+
+### ADR-007: 指纹驱动 Nuclei 模板精确筛选
+- **决策**: 按 httpx 识别的技术指纹分组，每组传入精确 `-tags` 跑 Nuclei
+- **理由**: 避免全量加载模板，减少扫描时间和资源消耗
+- **当前状态**: 已实现
+
+### ADR-008: 资产归一化与去重
+- **决策**: 使用 `normalized_value` 作为去重键，不同资产类型有不同归一规则
+- **理由**: 防止 Subfinder/httpx/Naabu 多来源产生重复资产记录
 - **当前状态**: 已实现
 
 > 更多决策详见 wiki/decisions/
@@ -158,21 +171,68 @@
 | M0 | 🟢 已完成 | 工程骨架（Scope Check + Worker + 最小闭环） |
 | M1 | 🟢 已完成 | 目标输入 + Scope Check + 执行计划预览 |
 | M2 | 🟢 已完成 | Subfinder/httpx/Naabu + 资产归一 + RawArtifact |
-| M3 | ⚪ 待开始 | Nuclei + Finding + confidence/priority 评分 |
-| M4 | ⚪ 待开始 | 验证队列 + Markdown/JSON 报告导出 |
+| M3 | 🟢 已完成 | Nuclei + Finding + confidence/priority 评分 |
+| M4 | ⚪ 待开始 | Markdown/JSON 报告导出 |
 
-当前 Sprint：**M1 目标与 Scope 增强**（已完成）
+当前状态：**M0-M3 全部完成，M4 待规划**
 
 ---
 
 ## 8. 活跃决策（待人类确认）
 
-- [ ] M2 阶段是否引入连接池管理外部工具并发？
+- [ ] M4 报告模板是否支持用户自定义？
+- [ ] v0.2 是否引入远程 Worker 架构？
 - [ ] 前端是否从 Tailwind v3 升级到 v4？
 
 ---
 
-## 9. 相关文件速查
+## 9. 完整扫描流程速查
+
+```
+用户输入目标
+    │
+    ▼
+┌─────────────┐
+│ Scope Check │  域名/URL/IP/CIDR 匹配 + 排除优先 + 时间窗口 + 速率限制
+│   (M0/M1)   │  输出：ScopeDecision (allow/deny + 原因)
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────┐
+│   资产发现 (M2)     │
+│  1. Subfinder ──►   │  子域名枚举
+│  2. httpx ──────►   │  存活探测 + 指纹采集 (technologies + webserver)
+│  3. Naabu ──────►   │  端口扫描 (可选)
+│  4. 资产归一 ───►   │  去重 + 归一化 (normalized_value)
+└──────┬──────────────┘
+       │
+       ▼
+┌─────────────────────┐
+│   Web 初筛 (M3)     │
+│  1. Scope Check     │  每个 WebEndpoint 单独校验
+│  2. 指纹 → Tag 映射  │  WordPress → wordpress, nginx → nginx
+│  3. 按 Tag 分组     │  相同 tag 集合的 URL 放同一组
+│  4. Nuclei 扫描     │  每组跑一次：nuclei -tags xxx
+│  5. JSONL 解析      │  提取 template-id / severity / matcher
+│  6. Finding 去重    │  dedup_key = SHA256(template|url|matcher)
+│  7. Scoring 评分    │  confidence / priority 规则计算
+│  8. Evidence 保存   │  request/response 脱敏 + RawArtifact 原始
+└──────┬──────────────┘
+       │
+       ▼
+┌─────────────────────┐
+│   人工验证 (M3)     │  Finding 列表 / 详情 / 状态变更 / 备注
+│   (已有 UI)         │  confirmed / false_positive / accepted_risk
+└──────┬──────────────┘
+       │
+       ▼
+┌─────────────────────┐
+│   报告导出 (M4)     │  Markdown 报告 + JSON 数据包
+│   (待实现)          │
+└─────────────────────┘
+```
+
+## 10. 相关文件速查
 
 | 文件 | 用途 |
 |------|------|
