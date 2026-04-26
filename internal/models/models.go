@@ -16,6 +16,7 @@ type Project struct {
 	Purpose        string     `json:"purpose" db:"purpose"`
 	StartTime      *time.Time `json:"start_time" db:"start_time"`
 	EndTime        *time.Time `json:"end_time" db:"end_time"`
+	RateLimit      int        `json:"rate_limit" db:"rate_limit"`
 	DefaultProfile string     `json:"default_profile" db:"default_profile"`
 	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`

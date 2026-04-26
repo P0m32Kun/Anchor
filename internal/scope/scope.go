@@ -22,9 +22,50 @@ func NewEngine(q *db.Queries) *Engine {
 	return &Engine{queries: q}
 }
 
-// Check evaluates a target against the project's scope rules.
+// Check evaluates a target against the project's scope rules and time window.
 // It persists the decision and returns it.
 func (e *Engine) Check(ctx context.Context, projectID string, target *models.Target) (*models.ScopeDecision, error) {
+	// Fetch project for time window and rate limit checks.
+	project, err := e.queries.GetProject(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("get project: %w", err)
+	}
+	if project == nil {
+		return nil, fmt.Errorf("project not found: %s", projectID)
+	}
+
+	// Time window check.
+	if denyReason := checkTimeWindow(project); denyReason != "" {
+		d := &models.ScopeDecision{
+			ID:          util.GenerateID(),
+			ProjectID:   projectID,
+			TargetValue: target.Value,
+			Decision:    models.ScopeDeny,
+			Reason:      denyReason,
+			CreatedAt:   time.Now().UTC(),
+		}
+		if err := e.queries.CreateScopeDecision(d); err != nil {
+			return nil, fmt.Errorf("persist scope decision: %w", err)
+		}
+		return d, nil
+	}
+
+	// Rate limit validation.
+	if project.RateLimit < 0 {
+		d := &models.ScopeDecision{
+			ID:          util.GenerateID(),
+			ProjectID:   projectID,
+			TargetValue: target.Value,
+			Decision:    models.ScopeDeny,
+			Reason:      fmt.Sprintf("无效的速率限制配置: %d", project.RateLimit),
+			CreatedAt:   time.Now().UTC(),
+		}
+		if err := e.queries.CreateScopeDecision(d); err != nil {
+			return nil, fmt.Errorf("persist scope decision: %w", err)
+		}
+		return d, nil
+	}
+
 	rules, err := e.queries.ListScopeRulesByProject(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("list scope rules: %w", err)
@@ -50,8 +91,36 @@ func (e *Engine) Check(ctx context.Context, projectID string, target *models.Tar
 	return d, nil
 }
 
+// checkTimeWindow returns a deny reason if the current time is outside
+// the project's configured time window. Returns empty string if in-window or unconfigured.
+func checkTimeWindow(project *models.Project) string {
+	now := time.Now()
+	if project.StartTime != nil && now.Before(*project.StartTime) {
+		return "不在测试时间窗口内（未到开始时间）"
+	}
+	if project.EndTime != nil && now.After(*project.EndTime) {
+		return "不在测试时间窗口内（已过结束时间）"
+	}
+	return ""
+}
+
 // ValidateBeforeRun performs TOCTOU check: re-validates scope decision freshness.
+// It always re-checks if the project time window or rate limit has changed,
+// because these can expire or be modified at any time.
 func (e *Engine) ValidateBeforeRun(ctx context.Context, projectID string, target *models.Target, taskID string) (*models.ScopeDecision, error) {
+	project, err := e.queries.GetProject(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("get project: %w", err)
+	}
+	if project == nil {
+		return nil, fmt.Errorf("project not found: %s", projectID)
+	}
+
+	// If time window or rate limit would currently deny, force a fresh Check.
+	if checkTimeWindow(project) != "" || project.RateLimit < 0 {
+		return e.Check(ctx, projectID, target)
+	}
+
 	latest, err := e.queries.GetLatestScopeDecision(projectID, target.Value)
 	if err != nil {
 		return nil, fmt.Errorf("get latest scope decision: %w", err)

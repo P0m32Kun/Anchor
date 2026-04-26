@@ -22,16 +22,16 @@ func New(db DBTX) *Queries { return &Queries{db: db} }
 
 func (q *Queries) CreateProject(p *models.Project) error {
 	_, err := q.db.Exec(`
-		INSERT INTO projects (id, name, organization, purpose, start_time, end_time, default_profile, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Name, p.Organization, p.Purpose, p.StartTime, p.EndTime, p.DefaultProfile, p.CreatedAt, p.UpdatedAt)
+		INSERT INTO projects (id, name, organization, purpose, start_time, end_time, rate_limit, default_profile, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Name, p.Organization, p.Purpose, p.StartTime, p.EndTime, p.RateLimit, p.DefaultProfile, p.CreatedAt, p.UpdatedAt)
 	return err
 }
 
 func (q *Queries) GetProject(id string) (*models.Project, error) {
-	row := q.db.QueryRow(`SELECT id, name, organization, purpose, start_time, end_time, default_profile, created_at, updated_at FROM projects WHERE id = ?`, id)
+	row := q.db.QueryRow(`SELECT id, name, organization, purpose, start_time, end_time, rate_limit, default_profile, created_at, updated_at FROM projects WHERE id = ?`, id)
 	p := &models.Project{}
-	err := row.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt)
+	err := row.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.RateLimit, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -39,7 +39,7 @@ func (q *Queries) GetProject(id string) (*models.Project, error) {
 }
 
 func (q *Queries) ListProjects() ([]*models.Project, error) {
-	rows, err := q.db.Query(`SELECT id, name, organization, purpose, start_time, end_time, default_profile, created_at, updated_at FROM projects ORDER BY created_at DESC`)
+	rows, err := q.db.Query(`SELECT id, name, organization, purpose, start_time, end_time, rate_limit, default_profile, created_at, updated_at FROM projects ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (q *Queries) ListProjects() ([]*models.Project, error) {
 	var list []*models.Project
 	for rows.Next() {
 		p := &models.Project{}
-		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.RateLimit, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, p)
@@ -61,6 +61,29 @@ func (q *Queries) CreateTarget(t *models.Target) error {
 	_, err := q.db.Exec(`INSERT INTO targets (id, project_id, type, value, source, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		t.ID, t.ProjectID, t.Type, t.Value, t.Source, t.Status, t.CreatedAt)
 	return err
+}
+
+// BulkCreateTargets inserts multiple targets within the current transaction.
+// Callers should use WithTx to wrap the call.
+func (q *Queries) BulkCreateTargets(targets []*models.Target) error {
+	for _, t := range targets {
+		_, err := q.db.Exec(`INSERT INTO targets (id, project_id, type, value, source, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			t.ID, t.ProjectID, t.Type, t.Value, t.Source, t.Status, t.CreatedAt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// TargetExistsByValue checks if a target with the given value already exists for the project.
+func (q *Queries) TargetExistsByValue(projectID, value string) (bool, error) {
+	row := q.db.QueryRow(`SELECT COUNT(1) FROM targets WHERE project_id = ? AND value = ?`, projectID, value)
+	var count int
+	if err := row.Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (q *Queries) GetTarget(id string) (*models.Target, error) {

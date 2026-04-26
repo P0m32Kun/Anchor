@@ -27,7 +27,7 @@ func main() {
 	defer sqliteDB.Close()
 
 	queries := db.New(sqliteDB)
-	server := api.NewServer(queries, dataDir)
+	server := api.NewServer(queries, sqliteDB, dataDir)
 
 	mux := http.NewServeMux()
 	server.Register(mux)

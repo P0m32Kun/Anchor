@@ -26,6 +26,10 @@ export interface Project {
   name: string;
   organization?: string;
   purpose?: string;
+  start_time?: string;
+  end_time?: string;
+  rate_limit?: number;
+  default_profile?: string;
   created_at: string;
 }
 
@@ -35,6 +39,24 @@ export interface Target {
   type: string;
   value: string;
   created_at: string;
+}
+
+export interface ImportResult {
+  imported: number;
+  duplicates: number;
+  denied: number;
+  errors: number;
+  targets: Target[];
+  denied_targets: { value: string; reason: string }[];
+}
+
+export interface DryRunResult {
+  project_id: string;
+  mode: string;
+  time_window_valid?: boolean;
+  rate_limit?: number;
+  estimated_duration_seconds?: number;
+  results: { target: string; decision: string; reason: string }[];
 }
 
 export interface ScopeRule {
@@ -62,7 +84,7 @@ export interface ToolHealth {
 }
 
 export const api = {
-  createProject: (data: { name: string; organization?: string; purpose?: string }) =>
+  createProject: (data: { name: string; organization?: string; purpose?: string; start_time?: string; end_time?: string; rate_limit?: number }) =>
     fetchJSON<Project>("/projects", { method: "POST", body: JSON.stringify(data) }),
 
   listProjects: () => fetchJSON<Project[]>("/projects"),
@@ -81,7 +103,21 @@ export const api = {
     fetchJSON<ScopeRule[]>(`/scope-rules?project_id=${projectId}`),
 
   dryRun: (projectId: string) =>
-    fetchJSON<any>(`/scan-plans/dry-run?project_id=${projectId}`, { method: "POST" }),
+    fetchJSON<DryRunResult>(`/scan-plans/dry-run?project_id=${projectId}`, { method: "POST" }),
+
+  importTargets: async (projectId: string, file: File): Promise<ImportResult> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_BASE}/projects/${projectId}/targets/import`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new APIError(data?.error?.message || res.statusText);
+    }
+    return res.json();
+  },
 
   runTask: (data: { project_id: string; plan_id?: string; tool: string; target_id: string; command: string }) =>
     fetchJSON<ScanTask>("/tasks/run", { method: "POST", body: JSON.stringify(data) }),

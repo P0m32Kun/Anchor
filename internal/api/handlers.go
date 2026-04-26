@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -21,6 +22,7 @@ import (
 // Server holds API dependencies.
 type Server struct {
 	queries    *db.Queries
+	rawDB      *sql.DB
 	scopeEng   *scope.Engine
 	worker     *worker.Runner
 	health     *health.Checker
@@ -28,10 +30,11 @@ type Server struct {
 	sseClients map[string]chan []byte
 }
 
-func NewServer(queries *db.Queries, dataDir string) *Server {
+func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	scopeEng := scope.NewEngine(queries)
 	s := &Server{
 		queries:    queries,
+		rawDB:      rawDB,
 		scopeEng:   scopeEng,
 		worker:     worker.NewRunner(queries, scopeEng, dataDir),
 		health:     health.NewChecker(queries),
@@ -46,6 +49,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects", s.handleListProjects)
 	mux.HandleFunc("GET /projects/{id}", s.handleGetProject)
 	mux.HandleFunc("POST /projects/{id}/targets", s.handleCreateTarget)
+	mux.HandleFunc("POST /projects/{id}/targets/import", s.handleImportTargets)
 	mux.HandleFunc("GET /projects/{id}/targets", s.handleListTargets)
 	mux.HandleFunc("POST /scope-rules", s.handleCreateScopeRule)
 	mux.HandleFunc("GET /scope-rules", s.handleListScopeRules)
@@ -96,12 +100,21 @@ func CORSMiddleware(next http.Handler) http.Handler {
 
 func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name         string `json:"name"`
-		Organization string `json:"organization"`
-		Purpose      string `json:"purpose"`
+		Name         string     `json:"name"`
+		Organization string     `json:"organization"`
+		Purpose      string     `json:"purpose"`
+		StartTime    *time.Time `json:"start_time"`
+		EndTime      *time.Time `json:"end_time"`
+		RateLimit    int        `json:"rate_limit"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	// Validate rate_limit.
+	if req.RateLimit < 0 {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "rate_limit must be >= 0"))
 		return
 	}
 
@@ -110,6 +123,9 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		Name:           req.Name,
 		Organization:   req.Organization,
 		Purpose:        req.Purpose,
+		StartTime:      req.StartTime,
+		EndTime:        req.EndTime,
+		RateLimit:      req.RateLimit,
 		DefaultProfile: "standard",
 		CreatedAt:      time.Now().UTC(),
 		UpdatedAt:      time.Now().UTC(),
@@ -195,6 +211,126 @@ func (s *Server) handleListTargets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, targets)
+}
+
+func (s *Server) handleImportTargets(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+
+	// Verify project exists.
+	project, err := s.queries.GetProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get project failed: %v", err))
+		return
+	}
+	if project == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "project not found"))
+		return
+	}
+
+	// Parse multipart form (max 32 MB).
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "failed to parse multipart form").WithDetail(err.Error()))
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "missing file field").WithDetail(err.Error()))
+		return
+	}
+	defer file.Close()
+
+	// Determine parser based on file extension.
+	var parsed []scope.ImportTarget
+	name := strings.ToLower(header.Filename)
+	if strings.HasSuffix(name, ".csv") {
+		parsed, err = scope.ParseCSV(file)
+	} else {
+		parsed, err = scope.ParseTXT(file)
+	}
+	if err != nil {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrParse, "failed to parse file").WithDetail(err.Error()))
+		return
+	}
+
+	if len(parsed) == 0 {
+		writeJSON(w, http.StatusOK, scope.ImportResult{})
+		return
+	}
+
+	// Deduplicate: track seen values within this import batch.
+	seen := make(map[string]bool)
+	var uniqueTargets []scope.ImportTarget
+	for _, t := range parsed {
+		if t.Value == "" {
+			continue
+		}
+		if seen[t.Value] {
+			continue
+		}
+		seen[t.Value] = true
+		uniqueTargets = append(uniqueTargets, t)
+	}
+
+	// Scope-check each target and build result.
+	now := time.Now().UTC()
+	result := scope.ImportResult{}
+
+	// Collect targets to create (use transaction for bulk insert).
+	var toInsert []*models.Target
+
+	for _, pt := range uniqueTargets {
+		// Check for duplicate in DB.
+		exists, dbErr := s.queries.TargetExistsByValue(projectID, pt.Value)
+		if dbErr != nil {
+			result.Errors++
+			continue
+		}
+		if exists {
+			result.Duplicates++
+			continue
+		}
+
+		t := &models.Target{
+			ID:        util.GenerateID(),
+			ProjectID: projectID,
+			Type:      pt.Type,
+			Value:     pt.Value,
+			Source:    "import",
+			Status:    "active",
+			CreatedAt: now,
+		}
+
+		// Run scope check.
+		decision, chkErr := s.scopeEng.Check(r.Context(), projectID, t)
+		if chkErr != nil {
+			result.Errors++
+			continue
+		}
+
+		if decision.Decision == models.ScopeDeny {
+			result.Denied++
+			result.DeniedTargets = append(result.DeniedTargets, scope.DeniedTarget{Value: t.Value, Reason: decision.Reason})
+			continue
+		}
+
+		toInsert = append(toInsert, t)
+		result.Targets = append(result.Targets, t)
+		result.Imported++
+	}
+
+	// Bulk insert within a transaction.
+	if len(toInsert) > 0 {
+		txErr := db.WithTx(s.rawDB, func(tx *db.Queries) error {
+			return tx.BulkCreateTargets(toInsert)
+		})
+		if txErr != nil {
+			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "bulk insert failed: %v", txErr))
+			return
+		}
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }
 
 // --- Scope Rules ---
@@ -286,17 +422,45 @@ func (s *Server) handleDryRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	project, err := s.queries.GetProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get project failed: %v", err))
+		return
+	}
+	if project == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "project not found"))
+		return
+	}
+
 	targets, err := s.queries.ListTargetsByProject(projectID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list targets failed: %v", err))
 		return
 	}
 
+	// Time window validation.
+	timeWindowOK := true
+	timeWindowReason := ""
+	if denyReason := checkTimeWindowAPI(project); denyReason != "" {
+		timeWindowOK = false
+		timeWindowReason = denyReason
+	}
+
 	var results []map[string]interface{}
+	allowCount := 0
 	for _, t := range targets {
 		decision, err := s.scopeEng.Check(r.Context(), projectID, t)
 		if err != nil {
+			results = append(results, map[string]interface{}{
+				"target":   t.Value,
+				"type":     t.Type,
+				"decision": "error",
+				"reason":   err.Error(),
+			})
 			continue
+		}
+		if decision.Decision == models.ScopeAllow {
+			allowCount++
 		}
 		results = append(results, map[string]interface{}{
 			"target":   t.Value,
@@ -306,11 +470,38 @@ func (s *Server) handleDryRun(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Estimate execution time based on target count and profile.
+	estimatedSeconds := estimateExecutionTime(len(targets), project.DefaultProfile)
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"project_id": projectID,
-		"results":    results,
-		"mode":       "dry-run",
+		"project_id":        projectID,
+		"results":           results,
+		"mode":              "dry-run",
+		"time_window_valid":    timeWindowOK,
+		"time_window_reason": timeWindowReason,
+		"rate_limit":        project.RateLimit,
+		"target_count":      len(targets),
+		"allow_count":       allowCount,
+		"estimated_seconds": estimatedSeconds,
 	})
+}
+
+// estimateExecutionTime returns a rough estimate in seconds based on target count and profile.
+func estimateExecutionTime(targetCount int, profile string) int {
+	if targetCount == 0 {
+		return 0
+	}
+	// Per-target base: light=30s, standard=60s, deep=120s
+	var perTarget int
+	switch profile {
+	case "light":
+		perTarget = 30
+	case "deep":
+		perTarget = 120
+	default:
+		perTarget = 60
+	}
+	return targetCount * perTarget
 }
 
 // --- Tasks ---
@@ -325,6 +516,25 @@ func (s *Server) handleRunTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	// Time window check (TOCTOU protection: user might have changed window after scope check).
+	project, err := s.queries.GetProject(req.ProjectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get project failed: %v", err))
+		return
+	}
+	if project == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "project not found"))
+		return
+	}
+	if denyReason := checkTimeWindowAPI(project); denyReason != "" {
+		writeError(w, http.StatusForbidden, errors.New(errors.ErrScopeDenied, denyReason))
+		return
+	}
+	if project.RateLimit < 0 {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "rate_limit must be >= 0"))
 		return
 	}
 
@@ -529,4 +739,17 @@ func redactArgs(cmd string) string {
 		}
 	}
 	return strings.Join(parts, " ")
+}
+
+// checkTimeWindowAPI returns a deny reason if now is outside the project's
+// configured time window. Returns empty string if within window or unconfigured.
+func checkTimeWindowAPI(project *models.Project) string {
+	now := time.Now()
+	if project.StartTime != nil && now.Before(*project.StartTime) {
+		return "不在测试时间窗口内（未到开始时间）"
+	}
+	if project.EndTime != nil && now.After(*project.EndTime) {
+		return "不在测试时间窗口内（已过结束时间）"
+	}
+	return ""
 }

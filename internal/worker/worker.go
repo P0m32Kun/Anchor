@@ -98,13 +98,27 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 		return fmt.Errorf("empty command template")
 	}
 
+	// Fetch project to check rate limit.
+	project, err := r.queries.GetProject(task.ProjectID)
+	if err != nil {
+		_ = r.queries.UpdateScanTaskStatus(task.ID, models.TaskFailed, nil, &now)
+		return fmt.Errorf("get project for rate limit: %w", err)
+	}
+	if project == nil {
+		_ = r.queries.UpdateScanTaskStatus(task.ID, models.TaskFailed, nil, &now)
+		return fmt.Errorf("project not found: %s", task.ProjectID)
+	}
+
 	binary := args[0]
 	if _, err := exec.LookPath(binary); err != nil {
 		_ = r.queries.UpdateScanTaskStatus(task.ID, models.TaskFailed, nil, &now)
 		return fmt.Errorf("tool not found: %s", binary)
 	}
 
-	cmd := exec.CommandContext(ctx, binary, args[1:]...)
+	// Append rate limit arguments if configured.
+	cmdArgs := appendRateLimitArgs(args[1:], task.Tool, project.RateLimit)
+
+	cmd := exec.CommandContext(ctx, binary, cmdArgs...)
 	cmd.Dir = workdir
 	cmd.Env = os.Environ()
 
@@ -272,4 +286,23 @@ func (lb *limitedBuffer) Bytes() []byte { return lb.buf.Bytes() }
 // BuildSubfinderCommand builds a Subfinder command for the given domain.
 func BuildSubfinderCommand(domain string) []string {
 	return []string{"subfinder", "-d", domain, "-oJ", "-o", "subfinder_output.jsonl"}
+}
+
+// appendRateLimitArgs appends tool-specific rate limit flags to the argument list.
+// Only adds flags when rate > 0 and the tool supports it.
+func appendRateLimitArgs(args []string, tool string, rate int) []string {
+	if rate <= 0 {
+		return args
+	}
+	switch strings.ToLower(tool) {
+	case "naabu":
+		return append(args, "-rate", fmt.Sprintf("%d", rate))
+	case "nuclei":
+		return append(args, "-rl", fmt.Sprintf("%d", rate))
+	case "httpx":
+		return append(args, "-rate-limit", fmt.Sprintf("%d", rate))
+	default:
+		// Subfinder and others don't support rate limiting; skip.
+		return args
+	}
 }

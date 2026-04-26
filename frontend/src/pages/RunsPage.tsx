@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 
-interface TaskWithArtifacts {
-  task: any;
-  artifacts: any[];
-}
-
 export default function RunsPage() {
-  const [tasks, setTasks] = useState<TaskWithArtifacts[]>([]);
   const [health, setHealth] = useState<any[]>([]);
 
   useEffect(() => {
@@ -17,16 +11,6 @@ export default function RunsPage() {
   const refreshHealth = async () => {
     const h = await api.runHealthCheck();
     setHealth(h);
-  };
-
-  const statusColor = (s: string) => {
-    switch (s) {
-      case "completed": return "text-green-600";
-      case "running": return "text-blue-600";
-      case "failed": return "text-red-600";
-      case "cancelled": return "text-gray-500";
-      default: return "text-gray-600";
-    }
   };
 
   return (
