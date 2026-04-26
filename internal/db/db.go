@@ -222,6 +222,42 @@ CREATE INDEX IF NOT EXISTS idx_ports_asset ON ports(asset_id);
 CREATE INDEX IF NOT EXISTS idx_services_asset ON services(asset_id);
 CREATE INDEX IF NOT EXISTS idx_web_endpoints_asset ON web_endpoints(asset_id);
 CREATE INDEX IF NOT EXISTS idx_web_endpoints_url ON web_endpoints(project_id, url);
+
+CREATE TABLE IF NOT EXISTS findings (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    asset_id TEXT REFERENCES assets(id) ON DELETE SET NULL,
+    service_id TEXT REFERENCES services(id) ON DELETE SET NULL,
+    web_endpoint_id TEXT REFERENCES web_endpoints(id) ON DELETE SET NULL,
+    source_tool TEXT NOT NULL,
+    source_rule_id TEXT,
+    dedup_key TEXT NOT NULL,
+    title TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK(severity IN ('info','low','medium','high','critical')),
+    confidence INTEGER DEFAULT 0,
+    priority INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending_review' CHECK(status IN ('new','pending_review','confirmed','false_positive','accepted_risk','ignored','reported')),
+    summary TEXT,
+    remediation TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(project_id, dedup_key)
+);
+
+CREATE TABLE IF NOT EXISTS evidence (
+    id TEXT PRIMARY KEY,
+    finding_id TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK(type IN ('request','response','screenshot','raw_output','note','file')),
+    artifact_id TEXT REFERENCES raw_artifacts(id) ON DELETE SET NULL,
+    excerpt TEXT,
+    created_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_findings_project ON findings(project_id);
+CREATE INDEX IF NOT EXISTS idx_findings_dedup ON findings(project_id, dedup_key);
+CREATE INDEX IF NOT EXISTS idx_findings_status ON findings(status);
+CREATE INDEX IF NOT EXISTS idx_evidence_finding ON evidence(finding_id);
 `
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("exec schema: %w", err)

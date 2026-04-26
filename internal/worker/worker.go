@@ -303,6 +303,31 @@ func BuildNaabuCommand(hostFile string) []string {
 	return []string{"naabu", "-json", "-list", hostFile}
 }
 
+// BuildNucleiCommand builds a Nuclei command.
+// If tags is non-empty, adds -tags flag. Otherwise runs without tag filter.
+func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string) []string {
+	args := []string{"nuclei", "-jsonl", "-l", targetFile}
+
+	switch profile {
+	case "light":
+		args = append(args, "-severity", "critical,high", "-timeout", "3")
+	case "standard", "":
+		args = append(args, "-severity", "critical,high,medium", "-timeout", "5")
+	case "deep":
+		args = append(args, "-severity", "critical,high,medium,low,info", "-timeout", "10")
+	}
+
+	if len(tags) > 0 {
+		args = append(args, "-tags", strings.Join(tags, ","))
+	}
+
+	if rateLimit > 0 {
+		args = append(args, "-rl", fmt.Sprintf("%d", rateLimit))
+	}
+
+	return args
+}
+
 // appendRateLimitArgs appends tool-specific rate limit flags to the argument list.
 // Only adds flags when rate > 0 and the tool supports it.
 func appendRateLimitArgs(args []string, tool string, rate int) []string {

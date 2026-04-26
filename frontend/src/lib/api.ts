@@ -134,6 +134,36 @@ export interface ToolHealth {
   dns_available: boolean;
 }
 
+export interface Finding {
+  id: string;
+  project_id: string;
+  asset_id?: string;
+  service_id?: string;
+  web_endpoint_id?: string;
+  source_tool: string;
+  source_rule_id?: string;
+  dedup_key: string;
+  title: string;
+  severity: string;
+  confidence: number;
+  priority: number;
+  status: string;
+  summary?: string;
+  remediation?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Evidence {
+  id: string;
+  finding_id: string;
+  type: string;
+  artifact_id?: string;
+  excerpt?: string;
+  created_by?: string;
+  created_at: string;
+}
+
 export const api = {
   createProject: (data: { name: string; organization?: string; purpose?: string; start_time?: string; end_time?: string; rate_limit?: number }) =>
     fetchJSON<Project>("/projects", { method: "POST", body: JSON.stringify(data) }),
@@ -195,4 +225,19 @@ export const api = {
   listPorts: (assetId: string) => fetchJSON<Port[]>(`/assets/${assetId}/ports`),
 
   listServices: (assetId: string) => fetchJSON<Service[]>(`/assets/${assetId}/services`),
+
+  startWebScreening: (projectId: string) =>
+    fetchJSON<{ status: string }>(`/projects/${projectId}/workflows/web-screening`, { method: "POST" }),
+
+  listFindings: (projectId: string, status?: string) =>
+    fetchJSON<Finding[]>(`/projects/${projectId}/findings${status ? `?status=${status}` : ""}`),
+
+  getFinding: (id: string) =>
+    fetchJSON<{ finding: Finding; evidence: Evidence[] }>(`/findings/${id}`),
+
+  patchFindingStatus: (id: string, status: string) =>
+    fetchJSON<{ status: string }>(`/findings/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+
+  addEvidence: (findingId: string, data: { type: string; excerpt: string; created_by?: string }) =>
+    fetchJSON<Evidence>(`/findings/${findingId}/evidence`, { method: "POST", body: JSON.stringify(data) }),
 };

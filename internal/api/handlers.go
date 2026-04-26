@@ -57,6 +57,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects/{id}/web-endpoints", s.handleListWebEndpointsByProject)
 	mux.HandleFunc("GET /assets/{id}/ports", s.handleListPorts)
 	mux.HandleFunc("GET /assets/{id}/services", s.handleListServices)
+	mux.HandleFunc("POST /projects/{id}/workflows/web-screening", s.handleStartWebScreening)
+	mux.HandleFunc("GET /projects/{id}/findings", s.handleListFindings)
+	mux.HandleFunc("GET /findings/{id}", s.handleGetFinding)
+	mux.HandleFunc("PATCH /findings/{id}/status", s.handlePatchFindingStatus)
+	mux.HandleFunc("POST /findings/{id}/evidence", s.handleAddEvidence)
 	mux.HandleFunc("POST /scope-rules", s.handleCreateScopeRule)
 	mux.HandleFunc("GET /scope-rules", s.handleListScopeRules)
 	mux.HandleFunc("POST /scan-plans", s.handleCreateScanPlan)
@@ -837,4 +842,158 @@ func (s *Server) handleListServices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, services)
+}
+
+// --- Web Screening Workflow ---
+
+func (s *Server) handleStartWebScreening(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	project, err := s.queries.GetProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get project failed: %v", err))
+		return
+	}
+	if project == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "project not found"))
+		return
+	}
+	if denyReason := checkTimeWindowAPI(project); denyReason != "" {
+		writeError(w, http.StatusForbidden, errors.New(errors.ErrScopeDenied, denyReason))
+		return
+	}
+
+	wf := workflow.NewWebScreeningWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir)
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		result, err := wf.Run(ctx, projectID)
+		if err != nil {
+			log.Printf("web screening workflow failed for project %s: %v", projectID, err)
+		}
+		s.broadcastSSE(map[string]interface{}{
+			"event":      "web_screening_complete",
+			"project_id": projectID,
+			"result":     result,
+		})
+	}()
+
+	writeJSON(w, http.StatusAccepted, map[string]string{"status": "started"})
+}
+
+// --- Findings ---
+
+func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	status := r.URL.Query().Get("status")
+	var findings []*models.Finding
+	var err error
+	if status != "" {
+		findings, err = s.queries.ListFindingsByStatus(projectID, models.FindingStatus(status))
+	} else {
+		findings, err = s.queries.ListFindingsByProject(projectID)
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list findings failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, findings)
+}
+
+func (s *Server) handleGetFinding(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	finding, err := s.queries.GetFinding(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get finding failed: %v", err))
+		return
+	}
+	if finding == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "finding not found"))
+		return
+	}
+	evidence, err := s.queries.ListEvidenceByFinding(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list evidence failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"finding":  finding,
+		"evidence": evidence,
+	})
+}
+
+func (s *Server) handlePatchFindingStatus(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	finding, err := s.queries.GetFinding(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get finding failed: %v", err))
+		return
+	}
+	if finding == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "finding not found"))
+		return
+	}
+	var req struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+	validStatuses := map[string]bool{
+		"confirmed":      true,
+		"false_positive": true,
+		"accepted_risk":  true,
+		"ignored":        true,
+		"pending_review": true,
+	}
+	if !validStatuses[req.Status] {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid status"))
+		return
+	}
+	now := time.Now().UTC()
+	if err := s.queries.UpdateFindingStatus(id, models.FindingStatus(req.Status), now); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update finding status failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": req.Status})
+}
+
+func (s *Server) handleAddEvidence(w http.ResponseWriter, r *http.Request) {
+	findingID := r.PathValue("id")
+	var req struct {
+		Type    string `json:"type"`
+		Excerpt string `json:"excerpt"`
+		CreatedBy string `json:"created_by"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+	if req.Type == "" || req.Excerpt == "" {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "type and excerpt are required"))
+		return
+	}
+	validTypes := map[string]bool{
+		"note":       true,
+		"screenshot": true,
+		"file":       true,
+	}
+	if !validTypes[req.Type] {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid evidence type"))
+		return
+	}
+	ev := &models.Evidence{
+		ID:        util.GenerateID(),
+		FindingID: findingID,
+		Type:      models.EvidenceType(req.Type),
+		Excerpt:   req.Excerpt,
+		CreatedBy: req.CreatedBy,
+		CreatedAt: time.Now().UTC(),
+	}
+	if err := s.queries.CreateEvidence(ev); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "create evidence failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusCreated, ev)
 }

@@ -22,7 +22,7 @@
 | M0 | 🟢 已完成 | 2026-04-26 | Tauri-Go 通信 + Scope Check + Subfinder 最小闭环 |
 | M1 | 🟢 已完成 | 2026-04-26 | 目标输入 + Scope Check + 执行计划预览 |
 | M2 | 🟢 已完成 | 2026-04-26 | Subfinder/httpx/Naabu + 资产归一 + RawArtifact |
-| M3 | ⚪ 待开始 | — | Nuclei + Finding + confidence/priority 评分 |
+| M3 | 🟢 已完成 | 2026-04-26 | Nuclei + Finding + confidence/priority 评分 |
 | M4 | ⚪ 待开始 | — | 验证队列 + Markdown/JSON 报告导出 |
 
 > 状态说明：🟡 进行中 / ⚪ 待开始 / 🟢 已完成 / 🔴 阻塞

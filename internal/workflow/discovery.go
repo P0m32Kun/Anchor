@@ -155,8 +155,13 @@ func (w *AssetDiscoveryWorkflow) Run(ctx context.Context, projectID string) (*Di
 				sc := hr.StatusCode
 				statusCode = &sc
 			}
+			// Merge webserver into technologies.
+			techs := hr.Tech
+			if hr.WebServer != "" {
+				techs = append(techs, hr.WebServer)
+			}
 			_, _, err = w.merger.CreateWebEndpointIfNotExists(
-				projectID, hostAsset.ID, hr.URL, hr.Scheme, hr.Host, port, hr.Path, hr.Title, statusCode, hr.Tech, "httpx",
+				projectID, hostAsset.ID, hr.URL, hr.Scheme, hr.Host, port, hr.Path, hr.Title, statusCode, techs, "httpx",
 			)
 			if err != nil {
 				continue

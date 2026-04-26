@@ -57,3 +57,69 @@
 ## 更早
 
 - 项目初始化（Tauri + Go 骨架）
+
+## 2026-04-26 — M3 完成
+
+**交付：**
+- Nuclei 命令构建（BuildNucleiCommand：light/standard 策略、-jsonl 输出、文件输入、-rl 速率限制）
+- Nuclei JSONL 解析器（internal/parser/nuclei.go），支持嵌套 info 对象提取，含单元测试
+- Finding / Evidence 数据模型 + SQLite schema（含索引 dedup_key、status）
+- Finding/Evidence DB 查询方法（CreateFinding/GetFindingByDedupKey/UpdateFindingEvidence/ListFindingsByProject/ListFindingsByStatus/CreateEvidence/ListEvidenceByFinding）
+- HTTP 脱敏工具（internal/util/sanitizer.go）：Authorization/Cookie/Set-Cookie/X-Api-Key/Api-Key 正则替换
+- Scoring 评分引擎（internal/scoring/scoring.go）：confidence/priority 规则评分，支持可解释原因列表
+- Web 初筛工作流（internal/workflow/screenshot.go）：批量 Scope Check → Nuclei 扫描 → JSONL 解析 → dedup_key 去重 → Finding 创建/更新 → Evidence 保存（脱敏）
+- API 端点：POST /projects/:id/workflows/web-screening、GET /projects/:id/findings、GET /findings/:id、PATCH /findings/:id/status、POST /findings/:id/evidence
+- 前端 FindingsPage：列表（severity/confidence/priority/status 筛选）、详情弹窗（来源信息、Evidence 列表、状态变更、添加备注）
+- App.tsx 添加 Findings 路由
+
+**验证：**
+- `go build` ✅ / `go test` 71 passed ✅ / `go vet` ✅
+- `npx tsc --noEmit` ✅
+
+**Tag:** `v0.1.0-m3`
+
+---
+
+## 2026-04-26 — M2 完成
+
+**交付：**
+- Subfinder/httpx/Naabu 工具解析器
+- Asset/Port/Service/WebEndpoint 数据模型 + SQLite schema
+- 资产归一（Normalizer + Merger）
+- 资产发现工作流（串行：Subfinder → httpx → Naabu）
+- API 端点（资产列表、WebEndpoint 列表、端口/服务查询）
+- 前端 AssetPage
+
+**关键修复：**
+- httpx/Naabu 命令行参数过长（37590 个域名）→ 改为文件输入（`-l` / `-list`）
+
+**验证：**
+- `go build` ✅ / `go test` 68 passed ✅ / `go vet` ✅
+- Subfinder 对 example.com 发现 37590 子域名
+- Assets API 正常返回
+
+**Tag:** `v0.1.0-m2`
+
+## 2026-04-26 — M3 完成
+
+**交付：**
+- Nuclei 集成（BuildNucleiCommand，支持 light/standard 策略）
+- Nuclei JSONL 解析器（嵌套 info 对象提取，单行容错）
+- Finding/Evidence 数据模型 + SQLite schema + CRUD
+- 脱敏工具（SanitizeHTTPHeaders，Authorization/Cookie/Api-Key 等）
+- Scoring 引擎（confidence/priority 规则评分，可解释原因列表）
+- Web 初筛工作流（Scope Check → Nuclei → 解析 → dedup → Finding 创建）
+- API 端点（工作流启动、Finding CRUD、状态变更、Evidence 添加）
+- 前端 FindingsPage（列表、筛选、详情弹窗、状态变更）
+
+**Code Review 修复：**
+- RawArtifact 保存脱敏后数据 → 改为保存原始数据，Evidence.Excerpt 用脱敏版本
+- 重复 Finding 评分未更新 → UpdateFindingEvidence 同步刷新评分
+- PATCH 对不存在 ID 返回 200 → 增加存在性校验返回 404
+- request/response 无大小限制 → 增加 10MB 上限
+
+**验证：**
+- `go build` ✅ / `go test` 71 passed ✅ / `go vet` ✅
+- API：Findings 列表/详情/筛选/PATCH/404/Evidence 添加 全部通过
+
+**Tag:** `v0.1.0-m3`

@@ -104,3 +104,54 @@
 - **Minor: 前端自动刷新缺失**: AssetPage 启动资产发现后仅弹 alert，不会自动刷新列表；需用户手动切换 tab 或刷新页面。
 - **Minor: 前端未展示 Services 信息**: 虽然 API 和 store 已定义，但 AssetPage 未展示服务/指纹数据。
 - **Minor: 每个工具创建独立 scan_plan**: `createAndRunTask` 为 subfinder/httpx/naabu 各创建一个 scan_plan，记录较冗余，后续可改为一个 plan 下挂多个 task。
+
+---
+
+## M3 实现评审
+
+### 评审结论
+所有 critical/major 问题已修复，代码通过编译和全部 71 个测试。
+
+---
+
+## Review
+
+### Correct（已确认正确）
+- **Nuclei 解析器**: `ParseNuclei` 正确提取嵌套 `info` 对象（name/severity/tags），单行 JSON 失败不影响整体流程，通过 `continue` 跳过并记录 ParseError。
+- **Finding 去重**: `computeDedupKey` 使用 SHA256(template-id + "|" + host + "|" + matcher-name)，与设计方案一致；`findings` 表有 `UNIQUE(project_id, dedup_key)` 约束。
+- **Evidence 追加**: 重复 Finding 命中时，新 scan 的 request/response 仍会调用 `saveEvidenceArtifact` 创建新的 Evidence 记录，实现追加而非覆盖。
+- **Scoring 封顶**: `ScoreFinding` 对 confidence 和 priority 均做 `> 100` 截断，初始值 50，加分项明确（matcher/请求响应/提取结果）。
+- **WebEndpoint Scope Check**: 初筛工作流对每个 endpoint 构造临时 Target 调用 `w.scope.Check`，拒绝未授权资产。
+- **工作流串行**: `handleStartWebScreening` 内 goroutine 执行 workflow，workflow 内部串行处理 endpoint → nuclei → 解析 → 入库。
+- **前端类型**: `Finding`、`Evidence` 接口与后端模型一致；列表筛选、详情弹窗、状态变更、备注添加均正常。
+
+### Fixed（已修复问题）
+
+#### 🔴 Critical: RawArtifact 保存脱敏后数据，原始 request/response 永久丢失
+- **问题**: `saveEvidenceArtifact` 先调用 `SanitizeHTTPHeaders` 再写入文件并创建 RawArtifact，`RedactionStatus: "redacted"`，导致审计所需的原始证据丢失，违反设计文档 "保留原始输出"。
+- **修复**:
+  - `internal/workflow/screenshot.go`: `saveEvidenceArtifact` 改为先保存原始数据到文件，RawArtifact 标记为 `RedactionStatus: "raw"`。
+  - Evidence.Excerpt 仍使用脱敏 + 截断后的数据（500 字符），兼顾安全展示与审计追溯。
+  - 新增 `maxEvidenceSize = 10MB` 上限，防止超大 request/response 撑爆磁盘。
+
+#### 🟠 Major: 重复 Finding 的 confidence/priority 未更新
+- **问题**: 当 `existing != nil` 时，`w.scoring.ScoreFinding(&nr)` 的计算结果被完全丢弃，Finding 的 confidence/priority/severity/summary 保持首次扫描的值，后续更充分的证据无法提升评分。
+- **修复**:
+  - `internal/db/queries.go`: 扩展 `UpdateFindingEvidence` 签名，增加 `severity`、`confidence`、`priority` 参数，更新时同步刷新评分与摘要。
+  - `internal/workflow/screenshot.go`: 重复命中时调用扩展后的方法，若新 scan 的 severity 为空则保留原值。
+
+#### 🟠 Major: PATCH /findings/:id/status 对不存在的 ID 返回 200
+- **问题**: `UpdateFindingStatus` 在 SQLite 中对不存在的行返回 nil，API 对任意 ID 都返回 200，违反 REST 语义。
+- **修复**: `internal/api/handlers.go` 的 `handlePatchFindingStatus` 在执行更新前先 `GetFinding(id)`，不存在时返回 404。
+
+#### 🟠 Major: request/response Evidence 无大小限制
+- **问题**: Nuclei 的 request/response 可能包含大文件上传/下载响应，`saveEvidenceArtifact` 直接全量写入磁盘，无截断机制。
+- **修复**: `internal/workflow/screenshot.go` 的 `saveEvidenceArtifact` 增加 10MB 硬上限，超出部分截断并追加 `[truncated]` 标记。
+
+### Note（待观察/后续优化）
+- **Major: 无 RBAC 权限校验**: MVP 尚无用户/角色体系，`PATCH /findings/:id/status`、`POST /findings/:id/evidence` 等端点均未做权限校验。建议 M4 引入 project-level API key 或 session 校验。
+- **Major: 脱敏未覆盖请求体/响应体**: `SanitizeHTTPHeaders` 仅替换 HTTP header 行，若请求体为 JSON 且包含 token/password，Evidence.Excerpt 仍可能泄露。MVP 下影响可控，后续需引入结构化 body 脱敏（JSON key 黑名单）。
+- **Minor: API 契约不一致**: 成功响应未包裹 `{"data": ...}`，错误响应使用 `detail` 字符串而非 `details` 对象（M1/M2 遗留）。
+- **Minor: `parseNucleiOutput` 静默丢弃解析错误**: 已改为 `log.Printf` 记录，但 SSE/前端仍无法感知，建议后续将 ParseError 写入数据库或任务 metadata。
+- **Minor: dedup_key 使用 `host` 而非 `matched-at`**: 同一 host 下不同路径的相同 matcher 会被去重。Nuclei 的 `host` 通常等于输入 target（含路径），当前设计在多数场景下合理，但若模板在多个路径命中同一 matcher，可能过度去重。
+- **Minor: `handleAddEvidence` 未校验 Finding 存在性**: 不存在的 finding_id 会触发 SQLite FK 约束错误并返回 500，建议改为提前 404。
