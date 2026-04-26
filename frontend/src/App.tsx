@@ -1,6 +1,7 @@
 import { Routes, Route, Link } from "react-router-dom";
 import ProjectPage from "./pages/ProjectPage";
 import TargetPage from "./pages/TargetPage";
+import AssetPage from "./pages/AssetPage";
 import RunsPage from "./pages/RunsPage";
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
         <Routes>
           <Route path="/" element={<ProjectPage />} />
           <Route path="/projects/:id" element={<TargetPage />} />
+          <Route path="/projects/:id/assets" element={<AssetPage />} />
           <Route path="/runs" element={<RunsPage />} />
         </Routes>
       </main>
