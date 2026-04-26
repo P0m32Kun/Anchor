@@ -17,6 +17,7 @@ import (
 	"secbench/internal/scope"
 	"secbench/internal/util"
 	"secbench/internal/worker"
+	"secbench/internal/workflow"
 )
 
 // Server holds API dependencies.
@@ -51,6 +52,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /projects/{id}/targets", s.handleCreateTarget)
 	mux.HandleFunc("POST /projects/{id}/targets/import", s.handleImportTargets)
 	mux.HandleFunc("GET /projects/{id}/targets", s.handleListTargets)
+	mux.HandleFunc("POST /projects/{id}/workflows/asset-discovery", s.handleStartAssetDiscovery)
+	mux.HandleFunc("GET /projects/{id}/assets", s.handleListAssets)
+	mux.HandleFunc("GET /projects/{id}/web-endpoints", s.handleListWebEndpointsByProject)
+	mux.HandleFunc("GET /assets/{id}/ports", s.handleListPorts)
+	mux.HandleFunc("GET /assets/{id}/services", s.handleListServices)
 	mux.HandleFunc("POST /scope-rules", s.handleCreateScopeRule)
 	mux.HandleFunc("GET /scope-rules", s.handleListScopeRules)
 	mux.HandleFunc("POST /scan-plans", s.handleCreateScanPlan)
@@ -752,4 +758,83 @@ func checkTimeWindowAPI(project *models.Project) string {
 		return "不在测试时间窗口内（已过结束时间）"
 	}
 	return ""
+}
+
+// --- Asset Discovery Workflow ---
+
+func (s *Server) handleStartAssetDiscovery(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	project, err := s.queries.GetProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get project failed: %v", err))
+		return
+	}
+	if project == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "project not found"))
+		return
+	}
+	if denyReason := checkTimeWindowAPI(project); denyReason != "" {
+		writeError(w, http.StatusForbidden, errors.New(errors.ErrScopeDenied, denyReason))
+		return
+	}
+
+	wf := workflow.NewAssetDiscoveryWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir)
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		result, err := wf.Run(ctx, projectID)
+		if err != nil {
+			log.Printf("asset discovery workflow failed for project %s: %v", projectID, err)
+		}
+		s.broadcastSSE(map[string]interface{}{
+			"event":      "asset_discovery_complete",
+			"project_id": projectID,
+			"result":     result,
+		})
+	}()
+
+	writeJSON(w, http.StatusAccepted, map[string]string{"status": "started"})
+}
+
+// --- Assets ---
+
+func (s *Server) handleListAssets(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	assets, err := s.queries.ListAssetsByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list assets failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, assets)
+}
+
+func (s *Server) handleListWebEndpointsByProject(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	endpoints, err := s.queries.ListWebEndpointsByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list web endpoints failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, endpoints)
+}
+
+func (s *Server) handleListPorts(w http.ResponseWriter, r *http.Request) {
+	assetID := r.PathValue("id")
+	ports, err := s.queries.ListPortsByAsset(assetID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list ports failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, ports)
+}
+
+func (s *Server) handleListServices(w http.ResponseWriter, r *http.Request) {
+	assetID := r.PathValue("id")
+	services, err := s.queries.ListServicesByAsset(assetID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list services failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, services)
 }

@@ -284,8 +284,23 @@ func (lb *limitedBuffer) Len() int      { return lb.buf.Len() }
 func (lb *limitedBuffer) Bytes() []byte { return lb.buf.Bytes() }
 
 // BuildSubfinderCommand builds a Subfinder command for the given domain.
+// Output goes to stdout as JSONL so the worker can capture it as an artifact.
 func BuildSubfinderCommand(domain string) []string {
-	return []string{"subfinder", "-d", domain, "-oJ", "-o", "subfinder_output.jsonl"}
+	return []string{"subfinder", "-d", domain, "-oJ"}
+}
+
+// BuildHttpxCommand builds an httpx command that reads hosts from a file.
+// hostFile should contain one host per line.
+// Output goes to stdout as JSONL so the worker can capture it as an artifact.
+func BuildHttpxCommand(hostFile string) []string {
+	return []string{"httpx", "-json", "-l", hostFile}
+}
+
+// BuildNaabuCommand builds a Naabu command that reads hosts from a file.
+// hostFile should contain one host per line.
+// Output goes to stdout as JSONL so the worker can capture it as an artifact.
+func BuildNaabuCommand(hostFile string) []string {
+	return []string{"naabu", "-json", "-list", hostFile}
 }
 
 // appendRateLimitArgs appends tool-specific rate limit flags to the argument list.

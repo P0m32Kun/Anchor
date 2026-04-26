@@ -49,9 +49,11 @@
 │   ├── errors/                # 结构化错误模型
 │   ├── health/                # 工具健康检查
 │   ├── models/                # 数据模型
+│   ├── parser/                # 工具输出解析器（Subfinder/httpx/Naabu）
 │   ├── scope/                 # Scope Check 引擎
 │   ├── util/                  # 工具函数
-│   └── worker/                # Worker subprocess runner
+│   ├── worker/                # Worker subprocess runner
+│   └── workflow/              # 资产发现等工作流编排
 ├── frontend/                   # Tauri + React 前端
 │   ├── src/
 │   │   ├── lib/              # API 客户端 + Zustand store
@@ -155,7 +157,7 @@
 |--------|------|------|
 | M0 | 🟢 已完成 | 工程骨架（Scope Check + Worker + 最小闭环） |
 | M1 | 🟢 已完成 | 目标输入 + Scope Check + 执行计划预览 |
-| M2 | ⚪ 待开始 | Subfinder/httpx/Naabu + 资产归一 + RawArtifact |
+| M2 | 🟢 已完成 | Subfinder/httpx/Naabu + 资产归一 + RawArtifact |
 | M3 | ⚪ 待开始 | Nuclei + Finding + confidence/priority 评分 |
 | M4 | ⚪ 待开始 | 验证队列 + Markdown/JSON 报告导出 |
 

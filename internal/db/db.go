@@ -160,6 +160,68 @@ CREATE INDEX IF NOT EXISTS idx_tasks_project ON scan_tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_scope_decisions_project ON scope_decisions(project_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_task ON raw_artifacts(task_id);
 CREATE INDEX IF NOT EXISTS idx_audit_project ON audit_logs(project_id);
+
+CREATE TABLE IF NOT EXISTS assets (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK(type IN ('domain', 'ip', 'url')),
+    value TEXT NOT NULL,
+    normalized_value TEXT NOT NULL,
+    source_tools TEXT,
+    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    tags TEXT,
+    UNIQUE(project_id, normalized_value)
+);
+
+CREATE TABLE IF NOT EXISTS ports (
+    id TEXT PRIMARY KEY,
+    asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    port INTEGER NOT NULL,
+    protocol TEXT DEFAULT 'tcp',
+    state TEXT DEFAULT 'open' CHECK(state IN ('open', 'closed', 'filtered')),
+    source_tool TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(asset_id, port)
+);
+
+CREATE TABLE IF NOT EXISTS services (
+    id TEXT PRIMARY KEY,
+    asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    port_id TEXT REFERENCES ports(id) ON DELETE SET NULL,
+    name TEXT,
+    product TEXT,
+    version TEXT,
+    banner TEXT,
+    confidence INTEGER DEFAULT 0,
+    source_tool TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS web_endpoints (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    scheme TEXT,
+    host TEXT,
+    port INTEGER,
+    path TEXT,
+    status_code INTEGER,
+    title TEXT,
+    technologies TEXT,
+    screenshot_artifact_id TEXT REFERENCES raw_artifacts(id) ON DELETE SET NULL,
+    source_tool TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(project_id, url)
+);
+
+CREATE INDEX IF NOT EXISTS idx_assets_project ON assets(project_id);
+CREATE INDEX IF NOT EXISTS idx_assets_normalized ON assets(project_id, normalized_value);
+CREATE INDEX IF NOT EXISTS idx_ports_asset ON ports(asset_id);
+CREATE INDEX IF NOT EXISTS idx_services_asset ON services(asset_id);
+CREATE INDEX IF NOT EXISTS idx_web_endpoints_asset ON web_endpoints(asset_id);
+CREATE INDEX IF NOT EXISTS idx_web_endpoints_url ON web_endpoints(project_id, url);
 `
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("exec schema: %w", err)

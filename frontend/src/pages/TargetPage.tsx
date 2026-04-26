@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { api, type ImportResult, type DryRunResult, type Project } from "../lib/api";
 import { useStore } from "../lib/store";
 
@@ -329,13 +329,16 @@ export default function TargetPage() {
 
       <section className="bg-white p-4 rounded shadow">
         <h2 className="font-semibold mb-3">操作</h2>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button onClick={runDryRun} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500">
             干运行 (Scope Check)
           </button>
           <button onClick={runSubfinder} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500">
             运行 Subfinder
           </button>
+          <Link to={`/projects/${currentProject.id}/assets`} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-500">
+            查看资产
+          </Link>
         </div>
 
         {dryRunResult && (

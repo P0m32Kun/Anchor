@@ -76,6 +76,57 @@ export interface ScanTask {
   created_at: string;
 }
 
+export interface Asset {
+  id: string;
+  project_id: string;
+  type: string;
+  value: string;
+  normalized_value: string;
+  source_tools?: string[];
+  first_seen: string;
+  last_seen: string;
+  tags?: Record<string, string>;
+}
+
+export interface WebEndpoint {
+  id: string;
+  project_id: string;
+  asset_id: string;
+  url: string;
+  scheme?: string;
+  host?: string;
+  port?: number;
+  path?: string;
+  status_code?: number;
+  title?: string;
+  technologies?: string[];
+  source_tool?: string;
+  created_at: string;
+}
+
+export interface Port {
+  id: string;
+  asset_id: string;
+  port: number;
+  protocol: string;
+  state: string;
+  source_tool?: string;
+  created_at: string;
+}
+
+export interface Service {
+  id: string;
+  asset_id: string;
+  port_id?: string;
+  name?: string;
+  product?: string;
+  version?: string;
+  banner?: string;
+  confidence: number;
+  source_tool?: string;
+  created_at: string;
+}
+
 export interface ToolHealth {
   tool: string;
   binary_path?: string;
@@ -133,4 +184,15 @@ export const api = {
   listToolHealth: () => fetchJSON<ToolHealth[]>("/health/tools"),
 
   runHealthCheck: () => fetchJSON<ToolHealth[]>("/health/check", { method: "POST" }),
+
+  startAssetDiscovery: (projectId: string) =>
+    fetchJSON<{ status: string }>(`/projects/${projectId}/workflows/asset-discovery`, { method: "POST" }),
+
+  listAssets: (projectId: string) => fetchJSON<Asset[]>(`/projects/${projectId}/assets`),
+
+  listWebEndpoints: (projectId: string) => fetchJSON<WebEndpoint[]>(`/projects/${projectId}/web-endpoints`),
+
+  listPorts: (assetId: string) => fetchJSON<Port[]>(`/assets/${assetId}/ports`),
+
+  listServices: (assetId: string) => fetchJSON<Service[]>(`/assets/${assetId}/services`),
 };
