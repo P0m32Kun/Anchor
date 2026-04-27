@@ -42,7 +42,7 @@ type Server struct {
 	mu               sync.Mutex
 }
 
-func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
+func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string, autoStartWorker bool) *Server {
 	scopeEng := scope.NewEngine(queries)
 	s := &Server{
 		queries:    queries,
@@ -56,15 +56,17 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 		taskQueue:   make(map[string]chan *models.ScanTask),
 		taskResults: make(map[string]chan map[string]interface{}),
 	}
-	// Auto-start local worker
-	go func() {
-		time.Sleep(1 * time.Second)
-		if err := s.spawnLocalWorker(); err != nil {
-			log.Printf("[server] auto-start local worker failed: %v", err)
-		}
-	}()
-	// Monitor worker and auto-restart
-	go s.monitorWorker()
+	if autoStartWorker {
+		// Auto-start local worker
+		go func() {
+			time.Sleep(1 * time.Second)
+			if err := s.spawnLocalWorker(); err != nil {
+				log.Printf("[server] auto-start local worker failed: %v", err)
+			}
+		}()
+		// Monitor worker and auto-restart
+		go s.monitorWorker()
+	}
 	return s
 }
 

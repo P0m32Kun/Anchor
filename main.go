@@ -17,6 +17,7 @@ import (
 func main() {
 	workerMode := flag.Bool("worker", false, "run in worker mode")
 	coreURL := flag.String("core-url", "", "core server URL (worker mode)")
+	noLocalWorker := flag.Bool("no-local-worker", false, "do not auto-start local worker (server mode)")
 	flag.Parse()
 
 	dataDir := os.Getenv("ANCHOR_DATA_DIR")
@@ -33,10 +34,10 @@ func main() {
 		return
 	}
 
-	runServer(dataDir)
+	runServer(dataDir, !*noLocalWorker)
 }
 
-func runServer(dataDir string) {
+func runServer(dataDir string, autoStartWorker bool) {
 	sqliteDB, err := db.Open(dataDir)
 	if err != nil {
 		log.Fatal("open db:", err)
@@ -44,7 +45,7 @@ func runServer(dataDir string) {
 	defer sqliteDB.Close()
 
 	queries := db.New(sqliteDB)
-	server := api.NewServer(queries, sqliteDB, dataDir)
+	server := api.NewServer(queries, sqliteDB, dataDir, autoStartWorker)
 
 	mux := http.NewServeMux()
 	server.Register(mux)

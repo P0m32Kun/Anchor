@@ -1,0 +1,31 @@
+# Anchor Core Server Dockerfile
+# Usage: docker build -f Dockerfile.server -t anchor-server .
+#        docker run -p 17421:17421 -v anchor-data:/data anchor-server
+
+FROM golang:1.23-alpine AS builder
+
+RUN apk add --no-cache git gcc musl-dev sqlite-dev
+
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor .
+
+# --- Runtime ---
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates sqlite-libs
+
+WORKDIR /app
+COPY --from=builder /build/anchor .
+
+ENV ANCHOR_DATA_DIR=/data
+ENV ANCHOR_PORT=17421
+
+EXPOSE 17421
+
+VOLUME ["/data"]
+
+ENTRYPOINT ["./anchor", "--no-local-worker"]

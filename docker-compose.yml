@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  # --- Core Server ---
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: anchor-server
+    ports:
+      - "17421:17421"
+    volumes:
+      - anchor-data:/data
+    environment:
+      - ANCHOR_DATA_DIR=/data
+      - ANCHOR_PORT=17421
+    restart: unless-stopped
+    networks:
+      - anchor-net
+
+  # --- Remote Worker (optional, scale with `docker compose up -d --scale worker=3`) ---
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: anchor-worker
+    environment:
+      - ANCHOR_DATA_DIR=/data
+      - ANCHOR_CORE_URL=http://server:17421
+    volumes:
+      - anchor-worker-data:/data
+    restart: unless-stopped
+    networks:
+      - anchor-net
+    depends_on:
+      - server
+    # Remote worker client not yet implemented - this will start in local worker mode
+    profiles: ["worker"]
+
+  # --- Nginx reverse proxy (optional, for HTTPS/domain) ---
+  nginx:
+    image: nginx:alpine
+    container_name: anchor-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - server
+    networks:
+      - anchor-net
+    profiles: ["nginx"]
+
+volumes:
+  anchor-data:
+  anchor-worker-data:
+
+networks:
+  anchor-net:
+    driver: bridge

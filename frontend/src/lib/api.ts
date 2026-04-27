@@ -1,4 +1,5 @@
-export const API_BASE = "http://localhost:17421";
+import { getApiBase } from "./config";
+export const API_BASE = getApiBase();
 
 export class APIError extends Error {
   code?: string;
