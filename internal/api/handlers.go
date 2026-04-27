@@ -125,6 +125,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /events", s.handleSSE)
 	mux.HandleFunc("GET /projects/{id}/reports/export.md", s.handleExportReportMD)
 	mux.HandleFunc("GET /projects/{id}/reports/export.json", s.handleExportReportJSON)
+	mux.HandleFunc("POST /projects/{id}/archive", s.handleCreateArchive)
+	mux.HandleFunc("GET /projects/{id}/archive/download", s.handleDownloadArchive)
 	mux.HandleFunc("GET /tool-templates", s.handleListToolTemplates)
 	mux.HandleFunc("GET /tool-templates/{id}", s.handleGetToolTemplate)
 	mux.HandleFunc("GET /workers", s.handleListWorkers)
