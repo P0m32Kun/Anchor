@@ -1,12 +1,15 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -23,13 +26,16 @@ import (
 
 // Server holds API dependencies.
 type Server struct {
-	queries    *db.Queries
-	rawDB      *sql.DB
-	scopeEng   *scope.Engine
-	worker     *worker.Runner
-	health     *health.Checker
-	dataDir    string
-	sseClients map[string]chan []byte
+	queries          *db.Queries
+	rawDB            *sql.DB
+	scopeEng         *scope.Engine
+	worker           *worker.Runner
+	health           *health.Checker
+	dataDir          string
+	sseClients       map[string]chan []byte
+	workerEndpoint   string
+	workerHTTPClient *http.Client
+	workerProc       *os.Process
 }
 
 func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
@@ -42,8 +48,38 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 		health:     health.NewChecker(queries),
 		dataDir:    dataDir,
 		sseClients: make(map[string]chan []byte),
+		workerHTTPClient: &http.Client{Timeout: 30 * time.Second},
 	}
+	// Auto-start local worker
+	go func() {
+		time.Sleep(1 * time.Second)
+		if err := s.spawnLocalWorker(); err != nil {
+			log.Printf("[server] auto-start local worker failed: %v", err)
+		}
+	}()
+	// Monitor worker and auto-restart
+	go s.monitorWorker()
 	return s
+}
+
+func (s *Server) monitorWorker() {
+	restartCount := 0
+	for {
+		time.Sleep(5 * time.Second)
+		if s.workerProc == nil {
+			if restartCount >= 3 {
+				log.Printf("[server] worker restart limit reached, giving up")
+				return
+			}
+			restartCount++
+			log.Printf("[server] worker not running, restarting (attempt %d/3)", restartCount)
+			if err := s.spawnLocalWorker(); err != nil {
+				log.Printf("[server] worker restart failed: %v", err)
+			}
+		} else {
+			restartCount = 0
+		}
+	}
 }
 
 func (s *Server) Register(mux *http.ServeMux) {
@@ -79,6 +115,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects/{id}/reports/export.json", s.handleExportReportJSON)
 	mux.HandleFunc("GET /tool-templates", s.handleListToolTemplates)
 	mux.HandleFunc("GET /tool-templates/{id}", s.handleGetToolTemplate)
+	mux.HandleFunc("GET /workers", s.handleListWorkers)
+	mux.HandleFunc("POST /workers/local/start", s.handleStartLocalWorker)
+	mux.HandleFunc("POST /workers/local/stop", s.handleStopLocalWorker)
+	mux.HandleFunc("GET /workers/health", s.handleWorkerHealth)
 }
 
 // --- Error helpers ---
@@ -725,6 +765,126 @@ func (s *Server) broadcastSSE(data map[string]interface{}) {
 }
 
 // --- Helpers ---
+
+func (s *Server) spawnLocalWorker() error {
+	if s.workerProc != nil {
+		return nil // already running
+	}
+
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("get executable: %w", err)
+	}
+
+	cmd := exec.Command(execPath, "--worker", "--core-url", "http://localhost:17421")
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("stdout pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start worker: %w", err)
+	}
+
+	s.workerProc = cmd.Process
+
+	// Parse WORKER_READY line
+	scanner := bufio.NewScanner(stdout)
+	if scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "WORKER_READY ") {
+			s.workerEndpoint = strings.TrimPrefix(line, "WORKER_READY ")
+			log.Printf("[server] local worker ready at %s", s.workerEndpoint)
+		}
+	}
+
+	go func() {
+		cmd.Wait()
+		log.Printf("[server] local worker exited")
+		s.workerProc = nil
+		s.workerEndpoint = ""
+	}()
+
+	return nil
+}
+
+func (s *Server) stopLocalWorker() error {
+	if s.workerProc == nil {
+		return nil
+	}
+	if err := s.workerProc.Signal(os.Interrupt); err != nil {
+		return err
+	}
+	time.Sleep(2 * time.Second)
+	if s.workerProc != nil {
+		s.workerProc.Kill()
+	}
+	s.workerProc = nil
+	s.workerEndpoint = ""
+	return nil
+}
+
+func (s *Server) handleListWorkers(w http.ResponseWriter, r *http.Request) {
+	workers := []map[string]interface{}{}
+	status := "stopped"
+	if s.workerProc != nil {
+		status = "running"
+	}
+	workers = append(workers, map[string]interface{}{
+		"id":       "local",
+		"name":     "本地 Worker",
+		"mode":     "local",
+		"status":   status,
+		"endpoint": s.workerEndpoint,
+	})
+	writeJSON(w, http.StatusOK, workers)
+}
+
+func (s *Server) handleStartLocalWorker(w http.ResponseWriter, r *http.Request) {
+	if err := s.spawnLocalWorker(); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "spawn worker: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "starting"})
+}
+
+func (s *Server) handleStopLocalWorker(w http.ResponseWriter, r *http.Request) {
+	if err := s.stopLocalWorker(); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "stop worker: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
+}
+
+func (s *Server) handleWorkerHealth(w http.ResponseWriter, r *http.Request) {
+	if s.workerEndpoint == "" {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"status": "no_worker",
+			"tools":  []map[string]string{},
+		})
+		return
+	}
+
+	resp, err := s.workerHTTPClient.Get(s.workerEndpoint + "/health")
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"status": "unreachable",
+			"error":  err.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	var health map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"status": "error",
+			"error":  err.Error(),
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, health)
+}
 
 func (s *Server) handleListToolTemplates(w http.ResponseWriter, r *http.Request) {
 	templates, err := s.queries.ListToolTemplates()
