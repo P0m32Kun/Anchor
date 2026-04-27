@@ -77,6 +77,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /events", s.handleSSE)
 	mux.HandleFunc("GET /projects/{id}/reports/export.md", s.handleExportReportMD)
 	mux.HandleFunc("GET /projects/{id}/reports/export.json", s.handleExportReportJSON)
+	mux.HandleFunc("GET /tool-templates", s.handleListToolTemplates)
+	mux.HandleFunc("GET /tool-templates/{id}", s.handleGetToolTemplate)
 }
 
 // --- Error helpers ---
@@ -723,6 +725,29 @@ func (s *Server) broadcastSSE(data map[string]interface{}) {
 }
 
 // --- Helpers ---
+
+func (s *Server) handleListToolTemplates(w http.ResponseWriter, r *http.Request) {
+	templates, err := s.queries.ListToolTemplates()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New(errors.ErrInternal, err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, templates)
+}
+
+func (s *Server) handleGetToolTemplate(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	template, err := s.queries.GetToolTemplate(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New(errors.ErrInternal, err.Error()))
+		return
+	}
+	if template == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "tool-template not found: "+id))
+		return
+	}
+	writeJSON(w, http.StatusOK, template)
+}
 
 func defaultToolTimeout(tool string) time.Duration {
 	switch strings.ToLower(tool) {

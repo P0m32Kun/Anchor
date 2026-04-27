@@ -726,3 +726,82 @@ func (q *Queries) ListEvidenceByFinding(findingID string) ([]*models.Evidence, e
 	}
 	return list, rows.Err()
 }
+
+// --- ToolTemplate ---
+
+func (q *Queries) ListToolTemplates() ([]*models.ToolTemplate, error) {
+	rows, err := q.db.Query(`
+		SELECT id, name, description, profile_type, tools_json, default_max_concurrency, screenshot_enabled, directory_bruteforce_enabled, nuclei_severity_filter, created_at, updated_at
+		FROM tool_templates ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.ToolTemplate
+	for rows.Next() {
+		t := &models.ToolTemplate{}
+		if err := rows.Scan(
+			&t.ID, &t.Name, &t.Description, &t.ProfileType, &t.ToolsJSON,
+			&t.DefaultMaxConcurrency, &t.ScreenshotEnabled, &t.DirectoryBruteforceEnabled,
+			&t.NucleiSeverityFilter, &t.CreatedAt, &t.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, t)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) GetToolTemplate(id string) (*models.ToolTemplate, error) {
+	row := q.db.QueryRow(`
+		SELECT id, name, description, profile_type, tools_json, default_max_concurrency, screenshot_enabled, directory_bruteforce_enabled, nuclei_severity_filter, created_at, updated_at
+		FROM tool_templates WHERE id = ?`, id)
+	t := &models.ToolTemplate{}
+	if err := row.Scan(
+		&t.ID, &t.Name, &t.Description, &t.ProfileType, &t.ToolsJSON,
+		&t.DefaultMaxConcurrency, &t.ScreenshotEnabled, &t.DirectoryBruteforceEnabled,
+		&t.NucleiSeverityFilter, &t.CreatedAt, &t.UpdatedAt,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return t, nil
+}
+
+// --- ScanStep ---
+
+func (q *Queries) CreateScanStep(s *models.ScanStep) error {
+	_, err := q.db.Exec(`
+		INSERT INTO scan_steps (id, task_id, name, status, started_at, finished_at, error_code, error_summary, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.ID, s.TaskID, s.Name, s.Status, s.StartedAt, s.FinishedAt, s.ErrorCode, s.ErrorSummary, s.CreatedAt)
+	return err
+}
+
+func (q *Queries) UpdateScanStepStatus(id string, status models.StepStatus, finishedAt *time.Time, errorCode, errorSummary string) error {
+	_, err := q.db.Exec(`
+		UPDATE scan_steps SET status = ?, finished_at = ?, error_code = ?, error_summary = ? WHERE id = ?`,
+		status, finishedAt, errorCode, errorSummary, id)
+	return err
+}
+
+func (q *Queries) ListScanStepsByTask(taskID string) ([]*models.ScanStep, error) {
+	rows, err := q.db.Query(`
+		SELECT id, task_id, name, status, started_at, finished_at, error_code, error_summary, created_at
+		FROM scan_steps WHERE task_id = ? ORDER BY created_at`, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.ScanStep
+	for rows.Next() {
+		s := &models.ScanStep{}
+		if err := rows.Scan(&s.ID, &s.TaskID, &s.Name, &s.Status, &s.StartedAt, &s.FinishedAt, &s.ErrorCode, &s.ErrorSummary, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, s)
+	}
+	return list, rows.Err()
+}

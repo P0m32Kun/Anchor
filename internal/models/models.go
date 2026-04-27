@@ -500,3 +500,104 @@ func ToJSON(v interface{}) json.RawMessage {
 	b, _ := json.Marshal(v)
 	return b
 }
+
+// --- ToolTemplate ---
+
+type ToolTemplate struct {
+	ID                       string    `json:"id" db:"id"`
+	Name                     string    `json:"name" db:"name"`
+	Description              string    `json:"description" db:"description"`
+	ProfileType              string    `json:"profile_type" db:"profile_type"`
+	ToolsJSON                string    `json:"tools_json" db:"tools_json"`
+	DefaultMaxConcurrency    int       `json:"default_max_concurrency" db:"default_max_concurrency"`
+	ScreenshotEnabled        bool      `json:"screenshot_enabled" db:"screenshot_enabled"`
+	DirectoryBruteforceEnabled bool    `json:"directory_bruteforce_enabled" db:"directory_bruteforce_enabled"`
+	NucleiSeverityFilter     string    `json:"nuclei_severity_filter" db:"nuclei_severity_filter"`
+	CreatedAt                time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt                time.Time `json:"updated_at" db:"updated_at"`
+}
+
+type TemplateTool struct {
+	Tool    string `json:"tool"`
+	Enabled bool   `json:"enabled"`
+	Rate    int    `json:"rate"`
+}
+
+func (t *ToolTemplate) Tools() ([]TemplateTool, error) {
+	var tools []TemplateTool
+	if err := json.Unmarshal([]byte(t.ToolsJSON), &tools); err != nil {
+		return nil, err
+	}
+	return tools, nil
+}
+
+// --- ScanStep ---
+
+type StepName string
+
+const (
+	StepScopeCheck      StepName = "scope_check"
+	StepPrepareInput    StepName = "prepare_input"
+	StepRunTool         StepName = "run_tool"
+	StepCollectArtifacts StepName = "collect_artifacts"
+	StepParseOutput     StepName = "parse_output"
+	StepNormalizeResult StepName = "normalize_result"
+	StepScoreResult     StepName = "score_result"
+	StepCleanup         StepName = "cleanup"
+)
+
+type StepStatus string
+
+const (
+	StepPending   StepStatus = "pending"
+	StepRunning   StepStatus = "running"
+	StepCompleted StepStatus = "completed"
+	StepFailed    StepStatus = "failed"
+	StepSkipped   StepStatus = "skipped"
+)
+
+type ScanStep struct {
+	ID           string     `json:"id" db:"id"`
+	TaskID       string     `json:"task_id" db:"task_id"`
+	Name         StepName   `json:"name" db:"name"`
+	Status       StepStatus `json:"status" db:"status"`
+	StartedAt    *time.Time `json:"started_at" db:"started_at"`
+	FinishedAt   *time.Time `json:"finished_at" db:"finished_at"`
+	ErrorCode    string     `json:"error_code" db:"error_code"`
+	ErrorSummary string     `json:"error_summary" db:"error_summary"`
+	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
+}
+
+func (s StepStatus) Value() (driver.Value, error) { return string(s), nil }
+func (s *StepStatus) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	switch v := value.(type) {
+	case string:
+		*s = StepStatus(v)
+		return nil
+	case []byte:
+		*s = StepStatus(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot scan %T into StepStatus", value)
+	}
+}
+
+func (n StepName) Value() (driver.Value, error) { return string(n), nil }
+func (n *StepName) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	switch v := value.(type) {
+	case string:
+		*n = StepName(v)
+		return nil
+	case []byte:
+		*n = StepName(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot scan %T into StepName", value)
+	}
+}

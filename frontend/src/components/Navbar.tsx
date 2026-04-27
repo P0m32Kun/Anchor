@@ -1,8 +1,14 @@
 import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
-  { path: "/", label: "项目" },
-  { path: "/runs", label: "运行" },
+  { path: "/", label: "Dashboard" },
+  { path: "/targets", label: "Targets" },
+  { path: "/assets", label: "Assets" },
+  { path: "/runs", label: "Runs" },
+  { path: "/findings", label: "Findings" },
+  { path: "/reports", label: "Reports" },
+  { path: "/workers", label: "Workers" },
+  { path: "/settings", label: "Settings" },
 ];
 
 export function Navbar() {
@@ -33,29 +39,31 @@ export function Navbar() {
           Anchor
         </Link>
 
-        {navItems.map((item) => {
-          const isActive =
-            item.path === "/"
-              ? location.pathname === "/"
-              : location.pathname.startsWith(item.path);
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              aria-current={isActive ? "page" : undefined}
-              className={`relative px-3.5 py-2 text-[13px] font-medium rounded-lg transition-all duration-200 ${
-                isActive
-                  ? "text-text-primary bg-white/[0.06]"
-                  : "text-text-tertiary hover:text-text-secondary hover:bg-white/[0.04]"
-              }`}
-            >
-              {item.label}
-              {isActive && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-brand-primary rounded-full shadow-[0_0_8px_rgba(47,129,247,0.6)]" />
-              )}
-            </Link>
-          );
-        })}
+        <div className="flex items-center gap-0.5 overflow-x-auto">
+          {navItems.map((item) => {
+            const isActive =
+              item.path === "/"
+                ? location.pathname === "/"
+                : location.pathname.startsWith(item.path);
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                aria-current={isActive ? "page" : undefined}
+                className={`relative px-3 py-2 text-[13px] font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
+                  isActive
+                    ? "text-text-primary bg-white/[0.06]"
+                    : "text-text-tertiary hover:text-text-secondary hover:bg-white/[0.04]"
+                }`}
+              >
+                {item.label}
+                {isActive && (
+                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-brand-primary rounded-full shadow-[0_0_8px_rgba(47,129,247,0.6)]" />
+                )}
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

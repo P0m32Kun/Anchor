@@ -258,6 +258,37 @@ CREATE INDEX IF NOT EXISTS idx_findings_project ON findings(project_id);
 CREATE INDEX IF NOT EXISTS idx_findings_dedup ON findings(project_id, dedup_key);
 CREATE INDEX IF NOT EXISTS idx_findings_status ON findings(status);
 CREATE INDEX IF NOT EXISTS idx_evidence_finding ON evidence(finding_id);
+
+-- v0.2 M0: tool_templates
+CREATE TABLE IF NOT EXISTS tool_templates (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL,
+	description TEXT,
+	profile_type TEXT NOT NULL CHECK(profile_type IN ('external','internal','restricted','lab')),
+	tools_json TEXT NOT NULL,           -- [{"tool":"subfinder","enabled":true,"rate":100}]
+	default_max_concurrency INTEGER DEFAULT 10,
+	screenshot_enabled BOOLEAN DEFAULT FALSE,
+	directory_bruteforce_enabled BOOLEAN DEFAULT FALSE,
+	nuclei_severity_filter TEXT DEFAULT 'critical,high',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- v0.2 M0: scan_steps
+CREATE TABLE IF NOT EXISTS scan_steps (
+	id TEXT PRIMARY KEY,
+	task_id TEXT NOT NULL REFERENCES scan_tasks(id) ON DELETE CASCADE,
+	name TEXT NOT NULL CHECK(name IN ('scope_check','prepare_input','run_tool','collect_artifacts','parse_output','normalize_result','score_result','cleanup')),
+	status TEXT DEFAULT 'pending' CHECK(status IN ('pending','running','completed','failed','skipped')),
+	started_at DATETIME,
+	finished_at DATETIME,
+	error_code TEXT,
+	error_summary TEXT,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_scan_steps_task ON scan_steps(task_id);
+CREATE INDEX IF NOT EXISTS idx_tool_templates_profile ON tool_templates(profile_type);
 `
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("exec schema: %w", err)
@@ -266,6 +297,11 @@ CREATE INDEX IF NOT EXISTS idx_evidence_finding ON evidence(finding_id);
 	// M1 migration: add rate_limit column to projects if it doesn't exist.
 	if err := migrateAddRateLimit(db); err != nil {
 		return fmt.Errorf("migrate rate_limit: %w", err)
+	}
+
+	// v0.2 migration
+	if err := migrateV02(db); err != nil {
+		return fmt.Errorf("migrate v0.2: %w", err)
 	}
 
 	return nil
@@ -285,6 +321,79 @@ func migrateAddRateLimit(db *sql.DB) error {
 	}
 	if _, err := db.Exec(`ALTER TABLE projects ADD COLUMN rate_limit INTEGER DEFAULT 0`); err != nil {
 		return fmt.Errorf("add rate_limit column: %w", err)
+	}
+	return nil
+}
+
+// migrateV02 handles v0.2 schema migrations.
+func migrateV02(db *sql.DB) error {
+	// Add steps_json and tool_template_id to scan_tasks
+	cols := []struct {
+		table string
+		name  string
+		def   string
+	}{
+		{"scan_tasks", "steps_json", "TEXT"},
+		{"scan_tasks", "tool_template_id", "TEXT"},
+		{"findings", "raw_request", "TEXT"},
+		{"findings", "raw_response", "TEXT"},
+		{"findings", "matched_template", "TEXT"},
+	}
+	for _, col := range cols {
+		var exists bool
+		err := db.QueryRow(
+			`SELECT 1 FROM pragma_table_info(?) WHERE name = ?`,
+			col.table, col.name,
+		).Scan(&exists)
+		if err == nil && exists {
+			continue
+		}
+		if _, err := db.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN %s %s`, col.table, col.name, col.def)); err != nil {
+			return fmt.Errorf("add column %s to %s: %w", col.name, col.table, err)
+		}
+	}
+
+	// Insert default tool templates if none exist
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM tool_templates`).Scan(&count); err != nil {
+		return fmt.Errorf("count tool_templates: %w", err)
+	}
+	if count == 0 {
+		templates := []struct {
+			id, name, desc, profile, tools, severity string
+			concurrency                              int
+			screenshot                               bool
+		}{
+			{
+				id: "external-quick", name: "外网快速摸底", desc: "轻量端口扫描 + 存活探测 + 高危漏洞",
+				profile: "external", tools: `[{"tool":"naabu","enabled":true,"rate":1000},{"tool":"httpx","enabled":true,"rate":50},{"tool":"nuclei","enabled":true,"rate":50}]`,
+				severity: "critical,high", concurrency: 10, screenshot: false,
+			},
+			{
+				id: "external-standard", name: "外网标准初筛", desc: "完整资产发现 + 标准漏洞扫描",
+				profile: "external", tools: `[{"tool":"subfinder","enabled":true,"rate":100},{"tool":"naabu","enabled":true,"rate":1000},{"tool":"httpx","enabled":true,"rate":50},{"tool":"nuclei","enabled":true,"rate":50}]`,
+				severity: "critical,high,medium", concurrency: 20, screenshot: true,
+			},
+			{
+				id: "internal-slow", name: "内网慢扫", desc: "低并发内网巡检，禁用高影响模板",
+				profile: "internal", tools: `[{"tool":"naabu","enabled":true,"rate":100},{"tool":"httpx","enabled":true,"rate":10},{"tool":"nuclei","enabled":true,"rate":10}]`,
+				severity: "critical,high", concurrency: 5, screenshot: false,
+			},
+			{
+				id: "retest", name: "复测模式", desc: "只扫描已确认 Finding 对应目标",
+				profile: "external", tools: `[{"tool":"nuclei","enabled":true,"rate":10}]`,
+				severity: "critical,high,medium", concurrency: 5, screenshot: false,
+			},
+		}
+		for _, t := range templates {
+			_, err := db.Exec(`
+				INSERT INTO tool_templates (id, name, description, profile_type, tools_json, default_max_concurrency, screenshot_enabled, nuclei_severity_filter)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`, t.id, t.name, t.desc, t.profile, t.tools, t.concurrency, t.screenshot, t.severity)
+			if err != nil {
+				return fmt.Errorf("insert template %s: %w", t.id, err)
+			}
+		}
 	}
 	return nil
 }
