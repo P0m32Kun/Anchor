@@ -1002,3 +1002,36 @@ func (q *Queries) ListScreenshotsByProject(projectID string) ([]*models.Screensh
 	}
 	return list, rows.Err()
 }
+
+// --- RetestRun ---
+
+func (q *Queries) CreateRetestRun(r *models.RetestRun) error {
+	_, err := q.db.Exec(`
+		INSERT INTO retest_runs (id, finding_id, task_id, result, evidence_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		r.ID, r.FindingID, r.TaskID, r.Result, r.EvidenceID, r.CreatedAt)
+	return err
+}
+
+func (q *Queries) ListRetestRunsByFinding(findingID string) ([]*models.RetestRun, error) {
+	rows, err := q.db.Query(`
+		SELECT id, finding_id, task_id, result, evidence_id, created_at
+		FROM retest_runs WHERE finding_id = ? ORDER BY created_at DESC`, findingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.RetestRun
+	for rows.Next() {
+		r := &models.RetestRun{}
+		var evidenceID sql.NullString
+		if err := rows.Scan(&r.ID, &r.FindingID, &r.TaskID, &r.Result, &evidenceID, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		if evidenceID.Valid {
+			r.EvidenceID = &evidenceID.String
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}

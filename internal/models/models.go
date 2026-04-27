@@ -401,6 +401,9 @@ type Finding struct {
 	Status         FindingStatus   `json:"status" db:"status"`
 	Summary        string          `json:"summary" db:"summary"`
 	Remediation    string          `json:"remediation" db:"remediation"`
+	RawRequest      string          `json:"raw_request" db:"raw_request"`
+	RawResponse     string          `json:"raw_response" db:"raw_response"`
+	MatchedTemplate string          `json:"matched_template" db:"matched_template"`
 	CreatedAt      time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at" db:"updated_at"`
 }
@@ -695,4 +698,24 @@ type Screenshot struct {
 	Width         int       `json:"width" db:"width"`
 	Height        int       `json:"height" db:"height"`
 	TakenAt       time.Time `json:"taken_at" db:"taken_at"`
+}
+
+// --- RetestRun ---
+
+type RetestResult string
+
+const (
+	RetestStillPresent   RetestResult = "still_present"
+	RetestFixed          RetestResult = "fixed"
+	RetestInconclusive   RetestResult = "inconclusive"
+	RetestFailedToTest   RetestResult = "failed_to_test"
+)
+
+type RetestRun struct {
+	ID         string       `json:"id" db:"id"`
+	FindingID  string       `json:"finding_id" db:"finding_id"`
+	TaskID     string       `json:"task_id" db:"task_id"`
+	Result     RetestResult `json:"result" db:"result"`
+	EvidenceID *string      `json:"evidence_id" db:"evidence_id"`
+	CreatedAt  time.Time    `json:"created_at" db:"created_at"`
 }
