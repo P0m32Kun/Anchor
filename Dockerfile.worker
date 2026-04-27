@@ -2,7 +2,7 @@
 # Usage: docker build -f Dockerfile.worker -t anchor-worker .
 #        docker run -e ANCHOR_CORE_URL=http://server:17421 anchor-worker
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 RUN apk add --no-cache git gcc musl-dev sqlite-dev
 
@@ -13,30 +13,21 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor .
 
-# --- Install security tools ---
-RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-RUN go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
-RUN go install github.com/projectdiscovery/httpx/cmd/httpx@latest
-RUN go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-RUN nuclei -update-templates
+# --- Install security tools (optional, can be mounted via volume) ---
+# NOTE: For E2E testing, tools are not required in the image.
+# In production, mount /usr/local/bin or install here.
 
 # --- Runtime ---
 FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates libpcap-dev chromium
+RUN apk add --no-cache ca-certificates sqlite-libs
 
 WORKDIR /app
 COPY --from=builder /build/anchor .
-COPY --from=builder /go/bin/subfinder /usr/local/bin/
-COPY --from=builder /go/bin/naabu /usr/local/bin/
-COPY --from=builder /go/bin/httpx /usr/local/bin/
-COPY --from=builder /go/bin/nuclei /usr/local/bin/
-COPY --from=builder /root/nuclei-templates /root/nuclei-templates
 
 ENV ANCHOR_DATA_DIR=/data
 ENV ANCHOR_CORE_URL=""
 
 VOLUME ["/data"]
 
-# Remote worker mode (registration + heartbeat + polling not yet implemented)
-ENTRYPOINT ["sh", "-c", "./anchor --worker ${ANCHOR_CORE_URL:+--core-url=$ANCHOR_CORE_URL}"]
+ENTRYPOINT ["./anchor", "--worker"]
