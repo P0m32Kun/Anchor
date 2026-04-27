@@ -901,3 +901,104 @@ func (q *Queries) ListWorkerHealthChecks(workerID string) ([]*models.WorkerHealt
 	}
 	return list, rows.Err()
 }
+
+// --- Run ---
+
+func (q *Queries) CreateRun(r *models.Run) error {
+	_, err := q.db.Exec(`
+		INSERT INTO runs (id, project_id, tool_template_id, name, status, started_at, finished_at, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ProjectID, r.ToolTemplateID, r.Name, r.Status, r.StartedAt, r.FinishedAt, r.CreatedAt)
+	return err
+}
+
+func (q *Queries) GetRun(id string) (*models.Run, error) {
+	row := q.db.QueryRow(`
+		SELECT id, project_id, tool_template_id, name, status, started_at, finished_at, created_at
+		FROM runs WHERE id = ?`, id)
+	r := &models.Run{}
+	var templateID sql.NullString
+	var startedAt, finishedAt sql.NullTime
+	if err := row.Scan(&r.ID, &r.ProjectID, &templateID, &r.Name, &r.Status, &startedAt, &finishedAt, &r.CreatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if templateID.Valid {
+		r.ToolTemplateID = &templateID.String
+	}
+	if startedAt.Valid {
+		r.StartedAt = &startedAt.Time
+	}
+	if finishedAt.Valid {
+		r.FinishedAt = &finishedAt.Time
+	}
+	return r, nil
+}
+
+func (q *Queries) ListRunsByProject(projectID string) ([]*models.Run, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, tool_template_id, name, status, started_at, finished_at, created_at
+		FROM runs WHERE project_id = ? ORDER BY created_at DESC`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.Run
+	for rows.Next() {
+		r := &models.Run{}
+		var templateID sql.NullString
+		var startedAt, finishedAt sql.NullTime
+		if err := rows.Scan(&r.ID, &r.ProjectID, &templateID, &r.Name, &r.Status, &startedAt, &finishedAt, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		if templateID.Valid {
+			r.ToolTemplateID = &templateID.String
+		}
+		if startedAt.Valid {
+			r.StartedAt = &startedAt.Time
+		}
+		if finishedAt.Valid {
+			r.FinishedAt = &finishedAt.Time
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+// --- Screenshot ---
+
+func (q *Queries) CreateScreenshot(s *models.Screenshot) error {
+	_, err := q.db.Exec(`
+		INSERT INTO screenshots (id, project_id, asset_id, task_id, url, original_path, thumbnail_path, width, height, taken_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.ID, s.ProjectID, s.AssetID, s.TaskID, s.URL, s.OriginalPath, s.ThumbnailPath, s.Width, s.Height, s.TakenAt)
+	return err
+}
+
+func (q *Queries) ListScreenshotsByProject(projectID string) ([]*models.Screenshot, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, asset_id, task_id, url, original_path, thumbnail_path, width, height, taken_at
+		FROM screenshots WHERE project_id = ? ORDER BY taken_at DESC`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.Screenshot
+	for rows.Next() {
+		s := &models.Screenshot{}
+		var assetID, taskID sql.NullString
+		if err := rows.Scan(&s.ID, &s.ProjectID, &assetID, &taskID, &s.URL, &s.OriginalPath, &s.ThumbnailPath, &s.Width, &s.Height, &s.TakenAt); err != nil {
+			return nil, err
+		}
+		if assetID.Valid {
+			s.AssetID = &assetID.String
+		}
+		if taskID.Valid {
+			s.TaskID = &taskID.String
+		}
+		list = append(list, s)
+	}
+	return list, rows.Err()
+}

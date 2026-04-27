@@ -320,6 +320,35 @@ CREATE TABLE IF NOT EXISTS worker_health_checks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_worker_health_worker ON worker_health_checks(worker_id);
+
+-- v0.2 M3: runs
+CREATE TABLE IF NOT EXISTS runs (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+	tool_template_id TEXT REFERENCES tool_templates(id) ON DELETE SET NULL,
+	name TEXT NOT NULL,
+	status TEXT DEFAULT 'pending' CHECK(status IN ('pending','running','completed','failed','cancelled')),
+	started_at DATETIME,
+	finished_at DATETIME,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- v0.2 M3: screenshots
+CREATE TABLE IF NOT EXISTS screenshots (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+	asset_id TEXT REFERENCES assets(id) ON DELETE SET NULL,
+	task_id TEXT REFERENCES scan_tasks(id) ON DELETE SET NULL,
+	url TEXT NOT NULL,
+	original_path TEXT NOT NULL,
+	thumbnail_path TEXT NOT NULL,
+	width INTEGER,
+	height INTEGER,
+	taken_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_screenshots_project ON screenshots(project_id);
 `
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("exec schema: %w", err)

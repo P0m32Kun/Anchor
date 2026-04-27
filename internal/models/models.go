@@ -658,3 +658,41 @@ type WorkerHealthCheck struct {
 	Details   string            `json:"details" db:"details"`
 	CheckedAt time.Time         `json:"checked_at" db:"checked_at"`
 }
+
+// --- Run ---
+
+type RunStatus string
+
+const (
+	RunPending    RunStatus = "pending"
+	RunRunning    RunStatus = "running"
+	RunCompleted  RunStatus = "completed"
+	RunFailed     RunStatus = "failed"
+	RunCancelled  RunStatus = "cancelled"
+)
+
+type Run struct {
+	ID             string     `json:"id" db:"id"`
+	ProjectID      string     `json:"project_id" db:"project_id"`
+	ToolTemplateID *string    `json:"tool_template_id" db:"tool_template_id"`
+	Name           string     `json:"name" db:"name"`
+	Status         RunStatus  `json:"status" db:"status"`
+	StartedAt      *time.Time `json:"started_at" db:"started_at"`
+	FinishedAt     *time.Time `json:"finished_at" db:"finished_at"`
+	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
+}
+
+// --- Screenshot ---
+
+type Screenshot struct {
+	ID            string    `json:"id" db:"id"`
+	ProjectID     string    `json:"project_id" db:"project_id"`
+	AssetID       *string   `json:"asset_id" db:"asset_id"`
+	TaskID        *string   `json:"task_id" db:"task_id"`
+	URL           string    `json:"url" db:"url"`
+	OriginalPath  string    `json:"original_path" db:"original_path"`
+	ThumbnailPath string    `json:"thumbnail_path" db:"thumbnail_path"`
+	Width         int       `json:"width" db:"width"`
+	Height        int       `json:"height" db:"height"`
+	TakenAt       time.Time `json:"taken_at" db:"taken_at"`
+}
