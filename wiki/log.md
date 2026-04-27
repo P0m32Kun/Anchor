@@ -1,6 +1,24 @@
-# SecBench 变更日志
+# Anchor 变更日志
 
 > 按时间倒序记录项目关键变更、决策和里程碑。
+
+---
+
+## 2026-04-27
+
+### M4 报告导出 + 端到端验收完成 ✅
+- 新增 `internal/report/` 包：Markdown 报告（8 章节模板）+ JSON 数据包生成
+- 新增 API：GET /projects/:id/reports/export.{md,json}（scope 校验）
+- 新增前端 ReportsPage：Finding 列表预览、Markdown 实时渲染（Prism.js）、JSON 下载
+- 新增 Finding 关联查询：ListFindingsWithEvidence（含 Evidence 列表）
+- 修复：ListEvidenceByFinding NULL `created_by` Scan 崩溃（sql.NullString）
+- 修复：Markdown 表格转义（`|` → `\|`）
+- 修复：前端 XSS 风险（`dangerouslySetInnerHTML` → `dompurify` 净化）
+- 端到端验收：9 个目标 → 86 条资产 → 人工确认 Finding → 报告导出
+- 项目模块路径重命名：`github.com/P0m32Kun/Anchor`
+- `go build` ✅ / `go test` ✅ / `go vet` ✅ / `npx tsc --noEmit` ✅
+
+**Tag:** `v0.1.0-m4`
 
 ---
 

@@ -4,7 +4,7 @@
 ✅ 已决策（2026-04-26）
 
 ## 背景
-SecBench 是 Tauri 桌面应用 + Go 本地服务的架构。需要确定前端（Tauri/React）与后端（Go）之间的通信方式。
+Anchor 是 Tauri 桌面应用 + Go 本地服务的架构。需要确定前端（Tauri/React）与后端（Go）之间的通信方式。
 
 ## 决策
 **MVP 使用 HTTP API (:8080)，后续考虑迁移到 Tauri Command 模式。**

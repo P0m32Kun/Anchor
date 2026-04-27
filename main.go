@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	dataDir := os.Getenv("SECBENCH_DATA_DIR")
+	dataDir := os.Getenv("ANCHOR_DATA_DIR")
 	if dataDir == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -32,9 +32,9 @@ func main() {
 	mux := http.NewServeMux()
 	server.Register(mux)
 
-	port := os.Getenv("SECBENCH_PORT")
+	port := os.Getenv("ANCHOR_PORT")
 	if port == "" {
-		port = "8080"
+		port = "17421"
 	}
 
 	log.Printf("anchor server listening on :%s", port)

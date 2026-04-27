@@ -12,49 +12,49 @@ function ProjectInfo({ project }: { project: Project }) {
   const isActive = (!start || start <= now) && (!end || end >= now);
 
   return (
-    <section className="bg-white p-4 rounded shadow">
+    <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
       <h2 className="font-semibold mb-2">项目信息</h2>
       <div className="text-sm space-y-1">
-        <div className="text-gray-500">
+        <div className="text-zinc-400">
           <span className="font-medium">组织:</span> {project.organization || "—"}
         </div>
         {project.purpose && (
-          <div className="text-gray-500">
+          <div className="text-zinc-400">
             <span className="font-medium">目的:</span> {project.purpose}
           </div>
         )}
         {start && end ? (
           <div className="flex items-center gap-2">
-            <span className="text-gray-500">
+            <span className="text-zinc-400">
               时间窗口: {start.toLocaleDateString()} ~ {end.toLocaleDateString()}
             </span>
             {isExpired && (
-              <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">
+              <span className="text-xs bg-red-500/15 text-red-300 px-2 py-0.5 rounded font-medium">
                 已过期
               </span>
             )}
             {isPending && (
-              <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded font-medium">
+              <span className="text-xs bg-yellow-500/15 text-yellow-300 px-2 py-0.5 rounded font-medium">
                 未开始
               </span>
             )}
             {isActive && (
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">
+              <span className="text-xs bg-green-500/15 text-green-300 px-2 py-0.5 rounded font-medium">
                 进行中
               </span>
             )}
           </div>
         ) : (
-          <div className="text-gray-400 text-xs">未配置时间窗口 (始终可用)</div>
+          <div className="text-zinc-500 text-xs">未配置时间窗口 (始终可用)</div>
         )}
-        <div className="text-gray-500">
+        <div className="text-zinc-400">
           <span className="font-medium">速率限制:</span>{" "}
           {project.rate_limit !== undefined && project.rate_limit > 0
             ? `${project.rate_limit} 包/秒`
             : "无限制"}
         </div>
         {project.default_profile && (
-          <div className="text-gray-500">
+          <div className="text-zinc-400">
             <span className="font-medium">默认 Profile:</span> {project.default_profile}
           </div>
         )}
@@ -132,15 +132,15 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
           }}
         />
         {importing ? (
-          <div className="text-gray-500">
+          <div className="text-zinc-400">
             <div className="animate-pulse mb-2">⏳</div>
             正在导入...
           </div>
         ) : (
-          <div className="text-gray-500">
+          <div className="text-zinc-400">
             <div className="text-2xl mb-2">📂</div>
             <div className="font-medium">点击上传 或将文件拖拽到此处</div>
-            <div className="text-xs text-gray-400 mt-1">支持 .txt / .csv 格式，每行一个目标</div>
+            <div className="text-xs text-zinc-500 mt-1">支持 .txt / .csv 格式，每行一个目标</div>
           </div>
         )}
       </div>
@@ -165,7 +165,7 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
               </div>
               <ul className="text-xs space-y-0.5 max-h-32 overflow-auto">
                 {result.denied_targets.map((d, i) => (
-                  <li key={i} className="text-gray-600">
+                  <li key={i} className="text-zinc-400">
                     <code className="bg-yellow-50 px-1 rounded">{d.value}</code>
                     <span className="text-yellow-700 ml-2">— {d.reason}</span>
                   </li>
@@ -181,24 +181,27 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
 
 function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
   const colors: Record<string, string> = {
-    green: "bg-green-100 text-green-700",
-    gray: "bg-gray-200 text-gray-600",
-    yellow: "bg-yellow-100 text-yellow-700",
-    red: "bg-red-100 text-red-700",
+    green: "bg-green-500/15 text-green-300",
+    gray: "bg-gray-200 text-zinc-400",
+    yellow: "bg-yellow-500/15 text-yellow-300",
+    red: "bg-red-500/15 text-red-300",
   };
   return (
     <div className="flex items-center gap-1">
       <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[color] || colors.gray}`}>
         {value}
       </span>
-      <span className="text-xs text-gray-500">{label}</span>
+      <span className="text-xs text-zinc-400">{label}</span>
     </div>
   );
 }
 
 export default function TargetPage() {
   const { id } = useParams<{ id: string }>();
-  const { targets, setTargets, currentProject, setCurrentProject } = useStore();
+  const targets = useStore((state) => state.targets) ?? [];
+  const setTargets = useStore((state) => state.setTargets);
+  const currentProject = useStore((state) => state.currentProject);
+  const setCurrentProject = useStore((state) => state.setCurrentProject);
   const [targetValue, setTargetValue] = useState("");
   const [targetType, setTargetType] = useState("domain");
   const [scopeAction, setScopeAction] = useState<"include" | "exclude">("include");
@@ -207,7 +210,7 @@ export default function TargetPage() {
 
   const loadTargets = useCallback(() => {
     if (!id) return;
-    api.listTargets(id).then(setTargets).catch(console.error);
+    api.listTargets(id).then((data) => setTargets(data ?? [])).catch(console.error);
   }, [id, setTargets]);
 
   useEffect(() => {
@@ -267,12 +270,12 @@ export default function TargetPage() {
 
       <ProjectInfo project={currentProject} />
 
-      <section className="bg-white p-4 rounded shadow">
+      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
         <h2 className="font-semibold mb-3">批量导入目标</h2>
         <FileImport projectId={currentProject.id} onImported={loadTargets} />
       </section>
 
-      <section className="bg-white p-4 rounded shadow">
+      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
         <h2 className="font-semibold mb-3">目标</h2>
         <form onSubmit={addTarget} className="flex gap-2 mb-3">
           <select
@@ -304,7 +307,7 @@ export default function TargetPage() {
         </ul>
       </section>
 
-      <section className="bg-white p-4 rounded shadow">
+      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
         <h2 className="font-semibold mb-3">Scope 规则</h2>
         <form onSubmit={addScopeRule} className="flex gap-2 mb-3">
           <select
@@ -327,11 +330,11 @@ export default function TargetPage() {
         </form>
       </section>
 
-      <section className="bg-white p-4 rounded shadow">
+      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
         <h2 className="font-semibold mb-3">操作</h2>
         <div className="flex gap-3 flex-wrap">
           <button onClick={runDryRun} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500">
-            干运行 (Scope Check)
+            授权检测 (Scope Check)
           </button>
           <button onClick={runSubfinder} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500">
             运行 Subfinder
@@ -349,10 +352,10 @@ export default function TargetPage() {
 
         {dryRunResult && (
           <div className="mt-4 bg-gray-50 p-3 rounded text-sm space-y-2">
-            <div className="font-semibold">干运行结果 ({dryRunResult.mode})</div>
+            <div className="font-semibold">授权检测结果 ({dryRunResult.mode})</div>
             <div className="flex gap-4 text-xs">
               <div>
-                <span className="text-gray-500">时间窗口:</span>{" "}
+                <span className="text-zinc-400">时间窗口:</span>{" "}
                 {dryRunResult.time_window_valid === undefined
                   ? "—"
                   : dryRunResult.time_window_valid
@@ -360,14 +363,14 @@ export default function TargetPage() {
                   : <span className="text-red-600 font-medium">无效</span>}
               </div>
               <div>
-                <span className="text-gray-500">速率限制:</span>{" "}
+                <span className="text-zinc-400">速率限制:</span>{" "}
                 {dryRunResult.rate_limit !== undefined && dryRunResult.rate_limit > 0
                   ? `${dryRunResult.rate_limit} 包/秒`
                   : "无限制"}
               </div>
               {dryRunResult.estimated_duration_seconds !== undefined && (
                 <div>
-                  <span className="text-gray-500">预计耗时:</span>{" "}
+                  <span className="text-zinc-400">预计耗时:</span>{" "}
                   <span className="font-medium">
                     {dryRunResult.estimated_duration_seconds < 60
                       ? `${dryRunResult.estimated_duration_seconds} 秒`
@@ -378,7 +381,7 @@ export default function TargetPage() {
             </div>
             {dryRunResult.results && dryRunResult.results.length > 0 && (
               <div>
-                <div className="text-xs font-medium text-gray-500 mt-2 mb-1">
+                <div className="text-xs font-medium text-zinc-400 mt-2 mb-1">
                   目标决策 ({dryRunResult.results.length}):
                 </div>
                 <ul className="space-y-0.5 max-h-64 overflow-auto">

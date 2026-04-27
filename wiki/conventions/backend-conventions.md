@@ -1,6 +1,7 @@
 # 后端编码约定
 
-> SecBench 后端（Go 1.22+）编码规范。
+> Anchor 后端（Go 1.22+）编码规范。
+> 最后更新：2026-04-27（M4）
 
 ---
 
@@ -8,7 +9,7 @@
 
 - **语言**: Go 1.22+
 - **数据库**: SQLite (github.com/mattn/go-sqlite3)
-- **HTTP**: net/http (标准库)
+- **HTTP**: net/http（标准库）
 - **测试**: testing + testify（如需要）
 - **外部工具**: Subfinder、httpx、Naabu、Nuclei、Nmap
 
@@ -17,13 +18,19 @@
 ```
 internal/
 ├── api/           # HTTP handlers（不直接访问 DB，通过 db 包）
+├── asset/         # 资产归一化与去重（Normalizer + Merger）
 ├── db/            # 数据库初始化、schema、迁移、查询封装
 ├── errors/        # 结构化错误模型
 ├── health/        # 工具健康检查
-├── models/        # 数据模型 + 枚举
+├── models/        # 数据模型 + 枚举 + 自定义 Scan/Value
+├── nuclei/        # Nuclei 指纹-Tag 映射
+├── parser/        # 工具输出解析器（Subfinder/httpx/Naabu/Nuclei）
+├── report/        # Markdown / JSON 报告生成
+├── scoring/       # Finding confidence/priority 评分引擎
 ├── scope/         # Scope Check 引擎
-├── util/          # 通用工具函数（线程安全 ID 生成等）
-└── worker/        # Worker subprocess runner
+├── util/          # 通用工具函数（脱敏、ID 生成等）
+├── worker/        # Worker subprocess runner
+└── workflow/      # 工作流编排（资产发现 / Web 初筛）
 ```
 
 ## 3. 代码规范
@@ -34,22 +41,21 @@ internal/
 - `models/`: 纯数据结构定义，无业务逻辑
 - `scope/`: Scope Check 核心逻辑，无 HTTP 和 DB 依赖
 - `worker/`: 子进程执行管理，无 HTTP 依赖
+- `workflow/`: 工作流编排，组合 worker/parser/asset/scope 等包
+- `parser/`: 工具输出解析，单行失败不中断整体流程
+- `report/`: 报告生成，依赖 db 查询聚合数据
 
 ### 3.2 错误处理
 ```go
-// 使用结构化错误码
 var ErrScopeDenied = errors.New("scope_denied")
 var ErrToolNotFound = errors.New("tool_not_found")
 
-// 函数返回 error，不 panic
 func (e *ScopeEngine) Check(target Target) (bool, error) {
     if target.Value == "" {
         return false, fmt.Errorf("%w: target value is empty", ErrInvalidInput)
     }
-    // ...
 }
 
-// Handler 层统一包装为 HTTP 响应
 func handleError(w http.ResponseWriter, err error) {
     switch {
     case errors.Is(err, ErrScopeDenied):
@@ -64,13 +70,10 @@ func handleError(w http.ResponseWriter, err error) {
 
 ### 3.3 Context 使用
 ```go
-// 所有耗时操作必须接受 context.Context
 func (w *Worker) Run(ctx context.Context, task Task) error {
     cmd := exec.CommandContext(ctx, task.Tool, task.Args...)
-    // context 取消时 cmd 自动终止
 }
 
-// HTTP handler 传递 request context
 func handleRunTask(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
     if err := worker.Run(ctx, task); err != nil {
@@ -81,7 +84,6 @@ func handleRunTask(w http.ResponseWriter, r *http.Request) {
 
 ### 3.4 并发安全
 ```go
-// 共享状态用 sync.RWMutex 保护
 type WorkerPool struct {
     mu     sync.RWMutex
     tasks  map[string]*Task
@@ -92,12 +94,15 @@ func (p *WorkerPool) AddTask(task *Task) {
     defer p.mu.Unlock()
     p.tasks[task.ID] = task
 }
+```
 
-func (p *WorkerPool) GetTask(id string) (*Task, bool) {
-    p.mu.RLock()
-    defer p.mu.RUnlock()
-    t, ok := p.tasks[id]
-    return t, ok
+### 3.5 NULL 列处理
+可为 NULL 的数据库列 Scan 时必须使用 `sql.NullString`/`sql.NullInt64`/`sql.NullTime`：
+```go
+var createdBy sql.NullString
+err := rows.Scan(&ev.ID, &ev.FindingID, &ev.Type, &ev.ArtifactID, &ev.Excerpt, &createdBy, &ev.CreatedAt)
+if createdBy.Valid {
+    ev.CreatedBy = createdBy.String
 }
 ```
 
@@ -106,7 +111,7 @@ func (p *WorkerPool) GetTask(id string) (*Task, bool) {
 ### 4.1 必须写测试的场景
 - 所有 `scope/` 包函数（安全关键）
 - 所有 `worker/` 包函数（并发 + 资源管理）
-- 所有输入解析函数
+- 所有 `parser/` 包函数（输入解析）
 - 所有状态转换逻辑
 
 ### 4.2 Table-Driven Tests
@@ -122,9 +127,7 @@ func TestScopeCheck(t *testing.T) {
         {"exact match", Target{Value: "example.com"}, []ScopeRule{...}, true, false},
         {"subdomain match", Target{Value: "sub.example.com"}, []ScopeRule{...}, true, false},
         {"exclude priority", Target{Value: "admin.example.com"}, []ScopeRule{...}, false, false},
-        {"empty target", Target{Value: ""}, []ScopeRule{}, false, true},
     }
-    
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             engine := NewScopeEngine(tt.rules)
@@ -145,29 +148,6 @@ func TestScopeCheck(t *testing.T) {
 ```bash
 # 所有涉及 goroutine 的代码必须跑 race detector
 go test -race ./...
-```
-
-### 4.4 对抗性测试
-```go
-// 测试恶意输入
-func TestScopeCheck_Adversarial(t *testing.T) {
-    malicious := []string{
-        "../../../etc/passwd",      // 路径遍历
-        "example.com; rm -rf /",    // 命令注入
-        "example.com\nadmin.example.com", // 换行注入
-        string(make([]byte, 1000000)), // 超长输入
-    }
-    
-    engine := NewScopeEngine([]ScopeRule{...})
-    for _, input := range malicious {
-        target := Target{Value: input}
-        _, err := engine.Check(target)
-        // 不应 panic，应返回错误
-        if err == nil {
-            t.Errorf("恶意输入未报错: %q", input)
-        }
-    }
-}
 ```
 
 ## 5. 安全规范
@@ -193,29 +173,28 @@ func TestScopeCheck_Adversarial(t *testing.T) {
 - 输出截断：100MB 硬上限
 - 取消机制：SIGTERM → 等待 5s → SIGKILL
 
+### 5.5 证据与脱敏
+- RawArtifact 必须保存**原始数据**，标记 `RedactionStatus: "raw"`
+- Evidence.Excerpt 使用脱敏版本，兼顾安全展示
+- Evidence 大小上限 10MB
+
 ## 6. 日志规范
 
 ```go
-// 分级日志
 log.Printf("[INFO] 任务 %s 开始执行", task.ID)
 log.Printf("[WARN] 工具 %s 版本 %s 低于推荐版本", tool.Name, tool.Version)
 log.Printf("[ERROR] 任务 %s 失败: %v", task.ID, err)
-
-// 敏感信息脱敏
-// BAD: log.Printf("Authorization: %s", req.Header.Get("Authorization"))
-// GOOD: log.Printf("Authorization: [REDACTED]")
 ```
 
 ## 7. 数据库
 
 ### 7.1 Schema 变更
 - 所有 schema 变更通过迁移脚本管理
-- 迁移脚本放在 `internal/db/migrations/`
-- 命名：`001_init.sql`、`002_add_scope_rules.sql`
+- 新表使用 `CREATE TABLE IF NOT EXISTS`
+- 向后兼容：新增列使用 `ALTER TABLE ADD COLUMN ... DEFAULT ...`
 
 ### 7.2 查询封装
 ```go
-// db/queries.go — 所有 SQL 集中管理
 func (db *DB) CreateProject(p *models.Project) error {
     _, err := db.Exec(`
         INSERT INTO projects (id, name, organization, purpose, created_at)
@@ -224,3 +203,10 @@ func (db *DB) CreateProject(p *models.Project) error {
     return err
 }
 ```
+
+### 7.3 唯一约束
+关键去重字段必须加数据库层 UNIQUE 约束：
+- `assets`: `UNIQUE(project_id, normalized_value)`
+- `ports`: `UNIQUE(asset_id, port)`
+- `web_endpoints`: `UNIQUE(project_id, url)`
+- `findings`: `UNIQUE(project_id, dedup_key)`

@@ -50,3 +50,13 @@ bin/
 # Agent configuration
 .pi/
 agents/
+
+# ContextDB runtime data
+memory/
+.contextdb-enable
+
+# Task tracking
+tasks/
+
+# Tauri generated
+src-tauri/gen/

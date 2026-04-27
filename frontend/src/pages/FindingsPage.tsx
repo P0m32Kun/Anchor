@@ -9,7 +9,7 @@ const severityColors: Record<string, string> = {
   high: "bg-orange-500 text-white",
   medium: "bg-yellow-400 text-black",
   low: "bg-blue-300 text-black",
-  info: "bg-gray-200 text-gray-700",
+  info: "bg-gray-200 text-zinc-300",
 };
 
 const statusLabels: Record<string, string> = {
@@ -21,16 +21,19 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  pending_review: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-green-100 text-green-800",
-  false_positive: "bg-gray-100 text-gray-600",
+  pending_review: "bg-yellow-500/15 text-yellow-300",
+  confirmed: "bg-green-500/15 text-green-300",
+  false_positive: "bg-zinc-800/60 text-zinc-400",
   accepted_risk: "bg-blue-100 text-blue-800",
-  ignored: "bg-gray-100 text-gray-500",
+  ignored: "bg-zinc-800/60 text-zinc-400",
 };
 
 export default function FindingsPage() {
   const { id: projectId } = useParams<{ id: string }>();
-  const { findings, setFindings, currentFinding, setCurrentFinding } = useStore();
+  const findings = useStore((state) => state.findings) ?? [];
+  const setFindings = useStore((state) => state.setFindings);
+  const currentFinding = useStore((state) => state.currentFinding);
+  const setCurrentFinding = useStore((state) => state.setCurrentFinding);
   const [filter, setFilter] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -40,7 +43,7 @@ export default function FindingsPage() {
     setLoading(true);
     api
       .listFindings(projectId, filter)
-      .then(setFindings)
+      .then((data) => setFindings(data ?? []))
       .finally(() => setLoading(false));
   }, [projectId, filter, setFindings]);
 
@@ -59,7 +62,7 @@ export default function FindingsPage() {
     await api.patchFindingStatus(findingId, status);
     if (projectId) {
       const updated = await api.listFindings(projectId, filter);
-      setFindings(updated);
+      setFindings(updated ?? []);
     }
     if (currentFinding) {
       const data = await api.getFinding(findingId);
@@ -77,7 +80,7 @@ export default function FindingsPage() {
               key={s || "all"}
               onClick={() => setFilter(s)}
               className={`px-3 py-1 rounded text-sm ${
-                filter === s ? "bg-slate-800 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                filter === s ? "bg-slate-800 text-white" : "bg-zinc-800/60 text-zinc-300 hover:bg-gray-200"
               }`}
             >
               {s ? statusLabels[s] || s : "全部"}
@@ -86,11 +89,11 @@ export default function FindingsPage() {
         </div>
       </div>
 
-      {loading && <p className="text-gray-500">加载中...</p>}
+      {loading && <p className="text-zinc-400">加载中...</p>}
 
-      <div className="bg-white rounded shadow overflow-x-auto">
+      <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl rounded overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-gray-600">
+          <thead className="bg-zinc-800/40 text-zinc-400">
             <tr>
               <th className="px-4 py-2 text-left">标题</th>
               <th className="px-4 py-2 text-left">严重级别</th>
@@ -102,17 +105,17 @@ export default function FindingsPage() {
           </thead>
           <tbody>
             {findings.map((f) => (
-              <tr key={f.id} className="border-t hover:bg-gray-50">
+              <tr key={f.id} className="border-t hover:bg-zinc-800/40">
                 <td className="px-4 py-2 font-medium">{f.title}</td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityColors[f.severity] || "bg-gray-100"}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityColors[f.severity] || "bg-zinc-800/60"}`}>
                     {f.severity}
                   </span>
                 </td>
                 <td className="px-4 py-2">{f.confidence}</td>
                 <td className="px-4 py-2">{f.priority}</td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[f.status] || "bg-gray-100"}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[f.status] || "bg-zinc-800/60"}`}>
                     {statusLabels[f.status] || f.status}
                   </span>
                 </td>
@@ -128,7 +131,7 @@ export default function FindingsPage() {
             ))}
             {findings.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
                   暂无 Finding
                 </td>
               </tr>
@@ -175,20 +178,20 @@ function FindingDetail({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+      <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl rounded w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold">Finding 详情</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800">✕</button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200">✕</button>
         </div>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-gray-500">标题</span>
+              <span className="text-zinc-400">标题</span>
               <p className="font-medium">{finding.title}</p>
             </div>
             <div>
-              <span className="text-gray-500">严重级别</span>
+              <span className="text-zinc-400">严重级别</span>
               <p>
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityColors[finding.severity] || ""}`}>
                   {finding.severity}
@@ -196,19 +199,19 @@ function FindingDetail({
               </p>
             </div>
             <div>
-              <span className="text-gray-500">可信度</span>
+              <span className="text-zinc-400">可信度</span>
               <p className="font-medium">{finding.confidence}</p>
             </div>
             <div>
-              <span className="text-gray-500">优先级</span>
+              <span className="text-zinc-400">优先级</span>
               <p className="font-medium">{finding.priority}</p>
             </div>
             <div>
-              <span className="text-gray-500">来源工具</span>
+              <span className="text-zinc-400">来源工具</span>
               <p className="font-medium">{finding.source_tool}</p>
             </div>
             <div>
-              <span className="text-gray-500">规则 ID</span>
+              <span className="text-zinc-400">规则 ID</span>
               <p className="font-medium">{finding.source_rule_id || "—"}</p>
             </div>
           </div>
@@ -224,7 +227,7 @@ function FindingDetail({
                   className={`px-3 py-1 rounded text-xs ${
                     finding.status === s
                       ? "bg-slate-800 text-white cursor-default"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      : "bg-zinc-800/60 text-zinc-300 hover:bg-gray-200"
                   }`}
                 >
                   {statusLabels[s]}
@@ -235,15 +238,15 @@ function FindingDetail({
 
           <div>
             <h3 className="font-semibold text-sm mb-2">Evidence</h3>
-            {evidence.length === 0 && <p className="text-gray-400 text-sm">暂无 Evidence</p>}
+            {evidence.length === 0 && <p className="text-zinc-500 text-sm">暂无 Evidence</p>}
             <div className="space-y-2">
               {evidence.map((e) => (
                 <div key={e.id} className="border rounded p-3 text-sm">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 rounded bg-gray-100 text-xs">{e.type}</span>
-                    <span className="text-gray-400 text-xs">{e.created_at}</span>
+                    <span className="px-2 py-0.5 rounded bg-zinc-800/60 text-xs">{e.type}</span>
+                    <span className="text-zinc-500 text-xs">{e.created_at}</span>
                   </div>
-                  {e.excerpt && <pre className="whitespace-pre-wrap text-xs bg-gray-50 p-2 rounded">{e.excerpt}</pre>}
+                  {e.excerpt && <pre className="whitespace-pre-wrap text-xs bg-zinc-800/40 p-2 rounded">{e.excerpt}</pre>}
                 </div>
               ))}
             </div>

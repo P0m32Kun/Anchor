@@ -21,9 +21,9 @@
 桌面应用需要同时处理 UI 查询和后台写入，WAL 模式是最佳选择。
 
 ## 当前实现
-- data_dir = `~/.secbench`
-- 数据库文件：`~/.secbench/secbench.db`
-- WAL 文件：`~/.secbench/secbench.db-wal`、`-shm`
+- data_dir = `~/.anchor`
+- 数据库文件：`~/.anchor/anchor.db`
+- WAL 文件：`~/.anchor/anchor.db-wal`、`-shm`
 - 初始化时检查目录可写权限
 
 ## 风险

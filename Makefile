@@ -9,6 +9,7 @@ run: build
 	./bin/anchor
 
 dev:
+	@lsof -ti:17421 | xargs kill -9 2>/dev/null || true
 	go run .
 
 test:
@@ -18,7 +19,11 @@ clean:
 	rm -rf bin/
 
 tauri-dev:
-	cd frontend && npm install && npm run tauri dev
+	@pkill -f "vite" 2>/dev/null || true
+	@pkill -f "target/debug/anchor" 2>/dev/null || true
+	cd frontend && npm install
+	./frontend/node_modules/.bin/tauri dev
 
 tauri-build:
-	cd frontend && npm install && npm run tauri build
+	cd frontend && npm install
+	./frontend/node_modules/.bin/tauri build

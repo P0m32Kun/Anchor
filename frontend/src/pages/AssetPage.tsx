@@ -5,25 +5,25 @@ import { useStore } from "../lib/store";
 
 function AssetTypeBadge({ type }: { type: string }) {
   const colors: Record<string, string> = {
-    domain: "bg-blue-100 text-blue-700",
+    domain: "bg-blue-500/15 text-blue-300",
     ip: "bg-purple-100 text-purple-700",
-    url: "bg-green-100 text-green-700",
+    url: "bg-green-500/15 text-green-300",
   };
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || "bg-gray-100 text-gray-600"}`}>
+    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || "bg-zinc-800/60 text-zinc-400"}`}>
       {type}
     </span>
   );
 }
 
 function StatusCodeBadge({ code }: { code?: number }) {
-  if (!code) return <span className="text-gray-400 text-xs">—</span>;
+  if (!code) return <span className="text-zinc-500 text-xs">—</span>;
   const color =
     code >= 200 && code < 300
-      ? "bg-green-100 text-green-700"
+      ? "bg-green-500/15 text-green-300"
       : code >= 300 && code < 400
-      ? "bg-yellow-100 text-yellow-700"
-      : "bg-red-100 text-red-700";
+      ? "bg-yellow-500/15 text-yellow-300"
+      : "bg-red-500/15 text-red-300";
   return (
     <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>
       {code}
@@ -33,16 +33,14 @@ function StatusCodeBadge({ code }: { code?: number }) {
 
 export default function AssetPage() {
   const { id } = useParams<{ id: string }>();
-  const {
-    currentProject,
-    setCurrentProject,
-    assets,
-    setAssets,
-    webEndpoints,
-    setWebEndpoints,
-    ports,
-    setPorts,
-  } = useStore();
+  const currentProject = useStore((state) => state.currentProject);
+  const setCurrentProject = useStore((state) => state.setCurrentProject);
+  const assets = useStore((state) => state.assets) ?? [];
+  const setAssets = useStore((state) => state.setAssets);
+  const webEndpoints = useStore((state) => state.webEndpoints) ?? [];
+  const setWebEndpoints = useStore((state) => state.setWebEndpoints);
+  const ports = useStore((state) => state.ports);
+  const setPorts = useStore((state) => state.setPorts);
 
   const [activeTab, setActiveTab] = useState<"assets" | "web" | "ports">("assets");
   const [loading, setLoading] = useState(false);
@@ -50,12 +48,12 @@ export default function AssetPage() {
 
   const loadAssets = useCallback(() => {
     if (!id) return;
-    api.listAssets(id).then(setAssets).catch(console.error);
+    api.listAssets(id).then((data) => setAssets(data ?? [])).catch(console.error);
   }, [id, setAssets]);
 
   const loadWebEndpoints = useCallback(() => {
     if (!id) return;
-    api.listWebEndpoints(id).then(setWebEndpoints).catch(console.error);
+    api.listWebEndpoints(id).then((data) => setWebEndpoints(data ?? [])).catch(console.error);
   }, [id, setWebEndpoints]);
 
   const loadPorts = useCallback(
@@ -121,7 +119,7 @@ export default function AssetPage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
               activeTab === t.key
                 ? "border-green-600 text-green-700"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                : "border-transparent text-zinc-400 hover:text-zinc-300"
             }`}
           >
             {t.label}
@@ -132,14 +130,14 @@ export default function AssetPage() {
       {activeTab === "assets" && (
         <div className="space-y-4">
           {domainAssets.length > 0 && (
-            <section className="bg-white p-4 rounded shadow">
-              <h3 className="font-semibold mb-2 text-sm text-gray-500">域名 ({domainAssets.length})</h3>
+            <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+              <h3 className="font-semibold mb-2 text-sm text-zinc-400">域名 ({domainAssets.length})</h3>
               <ul className="space-y-1">
                 {domainAssets.map((a) => (
                   <li key={a.id} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded">
                     <AssetTypeBadge type="domain" />
                     <span className="font-medium">{a.value}</span>
-                    <span className="text-gray-400 text-xs ml-auto">
+                    <span className="text-zinc-500 text-xs ml-auto">
                       {a.source_tools?.join(", ") || "—"}
                     </span>
                   </li>
@@ -148,13 +146,13 @@ export default function AssetPage() {
             </section>
           )}
           {ipAssets.length > 0 && (
-            <section className="bg-white p-4 rounded shadow">
-              <h3 className="font-semibold mb-2 text-sm text-gray-500">IP ({ipAssets.length})</h3>
+            <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+              <h3 className="font-semibold mb-2 text-sm text-zinc-400">IP ({ipAssets.length})</h3>
               <ul className="space-y-1">
                 {ipAssets.map((a) => (
                   <li
                     key={a.id}
-                    className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded cursor-pointer hover:bg-gray-100"
+                    className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded cursor-pointer hover:bg-zinc-800/60"
                     onClick={() => {
                       setSelectedAsset(a.id);
                       loadPorts(a.id);
@@ -162,7 +160,7 @@ export default function AssetPage() {
                   >
                     <AssetTypeBadge type="ip" />
                     <span className="font-medium">{a.value}</span>
-                    <span className="text-gray-400 text-xs ml-auto">
+                    <span className="text-zinc-500 text-xs ml-auto">
                       {a.source_tools?.join(", ") || "—"}
                     </span>
                   </li>
@@ -171,14 +169,14 @@ export default function AssetPage() {
             </section>
           )}
           {urlAssets.length > 0 && (
-            <section className="bg-white p-4 rounded shadow">
-              <h3 className="font-semibold mb-2 text-sm text-gray-500">URL ({urlAssets.length})</h3>
+            <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+              <h3 className="font-semibold mb-2 text-sm text-zinc-400">URL ({urlAssets.length})</h3>
               <ul className="space-y-1">
                 {urlAssets.map((a) => (
                   <li key={a.id} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded">
                     <AssetTypeBadge type="url" />
                     <span className="font-medium">{a.value}</span>
-                    <span className="text-gray-400 text-xs ml-auto">
+                    <span className="text-zinc-500 text-xs ml-auto">
                       {a.source_tools?.join(", ") || "—"}
                     </span>
                   </li>
@@ -187,7 +185,7 @@ export default function AssetPage() {
             </section>
           )}
           {assets.length === 0 && (
-            <div className="text-gray-400 text-sm bg-white p-8 rounded shadow text-center">
+            <div className="text-zinc-500 text-sm bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8 rounded text-center">
               暂无资产，点击右上角「资产发现」开始扫描
             </div>
           )}
@@ -195,11 +193,11 @@ export default function AssetPage() {
       )}
 
       {activeTab === "web" && (
-        <section className="bg-white p-4 rounded shadow">
+        <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
           {webEndpoints.length > 0 ? (
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-gray-500 border-b">
+                <tr className="text-left text-zinc-400 border-b">
                   <th className="pb-2">URL</th>
                   <th className="pb-2">状态码</th>
                   <th className="pb-2">Title</th>
@@ -208,7 +206,7 @@ export default function AssetPage() {
               </thead>
               <tbody>
                 {webEndpoints.map((we) => (
-                  <tr key={we.id} className="border-b last:border-0 hover:bg-gray-50">
+                  <tr key={we.id} className="border-b last:border-0 hover:bg-zinc-800/40">
                     <td className="py-2 font-mono text-xs">
                       <a href={we.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
                         {we.url}
@@ -217,7 +215,7 @@ export default function AssetPage() {
                     <td className="py-2">
                       <StatusCodeBadge code={we.status_code} />
                     </td>
-                    <td className="py-2 text-gray-700">{we.title || "—"}</td>
+                    <td className="py-2 text-zinc-300">{we.title || "—"}</td>
                     <td className="py-2">
                       <div className="flex flex-wrap gap-1">
                         {(we.technologies || []).map((t) => (
@@ -225,7 +223,7 @@ export default function AssetPage() {
                             {t}
                           </span>
                         ))}
-                        {!(we.technologies || []).length && <span className="text-gray-400">—</span>}
+                        {!(we.technologies || []).length && <span className="text-zinc-500">—</span>}
                       </div>
                     </td>
                   </tr>
@@ -233,15 +231,15 @@ export default function AssetPage() {
               </tbody>
             </table>
           ) : (
-            <div className="text-gray-400 text-sm text-center py-8">暂无 Web 端点</div>
+            <div className="text-zinc-500 text-sm text-center py-8">暂无 Web 端点</div>
           )}
         </section>
       )}
 
       {activeTab === "ports" && (
         <div className="space-y-4">
-          <section className="bg-white p-4 rounded shadow">
-            <h3 className="font-semibold mb-2 text-sm text-gray-500">选择 IP 资产查看端口</h3>
+          <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+            <h3 className="font-semibold mb-2 text-sm text-zinc-400">选择 IP 资产查看端口</h3>
             <div className="flex flex-wrap gap-2">
               {ipAssets.map((a) => (
                 <button
@@ -253,7 +251,7 @@ export default function AssetPage() {
                   className={`px-3 py-1 rounded text-sm border ${
                     selectedAsset === a.id
                       ? "bg-purple-100 border-purple-300 text-purple-700"
-                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                      : "bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl border-zinc-800 text-zinc-400 hover:bg-zinc-800/40"
                   }`}
                 >
                   {a.value}
@@ -263,7 +261,7 @@ export default function AssetPage() {
           </section>
 
           {selectedAsset && ports[selectedAsset] && (
-            <section className="bg-white p-4 rounded shadow">
+            <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
               <h3 className="font-semibold mb-2">
                 端口 ({ports[selectedAsset].length})
               </h3>
@@ -272,17 +270,17 @@ export default function AssetPage() {
                   {ports[selectedAsset].map((p) => (
                     <div
                       key={p.id}
-                      className="border rounded p-2 text-center text-sm hover:bg-gray-50"
+                      className="border rounded p-2 text-center text-sm hover:bg-zinc-800/40"
                     >
                       <div className="font-mono font-semibold text-lg">{p.port}</div>
-                      <div className="text-gray-400 text-xs">
+                      <div className="text-zinc-500 text-xs">
                         {p.protocol} / {p.state}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-gray-400 text-sm text-center py-4">暂无端口数据</div>
+                <div className="text-zinc-500 text-sm text-center py-4">暂无端口数据</div>
               )}
             </section>
           )}

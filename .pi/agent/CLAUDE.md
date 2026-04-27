@@ -1,4 +1,4 @@
-# SecBench 项目上下文
+# Anchor 项目上下文
 
 > 本项目 Agent 配置。所有在此项目目录下工作的 Agent 必须先读取 `wiki/SCHEMA.md`。
 
@@ -17,12 +17,12 @@
 
 ## 项目速查
 
-- **名称**: SecBench
+- **名称**: Anchor
 - **类型**: 目标中心自动化安全测试工作台（桌面应用）
 - **技术栈**: Tauri 2.x + React 18 + TypeScript + Tailwind + Go 1.22 + SQLite (WAL)
-- **通信**: HTTP API (:8080) + SSE 实时推送
+- **通信**: HTTP API (:17421) + SSE 实时推送
 - **当前里程碑**: M0 已完成（工程骨架），M1 待开始
-- **数据目录**: `~/.secbench`
+- **数据目录**: `~/.anchor`
 
 ---
 

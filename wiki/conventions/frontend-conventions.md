@@ -1,6 +1,7 @@
 # 前端编码约定
 
-> SecBench 前端（Tauri + React + TypeScript + Tailwind）编码规范。
+> Anchor 前端（Tauri + React + TypeScript + Tailwind）编码规范。
+> 最后更新：2026-04-27（M4）
 
 ---
 
@@ -13,6 +14,7 @@
 - **路由**: React Router（如需要）
 - **HTTP**: 原生 fetch（通过 api.ts 封装）
 - **SSE**: 原生 EventSource
+- **语法高亮**: Prism.js
 
 ## 2. 目录结构
 
@@ -24,12 +26,13 @@ frontend/src/
 │   └── utils.ts           # 通用工具函数
 ├── components/            # 共享组件
 │   ├── ui/               # shadcn/ui 组件
-│   └── common/           # 自定义共享组件
+│   ├── common/           # 自定义共享组件
+│   └── index.ts          # 统一导出
 ├── pages/                # 页面组件（路由级别）
 │   ├── ProjectPage.tsx
 │   ├── TargetPage.tsx
-│   ├── PlanPage.tsx
 │   ├── RunsPage.tsx
+│   ├── AssetPage.tsx
 │   ├── FindingsPage.tsx
 │   └── ReportsPage.tsx
 ├── hooks/                # 自定义 hooks
@@ -150,10 +153,11 @@ export function connectEvents(onMessage: (data: EventData) => void) {
 
 - 所有组件 props、函数参数必须加类型
 - API 返回数据必须定义接口
-- 使用 `zod` 或类似库做运行时类型校验（如需要）
+- 后端模型变更后同步更新前端类型
 
 ## 8. 安全
 
 - **NEVER** 在前端代码中嵌入 API key、token、密码
 - **NEVER** 在 URL 中传递敏感参数（用 POST body）
 - 所有用户输入在提交前做前端校验（但后端仍需二次校验）
+- **NEVER** 使用 `dangerouslySetInnerHTML` 渲染用户可控内容；如需展示富文本，使用纯文本 `<pre>` 或经过净化的 HTML

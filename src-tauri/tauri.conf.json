@@ -1,17 +1,17 @@
 {
-  "productName": "SecBench",
+  "productName": "Anchor",
   "version": "0.1.0",
   "identifier": "com.anchor.app",
   "build": {
     "frontendDist": "../frontend/dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "cd frontend && npm run dev",
+    "beforeDevCommand": "cd ../frontend && npm run dev",
     "beforeBuildCommand": "cd frontend && npm run build"
   },
   "app": {
     "windows": [
       {
-        "title": "SecBench",
+        "title": "Anchor",
         "width": 1280,
         "height": 800
       }
