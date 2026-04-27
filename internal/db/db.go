@@ -289,6 +289,37 @@ CREATE TABLE IF NOT EXISTS scan_steps (
 
 CREATE INDEX IF NOT EXISTS idx_scan_steps_task ON scan_steps(task_id);
 CREATE INDEX IF NOT EXISTS idx_tool_templates_profile ON tool_templates(profile_type);
+
+-- v0.2 M2: worker_nodes
+CREATE TABLE IF NOT EXISTS worker_nodes (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL,
+	endpoint TEXT,
+	mode TEXT NOT NULL CHECK(mode IN ('local','remote')),
+	status TEXT DEFAULT 'offline' CHECK(status IN ('online','offline','busy','error')),
+	trust_level TEXT DEFAULT 'standard' CHECK(trust_level IN ('low','standard','high')),
+	network_profile TEXT DEFAULT 'external',
+	capabilities TEXT,
+	tool_versions TEXT,
+	template_versions TEXT,
+	max_concurrency INTEGER DEFAULT 10,
+	last_seen DATETIME,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	revoked_at DATETIME
+);
+
+-- v0.2 M2: worker_health_checks
+CREATE TABLE IF NOT EXISTS worker_health_checks (
+	id TEXT PRIMARY KEY,
+	worker_id TEXT NOT NULL REFERENCES worker_nodes(id) ON DELETE CASCADE,
+	tool TEXT NOT NULL,
+	status TEXT NOT NULL CHECK(status IN ('ready','missing','version_mismatch','config_error','permission_error')),
+	version TEXT,
+	details TEXT,
+	checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_worker_health_worker ON worker_health_checks(worker_id);
 `
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("exec schema: %w", err)

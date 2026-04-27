@@ -805,3 +805,99 @@ func (q *Queries) ListScanStepsByTask(taskID string) ([]*models.ScanStep, error)
 	}
 	return list, rows.Err()
 }
+
+// --- WorkerNode ---
+
+func (q *Queries) CreateWorkerNode(w *models.WorkerNode) error {
+	_, err := q.db.Exec(`
+		INSERT INTO worker_nodes (id, name, endpoint, mode, status, trust_level, network_profile, capabilities, tool_versions, template_versions, max_concurrency, last_seen, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		w.ID, w.Name, w.Endpoint, w.Mode, w.Status, w.TrustLevel, w.NetworkProfile, w.Capabilities, w.ToolVersions, w.TemplateVersions, w.MaxConcurrency, w.LastSeen, w.CreatedAt)
+	return err
+}
+
+func (q *Queries) GetWorkerNode(id string) (*models.WorkerNode, error) {
+	row := q.db.QueryRow(`
+		SELECT id, name, endpoint, mode, status, trust_level, network_profile, capabilities, tool_versions, template_versions, max_concurrency, last_seen, created_at, revoked_at
+		FROM worker_nodes WHERE id = ?`, id)
+	w := &models.WorkerNode{}
+	var lastSeen, revokedAt sql.NullTime
+	if err := row.Scan(&w.ID, &w.Name, &w.Endpoint, &w.Mode, &w.Status, &w.TrustLevel, &w.NetworkProfile, &w.Capabilities, &w.ToolVersions, &w.TemplateVersions, &w.MaxConcurrency, &lastSeen, &w.CreatedAt, &revokedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if lastSeen.Valid {
+		w.LastSeen = &lastSeen.Time
+	}
+	if revokedAt.Valid {
+		w.RevokedAt = &revokedAt.Time
+	}
+	return w, nil
+}
+
+func (q *Queries) ListWorkerNodes() ([]*models.WorkerNode, error) {
+	rows, err := q.db.Query(`
+		SELECT id, name, endpoint, mode, status, trust_level, network_profile, capabilities, tool_versions, template_versions, max_concurrency, last_seen, created_at, revoked_at
+		FROM worker_nodes ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.WorkerNode
+	for rows.Next() {
+		w := &models.WorkerNode{}
+		var lastSeen, revokedAt sql.NullTime
+		if err := rows.Scan(&w.ID, &w.Name, &w.Endpoint, &w.Mode, &w.Status, &w.TrustLevel, &w.NetworkProfile, &w.Capabilities, &w.ToolVersions, &w.TemplateVersions, &w.MaxConcurrency, &lastSeen, &w.CreatedAt, &revokedAt); err != nil {
+			return nil, err
+		}
+		if lastSeen.Valid {
+			w.LastSeen = &lastSeen.Time
+		}
+		if revokedAt.Valid {
+			w.RevokedAt = &revokedAt.Time
+		}
+		list = append(list, w)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) UpdateWorkerNodeStatus(id string, status models.WorkerStatus, lastSeen time.Time) error {
+	_, err := q.db.Exec(`UPDATE worker_nodes SET status = ?, last_seen = ? WHERE id = ?`, status, lastSeen, id)
+	return err
+}
+
+func (q *Queries) RevokeWorkerNode(id string, revokedAt time.Time) error {
+	_, err := q.db.Exec(`UPDATE worker_nodes SET status = ?, revoked_at = ? WHERE id = ?`, models.WorkerStatusOffline, revokedAt, id)
+	return err
+}
+
+// --- WorkerHealthCheck ---
+
+func (q *Queries) CreateWorkerHealthCheck(h *models.WorkerHealthCheck) error {
+	_, err := q.db.Exec(`
+		INSERT INTO worker_health_checks (id, worker_id, tool, status, version, details, checked_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		h.ID, h.WorkerID, h.Tool, h.Status, h.Version, h.Details, h.CheckedAt)
+	return err
+}
+
+func (q *Queries) ListWorkerHealthChecks(workerID string) ([]*models.WorkerHealthCheck, error) {
+	rows, err := q.db.Query(`
+		SELECT id, worker_id, tool, status, version, details, checked_at
+		FROM worker_health_checks WHERE worker_id = ? ORDER BY checked_at DESC`, workerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.WorkerHealthCheck
+	for rows.Next() {
+		h := &models.WorkerHealthCheck{}
+		if err := rows.Scan(&h.ID, &h.WorkerID, &h.Tool, &h.Status, &h.Version, &h.Details, &h.CheckedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, h)
+	}
+	return list, rows.Err()
+}

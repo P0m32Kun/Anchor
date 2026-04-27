@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/db"
@@ -36,6 +37,9 @@ type Server struct {
 	workerEndpoint   string
 	workerHTTPClient *http.Client
 	workerProc       *os.Process
+	taskQueue        map[string]chan *models.ScanTask
+	taskResults      map[string]chan map[string]interface{}
+	mu               sync.Mutex
 }
 
 func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
@@ -49,6 +53,8 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 		dataDir:    dataDir,
 		sseClients: make(map[string]chan []byte),
 		workerHTTPClient: &http.Client{Timeout: 30 * time.Second},
+		taskQueue:   make(map[string]chan *models.ScanTask),
+		taskResults: make(map[string]chan map[string]interface{}),
 	}
 	// Auto-start local worker
 	go func() {
@@ -119,6 +125,12 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /workers/local/start", s.handleStartLocalWorker)
 	mux.HandleFunc("POST /workers/local/stop", s.handleStopLocalWorker)
 	mux.HandleFunc("GET /workers/health", s.handleWorkerHealth)
+	// Remote worker APIs
+	mux.HandleFunc("POST /workers/register", s.handleRegisterWorker)
+	mux.HandleFunc("POST /workers/{id}/heartbeat", s.handleWorkerHeartbeat)
+	mux.HandleFunc("GET /workers/{id}/tasks/poll", s.handlePollTasks)
+	mux.HandleFunc("POST /tasks/{id}/result", s.handleTaskResult)
+	mux.HandleFunc("POST /workers/{id}/revoke", s.handleRevokeWorker)
 }
 
 // --- Error helpers ---
@@ -826,17 +838,34 @@ func (s *Server) stopLocalWorker() error {
 
 func (s *Server) handleListWorkers(w http.ResponseWriter, r *http.Request) {
 	workers := []map[string]interface{}{}
-	status := "stopped"
+
+	// Local worker
+	localStatus := "stopped"
 	if s.workerProc != nil {
-		status = "running"
+		localStatus = "running"
 	}
 	workers = append(workers, map[string]interface{}{
 		"id":       "local",
 		"name":     "本地 Worker",
 		"mode":     "local",
-		"status":   status,
+		"status":   localStatus,
 		"endpoint": s.workerEndpoint,
 	})
+
+	// Remote workers from database
+	dbWorkers, err := s.queries.ListWorkerNodes()
+	if err == nil {
+		for _, w := range dbWorkers {
+			workers = append(workers, map[string]interface{}{
+				"id":       w.ID,
+				"name":     w.Name,
+				"mode":     w.Mode,
+				"status":   w.Status,
+				"endpoint": w.Endpoint,
+			})
+		}
+	}
+
 	writeJSON(w, http.StatusOK, workers)
 }
 
