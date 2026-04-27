@@ -13,7 +13,7 @@ func Open(dataDir string) (*sql.DB, error) {
 	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
-	dbPath := filepath.Join(dataDir, "secbench.db")
+	dbPath := filepath.Join(dataDir, "anchor.db")
 	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)

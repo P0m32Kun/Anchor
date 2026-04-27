@@ -23,7 +23,7 @@
 | M1 | 🟢 已完成 | 2026-04-26 | 目标输入 + Scope Check + 执行计划预览 |
 | M2 | 🟢 已完成 | 2026-04-26 | Subfinder/httpx/Naabu + 资产归一 + RawArtifact |
 | M3 | 🟢 已完成 | 2026-04-26 | Nuclei + Finding + confidence/priority 评分 |
-| M4 | ⚪ 待开始 | — | 验证队列 + Markdown/JSON 报告导出 |
+| M4 | 🟢 已完成 | 2026-04-27 | 验证队列 + Markdown/JSON 报告导出 |
 
 > 状态说明：🟡 进行中 / ⚪ 待开始 / 🟢 已完成 / 🔴 阻塞
 
@@ -46,30 +46,30 @@ M0-M3 已完成。当前已有：
 
 ### 任务清单
 
-- [ ] **1. 报告数据聚合**
-  - [ ] 1.1 按项目 ID 拉取 confirmed + accepted_risk Finding
-  - [ ] 1.2 关联 Asset / WebEndpoint / Evidence
-  - [ ] 1.3 聚合工具版本和任务摘要
+- [x] **1. 报告数据聚合**
+  - [x] 1.1 按项目 ID 拉取 confirmed + accepted_risk Finding
+  - [x] 1.2 关联 Asset / WebEndpoint / Evidence
+  - [x] 1.3 聚合工具版本和任务摘要
 
-- [ ] **2. Markdown 报告生成**
-  - [ ] 2.1 报告模板定义（结构：概览/范围/方法/摘要/风险统计/漏洞详情/接受风险/附录）
-  - [ ] 2.2 漏洞详情渲染（资产/严重性/可信度/证据/复现摘要/修复建议）
-  - [ ] 2.3 风险统计图表（critical/high/medium/low 分布）
-  - [ ] 2.4 `GET /projects/:id/reports/export.md`
+- [x] **2. Markdown 报告生成**
+  - [x] 2.1 报告模板定义（结构：概览/范围/方法/摘要/风险统计/漏洞详情/接受风险/附录）
+  - [x] 2.2 漏洞详情渲染（资产/严重性/可信度/证据/复现摘要/修复建议）
+  - [x] 2.3 风险统计图表（critical/high/medium/low 分布）
+  - [x] 2.4 `GET /projects/:id/reports/export.md`
 
-- [ ] **3. JSON 导出**
-  - [ ] 3.1 JSON Schema 定义（project/scope/assets/findings/evidence/tool_invocations）
-  - [ ] 3.2 `GET /projects/:id/reports/export.json`
-  - [ ] 3.3 与 DefectDojo 导入格式兼容（可选，预留字段）
+- [x] **3. JSON 导出**
+  - [x] 3.1 JSON Schema 定义（project/scope/assets/findings/evidence/tool_invocations）
+  - [x] 3.2 `GET /projects/:id/reports/export.json`
+  - [ ] 3.3 与 DefectDojo 导入格式兼容（可选，预留字段）→ 延后到 v0.4
 
-- [ ] **4. 前端报告页面**
-  - [ ] 4.1 Reports 页面（报告大纲预览）
-  - [ ] 4.2 漏洞顺序调整（拖拽排序）
-  - [ ] 4.3 Markdown 预览 + 导出按钮
+- [x] **4. 前端报告页面**
+  - [x] 4.1 Reports 页面（报告大纲预览）
+  - [ ] 4.2 漏洞顺序调整（拖拽排序）→ 延后到 v0.2
+  - [x] 4.3 Markdown 预览 + 导出按钮
 
-- [ ] **5. MVP 端到端验收**
-  - [ ] 5.1 创建项目 → 导入目标 → 资产发现 → Web 初筛 → 人工确认 → 报告导出
-  - [ ] 5.2 单项目 100 目标标准初筛稳定性测试
+- [x] **5. MVP 端到端验收**
+  - [x] 5.1 创建项目 → 导入目标 → 资产发现 → Web 初筛 → 人工确认 → 报告导出
+  - [ ] 5.2 单项目 100 目标标准初筛稳定性测试 → 延后
 
 ### 验收标准
 
@@ -224,16 +224,30 @@ M0-M3 已完成。当前已有：
 - 测试覆盖：52 个单元测试（新增 39 个，含导入解析 + 时间窗口）
 
 ### M2：资产发现
-- 开始日期：—
-- 结束日期：—
-- 验收结果：□
+- 开始日期：2026-04-26
+- 结束日期：2026-04-26
+- Git tag：`v0.1.0-m2`
+- 验收结果：✅ Subfinder/httpx/Naabu 联调通过，资产归一化正确
+- 关键交付：Discovery 工作流、资产合并器、RawArtifact 保存、WebEndpoint 解析
+- 代码统计：+6 新文件（discovery.go, merger.go, parser/*.go 等）
+- 测试覆盖：13 个 parser 单元测试
 
 ### M3：Nuclei 初筛
-- 开始日期：—
-- 结束日期：—
-- 验收结果：□
+- 开始日期：2026-04-26
+- 结束日期：2026-04-26
+- Git tag：`v0.1.0-m3`
+- 验收结果：✅ Nuclei 输出解析 + Finding 生成 + 评分体系
+- 关键交付：Nuclei parser、Finding 模型、confidence/priority 评分、Tag Mapper
+- 代码统计：+4 新文件（nuclei.go, scoring.go, tagmapper.go 等）
+- 测试覆盖：15 个单元测试（含 tagmapper_test.go）
 
 ### M4：人工验证与报告
-- 开始日期：—
-- 结束日期：—
-- 验收结果：□
+- 开始日期：2026-04-27
+- 结束日期：2026-04-27
+- Git tag：`v0.1.0-m4`
+- 验收结果：✅ 端到端验收通过（9 目标 → 86 资产 → 报告导出）
+- 关键交付：report 包（Aggregate/Markdown/JSON）、ReportsPage 前端、export.md/.json API
+- 代码统计：+5 新文件（report/*.go, ReportsPage.tsx）
+- 测试覆盖：15 个 report 单元测试
+- 端到端：创建项目 → 导入 9 目标 → 资产发现 → Nuclei 扫描 → 人工确认 → Markdown/JSON 报告导出
+- Bug 修复：Evidence `created_by` NULL 处理（ListEvidenceByFinding Scan 错误）

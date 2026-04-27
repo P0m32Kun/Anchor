@@ -48,7 +48,7 @@
 ```bash
 cd /Users/kun/DEV/p0m32kun
 go run main.go
-# 服务监听 :8080，数据目录 ~/.secbench
+# 服务监听 :8080，数据目录 ~/.anchor
 ```
 
 ### 运行前端
@@ -109,7 +109,8 @@ tauri build   # 构建 Tauri 桌面应用
 │   │   │   ├── TargetPage.tsx
 │   │   │   ├── RunsPage.tsx
 │   │   │   ├── AssetPage.tsx      # 资产列表（M2）
-│   │   │   └── FindingsPage.tsx   # Finding 验证队列（M3）
+│   │   │   ├── FindingsPage.tsx   # Finding 验证队列（M3）
+│   │   │   └── ReportsPage.tsx    # 报告导出（M4）
 │   │   └── App.tsx           # 路由与布局
 │   └── package.json
 ├── src-tauri/                  # Tauri 配置
@@ -156,11 +157,12 @@ tauri build   # 构建 Tauri 桌面应用
 - [x] Evidence 保存（request/response 脱敏）
 - [x] Finding 验证队列 UI
 
-### M4: 报告导出 🚧
+### M4: 报告导出 ✅
 
-- [ ] Markdown 报告生成
-- [ ] JSON 数据导出
-- [ ] 前端报告预览页面
+- [x] Markdown 报告生成（8 章节硬编码模板：摘要/范围/方法/风险统计/漏洞详情/接受风险/附录）
+- [x] JSON 数据导出（meta/project/targets/scope/assets/findings/evidence/tools）
+- [x] 前端报告预览页面（ReportsPage.tsx：Finding 列表 + Markdown 预览 + 导出按钮）
+- [x] 端到端验收通过（9 目标 → 86 资产 → 人工确认 → 报告导出）
 
 ## 外部工具依赖
 
@@ -180,6 +182,7 @@ tauri build   # 构建 Tauri 桌面应用
 | `v0.1.0-m1` | 目标与 Scope 增强（批量导入 + 时间窗口 + 速率限制） |
 | `v0.1.0-m2` | 资产发现（Subfinder/httpx/Naabu + 归一） |
 | `v0.1.0-m3` | Nuclei 初筛（指纹驱动模板筛选 + Finding + 评分） |
+| `v0.1.0-m4` | 报告导出（Markdown/JSON + 前端报告页面 + 端到端验收） |
 
 ## 许可
 

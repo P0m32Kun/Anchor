@@ -240,4 +240,22 @@ export const api = {
 
   addEvidence: (findingId: string, data: { type: string; excerpt: string; created_by?: string }) =>
     fetchJSON<Evidence>(`/findings/${findingId}/evidence`, { method: "POST", body: JSON.stringify(data) }),
+
+  exportReportMD: async (projectId: string): Promise<Blob> => {
+    const res = await fetch(`${API_BASE}/projects/${projectId}/reports/export.md`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new APIError(data?.error?.message || `Export failed: ${res.statusText}`);
+    }
+    return res.blob();
+  },
+
+  exportReportJSON: async (projectId: string): Promise<Blob> => {
+    const res = await fetch(`${API_BASE}/projects/${projectId}/reports/export.json`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new APIError(data?.error?.message || `Export failed: ${res.statusText}`);
+    }
+    return res.blob();
+  },
 };

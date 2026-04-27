@@ -3,10 +3,10 @@
 GO_FILES := $(shell find . -name '*.go' -not -path './frontend/*')
 
 build:
-	go build -o bin/secbench .
+	go build -o bin/anchor .
 
 run: build
-	./bin/secbench
+	./bin/anchor
 
 dev:
 	go run .

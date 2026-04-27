@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"secbench/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
 func TestMatchDomainRule(t *testing.T) {

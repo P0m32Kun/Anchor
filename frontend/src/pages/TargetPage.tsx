@@ -339,6 +339,12 @@ export default function TargetPage() {
           <Link to={`/projects/${currentProject.id}/assets`} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-500">
             查看资产
           </Link>
+          <Link to={`/projects/${currentProject.id}/findings`} className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-500">
+            漏洞发现
+          </Link>
+          <Link to={`/projects/${currentProject.id}/reports`} className="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-500">
+            📄 报告
+          </Link>
         </div>
 
         {dryRunResult && (

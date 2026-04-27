@@ -4,9 +4,9 @@ import (
 	"slices"
 	"time"
 
-	"secbench/internal/db"
-	"secbench/internal/models"
-	"secbench/internal/util"
+	"github.com/P0m32Kun/Anchor/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
 // Merger handles asset deduplication and merging.

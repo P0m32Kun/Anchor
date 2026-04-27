@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"secbench/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
 type DBTX interface {
@@ -336,6 +336,26 @@ func (q *Queries) UpdateToolInvocation(taskID string, finishedAt time.Time, exit
 	return err
 }
 
+// ListToolInvocationsByProject returns all tool invocations for a project.
+func (q *Queries) ListToolInvocationsByProject(projectID string) ([]*models.ToolInvocation, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, task_id, tool, binary_path, version, command_redacted, workdir, started_at, finished_at, exit_code
+		FROM tool_invocations WHERE project_id = ? ORDER BY started_at`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.ToolInvocation
+	for rows.Next() {
+		inv := &models.ToolInvocation{}
+		if err := rows.Scan(&inv.ID, &inv.ProjectID, &inv.TaskID, &inv.Tool, &inv.BinaryPath, &inv.Version, &inv.CommandRedacted, &inv.Workdir, &inv.StartedAt, &inv.FinishedAt, &inv.ExitCode); err != nil {
+			return nil, err
+		}
+		list = append(list, inv)
+	}
+	return list, rows.Err()
+}
+
 func nullableString(ns sql.NullString) *string {
 	if ns.Valid {
 		return &ns.String
@@ -652,6 +672,27 @@ func scanFinding(row interface {
 	return f, nil
 }
 
+// ListFindingsForReport returns findings with status IN ('confirmed', 'accepted_risk') for a project.
+// Used by report aggregation to select only report-eligible findings.
+func (q *Queries) ListFindingsForReport(projectID string) ([]*models.Finding, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, asset_id, service_id, web_endpoint_id, source_tool, source_rule_id, dedup_key, title, severity, confidence, priority, status, summary, remediation, created_at, updated_at
+		FROM findings WHERE project_id = ? AND status IN ('confirmed', 'accepted_risk') ORDER BY priority DESC, created_at DESC`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.Finding
+	for rows.Next() {
+		f, err := scanFinding(rows)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, f)
+	}
+	return list, rows.Err()
+}
+
 // --- Evidence ---
 
 func (q *Queries) CreateEvidence(e *models.Evidence) error {
@@ -673,11 +714,14 @@ func (q *Queries) ListEvidenceByFinding(findingID string) ([]*models.Evidence, e
 	var list []*models.Evidence
 	for rows.Next() {
 		e := &models.Evidence{}
-		var artifactID sql.NullString
-		if err := rows.Scan(&e.ID, &e.FindingID, &e.Type, &artifactID, &e.Excerpt, &e.CreatedBy, &e.CreatedAt); err != nil {
+		var artifactID, createdBy sql.NullString
+		if err := rows.Scan(&e.ID, &e.FindingID, &e.Type, &artifactID, &e.Excerpt, &createdBy, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 		e.ArtifactID = nullableString(artifactID)
+		if createdBy.Valid {
+			e.CreatedBy = createdBy.String
+		}
 		list = append(list, e)
 	}
 	return list, rows.Err()

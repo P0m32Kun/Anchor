@@ -4,6 +4,7 @@ import TargetPage from "./pages/TargetPage";
 import AssetPage from "./pages/AssetPage";
 import RunsPage from "./pages/RunsPage";
 import FindingsPage from "./pages/FindingsPage";
+import ReportsPage from "./pages/ReportsPage";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/projects/:id" element={<TargetPage />} />
           <Route path="/projects/:id/assets" element={<AssetPage />} />
           <Route path="/projects/:id/findings" element={<FindingsPage />} />
+          <Route path="/projects/:id/reports" element={<ReportsPage />} />
           <Route path="/runs" element={<RunsPage />} />
         </Routes>
       </main>

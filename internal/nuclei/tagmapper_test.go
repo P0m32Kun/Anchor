@@ -3,7 +3,7 @@ package nuclei
 import (
 	"testing"
 
-	"secbench/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
 func TestMapPreciseTags_WordPress(t *testing.T) {

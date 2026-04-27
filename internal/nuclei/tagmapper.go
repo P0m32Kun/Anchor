@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"secbench/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
 // techToTag maps normalized technology names to the most specific Nuclei tag.

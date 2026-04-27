@@ -13,10 +13,10 @@ import (
 	"syscall"
 	"time"
 
-	"secbench/internal/db"
-	"secbench/internal/models"
-	"secbench/internal/scope"
-	"secbench/internal/util"
+	"github.com/P0m32Kun/Anchor/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
 const (

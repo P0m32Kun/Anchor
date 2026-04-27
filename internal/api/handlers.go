@@ -10,14 +10,15 @@ import (
 	"strings"
 	"time"
 
-	"secbench/internal/db"
-	"secbench/internal/errors"
-	"secbench/internal/health"
-	"secbench/internal/models"
-	"secbench/internal/scope"
-	"secbench/internal/util"
-	"secbench/internal/worker"
-	"secbench/internal/workflow"
+	"github.com/P0m32Kun/Anchor/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/errors"
+	"github.com/P0m32Kun/Anchor/internal/health"
+	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/report"
+	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/util"
+	"github.com/P0m32Kun/Anchor/internal/worker"
+	"github.com/P0m32Kun/Anchor/internal/workflow"
 )
 
 // Server holds API dependencies.
@@ -74,6 +75,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health/tools", s.handleToolHealth)
 	mux.HandleFunc("POST /health/check", s.handleHealthCheck)
 	mux.HandleFunc("GET /events", s.handleSSE)
+	mux.HandleFunc("GET /projects/{id}/reports/export.md", s.handleExportReportMD)
+	mux.HandleFunc("GET /projects/{id}/reports/export.json", s.handleExportReportJSON)
 }
 
 // --- Error helpers ---
@@ -996,4 +999,63 @@ func (s *Server) handleAddEvidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, ev)
+}
+
+// handleExportReportMD generates a Markdown report for a project.
+func (s *Server) handleExportReportMD(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+
+	project, err := s.queries.GetProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get project failed: %v", err))
+		return
+	}
+	if project == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "project not found"))
+		return
+	}
+
+	data, err := report.Aggregate(r.Context(), s.queries, project)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "report aggregation failed: %v", err))
+		return
+	}
+
+	md := report.GenerateMarkdown(data)
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=report_%s.md", projectID))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(md))
+}
+
+// handleExportReportJSON generates a JSON export for a project.
+func (s *Server) handleExportReportJSON(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+
+	project, err := s.queries.GetProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get project failed: %v", err))
+		return
+	}
+	if project == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "project not found"))
+		return
+	}
+
+	data, err := report.Aggregate(r.Context(), s.queries, project)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "report aggregation failed: %v", err))
+		return
+	}
+
+	jsonData, err := report.GenerateJSON(data)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "json generation failed: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=report_%s.json", projectID))
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonData)
 }

@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"secbench/internal/api"
-	"secbench/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/api"
+	"github.com/P0m32Kun/Anchor/internal/db"
 )
 
 func main() {
@@ -17,7 +17,7 @@ func main() {
 		if err != nil {
 			log.Fatal("cannot determine data dir:", err)
 		}
-		dataDir = filepath.Join(home, ".secbench")
+		dataDir = filepath.Join(home, ".anchor")
 	}
 
 	sqliteDB, err := db.Open(dataDir)
@@ -37,7 +37,7 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("secbench server listening on :%s", port)
+	log.Printf("anchor server listening on :%s", port)
 	log.Printf("data dir: %s", dataDir)
 
 	handler := api.CORSMiddleware(mux)

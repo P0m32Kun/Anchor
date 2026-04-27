@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"secbench/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
 func TestParseLine(t *testing.T) {

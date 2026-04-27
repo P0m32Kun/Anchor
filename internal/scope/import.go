@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"secbench/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
 // ImportTarget is a parsed target entry from TXT or CSV import.

@@ -43,3 +43,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Build output
+bin/
+
+# Agent configuration
+.pi/
+agents/

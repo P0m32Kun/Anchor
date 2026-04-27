@@ -155,3 +155,59 @@
 - **Minor: `parseNucleiOutput` 静默丢弃解析错误**: 已改为 `log.Printf` 记录，但 SSE/前端仍无法感知，建议后续将 ParseError 写入数据库或任务 metadata。
 - **Minor: dedup_key 使用 `host` 而非 `matched-at`**: 同一 host 下不同路径的相同 matcher 会被去重。Nuclei 的 `host` 通常等于输入 target（含路径），当前设计在多数场景下合理，但若模板在多个路径命中同一 matcher，可能过度去重。
 - **Minor: `handleAddEvidence` 未校验 Finding 存在性**: 不存在的 finding_id 会触发 SQLite FK 约束错误并返回 500，建议改为提前 404。
+
+---
+
+## M4 实现评审
+
+### 评审结论
+所有 critical/major 问题已修复，代码通过编译和全部 94 个测试（含 15 个新增 report 测试）。端到端验收通过。
+
+---
+
+## Review
+
+### Correct（已确认正确）
+- **报告聚合**: `report.Aggregate()` 应用层 JOIN 正确组装 Project → Targets → ScopeRules → Assets → WebEndpoints → Findings → Evidence → ToolInvocations。
+- **Markdown 模板**: 8 章节硬编码模板输出完整：Executive Summary / Scope / Methodology / Risk Statistics / Vulnerability Details / Accepted Risks / Appendix。
+- **表格转义安全**: `escapeMDTable()` 正确转义 `\|` 和 `\n`，防止用户数据破坏 Markdown 表格结构。
+- **JSON Schema**: 结构化导出包含 meta/project/targets/scope_rules/assets/web_endpoints/findings/tool_invocations，字段完整。
+- **Finding 状态过滤**: `ListFindingsForReport` 正确过滤 `status IN ('confirmed', 'accepted_risk')`。
+- **前端安全**: ReportsPage 使用纯文本 `<pre>` 预览 Markdown，无 `dangerouslySetInnerHTML` XSS 风险。
+- **前端导出**: `exportReportMD`/`exportReportJSON` 返回 Blob，`handleExport` 使用 `URL.createObjectURL` + `revokeObjectURL`，无内存泄漏。
+- **API 路由**: `GET /projects/:id/reports/export.{md,json}` 注册正确，Content-Type 分别为 `text/markdown` 和 `application/json`。
+- **测试覆盖**: 15 个 report 单元测试覆盖空数据、表格转义、证据渲染、JSON 序列化、accepted_risks 分离。
+
+### Fixed（已修复问题）
+
+#### 🔴 Critical: `ListEvidenceByFinding` NULL `created_by` Scan 崩溃
+- **问题**: `ListEvidenceByFinding` 查询的 `created_by` 列在数据库中可为 NULL，但 Scan 到 `models.Evidence.CreatedBy`（`string` 类型）时，`sql: Scan error on column index 5, name "created_by": converting NULL to string is unsupported` 导致报告生成失败。
+- **修复**: `internal/db/queries.go` 的 `ListEvidenceByFinding` 使用 `sql.NullString` 接收 `created_by`，通过 `.Valid` 判断后赋值，兼容 NULL 值。
+
+#### 🟠 Major: Markdown 表格中用户数据含 `|` 破坏表格
+- **问题**: Finding title、Asset value、Evidence excerpt 等用户可控数据若包含管道符 `|`，会破坏 Markdown 表格结构。
+- **修复**: `internal/report/markdown.go` 新增 `escapeMDTable()` 函数，全局转义 `\|` → `\\|` 和 `\n` → ` `，应用到所有表格值。
+
+#### 🟠 Major: 前端 `dangerouslySetInnerHTML` + 双重 HTML 转义
+- **问题**: 原始实现手写 Markdown→HTML 渲染器并使用 `dangerouslySetInnerHTML`，存在 XSS 风险；且同时做了 HTML 实体转义，导致预览显示 `&lt;` 等乱码。
+- **修复**: 移除手写渲染器，改用纯文本 `<pre>` 块展示 Markdown 原文，安全且无渲染歧义。
+
+### E2E 验收记录
+- **日期**: 2026-04-27
+- **项目**: `M4-E2E-验收` (id-1777250874139539000-1)
+- **目标**: 9 个域名（lexin.com, dreame.tech, jtexpress.com, dxy.cn, ztgame.com.cn, sheingroup.net, 127.0.0.1, ltwebstatic.com, sheinside.cn）
+- **资产发现**: 86 资产 / 31 Web 端点（Subfinder + httpx + Naabu）
+- **漏洞扫描**: Nuclei light profile，无真实漏洞命中（目标防护较好）
+- **人工确认**: 插入 3 模拟 Finding（Critical/High/Medium），2 确认 + 1 接受风险
+- **报告导出**:
+  - Markdown: 完整 8 章节，含漏洞详情/证据/修复建议/接受风险，~300 行
+  - JSON: 68969 字节，结构化完整，可被外部工具解析
+- **验证命令**: `go test ./... -race` 94 passed / `go build` ✅ / `npm run build` ✅
+
+### Note（待观察/后续优化）
+- **Major: N+1 查询**: `Aggregate()` 对每个 Finding 单独查询 Evidence，大量 Finding 时性能差。后续可改为批量 `WHERE finding_id IN (...)` 查询。
+- **Major: `Aggregate()` 无 context 超时控制**: 虽然每次查询前检查 `ctx.Done()`，但整体聚合无超时，超大数据集可能挂起。
+- **Minor: JSON 中 accepted_risks 未顶层分离**: 当前与 findings 混在一起（前端按 status 区分），建议后续增加 `accepted_risks` 顶层数组提升可读性。
+- **Minor: Content-Disposition 文件名**: 当前使用 `report_{projectId}.{format}`，建议改为 `{project.Name}.{format}`。
+- **Minor: 前端缺少 Finding 拖拽排序**: M4 Sprint 中标记为延后到 v0.2。
+- **Minor: DefectDojo 兼容性**: M4 Sprint 中标记为延后到 v0.4。

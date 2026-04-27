@@ -1,4 +1,4 @@
-module secbench
+module github.com/P0m32Kun/Anchor
 
 go 1.22
 

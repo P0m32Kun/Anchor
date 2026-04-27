@@ -1,7 +1,7 @@
 package scoring
 
 import (
-	"secbench/internal/parser"
+	"github.com/P0m32Kun/Anchor/internal/parser"
 )
 
 // ScoringEngine computes confidence and priority for parser results.

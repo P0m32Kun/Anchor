@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"secbench/internal/db"
-	"secbench/internal/models"
-	"secbench/internal/nuclei"
-	"secbench/internal/parser"
-	"secbench/internal/scope"
-	"secbench/internal/scoring"
-	"secbench/internal/util"
-	"secbench/internal/worker"
+	"github.com/P0m32Kun/Anchor/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/nuclei"
+	"github.com/P0m32Kun/Anchor/internal/parser"
+	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/scoring"
+	"github.com/P0m32Kun/Anchor/internal/util"
+	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
 type WebScreeningWorkflow struct {
