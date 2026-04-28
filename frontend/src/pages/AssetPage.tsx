@@ -83,9 +83,17 @@ export default function AssetPage() {
     }
   };
 
+  const [filterTitle, setFilterTitle] = useState("");
+  const [filterTech, setFilterTech] = useState("");
+
   const domainAssets = assets.filter((a) => a.type === "domain");
   const ipAssets = assets.filter((a) => a.type === "ip");
   const urlAssets = assets.filter((a) => a.type === "url");
+
+  const filteredWeb = webEndpoints.filter((ep) => {
+    if (filterTitle && !ep.title?.toLowerCase().includes(filterTitle.toLowerCase())) return false;
+    return true;
+  });
 
   if (!currentProject) return <div>加载中...</div>;
 
@@ -129,6 +137,21 @@ export default function AssetPage() {
 
       {activeTab === "assets" && (
         <div className="space-y-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="筛选技术栈..."
+              value={filterTech}
+              onChange={(e) => setFilterTech(e.target.value)}
+              className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
+            />
+            <button
+              onClick={() => { setFilterTech(""); setFilterTitle(""); }}
+              className="text-zinc-500 text-sm hover:text-zinc-300 px-2"
+            >
+              清除
+            </button>
+          </div>
           {domainAssets.length > 0 && (
             <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
               <h3 className="font-semibold mb-2 text-sm text-zinc-400">域名 ({domainAssets.length})</h3>
@@ -194,7 +217,16 @@ export default function AssetPage() {
 
       {activeTab === "web" && (
         <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
-          {webEndpoints.length > 0 ? (
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              placeholder="筛选标题..."
+              value={filterTitle}
+              onChange={(e) => setFilterTitle(e.target.value)}
+              className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
+            />
+          </div>
+          {filteredWeb.length > 0 ? (
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-zinc-400 border-b">
@@ -205,7 +237,7 @@ export default function AssetPage() {
                 </tr>
               </thead>
               <tbody>
-                {webEndpoints.map((we) => (
+                {filteredWeb.map((we) => (
                   <tr key={we.id} className="border-b last:border-0 hover:bg-zinc-800/40">
                     <td className="py-2 font-mono text-xs">
                       <a href={we.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
@@ -231,7 +263,7 @@ export default function AssetPage() {
               </tbody>
             </table>
           ) : (
-            <div className="text-zinc-500 text-sm text-center py-8">暂无 Web 端点</div>
+            <div className="text-zinc-500 text-sm text-center py-8">暂无匹配的 Web 端点</div>
           )}
         </section>
       )}

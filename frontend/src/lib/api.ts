@@ -259,4 +259,31 @@ export const api = {
     }
     return res.blob();
   },
+
+  // --- Runs ---
+  listRuns: (projectId: string) =>
+    fetchJSON<Run[]>(`/projects/${projectId}/runs`),
+  getRun: (id: string) =>
+    fetchJSON<Run>(`/runs/${id}`),
+  getRunTasks: (id: string) =>
+    fetchJSON<ScanTask[]>(`/runs/${id}/tasks`),
+
+  // --- Retest ---
+  retestFinding: (id: string) =>
+    fetchJSON<any>(`/findings/${id}/retest`, { method: "POST" }),
+  listRetests: (id: string) =>
+    fetchJSON<any[]>(`/findings/${id}/retests`),
+  batchUpdateFindingStatus: (ids: string[], status: string) =>
+    fetchJSON<any>(`/findings/batch-status`, { method: "PATCH", body: JSON.stringify({ ids, status }) }),
 };
+
+export interface Run {
+  id: string;
+  project_id: string;
+  tool_template_id?: string;
+  name: string;
+  status: string;
+  started_at?: string;
+  finished_at?: string;
+  created_at: string;
+}

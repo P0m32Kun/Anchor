@@ -119,12 +119,25 @@ export default function FindingsPage() {
                     {statusLabels[f.status] || f.status}
                   </span>
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 flex gap-2">
                   <button
                     onClick={() => openDetail(f.id)}
                     className="text-blue-600 hover:underline text-xs"
                   >
                     详情
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.retestFinding(f.id);
+                        alert("复测已发起");
+                      } catch (e) {
+                        alert("复测失败: " + String(e));
+                      }
+                    }}
+                    className="text-green-600 hover:underline text-xs"
+                  >
+                    复测
                   </button>
                 </td>
               </tr>
