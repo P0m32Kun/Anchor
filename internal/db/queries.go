@@ -174,19 +174,46 @@ func (q *Queries) CreateScanPlan(p *models.ScanPlan) error {
 // --- Scan Tasks ---
 
 func (q *Queries) CreateScanTask(t *models.ScanTask) error {
-	_, err := q.db.Exec(`INSERT INTO scan_tasks (id, project_id, plan_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.ProjectID, t.PlanID, t.DependsOnTaskID, t.TargetID, t.Tool, t.CommandTemplate, t.ArgumentsRedacted, t.Status, t.CreatedAt)
+	// Convert empty strings to NULL for foreign key fields
+	planID := sqlNullStringValue(t.PlanID)
+	runID := sqlNullString(t.RunID)
+	dependsOn := sqlNullString(t.DependsOnTaskID)
+	targetID := sqlNullString(t.TargetID)
+	_, err := q.db.Exec(`INSERT INTO scan_tasks (id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.ProjectID, planID, runID, dependsOn, targetID, t.Tool, t.CommandTemplate, t.ArgumentsRedacted, t.Status, t.CreatedAt)
 	return err
 }
 
 func (q *Queries) GetScanTask(id string) (*models.ScanTask, error) {
-	row := q.db.QueryRow(`SELECT id, project_id, plan_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, worker_id, created_at FROM scan_tasks WHERE id = ?`, id)
+	row := q.db.QueryRow(`SELECT id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, worker_id, created_at FROM scan_tasks WHERE id = ?`, id)
 	t := &models.ScanTask{}
-	err := row.Scan(&t.ID, &t.ProjectID, &t.PlanID, &t.DependsOnTaskID, &t.TargetID, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &t.StartedAt, &t.FinishedAt, &t.ExitCode, &t.WorkerID, &t.CreatedAt)
+	var planID, runID sql.NullString
+	var startedAt, finishedAt sql.NullTime
+	var exitCode sql.NullInt64
+	err := row.Scan(&t.ID, &t.ProjectID, &planID, &runID, &t.DependsOnTaskID, &t.TargetID, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &startedAt, &finishedAt, &exitCode, &t.WorkerID, &t.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return t, err
+	if err != nil {
+		return nil, err
+	}
+	if planID.Valid {
+		t.PlanID = planID.String
+	}
+	if runID.Valid {
+		t.RunID = &runID.String
+	}
+	if startedAt.Valid {
+		t.StartedAt = &startedAt.Time
+	}
+	if finishedAt.Valid {
+		t.FinishedAt = &finishedAt.Time
+	}
+	if exitCode.Valid {
+		ec := int(exitCode.Int64)
+		t.ExitCode = &ec
+	}
+	return t, nil
 }
 
 func (q *Queries) UpdateScanTaskStatus(id string, status models.TaskStatus, exitCode *int, finishedAt *time.Time) error {
@@ -361,6 +388,20 @@ func nullableString(ns sql.NullString) *string {
 		return &ns.String
 	}
 	return nil
+}
+
+func sqlNullString(s *string) sql.NullString {
+	if s != nil && *s != "" {
+		return sql.NullString{String: *s, Valid: true}
+	}
+	return sql.NullString{}
+}
+
+func sqlNullStringValue(s string) sql.NullString {
+	if s != "" {
+		return sql.NullString{String: s, Valid: true}
+	}
+	return sql.NullString{}
 }
 func nullableBool(nb sql.NullBool) *bool {
 	if nb.Valid {
@@ -1034,4 +1075,42 @@ func (q *Queries) ListRetestRunsByFinding(findingID string) ([]*models.RetestRun
 		list = append(list, r)
 	}
 	return list, rows.Err()
+}
+
+// --- ScanTask scheduling (v0.2) ---
+
+func (q *Queries) ListScanTasksByRun(runID string) ([]*models.ScanTask, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, worker_id, created_at
+		FROM scan_tasks WHERE run_id = ? ORDER BY created_at`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.ScanTask
+	for rows.Next() {
+		t := &models.ScanTask{}
+		var rid, pid, dep, tid, wid sql.NullString
+		var sa, fa sql.NullTime
+		var ec sql.NullInt64
+		if err := rows.Scan(
+			&t.ID, &t.ProjectID, &pid, &rid, &dep, &tid, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &sa, &fa, &ec, &wid, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		if pid.Valid { t.PlanID = pid.String }
+		if rid.Valid { t.RunID = &rid.String }
+		if dep.Valid { t.DependsOnTaskID = &dep.String }
+		if tid.Valid { t.TargetID = &tid.String }
+		if sa.Valid { t.StartedAt = &sa.Time }
+		if fa.Valid { t.FinishedAt = &fa.Time }
+		if ec.Valid { v := int(ec.Int64); t.ExitCode = &v }
+		if wid.Valid { t.WorkerID = &wid.String }
+		list = append(list, t)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) UpdateRunStatus(id string, status models.RunStatus, startedAt, finishedAt *time.Time) error {
+	_, err := q.db.Exec(`UPDATE runs SET status = ?, started_at = ?, finished_at = ? WHERE id = ?`, status, startedAt, finishedAt, id)
+	return err
 }

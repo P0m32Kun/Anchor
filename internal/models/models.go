@@ -103,6 +103,7 @@ type ScanTask struct {
 	ID                string     `json:"id" db:"id"`
 	ProjectID         string     `json:"project_id" db:"project_id"`
 	PlanID            string     `json:"plan_id" db:"plan_id"`
+	RunID             *string    `json:"run_id" db:"run_id"`
 	DependsOnTaskID   *string    `json:"depends_on_task_id" db:"depends_on_task_id"`
 	TargetID          *string    `json:"target_id" db:"target_id"`
 	Tool              string     `json:"tool" db:"tool"`

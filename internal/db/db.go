@@ -455,5 +455,22 @@ func migrateV02(db *sql.DB) error {
 			}
 		}
 	}
+	if err := migrateV02RunID(db); err != nil {
+		return fmt.Errorf("migrate v0.2 run_id: %w", err)
+	}
+	return nil
+}
+
+func migrateV02RunID(db *sql.DB) error {
+	// Check if column exists
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('scan_tasks') WHERE name = 'run_id'`).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		_, err = db.Exec(`ALTER TABLE scan_tasks ADD COLUMN run_id TEXT REFERENCES runs(id) ON DELETE CASCADE`)
+		return err
+	}
 	return nil
 }

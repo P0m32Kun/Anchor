@@ -99,6 +99,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects/{id}/targets", s.handleListTargets)
 	mux.HandleFunc("POST /projects/{id}/runs", s.handleCreateRun)
 	mux.HandleFunc("GET /projects/{id}/runs", s.handleListRuns)
+	mux.HandleFunc("GET /runs/{id}", s.handleGetRun)
+	mux.HandleFunc("GET /runs/{id}/tasks", s.handleGetRunTasks)
 	mux.HandleFunc("POST /projects/{id}/workflows/asset-discovery", s.handleStartAssetDiscovery)
 	mux.HandleFunc("GET /projects/{id}/assets", s.handleListAssetsFiltered)
 	mux.HandleFunc("GET /projects/{id}/web-endpoints", s.handleListWebEndpointsByProject)

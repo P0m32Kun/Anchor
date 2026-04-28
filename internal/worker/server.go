@@ -17,15 +17,19 @@ import (
 
 // WorkerServer runs in worker mode, receiving tasks via HTTP and executing them.
 type WorkerServer struct {
-	dataDir   string
-	procs     map[string]*exec.Cmd
-	mu        sync.Mutex
+	dataDir    string
+	coreURL    string
+	httpClient *http.Client
+	procs      map[string]*exec.Cmd
+	mu         sync.Mutex
 }
 
-func NewWorkerServer(dataDir string) *WorkerServer {
+func NewWorkerServer(dataDir string, coreURL string) *WorkerServer {
 	return &WorkerServer{
-		dataDir: dataDir,
-		procs:   make(map[string]*exec.Cmd),
+		dataDir:    dataDir,
+		coreURL:    coreURL,
+		httpClient: &http.Client{Timeout: 30 * time.Second},
+		procs:      make(map[string]*exec.Cmd),
 	}
 }
 
@@ -176,10 +180,23 @@ func (ws *WorkerServer) reportResult(taskID, status string, artifacts []map[stri
 	}
 	data, _ := json.Marshal(result)
 	
-	// For local worker, we don't have a core URL. The result should be collected
-	// by the core server polling or via stdout. For now, write to a result file.
+	// Write result file (always)
 	resultPath := filepath.Join(ws.dataDir, "workdirs", taskID, "_result.json")
 	os.WriteFile(resultPath, data, 0640)
+	
+	// Report to core server if coreURL is set
+	if ws.coreURL != "" {
+		resp, err := ws.httpClient.Post(
+			fmt.Sprintf("%s/tasks/%s/result", ws.coreURL, taskID),
+			"application/json",
+			bytes.NewReader(data),
+		)
+		if err != nil {
+			log.Printf("[worker] report result to core failed: %v", err)
+		} else {
+			resp.Body.Close()
+		}
+	}
 	
 	log.Printf("[worker] task %s finished: %s", taskID, status)
 }

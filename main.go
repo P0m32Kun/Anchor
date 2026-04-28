@@ -66,7 +66,7 @@ func runServer(dataDir string, autoStartWorker bool) {
 }
 
 func runWorker(dataDir, coreURL string) {
-	ws := worker.NewWorkerServer(dataDir)
+	ws := worker.NewWorkerServer(dataDir, coreURL)
 
 	mux := http.NewServeMux()
 	ws.Register(mux)

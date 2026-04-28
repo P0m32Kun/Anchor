@@ -181,6 +181,12 @@ func (s *Server) handleTaskResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if associated run is complete
+	task, err := s.queries.GetScanTask(taskID)
+	if err == nil && task != nil && task.RunID != nil {
+		go s.checkRunCompletion(*task.RunID)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

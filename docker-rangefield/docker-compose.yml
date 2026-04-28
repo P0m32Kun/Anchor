@@ -1,0 +1,95 @@
+version: "3.8"
+
+services:
+  # --- 基准正常服务 ---
+  nginx:
+    image: nginx:alpine
+    container_name: rf-nginx
+    ports:
+      - "18080:80"
+    networks:
+      rangefield:
+        ipv4_address: 172.20.0.10
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # --- Tomcat 弱口令管理后台 (Java) ---
+  tomcat:
+    build:
+      context: ./apps/tomcat-vuln
+      dockerfile: Dockerfile
+    container_name: rf-tomcat
+    ports:
+      - "18081:8080"
+    networks:
+      rangefield:
+        ipv4_address: 172.20.0.11
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/manager/html"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Grafana 弱口令 (Go/JavaScript) ---
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: rf-grafana
+    ports:
+      - "18082:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    networks:
+      rangefield:
+        ipv4_address: 172.20.0.12
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- Redis 未授权访问 ---
+  redis:
+    image: redis:5-alpine
+    container_name: rf-redis
+    ports:
+      - "16379:6379"
+    command: redis-server --protected-mode no --bind 0.0.0.0
+    networks:
+      rangefield:
+        ipv4_address: 172.20.0.13
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # --- MySQL 弱口令 ---
+  mysql:
+    image: mysql:5.7
+    container_name: rf-mysql
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: testdb
+    networks:
+      rangefield:
+        ipv4_address: 172.20.0.14
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  rangefield:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
