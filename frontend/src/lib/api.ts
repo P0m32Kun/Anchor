@@ -263,10 +263,16 @@ export const api = {
   // --- Runs ---
   listRuns: (projectId: string) =>
     fetchJSON<Run[]>(`/projects/${projectId}/runs`),
+  createRun: (projectId: string, data: { tool_template_id: string; name: string }) =>
+    fetchJSON<Run>(`/projects/${projectId}/runs`, { method: "POST", body: JSON.stringify(data) }),
   getRun: (id: string) =>
     fetchJSON<Run>(`/runs/${id}`),
   getRunTasks: (id: string) =>
     fetchJSON<ScanTask[]>(`/runs/${id}/tasks`),
+
+  // --- Tool Templates ---
+  listToolTemplates: () =>
+    fetchJSON<ToolTemplate[]>("/tool-templates"),
 
   // --- Retest ---
   retestFinding: (id: string) =>
@@ -285,5 +291,15 @@ export interface Run {
   status: string;
   started_at?: string;
   finished_at?: string;
+  created_at: string;
+}
+
+export interface ToolTemplate {
+  id: string;
+  name: string;
+  description: string;
+  tools_json: string;
+  rate_limit: number;
+  is_preset: boolean;
   created_at: string;
 }
