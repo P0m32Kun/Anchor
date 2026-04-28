@@ -2,7 +2,7 @@
 # Usage: docker build -f Dockerfile.server -t anchor-server .
 #        docker run -p 17421:17421 -v anchor-data:/data anchor-server
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk add --no-cache git gcc musl-dev sqlite-dev
 
@@ -28,4 +28,5 @@ EXPOSE 17421
 
 VOLUME ["/data"]
 
-ENTRYPOINT ["./anchor", "--no-local-worker"]
+ENTRYPOINT ["./anchor"]
+CMD ["--no-local-worker"]
