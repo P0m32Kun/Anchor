@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState, useProjectId, useToast } from "../components";
+import { EmptyState, Input, useProjectId, useToast } from "../components";
 import type { Finding, Evidence } from "../lib/api";
 
 const severityColors: Record<string, string> = {
@@ -38,9 +38,18 @@ export default function FindingsPage() {
   const loading = useStore((state) => state.findingsLoading);
   const setFindingsLoading = useStore((state) => state.setFindingsLoading);
   const setFindingsError = useStore((state) => state.setFindingsError);
-  const [filter, setFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [severityFilter, setSeverityFilter] = useState<string>("");
+  const [keyword, setKeyword] = useState<string>("");
+  const [debouncedKeyword, setDebouncedKeyword] = useState<string>("");
   const [detailOpen, setDetailOpen] = useState(false);
   const toast = useToast();
+
+  // Debounce keyword input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedKeyword(keyword), 300);
+    return () => clearTimeout(timer);
+  }, [keyword]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -48,7 +57,7 @@ export default function FindingsPage() {
     setFindingsLoading(true);
     setFindingsError(null);
     api
-      .listFindings(projectId, filter, ctrl.signal)
+      .listFindings(projectId, undefined, ctrl.signal)
       .then((data) => setFindings(data ?? []))
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -57,7 +66,7 @@ export default function FindingsPage() {
       })
       .finally(() => setFindingsLoading(false));
     return () => ctrl.abort();
-  }, [projectId, filter, setFindings, setFindingsLoading, setFindingsError]);
+  }, [projectId, setFindings, setFindingsLoading, setFindingsError]);
 
   const openDetail = async (findingId: string) => {
     const data = await api.getFinding(findingId);
@@ -73,7 +82,7 @@ export default function FindingsPage() {
   const changeStatus = async (findingId: string, status: string) => {
     await api.patchFindingStatus(findingId, status);
     if (projectId) {
-      const updated = await api.listFindings(projectId, filter);
+      const updated = await api.listFindings(projectId, undefined);
       setFindings(updated ?? []);
     }
     if (currentFinding) {
@@ -81,6 +90,26 @@ export default function FindingsPage() {
       setCurrentFinding(data);
     }
   };
+
+  // Client-side filtering: severity + status + keyword
+  const filteredFindings = useMemo(() => {
+    let result = findings;
+    if (statusFilter) {
+      result = result.filter((f) => f.status === statusFilter);
+    }
+    if (severityFilter) {
+      result = result.filter((f) => f.severity === severityFilter);
+    }
+    if (debouncedKeyword.trim()) {
+      const kw = debouncedKeyword.trim().toLowerCase();
+      result = result.filter(
+        (f) =>
+          f.title.toLowerCase().includes(kw) ||
+          (f.summary && f.summary.toLowerCase().includes(kw))
+      );
+    }
+    return result;
+  }, [findings, statusFilter, severityFilter, debouncedKeyword]);
 
   const navigate = useNavigate();
 
@@ -102,14 +131,35 @@ export default function FindingsPage() {
       {/* Title area */}
       <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Findings</h1>
 
-      {/* Filter area */}
-      <div className="flex gap-2">
+      {/* Severity filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm text-zinc-400">严重级别：</span>
+        {["", "critical", "high", "medium", "low", "info"].map((s) => (
+          <button
+            key={s || "all"}
+            onClick={() => setSeverityFilter(s)}
+            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              severityFilter === s
+                ? "bg-slate-800 text-white"
+                : "bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60"
+            }`}
+          >
+            {s ? s.charAt(0).toUpperCase() + s.slice(1) : "全部"}
+          </button>
+        ))}
+      </div>
+
+      {/* Status filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm text-zinc-400">状态：</span>
         {["", "pending_review", "confirmed", "false_positive", "accepted_risk", "ignored"].map((s) => (
           <button
             key={s || "all"}
-            onClick={() => setFilter(s)}
+            onClick={() => setStatusFilter(s)}
             className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              filter === s ? "bg-slate-800 text-white" : "bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60"
+              statusFilter === s
+                ? "bg-slate-800 text-white"
+                : "bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60"
             }`}
           >
             {s ? statusLabels[s] || s : "全部"}
@@ -117,11 +167,23 @@ export default function FindingsPage() {
         ))}
       </div>
 
-      {/* Content area */}
-      {/* Status area */}
+      {/* Keyword search */}
+      <div className="max-w-md">
+        <Input
+          placeholder="搜索标题或描述..."
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+        />
+      </div>
+
+      {/* Result count */}
+      <div className="text-sm text-zinc-400">
+        共 {filteredFindings.length} 个 findings
+        {(statusFilter || severityFilter || debouncedKeyword) && "（已筛选）"}
+      </div>
+
       {loading && <p className="text-zinc-400 text-sm">加载中...</p>}
 
-      {/* Content area */}
       <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-zinc-800/40 text-zinc-400">
@@ -135,7 +197,7 @@ export default function FindingsPage() {
             </tr>
           </thead>
           <tbody>
-            {findings.map((f) => (
+            {filteredFindings.map((f) => (
               <tr key={f.id} className="border-t hover:bg-zinc-800/40">
                 <td className="px-4 py-2 font-medium">{f.title}</td>
                 <td className="px-4 py-2">
@@ -173,7 +235,7 @@ export default function FindingsPage() {
                 </td>
               </tr>
             ))}
-            {findings.length === 0 && !loading && (
+            {filteredFindings.length === 0 && !loading && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
                   暂无 Finding

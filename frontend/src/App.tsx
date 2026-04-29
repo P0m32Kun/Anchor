@@ -6,11 +6,11 @@
  * |--------------------------|----------------|----------------------------------|-------------|
  * | /                        | DashboardPage  | Main dashboard with stats        | Yes         |
  * | /projects                | ProjectPage    | Project list & creation          | Yes         |
- * | /targets                 | TargetPage     | Target management & import       | Yes         |
- * | /assets                  | AssetPage      | Asset inventory                  | Yes         |
- * | /runs                    | RunsPage       | Scan run history & controls      | Yes         |
- * | /findings                | FindingsPage   | Security findings list           | Yes         |
- * | /reports                 | ReportsPage    | Report generation & export       | Yes         |
+ * | /targets                 | LegacyRouteGuard| Redirect to /projects/:id/targets | Yes         |
+ * | /assets                  | LegacyRouteGuard| Redirect to /projects/:id/assets  | Yes         |
+ * | /runs                    | LegacyRouteGuard| Redirect to /projects/:id/runs    | Yes         |
+ * | /findings                | LegacyRouteGuard| Redirect to /projects/:id/findings| Yes         |
+ * | /reports                 | LegacyRouteGuard| Redirect to /projects/:id/reports | Yes         |
  * | /workers                 | WorkersPage    | Worker node management           | Yes         |
  * | /settings                | SettingsPage   | App configuration                | Yes         |
  * | /projects/:projectId     | ProjectLayout  | Project wrapper + redirect       | No          |
@@ -31,10 +31,11 @@
  * removing or properly implementing them.
  */
 
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import { ToastProvider, Navbar, useToast, ErrorBoundary } from "./components";
 import { setGlobalErrorHandler } from "./lib/api";
+import { useStore } from "./lib/store";
 import ProjectLayout from "./components/ProjectLayout";
 import DashboardPage from "./pages/DashboardPage";
 import ProjectPage from "./pages/ProjectPage";
@@ -45,6 +46,28 @@ import FindingsPage from "./pages/FindingsPage";
 import ReportsPage from "./pages/ReportsPage";
 import WorkersPage from "./pages/WorkersPage";
 import SettingsPage from "./pages/SettingsPage";
+
+function LegacyRouteGuard() {
+  const location = useLocation();
+  const lastProjectId = useStore((s) => s.currentProjectId);
+
+  useEffect(() => {
+    console.warn(`[Deprecation] Accessed legacy route: ${location.pathname}`);
+  }, [location]);
+
+  if (!lastProjectId) return <Navigate to="/projects" replace />;
+
+  const legacyMap: Record<string, string> = {
+    "/targets": `/projects/${lastProjectId}/targets`,
+    "/assets": `/projects/${lastProjectId}/assets`,
+    "/runs": `/projects/${lastProjectId}/runs`,
+    "/findings": `/projects/${lastProjectId}/findings`,
+    "/reports": `/projects/${lastProjectId}/reports`,
+  };
+
+  const redirectTo = legacyMap[location.pathname];
+  return redirectTo ? <Navigate to={redirectTo} replace /> : <Navigate to="/projects" replace />;
+}
 
 function AppContent() {
   const toast = useToast();
@@ -71,11 +94,11 @@ function AppContent() {
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
-            <Route path="/targets" element={<TargetPage />} />
-            <Route path="/assets" element={<AssetPage />} />
-            <Route path="/runs" element={<RunsPage />} />
-            <Route path="/findings" element={<FindingsPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/targets" element={<LegacyRouteGuard />} />
+            <Route path="/assets" element={<LegacyRouteGuard />} />
+            <Route path="/runs" element={<LegacyRouteGuard />} />
+            <Route path="/findings" element={<LegacyRouteGuard />} />
+            <Route path="/reports" element={<LegacyRouteGuard />} />
             <Route path="/workers" element={<WorkersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/projects" element={<ProjectPage />} />
