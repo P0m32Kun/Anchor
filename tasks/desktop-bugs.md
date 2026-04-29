@@ -22,18 +22,18 @@
 
 | # | 优先级 | 页面/模块 | 描述 | 复现步骤 | 状态 |
 |---|--------|-----------|------|----------|------|
-| 1 | **P0** | 全局 / API 层 | **Vite Proxy 与前端 API 路径完全错位** — `vite.config.ts` 只代理 `/api/*` 到后端，但前端所有 API 调用使用的是 `/projects`、`/workers`、`/runs` 等路径（无 `/api` 前缀），后端路由也未注册 `/api/...` 前缀。导致 Web dev 模式下**所有 API 请求全部 404**，应用完全不可用。 | 1. 清空 localStorage，刷新页面<br>2. 打开 Network 面板<br>3. 观察所有 fetch 请求返回 200 (HTML) 而非 JSON | 🔴 未修复 |
-| 2 | **P1** | Dashboard | **Dashboard 从不显示当前项目** — 代码中未从 Zustand store 读取 `currentProject`，无论是否已选项目，始终显示 "前往创建 →"。 | 1. 进入 Projects 页面，创建或点击一个项目<br>2. 跳转到 Dashboard<br>3. 观察 "当前项目" 仍显示 "前往创建 →" | 🔴 未修复 |
-| 3 | **P1** | 全局 / Store | **`currentProject` 不持久化** — Zustand store 未使用 persist 中间件，`currentProject` 在页面刷新后丢失，导致每次刷新都需要重新选择项目。 | 1. 在 Projects 页面点击一个项目<br>2. 刷新页面<br>3. 进入 Targets / Runs / Assets 页面，提示 "请先选择一个项目" | 🔴 未修复 |
-| 4 | **P1** | Targets | **TargetPage 缺少项目级路由** — `App.tsx` 有 `/projects/:id/assets`、`/projects/:id/findings`、`/projects/:id/reports`，但**没有** `/projects/:id/targets` 或 `/projects/:id/runs`。TargetPage 只能通过 `/targets` 访问，完全依赖 Zustand 中的 `currentProject`。 | 1. 直接访问 `http://localhost:1420/projects/{id}/targets`<br>2. 404 或显示 Dashboard 内容（取决于路由匹配） | 🔴 未修复 |
-| 5 | **P1** | Targets | **添加目标时 Scope 确认响应未处理** — 当项目没有配置 Scope 规则时，后端 `POST /projects/{id}/targets` 返回 `{needs_scope_confirmation: true, suggested_rule: {...}}`，但前端 `addTarget` 期望返回 `Target` 对象，直接将其加入 targets 列表（实际无效果，且目标未真正创建）。 | 1. 创建新项目（不添加 Scope 规则）<br>2. 在 Targets 页面输入域名点击 "添加"<br>3. 观察目标列表无变化，无错误提示 | 🔴 未修复 |
-| 6 | **P1** | Findings | **Findings 页面无项目时展示误导性空表** — 访问 `/findings`（无项目 ID）时，`useParams` 得到 `undefined`，不发起 API 请求，但页面仍渲染表头和 "暂无 Finding"，用户无法知道需要先选项目。 | 1. 直接访问 `http://localhost:1420/findings`<br>2. 观察页面显示完整表格和 "暂无 Finding" | 🔴 未修复 |
-| 7 | **P1** | Reports | **Reports 页面允许无项目 ID 访问** — 路由 `/reports` 无 `:id` 参数，但代码写 `const projectId = id!`，实际为 `undefined`，导致 API 调用 `/projects/undefined/reports/export.md`，返回 404 或空内容，页面显示 "0 个确认漏洞" 等空态。 | 1. 直接访问 `http://localhost:1420/reports`<br>2. 观察页面无错误提示，仅显示空报告 | 🔴 未修复 |
-| 8 | **P2** | 全局 | **所有 API 调用静默失败** — 几乎每个页面都用 `.catch(console.error)` 或 `.catch(() => {})` 吞掉异常，用户看不到任何网络错误提示，只能看到永远为空的数据。 | 1. 停止后端服务<br>2. 刷新任意页面<br>3. 观察 Console 有错误，但 UI 只显示 "暂无"、"0 次"、"加载中..." 等 | 🟡 未修复 |
-| 9 | **P2** | Dashboard | **后端断开时 Dashboard 不提示连接失败** — Workers 请求失败时 `catch {}` 直接忽略，`onlineWorkers` 保持为 0，显示 "在线 Worker 0" 而非 "连接失败"。 | 1. 启动应用后停止后端<br>2. 观察 Dashboard "在线 Worker" 从 N 变为 0，无任何错误提示 | 🟡 未修复 |
-| 10 | **P2** | Runs | **Runs 页面空态信息矛盾** — 无项目时显示 "共 0 次" 和 "请先选择一个项目" 同时出现，前者暗示有数据只是为空，后者说明无法加载。 | 1. 直接访问 `/runs`（不选项目）<br>2. 观察 "共 0 次" 和 "请先选择一个项目" 并列显示 | 🟡 未修复 |
-| 11 | **P2** | Projects | **创建项目后不会自动选中** — `handleCreate` 只调用 `setProjects([p, ...projects])`，不调用 `setCurrentProject(p)`，用户创建后需手动点击项目卡片才能继续操作。 | 1. 在 Projects 页面创建新项目<br>2. 创建成功后页面仍留在 Projects，未自动跳转或选中 | 🟡 未修复 |
-| 12 | **P2** | Settings | **Server 地址在 Web 模式下为空** — `config.ts` Web 模式返回 `""`（相对路径），但输入框 placeholder 为 `http://localhost:17421`，用户初次进入 Settings 看到空白输入框，无法直观知道当前是否已连接。 | 1. 清空 localStorage 后进入 Settings<br>2. 观察 Server 地址输入框为空 | 🟡 未修复 |
+| 1 | **P0** | 全局 / API 层 | **Vite Proxy 与前端 API 路径完全错位** — `vite.config.ts` 只代理 `/api/*` 到后端，但前端所有 API 调用使用的是 `/projects`、`/workers`、`/runs` 等路径（无 `/api` 前缀），后端路由也未注册 `/api/...` 前缀。导致 Web dev 模式下**所有 API 请求全部 404**，应用完全不可用。 | 1. 清空 localStorage，刷新页面<br>2. 打开 Network 面板<br>3. 观察所有 fetch 请求返回 200 (HTML) 而非 JSON | ✅ 已修复（config.ts Web 模式返回 `/api` + Vite proxy rewrite） |
+| 2 | **P1** | Dashboard | **Dashboard 从不显示当前项目** — 代码中未从 Zustand store 读取 `currentProject`，无论是否已选项目，始终显示 "前往创建 →"。 | 1. 进入 Projects 页面，创建或点击一个项目<br>2. 跳转到 Dashboard<br>3. 观察 "当前项目" 仍显示 "前往创建 →" | ✅ 已修复（读取 useStore currentProject，显示项目名+跳转） |
+| 3 | **P1** | 全局 / Store | **`currentProject` 不持久化** — Zustand store 未使用 persist 中间件，`currentProject` 在页面刷新后丢失，导致每次刷新都需要重新选择项目。 | 1. 在 Projects 页面点击一个项目<br>2. 刷新页面<br>3. 进入 Targets / Runs / Assets 页面，提示 "请先选择一个项目" | ✅ 已修复（zustand/middleware persist，partialize 只持久化 currentProject） |
+| 4 | **P1** | Targets | **TargetPage 缺少项目级路由** — `App.tsx` 有 `/projects/:id/assets`、`/projects/:id/findings`、`/projects/:id/reports`，但**没有** `/projects/:id/targets` 或 `/projects/:id/runs`。TargetPage 只能通过 `/targets` 访问，完全依赖 Zustand 中的 `currentProject`。 | 1. 直接访问 `http://localhost:1420/projects/{id}/targets`<br>2. 404 或显示 Dashboard 内容（取决于路由匹配） | ✅ 已修复（App.tsx 添加 `/projects/:id/targets` 和 `/projects/:id/runs`） |
+| 5 | **P1** | Targets | **添加目标时 Scope 确认响应未处理** — 当项目没有配置 Scope 规则时，后端 `POST /projects/{id}/targets` 返回 `{needs_scope_confirmation: true, suggested_rule: {...}}`，但前端 `addTarget` 期望返回 `Target` 对象，直接将其加入 targets 列表（实际无效果，且目标未真正创建）。 | 1. 创建新项目（不添加 Scope 规则）<br>2. 在 Targets 页面输入域名点击 "添加"<br>3. 观察目标列表无变化，无错误提示 | ✅ 已修复（createTarget 返回联合类型，TargetPage 检查 needs_scope_confirmation 并自动添加规则） |
+| 6 | **P1** | Findings | **Findings 页面无项目时展示误导性空表** — 访问 `/findings`（无项目 ID）时，`useParams` 得到 `undefined`，不发起 API 请求，但页面仍渲染表头和 "暂无 Finding"，用户无法知道需要先选项目。 | 1. 直接访问 `http://localhost:1420/findings`<br>2. 观察页面显示完整表格和 "暂无 Finding" | ✅ 已修复（无 projectId 时显示 EmptyState 引导到项目列表） |
+| 7 | **P1** | Reports | **Reports 页面允许无项目 ID 访问** — 路由 `/reports` 无 `:id` 参数，但代码写 `const projectId = id!`，实际为 `undefined`，导致 API 调用 `/projects/undefined/reports/export.md`，返回 404 或空内容，页面显示 "0 个确认漏洞" 等空态。 | 1. 直接访问 `http://localhost:1420/reports`<br>2. 观察页面无错误提示，仅显示空报告 | ✅ 已修复（无 projectId 时显示 EmptyState 引导到项目列表） |
+| 8 | **P2** | 全局 | **所有 API 调用静默失败** — 几乎每个页面都用 `.catch(console.error)` 或 `.catch(() => {})` 吞掉异常，用户看不到任何网络错误提示，只能看到永远为空的数据。 | 1. 停止后端服务<br>2. 刷新任意页面<br>3. 观察 Console 有错误，但 UI 只显示 "暂无"、"0 次"、"加载中..." 等 | ✅ 已修复（fetchJSON 全局错误拦截 + setGlobalErrorHandler + App.tsx Toast 通知） |
+| 9 | **P2** | Dashboard | **后端断开时 Dashboard 不提示连接失败** — Workers 请求失败时 `catch {}` 直接忽略，`onlineWorkers` 保持为 0，显示 "在线 Worker 0" 而非 "连接失败"。 | 1. 启动应用后停止后端<br>2. 观察 Dashboard "在线 Worker" 从 N 变为 0，无任何错误提示 | ✅ 已修复（connectionError 状态 + 错误 UI + 重试按钮） |
+| 10 | **P2** | Runs | **Runs 页面空态信息矛盾** — 无项目时显示 "共 0 次" 和 "请先选择一个项目" 同时出现，前者暗示有数据只是为空，后者说明无法加载。 | 1. 直接访问 `/runs`（不选项目）<br>2. 观察 "共 0 次" 和 "请先选择一个项目" 并列显示 | ✅ 已修复（移除 "共 0 次"，统一 EmptyState 引导） |
+| 11 | **P2** | Projects | **创建项目后不会自动选中** — `handleCreate` 只调用 `setProjects([p, ...projects])`，不调用 `setCurrentProject(p)`，用户创建后需手动点击项目卡片才能继续操作。 | 1. 在 Projects 页面创建新项目<br>2. 创建成功后页面仍留在 Projects，未自动跳转或选中 | ✅ 已修复（handleCreate 后 setCurrentProject(p)） |
+| 12 | **P2** | Settings | **Server 地址在 Web 模式下为空** — `config.ts` Web 模式返回 `""`（相对路径），但输入框 placeholder 为 `http://localhost:17421`，用户初次进入 Settings 看到空白输入框，无法直观知道当前是否已连接。 | 1. 清空 localStorage 后进入 Settings<br>2. 观察 Server 地址输入框为空 | ✅ 已修复（placeholder 动态显示实际 API base，增加说明文字） |
 | 13 | **P3** | Backend | **空集合返回 `null` 而非 `[]`** — `ListTargetsByProject`、`ListFindingsByProject` 等查询在没有记录时返回 Go 的 `nil` slice，JSON 序列化为 `null` 而非 `[]`。前端虽用 `?? []` 兜底，但 API 契约不一致。 | 1. `curl /projects/{id}/targets`（无目标的项目）<br>2. 观察返回 `null` | 🟡 未修复 |
 | 14 | **P3** | Projects | **datetime-local 输入框在某些浏览器中渲染为多个 spinbutton** — 在测试浏览器中，`<input type="datetime-local">` 被拆分为年/月/日/时/分五个独立 spinbutton，占用大量空间且体验不佳。 | 1. 打开 Projects 页面<br>2. 观察开始/结束时间输入区域 | 🟡 未修复 |
 
@@ -213,10 +213,29 @@ api.listAssets(projectId).then((data) => setAssets(data ?? [])).catch(console.er
 | 空数据时页面表现（EmptyState） | ⚠️ 部分通过 | 空状态存在，但与错误状态混淆 |
 | 错误状态表现（API 500 等） | ❌ 失败 | 全局静默失败，无用户可见错误提示 |
 
-**总体评估**：
-- **P0 阻断**：1 个（API 路径错位导致 Web 模式完全不可用）
-- **P1 严重**：6 个（项目上下文丢失、路由缺失、Scope 确认未处理、空态误导）
-- **P2 一般**：5 个（静默失败、空态矛盾、创建不自动选中、配置显示不清）
-- **P3 细节**：2 个（API 返回 null、datetime 渲染异常）
+## 修复进度
 
-**主流程状态**：🔴 **阻断** — 在修复 P0 API 路径问题之前，Web dev 模式无法完成任何涉及 API 的操作。
+| 批次 | Bug | 状态 | 修复日期 |
+|------|-----|:----:|----------|
+| Sprint 0 | #1 P0 API 路径错位 | ✅ | 2026-04-29 |
+| 第一批 | #3 P1 currentProject 不持久化 | ✅ | 2026-04-29 |
+| 第一批 | #4 P1 TargetPage 缺少项目级路由 | ✅ | 2026-04-29 |
+| 第一批 | #11 P2 创建后不自动选中 | ✅ | 2026-04-29 |
+| 第一批 | #12 P2 Settings 地址为空 | ✅ | 2026-04-29 |
+| 第二批 | #2 P1 Dashboard 不显示项目 | ✅ | 2026-04-29 |
+| 第二批 | #6 P1 Findings 误导性空表 | ✅ | 2026-04-29 |
+| 第二批 | #7 P1 Reports 无 projectId | ✅ | 2026-04-29 |
+| 第二批 | #10 P2 Runs 空态矛盾 | ✅ | 2026-04-29 |
+| 第三批 | #5 P1 Scope 确认未处理 | ✅ | 2026-04-29 |
+| 第三批 | #8 P2 全局 API 静默失败 | ✅ | 2026-04-29 |
+| 第三批 | #9 P2 Dashboard 断开无提示 | ✅ | 2026-04-29 |
+
+---
+
+**总体评估**（修复后）：
+- **P0 阻断**：0 个 ✅
+- **P1 严重**：0 个 ✅
+- **P2 一般**：0 个 ✅
+- **P3 细节**：2 个 🟡（留到 Sprint 4 集中处理）
+
+**主流程状态**：🟢 **可运行** — Web dev 模式下 API 调用正常，核心页面有错误提示和空态引导。
