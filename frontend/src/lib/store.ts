@@ -31,6 +31,10 @@ interface AppState {
   runs: Run[];
   runsLoading: boolean;
   runsError: string | null;
+  workersLoading: boolean;
+  workersError: string | null;
+  reportsLoading: boolean;
+  reportsError: string | null;
   setProjects: (p: Project[]) => void;
   setProjectsLoading: (loading: boolean) => void;
   setProjectsError: (error: string | null) => void;
@@ -55,6 +59,10 @@ interface AppState {
   setRuns: (runs: Run[]) => void;
   setRunsLoading: (loading: boolean) => void;
   setRunsError: (error: string | null) => void;
+  setWorkersLoading: (loading: boolean) => void;
+  setWorkersError: (error: string | null) => void;
+  setReportsLoading: (loading: boolean) => void;
+  setReportsError: (error: string | null) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -83,6 +91,10 @@ export const useStore = create<AppState>()(
       runs: [],
       runsLoading: false,
       runsError: null,
+      workersLoading: false,
+      workersError: null,
+      reportsLoading: false,
+      reportsError: null,
 
       setProjects: (projects) => set({ projects }),
       setProjectsLoading: (projectsLoading) => set({ projectsLoading }),
@@ -148,6 +160,10 @@ export const useStore = create<AppState>()(
       setRuns: (runs) => set({ runs }),
       setRunsLoading: (runsLoading) => set({ runsLoading }),
       setRunsError: (runsError) => set({ runsError }),
+      setWorkersLoading: (workersLoading) => set({ workersLoading }),
+      setWorkersError: (workersError) => set({ workersError }),
+      setReportsLoading: (reportsLoading) => set({ reportsLoading }),
+      setReportsError: (reportsError) => set({ reportsError }),
     }),
     {
       name: "app-store",

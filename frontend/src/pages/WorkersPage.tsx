@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { API_BASE } from "../lib/api";
-import { EmptyState } from "../components";
+import { useStore } from "../lib/store";
+import { EmptyState, SkeletonList } from "../components";
 
 interface Worker {
   id: string;
@@ -37,10 +38,13 @@ function statusLabel(status: string): string {
 
 export default function WorkersPage() {
   const [workers, setWorkers] = useState<Worker[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [offlineWorkers, setOfflineWorkers] = useState<Worker[]>([]);
+  const loading = useStore((state) => state.workersLoading);
+  const error = useStore((state) => state.workersError);
+  const setWorkersLoading = useStore((state) => state.setWorkersLoading);
+  const setWorkersError = useStore((state) => state.setWorkersError);
   const fetchingRef = useRef(false);
+  const isInitialRef = useRef(true);
 
   useEffect(() => {
     let ctrl = new AbortController();
@@ -49,6 +53,9 @@ export default function WorkersPage() {
       if (fetchingRef.current) return; // Prevent request storm
       fetchingRef.current = true;
 
+      if (isInitialRef.current) {
+        setWorkersLoading(true);
+      }
       try {
         const res = await fetch(`${API_BASE}/workers`, { signal: ctrl.signal });
         if (!res.ok) throw new Error("fetch failed");
@@ -61,12 +68,15 @@ export default function WorkersPage() {
 
         setWorkers(onlineOrBusy);
         setOfflineWorkers(offline);
-        setError(null);
+        setWorkersError(null);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
-        setError("连接失败，请检查服务是否运行");
+        setWorkersError("连接失败，请检查服务是否运行");
       } finally {
-        setLoading(false);
+        if (isInitialRef.current) {
+          setWorkersLoading(false);
+          isInitialRef.current = false;
+        }
         fetchingRef.current = false;
       }
     }
@@ -83,7 +93,7 @@ export default function WorkersPage() {
       ctrl.abort();
       clearInterval(interval);
     };
-  }, []);
+  }, [setWorkersLoading, setWorkersError]);
 
   return (
     <div className="space-y-6">
@@ -107,9 +117,7 @@ export default function WorkersPage() {
         </div>
 
         {loading ? (
-          <div className="text-sm text-text-tertiary py-6 text-center bg-white/[0.02] rounded-lg">
-            加载中...
-          </div>
+          <SkeletonList count={3} />
         ) : error ? (
           <div className="text-sm text-red-400 py-6 text-center bg-white/[0.02] rounded-lg">
             {error}

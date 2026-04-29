@@ -30,6 +30,45 @@ func Open(dataDir string) (*sql.DB, error) {
 func Migrate(db *sql.DB) error { return migrate(db) }
 
 func migrate(db *sql.DB) error {
+	var version int
+	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		return fmt.Errorf("read user_version: %w", err)
+	}
+
+	if version < 1 {
+		if err := migrateV1(db); err != nil {
+			return fmt.Errorf("migrate v1: %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 1"); err != nil {
+			return fmt.Errorf("set user_version 1: %w", err)
+		}
+		version = 1
+	}
+
+	if version < 2 {
+		if err := migrateAddRateLimit(db); err != nil {
+			return fmt.Errorf("migrate v2 (rate_limit): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 2"); err != nil {
+			return fmt.Errorf("set user_version 2: %w", err)
+		}
+		version = 2
+	}
+
+	if version < 3 {
+		if err := migrateV02(db); err != nil {
+			return fmt.Errorf("migrate v3 (v0.2): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 3"); err != nil {
+			return fmt.Errorf("set user_version 3: %w", err)
+		}
+		version = 3
+	}
+
+	return nil
+}
+
+func migrateV1(db *sql.DB) error {
 	schema := `
 PRAGMA foreign_keys = ON;
 
@@ -369,19 +408,8 @@ CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_screenshots_project ON screenshots(project_id);
 `
 	if _, err := db.Exec(schema); err != nil {
-		return fmt.Errorf("exec schema: %w", err)
+		return fmt.Errorf("exec schema v1: %w", err)
 	}
-
-	// M1 migration: add rate_limit column to projects if it doesn't exist.
-	if err := migrateAddRateLimit(db); err != nil {
-		return fmt.Errorf("migrate rate_limit: %w", err)
-	}
-
-	// v0.2 migration
-	if err := migrateV02(db); err != nil {
-		return fmt.Errorf("migrate v0.2: %w", err)
-	}
-
 	return nil
 }
 

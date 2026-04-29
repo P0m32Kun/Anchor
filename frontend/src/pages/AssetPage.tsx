@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { useProjectId, useToast, EmptyState, Table } from "../components";
+import { useProjectId, useToast, EmptyState, Table, SkeletonList } from "../components";
 
 const ASSET_TYPES = ["all", "domain", "url", "ip", "cidr", "service"] as const;
 
@@ -273,7 +273,7 @@ export default function AssetPage() {
             </div>
           </div>
           {loading ? (
-            <div className="py-12 text-center text-zinc-400">加载中...</div>
+            <SkeletonList count={5} />
           ) : error ? (
             <div className="py-12 text-center">
               <p className="text-brand-danger mb-2">加载失败: {error}</p>
@@ -358,7 +358,7 @@ export default function AssetPage() {
               </tbody>
             </table>
           ) : (
-            <div className="text-zinc-500 text-sm text-center py-8">暂无匹配的 Web 端点</div>
+            <EmptyState title="暂无 Web 端点" description="当前项目还没有发现任何 Web 端点" />
           )}
         </section>
       )}
@@ -423,7 +423,7 @@ export default function AssetPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-zinc-500 text-sm text-center py-4">暂无端口数据</div>
+                <EmptyState title="暂无端口数据" description="当前 IP 资产还没有扫描到任何开放端口" />
               )}
             </section>
           )}

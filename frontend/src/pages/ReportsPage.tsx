@@ -4,8 +4,9 @@ import { api, Finding, API_BASE } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { Button } from "../components/Button";
 import { SeverityBadge, StatusBadge } from "../components/Badge";
-import { EmptyState } from "../components/EmptyState";
+import { EmptyState, SkeletonCard } from "../components";
 import { useProjectId, useToast } from "../components";
+import { useStore } from "../lib/store";
 
 interface FindingDetail {
   finding: Finding;
@@ -71,8 +72,10 @@ export default function ReportsPage() {
   const toast = useToast();
 
   const [findings, setFindings] = useState<FindingDetail[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const loading = useStore((state) => state.reportsLoading);
+  const error = useStore((state) => state.reportsError);
+  const setReportsLoading = useStore((state) => state.setReportsLoading);
+  const setReportsError = useStore((state) => state.setReportsError);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewRawText, setPreviewRawText] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -89,8 +92,8 @@ export default function ReportsPage() {
   const loadData = async (signal?: AbortSignal) => {
     if (!projectId) return;
     try {
-      setLoading(true);
-      setError(null);
+      setReportsLoading(true);
+      setReportsError(null);
 
       const allFindings = await api.listFindings(projectId, undefined, signal);
       const reportFindings = (allFindings ?? []).filter(
@@ -113,9 +116,9 @@ export default function ReportsPage() {
       setFindings(enriched);
     } catch (e: any) {
       if (e instanceof DOMException && e.name === "AbortError") return;
-      setError(e.message || "Failed to load findings");
+      setReportsError(e.message || "Failed to load findings");
     } finally {
-      setLoading(false);
+      setReportsLoading(false);
     }
   };
 
@@ -134,7 +137,7 @@ export default function ReportsPage() {
       setShowPreview(true);
       setPreviewMode("rendered");
     } catch (e: any) {
-      setError(e.message || "Failed to generate preview");
+      setReportsError(e.message || "Failed to generate preview");
       toast("预览生成失败：" + (e.message || "未知错误"), "error");
     }
   }, [projectId, toast]);
@@ -149,7 +152,7 @@ export default function ReportsPage() {
 
     try {
       setExporting(format);
-      setError(null);
+      setReportsError(null);
       const blob =
         format === "md"
           ? await api.exportReportMD(projectId)
@@ -168,7 +171,7 @@ export default function ReportsPage() {
       }
     } catch (e: any) {
       const msg = e.message || `Export ${format.toUpperCase()} failed`;
-      setError(msg);
+      setReportsError(msg);
       toast("导出失败：" + msg, "error");
     } finally {
       setExporting(null);
@@ -277,11 +280,22 @@ export default function ReportsPage() {
         </div>
       )}
       {loading && (
-        <div className="text-center text-zinc-500 py-12">加载中...</div>
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <SkeletonCard key={i} lines={4} />
+          ))}
+        </div>
+      )}
+
+      {!loading && findings.length === 0 && !error && (
+        <EmptyState
+          title="暂无可报告的发现"
+          description="当前项目还没有 confirmed 或 accepted_risk 状态的 finding。请先运行扫描任务并审核 findings。"
+        />
       )}
 
       {/* Report Outline */}
-      {!loading && (
+      {!loading && findings.length > 0 && (
         <div className="mb-6">
           <h2 className="text-sm font-semibold text-zinc-300 mb-3">报告大纲</h2>
 
@@ -325,11 +339,6 @@ export default function ReportsPage() {
 
           {/* Finding List */}
           <div className="space-y-3 mt-4">
-            {findings.length === 0 && (
-              <div className="text-center text-zinc-500 py-8">
-                暂无可报告的发现 (confirmed/accepted_risk)
-              </div>
-            )}
             {findings.map((fd) => (
               <div
                 key={fd.finding.id}

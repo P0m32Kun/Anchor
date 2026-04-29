@@ -353,27 +353,12 @@ export default function RunsPage() {
           )}
 
           {runs.length === 0 && !runsLoading && projectId && (
-            <div className="py-12 text-center">
-              <div className="w-12 h-12 rounded-apple bg-white/[0.06] flex items-center justify-center text-text-quaternary mb-4 border border-white/[0.06] mx-auto">
-                <svg
-                  className="w-6 h-6"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-text-secondary mb-1">
-                暂无扫描任务
-              </h3>
-              <p className="text-sm text-text-tertiary max-w-xs mx-auto mb-6">
-                按照以下步骤开始你的第一次扫描
-              </p>
-              <div className="flex items-center justify-center gap-2 text-sm text-text-tertiary">
+            <>
+              <EmptyState
+                title="暂无扫描任务"
+                description="按照以下步骤开始你的第一次扫描"
+              />
+              <div className="flex items-center justify-center gap-2 text-sm text-text-tertiary -mt-4 pb-4">
                 <button
                   onClick={() => navigate("/projects")}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-colors"
@@ -404,7 +389,7 @@ export default function RunsPage() {
                   启动扫描
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
 

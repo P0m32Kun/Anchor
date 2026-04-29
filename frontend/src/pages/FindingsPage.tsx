@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState, Input, Select, useProjectId, useToast } from "../components";
+import { EmptyState, Input, Select, SkeletonList, useProjectId, useToast } from "../components";
 import type { Finding, Evidence } from "../lib/api";
 
 const severityColors: Record<string, string> = {
@@ -253,9 +253,19 @@ export default function FindingsPage() {
         </div>
       )}
 
-      {loading && <p className="text-zinc-400 text-sm">加载中...</p>}
+      {loading && <SkeletonList count={5} />}
 
-      <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl overflow-x-auto">
+      {!loading && filteredFindings.length === 0 && (
+        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8">
+          <EmptyState
+            title="暂无 Finding"
+            description="当前项目还没有任何安全发现，请先运行扫描任务"
+          />
+        </div>
+      )}
+
+      {!loading && filteredFindings.length > 0 && (
+        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-zinc-800/40 text-zinc-400">
             <tr>
@@ -331,16 +341,10 @@ export default function FindingsPage() {
                 </td>
               </tr>
             ))}
-            {filteredFindings.length === 0 && !loading && (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
-                  暂无 Finding
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
-      </div>
+        </div>
+      )}
 
       {detailOpen && currentFinding && (
         <FindingDetail
