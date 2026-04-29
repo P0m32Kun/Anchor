@@ -2,10 +2,12 @@ import { getApiBase } from "./config";
 export const API_BASE = getApiBase();
 
 export class APIError extends Error {
-  code?: string;
-  constructor(message: string, code?: string) {
+  code: "TIMEOUT" | "NETWORK_ERROR" | "HTTP_5xx" | "HTTP_4xx" | "NON_JSON_RESPONSE" | "UNKNOWN";
+  retryable: boolean;
+  constructor(message: string, code: APIError["code"] = "UNKNOWN") {
     super(message);
     this.code = code;
+    this.retryable = code === "TIMEOUT" || code === "NETWORK_ERROR" || code === "HTTP_5xx";
   }
 }
 
@@ -18,7 +20,7 @@ export function clearGlobalErrorHandler() {
   globalErrorHandler = null;
 }
 
-async function fetchJSON<T>(path: string, opts?: RequestInit & { timeout?: number }): Promise<T> {
+async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number }): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), opts?.timeout ?? 30000);
 
@@ -35,9 +37,24 @@ async function fetchJSON<T>(path: string, opts?: RequestInit & { timeout?: numbe
     });
 
     if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      const message = data?.error?.message || `${res.status}: ${await res.text()}`;
-      throw new APIError(message, data?.error?.code);
+      let message: string;
+      try {
+        const data = await res.json();
+        message = data?.error?.message || `${res.status}: ${res.statusText}`;
+      } catch {
+        message = `${res.status}: ${res.statusText}`;
+      }
+      const code = res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx";
+      throw new APIError(message, code);
+    }
+
+    if (res.status === 204) {
+      return null as T;
+    }
+
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      throw new APIError("服务器返回了非 JSON 响应", "NON_JSON_RESPONSE");
     }
 
     return res.json();
@@ -55,6 +72,56 @@ async function fetchJSON<T>(path: string, opts?: RequestInit & { timeout?: numbe
     }
 
     // Notify global handler (e.g., Toast) without swallowing the error
+    if (globalErrorHandler) {
+      globalErrorHandler(apiErr);
+    }
+
+    throw apiErr;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function fetchBlob(path: string, opts?: RequestInit & { timeout?: number }): Promise<Blob> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), opts?.timeout ?? 60000);
+
+  if (opts?.signal) {
+    opts.signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...opts,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      let message: string;
+      try {
+        const data = await res.json();
+        message = data?.error?.message || `${res.status}: ${res.statusText}`;
+      } catch {
+        message = `${res.status}: ${res.statusText}`;
+      }
+      const code = res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx";
+      throw new APIError(message, code);
+    }
+
+    return res.blob();
+  } catch (err: any) {
+    let apiErr: APIError;
+
+    if (err instanceof APIError) {
+      apiErr = err;
+    } else if (err instanceof DOMException && err.name === "AbortError") {
+      apiErr = new APIError("请求超时，请检查网络", "TIMEOUT");
+    } else if (err instanceof TypeError) {
+      apiErr = new APIError("网络连接失败，请检查后端服务是否运行", "NETWORK_ERROR");
+    } else {
+      apiErr = new APIError(err?.message || "请求失败", "UNKNOWN");
+    }
+
     if (globalErrorHandler) {
       globalErrorHandler(apiErr);
     }
@@ -221,127 +288,123 @@ export interface Evidence {
 }
 
 export const api = {
-  createProject: (data: { name: string; organization?: string; purpose?: string; start_time?: string; end_time?: string; rate_limit?: number }) =>
-    fetchJSON<Project>("/projects", { method: "POST", body: JSON.stringify(data) }),
+  createProject: (data: { name: string; organization?: string; purpose?: string; start_time?: string; end_time?: string; rate_limit?: number }, signal?: AbortSignal) =>
+    fetchAPI<Project>("/projects", { method: "POST", body: JSON.stringify(data), signal }),
 
-  listProjects: () => fetchJSON<Project[]>("/projects"),
+  listProjects: (signal?: AbortSignal) => fetchAPI<Project[]>("/projects", { signal }),
 
-  getProject: (id: string) => fetchJSON<Project>(`/projects/${id}`),
+  getProject: (id: string, signal?: AbortSignal) => fetchAPI<Project>(`/projects/${id}`, { signal }),
 
-  updateProject: (id: string, data: Partial<Omit<Project, "id" | "created_at">>) =>
-    fetchJSON<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  updateProject: (id: string, data: Partial<Omit<Project, "id" | "created_at">>, signal?: AbortSignal) =>
+    fetchAPI<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
 
-  deleteProject: (id: string) =>
-    fetchJSON<{ status: string }>(`/projects/${id}`, { method: "DELETE" }),
+  deleteProject: (id: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/projects/${id}`, { method: "DELETE", signal }),
 
-  createTarget: (projectId: string, data: { type: string; value: string }) =>
-    fetchJSON<Target | ScopeConfirmationResponse>(`/projects/${projectId}/targets`, { method: "POST", body: JSON.stringify(data) }),
+  createTarget: (projectId: string, data: { type: string; value: string }, signal?: AbortSignal) =>
+    fetchAPI<Target | ScopeConfirmationResponse>(`/projects/${projectId}/targets`, { method: "POST", body: JSON.stringify(data), signal }),
 
-  listTargets: (projectId: string) => fetchJSON<Target[]>(`/projects/${projectId}/targets`),
+  listTargets: (projectId: string, signal?: AbortSignal) => fetchAPI<Target[]>(`/projects/${projectId}/targets`, { signal }),
 
-  createScopeRule: (data: { project_id: string; action: string; type: string; value: string; reason?: string }) =>
-    fetchJSON<ScopeRule>("/scope-rules", { method: "POST", body: JSON.stringify(data) }),
+  createScopeRule: (data: { project_id: string; action: string; type: string; value: string; reason?: string }, signal?: AbortSignal) =>
+    fetchAPI<ScopeRule>("/scope-rules", { method: "POST", body: JSON.stringify(data), signal }),
 
-  listScopeRules: (projectId: string) =>
-    fetchJSON<ScopeRule[]>(`/scope-rules?project_id=${projectId}`),
+  listScopeRules: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<ScopeRule[]>(`/scope-rules?project_id=${projectId}`, { signal }),
 
-  dryRun: (projectId: string) =>
-    fetchJSON<DryRunResult>(`/scan-plans/dry-run?project_id=${projectId}`, { method: "POST" }),
+  dryRun: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<DryRunResult>(`/scan-plans/dry-run?project_id=${projectId}`, { method: "POST", signal }),
 
-  importTargets: async (projectId: string, file: File): Promise<ImportResult> => {
+  importTargets: async (projectId: string, file: File, signal?: AbortSignal): Promise<ImportResult> => {
     const formData = new FormData();
     formData.append("file", file);
     const res = await fetch(`${API_BASE}/projects/${projectId}/targets/import`, {
       method: "POST",
       body: formData,
+      signal,
     });
     if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      throw new APIError(data?.error?.message || res.statusText);
+      let message: string;
+      try {
+        const data = await res.json();
+        message = data?.error?.message || `${res.status}: ${res.statusText}`;
+      } catch {
+        message = `${res.status}: ${res.statusText}`;
+      }
+      const code = res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx";
+      throw new APIError(message, code);
     }
     return res.json();
   },
 
-  runTask: (data: { project_id: string; plan_id?: string; tool: string; target_id: string; command: string }) =>
-    fetchJSON<ScanTask>("/tasks/run", { method: "POST", body: JSON.stringify(data) }),
+  runTask: (data: { project_id: string; plan_id?: string; tool: string; target_id: string; command: string }, signal?: AbortSignal) =>
+    fetchAPI<ScanTask>("/tasks/run", { method: "POST", body: JSON.stringify(data), signal }),
 
-  getTask: (id: string) => fetchJSON<ScanTask>(`/scan-tasks/${id}`),
+  getTask: (id: string, signal?: AbortSignal) => fetchAPI<ScanTask>(`/scan-tasks/${id}`, { signal }),
 
-  cancelTask: (id: string) =>
-    fetchJSON<any>(`/scan-tasks/${id}/cancel`, { method: "POST" }),
+  cancelTask: (id: string, signal?: AbortSignal) =>
+    fetchAPI<any>(`/scan-tasks/${id}/cancel`, { method: "POST", signal }),
 
-  listArtifacts: (taskId: string) =>
-    fetchJSON<any[]>(`/tasks/${taskId}/artifacts`),
+  listArtifacts: (taskId: string, signal?: AbortSignal) =>
+    fetchAPI<any[]>(`/tasks/${taskId}/artifacts`, { signal }),
 
-  listToolHealth: () => fetchJSON<ToolHealth[]>("/health/tools"),
+  listToolHealth: (signal?: AbortSignal) => fetchAPI<ToolHealth[]>("/health/tools", { signal }),
 
-  runHealthCheck: () => fetchJSON<ToolHealth[]>("/health/check", { method: "POST" }),
+  runHealthCheck: (signal?: AbortSignal) => fetchAPI<ToolHealth[]>("/health/check", { method: "POST", signal }),
 
-  startAssetDiscovery: (projectId: string) =>
-    fetchJSON<{ status: string }>(`/projects/${projectId}/workflows/asset-discovery`, { method: "POST" }),
+  startAssetDiscovery: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/projects/${projectId}/workflows/asset-discovery`, { method: "POST", signal }),
 
-  listAssets: (projectId: string) => fetchJSON<Asset[]>(`/projects/${projectId}/assets`),
+  listAssets: (projectId: string, signal?: AbortSignal) => fetchAPI<Asset[]>(`/projects/${projectId}/assets`, { signal }),
 
-  listWebEndpoints: (projectId: string) => fetchJSON<WebEndpoint[]>(`/projects/${projectId}/web-endpoints`),
+  listWebEndpoints: (projectId: string, signal?: AbortSignal) => fetchAPI<WebEndpoint[]>(`/projects/${projectId}/web-endpoints`, { signal }),
 
-  listPorts: (assetId: string) => fetchJSON<Port[]>(`/assets/${assetId}/ports`),
+  listPorts: (assetId: string, signal?: AbortSignal) => fetchAPI<Port[]>(`/assets/${assetId}/ports`, { signal }),
 
-  listServices: (assetId: string) => fetchJSON<Service[]>(`/assets/${assetId}/services`),
+  listServices: (assetId: string, signal?: AbortSignal) => fetchAPI<Service[]>(`/assets/${assetId}/services`, { signal }),
 
-  startWebScreening: (projectId: string) =>
-    fetchJSON<{ status: string }>(`/projects/${projectId}/workflows/web-screening`, { method: "POST" }),
+  startWebScreening: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/projects/${projectId}/workflows/web-screening`, { method: "POST", signal }),
 
-  listFindings: (projectId: string, status?: string) =>
-    fetchJSON<Finding[]>(`/projects/${projectId}/findings${status ? `?status=${status}` : ""}`),
+  listFindings: (projectId: string, status?: string, signal?: AbortSignal) =>
+    fetchAPI<Finding[]>(`/projects/${projectId}/findings${status ? `?status=${status}` : ""}`, { signal }),
 
-  getFinding: (id: string) =>
-    fetchJSON<{ finding: Finding; evidence: Evidence[] }>(`/findings/${id}`),
+  getFinding: (id: string, signal?: AbortSignal) =>
+    fetchAPI<{ finding: Finding; evidence: Evidence[] }>(`/findings/${id}`, { signal }),
 
-  patchFindingStatus: (id: string, status: string) =>
-    fetchJSON<{ status: string }>(`/findings/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  patchFindingStatus: (id: string, status: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/findings/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }), signal }),
 
-  addEvidence: (findingId: string, data: { type: string; excerpt: string; created_by?: string }) =>
-    fetchJSON<Evidence>(`/findings/${findingId}/evidence`, { method: "POST", body: JSON.stringify(data) }),
+  addEvidence: (findingId: string, data: { type: string; excerpt: string; created_by?: string }, signal?: AbortSignal) =>
+    fetchAPI<Evidence>(`/findings/${findingId}/evidence`, { method: "POST", body: JSON.stringify(data), signal }),
 
-  exportReportMD: async (projectId: string): Promise<Blob> => {
-    const res = await fetch(`${API_BASE}/projects/${projectId}/reports/export.md`);
-    if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      throw new APIError(data?.error?.message || `Export failed: ${res.statusText}`);
-    }
-    return res.blob();
-  },
+  exportReportMD: (projectId: string, signal?: AbortSignal) =>
+    fetchBlob(`/projects/${projectId}/reports/export.md`, { signal }),
 
-  exportReportJSON: async (projectId: string): Promise<Blob> => {
-    const res = await fetch(`${API_BASE}/projects/${projectId}/reports/export.json`);
-    if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      throw new APIError(data?.error?.message || `Export failed: ${res.statusText}`);
-    }
-    return res.blob();
-  },
+  exportReportJSON: (projectId: string, signal?: AbortSignal) =>
+    fetchBlob(`/projects/${projectId}/reports/export.json`, { signal }),
 
   // --- Runs ---
-  listRuns: (projectId: string) =>
-    fetchJSON<Run[]>(`/projects/${projectId}/runs`),
-  createRun: (projectId: string, data: { tool_template_id: string; name: string }) =>
-    fetchJSON<Run>(`/projects/${projectId}/runs`, { method: "POST", body: JSON.stringify(data) }),
-  getRun: (id: string) =>
-    fetchJSON<Run>(`/runs/${id}`),
-  getRunTasks: (id: string) =>
-    fetchJSON<ScanTask[]>(`/runs/${id}/tasks`),
+  listRuns: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<Run[]>(`/projects/${projectId}/runs`, { signal }),
+  createRun: (projectId: string, data: { tool_template_id: string; name: string }, signal?: AbortSignal) =>
+    fetchAPI<Run>(`/projects/${projectId}/runs`, { method: "POST", body: JSON.stringify(data), signal }),
+  getRun: (id: string, signal?: AbortSignal) =>
+    fetchAPI<Run>(`/runs/${id}`, { signal }),
+  getRunTasks: (id: string, signal?: AbortSignal) =>
+    fetchAPI<ScanTask[]>(`/runs/${id}/tasks`, { signal }),
 
   // --- Tool Templates ---
-  listToolTemplates: () =>
-    fetchJSON<ToolTemplate[]>("/tool-templates"),
+  listToolTemplates: (signal?: AbortSignal) =>
+    fetchAPI<ToolTemplate[]>("/tool-templates", { signal }),
 
   // --- Retest ---
-  retestFinding: (id: string) =>
-    fetchJSON<any>(`/findings/${id}/retest`, { method: "POST" }),
-  listRetests: (id: string) =>
-    fetchJSON<any[]>(`/findings/${id}/retests`),
-  batchUpdateFindingStatus: (ids: string[], status: string) =>
-    fetchJSON<any>(`/findings/batch-status`, { method: "PATCH", body: JSON.stringify({ ids, status }) }),
+  retestFinding: (id: string, signal?: AbortSignal) =>
+    fetchAPI<any>(`/findings/${id}/retest`, { method: "POST", signal }),
+  listRetests: (id: string, signal?: AbortSignal) =>
+    fetchAPI<any[]>(`/findings/${id}/retests`, { signal }),
+  batchUpdateFindingStatus: (ids: string[], status: string, signal?: AbortSignal) =>
+    fetchAPI<any>(`/findings/batch-status`, { method: "PATCH", body: JSON.stringify({ ids, status }), signal }),
 };
 
 export interface Run {
