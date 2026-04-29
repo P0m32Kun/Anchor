@@ -57,6 +57,7 @@ memory/
 
 # Task tracking
 tasks/
+!tasks/desktop-bugs.md
 
 # Tauri generated
 src-tauri/gen/
