@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState, useProjectId } from "../components";
+import { EmptyState, useProjectId, useToast } from "../components";
 import type { Finding, Evidence } from "../lib/api";
 
 const severityColors: Record<string, string> = {
@@ -38,6 +38,7 @@ export default function FindingsPage() {
   const [filter, setFilter] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     if (!projectId) return;
@@ -87,27 +88,31 @@ export default function FindingsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Findings</h1>
-        <div className="flex gap-2">
-          {["", "pending_review", "confirmed", "false_positive", "accepted_risk", "ignored"].map((s) => (
-            <button
-              key={s || "all"}
-              onClick={() => setFilter(s)}
-              className={`px-3 py-1 rounded text-sm ${
-                filter === s ? "bg-slate-800 text-white" : "bg-zinc-800/60 text-zinc-300 hover:bg-gray-200"
-              }`}
-            >
-              {s ? statusLabels[s] || s : "全部"}
-            </button>
-          ))}
-        </div>
+    <div className="max-w-5xl space-y-6">
+      {/* Title area */}
+      <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Findings</h1>
+
+      {/* Filter area */}
+      <div className="flex gap-2">
+        {["", "pending_review", "confirmed", "false_positive", "accepted_risk", "ignored"].map((s) => (
+          <button
+            key={s || "all"}
+            onClick={() => setFilter(s)}
+            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              filter === s ? "bg-slate-800 text-white" : "bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60"
+            }`}
+          >
+            {s ? statusLabels[s] || s : "全部"}
+          </button>
+        ))}
       </div>
 
-      {loading && <p className="text-zinc-400">加载中...</p>}
+      {/* Content area */}
+      {/* Status area */}
+      {loading && <p className="text-zinc-400 text-sm">加载中...</p>}
 
-      <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl rounded overflow-x-auto">
+      {/* Content area */}
+      <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-zinc-800/40 text-zinc-400">
             <tr>
@@ -146,9 +151,9 @@ export default function FindingsPage() {
                     onClick={async () => {
                       try {
                         await api.retestFinding(f.id);
-                        alert("复测已发起");
+                        toast("复测已发起", "success");
                       } catch (e) {
-                        alert("复测失败: " + String(e));
+                        toast("复测失败: " + String(e), "error");
                       }
                     }}
                     className="text-green-600 hover:underline text-xs"

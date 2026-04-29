@@ -73,19 +73,25 @@ export default function RunsPage() {
 
   return (
     <div className="max-w-5xl space-y-6">
+      {/* Title area */}
       <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">扫描执行</h1>
 
+      {/* Operation area */}
+      {projectId && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setShowCreate(true)}
+            className="bg-brand-primary text-white text-xs px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+          >
+            新建扫描
+          </button>
+        </div>
+      )}
+
+      {/* Content area */}
       <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-base font-medium text-zinc-200">执行历史</h2>
-          {projectId && (
-            <button
-              onClick={() => setShowCreate(true)}
-              className="bg-brand-primary text-white text-xs px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-            >
-              新建扫描
-            </button>
-          )}
         </div>
         <div className="divide-y divide-zinc-800/60">
           {runs.map((run) => (

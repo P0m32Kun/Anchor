@@ -4,14 +4,14 @@
 In Progress
 
 ## Tasks
-- [x] Sprint 1.10 — ErrorBoundary
+- [x] TargetPage.tsx 布局统一 + alert/confirm 替换
+- [x] AssetPage.tsx 布局统一 + alert 替换
 
 ## Files Changed
-- `frontend/src/components/ErrorBoundary.tsx` (新建)
-- `frontend/src/App.tsx` (集成 ErrorBoundary)
-- `frontend/src/components/index.ts` (导出)
+- frontend/src/pages/TargetPage.tsx
+- frontend/src/pages/AssetPage.tsx
 
 ## Notes
-- ErrorBoundary 组件支持自定义 fallback，默认显示"页面出现错误"+重新加载按钮
-- App.tsx 中 Routes 被 ErrorBoundary 包裹，隔离路由级渲染错误
 - `npm run typecheck` 零错误
+- TargetPage 无 `alert` / `confirm` 残留
+- AssetPage 无 `alert` 残留

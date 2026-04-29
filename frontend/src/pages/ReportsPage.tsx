@@ -125,55 +125,53 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <Link to={`/projects/${projectId}`} className="text-sm text-brand-primary hover:text-brand-primary/80 mb-1 block transition-colors">
-            ← 返回项目
-          </Link>
-          <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">安全评估报告</h1>
-          <p className="text-zinc-500 text-sm mt-1">
-            <span className="font-mono text-zinc-300">{confirmedCount}</span> 个确认漏洞，
-            <span className="font-mono text-zinc-300">{acceptedCount}</span> 个接受风险
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handlePreviewMarkdown}
-            disabled={loading || showPreview}
-          >
-            {showPreview ? "已生成预览" : "Markdown 预览"}
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => handleExport("md")}
-            disabled={exporting !== null}
-          >
-            {exporting === "md" ? "导出中..." : "导出 Markdown"}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => handleExport("json")}
-            disabled={exporting !== null}
-          >
-            {exporting === "json" ? "导出中..." : "导出 JSON"}
-          </Button>
-        </div>
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* Title area */}
+      <div>
+        <Link to={`/projects/${projectId}`} className="text-sm text-brand-primary hover:text-brand-primary/80 mb-1 block transition-colors">
+          ← 返回项目
+        </Link>
+        <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">安全评估报告</h1>
+        <p className="text-zinc-500 text-sm mt-1">
+          <span className="font-mono text-zinc-300">{confirmedCount}</span> 个确认漏洞，
+          <span className="font-mono text-zinc-300">{acceptedCount}</span> 个接受风险
+        </p>
       </div>
 
-      {/* Error */}
+      {/* Operation area */}
+      <div className="flex gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handlePreviewMarkdown}
+          disabled={loading || showPreview}
+        >
+          {showPreview ? "已生成预览" : "Markdown 预览"}
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => handleExport("md")}
+          disabled={exporting !== null}
+        >
+          {exporting === "md" ? "导出中..." : "导出 Markdown"}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => handleExport("json")}
+          disabled={exporting !== null}
+        >
+          {exporting === "json" ? "导出中..." : "导出 JSON"}
+        </Button>
+      </div>
+
+      {/* Status area */}
       {error && (
-        <div className="bg-brand-danger/10 border border-brand-danger/20 text-brand-danger px-4 py-3 rounded-lg mb-4">
+        <div className="bg-brand-danger/10 border border-brand-danger/20 text-brand-danger px-4 py-3 rounded-lg">
           {error}
         </div>
       )}
-
-      {/* Loading */}
       {loading && (
         <div className="text-center text-zinc-500 py-12">加载中...</div>
       )}

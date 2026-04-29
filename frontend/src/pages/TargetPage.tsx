@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { api, type ImportResult, type DryRunResult, type Project, type Target } from "../lib/api";
+import { api, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse } from "../lib/api";
 import { useStore } from "../lib/store";
-import { useProjectId } from "../components";
+import { useProjectId, ConfirmDialog, useToast, EmptyState, Table, Badge, SkeletonList } from "../components";
 
 function ProjectInfo({ project }: { project: Project }) {
   const now = new Date();
@@ -189,6 +189,7 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
     gray: "bg-white/[0.04] text-text-tertiary",
     yellow: "bg-accent-yellow/15 text-accent-yellow",
     red: "bg-brand-danger/15 text-brand-danger",
+    blue: "bg-brand-primary/15 text-brand-primary",
   };
   return (
     <div className="flex items-center gap-1">
@@ -210,10 +211,32 @@ export default function TargetPage() {
   const [scopeAction, setScopeAction] = useState<"include" | "exclude">("include");
   const [scopeValue, setScopeValue] = useState("");
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [scopeConfirmOpen, setScopeConfirmOpen] = useState(false);
+  const [pendingScopeConfirm, setPendingScopeConfirm] = useState<{
+    message: string;
+    suggested: ScopeConfirmationResponse["suggested_rule"];
+    pendingType: string;
+    pendingValue: string;
+  } | null>(null);
 
-  const loadTargets = useCallback(() => {
+  const toast = useToast();
+
+  const loadTargets = useCallback(async () => {
     if (!projectId) return;
-    api.listTargets(projectId).then((data) => setTargets(data ?? [])).catch(console.error);
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.listTargets(projectId);
+      setTargets(data ?? []);
+    } catch (err) {
+      const msg = String(err);
+      setError(msg);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [projectId, setTargets]);
 
   useEffect(() => {
@@ -224,76 +247,127 @@ export default function TargetPage() {
   const addTarget = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId || !targetValue.trim()) return;
-    const res = await api.createTarget(projectId, { type: targetType, value: targetValue });
-    if ("needs_scope_confirmation" in res && res.needs_scope_confirmation) {
-      const suggested = res.suggested_rule;
-      const confirmed = window.confirm(
-        `${res.message}\n\n建议添加 Scope 规则: [${suggested.action}] ${suggested.type} = ${suggested.value}\n\n是否自动添加该规则并重新添加目标？`
-      );
-      if (confirmed) {
-        try {
-          await api.createScopeRule({
-            project_id: projectId,
-            action: suggested.action,
-            type: suggested.type,
-            value: suggested.value,
-          });
-          const t = await api.createTarget(projectId, { type: targetType, value: targetValue });
-          if ("needs_scope_confirmation" in t && t.needs_scope_confirmation) {
-            alert("Scope 规则已添加，但目标仍需要确认，请手动检查。");
-          } else {
-            setTargets([...targets, t as Target]);
-            setTargetValue("");
-          }
-        } catch (err) {
-          alert("添加 Scope 规则失败: " + String(err));
-        }
+    try {
+      const res = await api.createTarget(projectId, { type: targetType, value: targetValue });
+      if ("needs_scope_confirmation" in res && res.needs_scope_confirmation) {
+        setPendingScopeConfirm({
+          message: res.message,
+          suggested: res.suggested_rule,
+          pendingType: targetType,
+          pendingValue: targetValue,
+        });
+        setScopeConfirmOpen(true);
+        return;
       }
-      return;
+      setTargets([...targets, res as Target]);
+      setTargetValue("");
+      toast("目标已添加", "success");
+    } catch (err) {
+      toast("添加目标失败: " + String(err), "error");
     }
-    setTargets([...targets, res as Target]);
-    setTargetValue("");
+  };
+
+  const handleConfirmScope = async () => {
+    if (!pendingScopeConfirm || !projectId) return;
+    try {
+      const { suggested, pendingType, pendingValue } = pendingScopeConfirm;
+      await api.createScopeRule({
+        project_id: projectId,
+        action: suggested.action,
+        type: suggested.type,
+        value: suggested.value,
+      });
+      const t = await api.createTarget(projectId, { type: pendingType, value: pendingValue });
+      if ("needs_scope_confirmation" in t && t.needs_scope_confirmation) {
+        toast("Scope 规则已添加，但目标仍需要确认，请手动检查。", "warning");
+      } else {
+        setTargets([...targets, t as Target]);
+        setTargetValue("");
+        toast("目标已添加", "success");
+      }
+    } catch (err) {
+      toast("添加 Scope 规则失败: " + String(err), "error");
+    } finally {
+      setScopeConfirmOpen(false);
+      setPendingScopeConfirm(null);
+    }
   };
 
   const addScopeRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId || !scopeValue.trim()) return;
-    await api.createScopeRule({
-      project_id: projectId,
-      action: scopeAction,
-      type: "domain",
-      value: scopeValue,
-    });
-    setScopeValue("");
-    alert("规则已添加");
+    try {
+      await api.createScopeRule({
+        project_id: projectId,
+        action: scopeAction,
+        type: "domain",
+        value: scopeValue,
+      });
+      setScopeValue("");
+      toast("规则已添加", "success");
+    } catch (err) {
+      toast("添加规则失败: " + String(err), "error");
+    }
   };
 
   const runDryRun = async () => {
     if (!projectId) return;
-    const res = await api.dryRun(projectId);
-    setDryRunResult(res);
+    try {
+      const res = await api.dryRun(projectId);
+      setDryRunResult(res);
+      toast("授权检测完成", "success");
+    } catch (err) {
+      toast("授权检测失败: " + String(err), "error");
+    }
   };
 
   const runSubfinder = async () => {
     if (!projectId) return;
     const domain = targets.find((t) => t.type === "domain");
     if (!domain) {
-      alert("请先添加一个域名目标");
+      toast("请先添加一个域名目标", "warning");
       return;
     }
-    const task = await api.runTask({
-      project_id: projectId,
-      tool: "subfinder",
-      target_id: domain.id,
-      command: `subfinder -d ${domain.value} -oJ -o subfinder_output.jsonl`,
-    });
-    alert(`任务已启动: ${task.id}`);
+    try {
+      const task = await api.runTask({
+        project_id: projectId,
+        tool: "subfinder",
+        target_id: domain.id,
+        command: `subfinder -d ${domain.value} -oJ -o subfinder_output.jsonl`,
+      });
+      toast(`任务已启动: ${task.id}`, "success");
+    } catch (err) {
+      toast("启动任务失败: " + String(err), "error");
+    }
   };
+
+  const targetColumns: { key: string; header: string; width?: string; render?: (row: Record<string, unknown>) => React.ReactNode }[] = [
+    {
+      key: "type",
+      header: "类型",
+      width: "120px",
+      render: (row) => (
+        <Badge variant="primary" size="sm">
+          {String(row.type)}
+        </Badge>
+      ),
+    },
+    { key: "value", header: "目标值" },
+    {
+      key: "created_at",
+      header: "创建时间",
+      width: "200px",
+      render: (row) => new Date(String(row.created_at)).toLocaleString(),
+    },
+  ];
 
   if (!currentProject) {
     return (
-      <div className="max-w-4xl space-y-6">
-        <h1 className="text-2xl font-bold">Targets</h1>
+      <div className="max-w-5xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">目标管理</h1>
+          <p className="text-zinc-400 text-sm mt-1">管理项目目标、Scope 规则和批量导入</p>
+        </div>
         <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8 text-center">
           <p className="text-zinc-400 mb-4">请先从 Dashboard 选择一个项目</p>
           <Link to="/" className="text-blue-600 hover:underline">前往 Dashboard</Link>
@@ -303,19 +377,19 @@ export default function TargetPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <h1 className="text-2xl font-bold">{currentProject.name}</h1>
+    <div className="max-w-5xl space-y-6">
+      {/* 标题区 */}
+      <div>
+        <h1 className="text-2xl font-bold">目标管理</h1>
+        <p className="text-zinc-400 text-sm mt-1">管理项目目标、Scope 规则和批量导入</p>
+      </div>
 
       <ProjectInfo project={currentProject} />
 
-      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
-        <h2 className="font-semibold mb-3">批量导入目标</h2>
-        <FileImport projectId={currentProject.id} onImported={loadTargets} />
-      </section>
-
-      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
-        <h2 className="font-semibold mb-3">目标</h2>
-        <form onSubmit={addTarget} className="flex gap-2 mb-3">
+      {/* 操作区 */}
+      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 space-y-4">
+        <h2 className="font-semibold">添加目标</h2>
+        <form onSubmit={addTarget} className="flex gap-2">
           <select
             className="border rounded px-2 bg-zinc-800 border-zinc-700 text-zinc-200"
             value={targetType}
@@ -337,20 +411,46 @@ export default function TargetPage() {
             添加
           </button>
         </form>
-        <ul className="space-y-1">
-          {targets.map((t) => (
-            <li key={t.id} className="text-sm bg-gray-50 px-3 py-2 rounded">
-              [{t.type}] {t.value}
-            </li>
-          ))}
-        </ul>
+
+        <h2 className="font-semibold">批量导入</h2>
+        <FileImport projectId={currentProject.id} onImported={loadTargets} />
       </section>
 
+      {/* 内容区 */}
+      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4">
+        <h2 className="font-semibold mb-3">目标列表</h2>
+        {loading ? (
+          <SkeletonList count={3} />
+        ) : error ? (
+          <div className="py-12 text-center">
+            <p className="text-brand-danger mb-2">加载失败: {error}</p>
+            <button
+              onClick={loadTargets}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              重试
+            </button>
+          </div>
+        ) : targets.length === 0 ? (
+          <EmptyState
+            title="暂无目标"
+            description="当前项目还没有添加任何目标，请在上方添加或导入。"
+          />
+        ) : (
+          <Table
+            columns={targetColumns}
+            data={targets as unknown as Record<string, unknown>[]}
+            emptyText="暂无目标"
+          />
+        )}
+      </section>
+
+      {/* Scope 规则 */}
       <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
         <h2 className="font-semibold mb-3">Scope 规则</h2>
         <form onSubmit={addScopeRule} className="flex gap-2 mb-3">
           <select
-            className="border rounded px-2"
+            className="border rounded px-2 bg-zinc-800 border-zinc-700 text-zinc-200"
             value={scopeAction}
             onChange={(e) => setScopeAction(e.target.value as any)}
           >
@@ -358,7 +458,7 @@ export default function TargetPage() {
             <option value="exclude">排除</option>
           </select>
           <input
-            className="flex-1 border rounded px-3 py-2"
+            className="flex-1 border rounded px-3 py-2 bg-zinc-800 border-zinc-700 text-zinc-200 placeholder-zinc-500"
             placeholder="域名规则，如 example.com"
             value={scopeValue}
             onChange={(e) => setScopeValue(e.target.value)}
@@ -369,6 +469,7 @@ export default function TargetPage() {
         </form>
       </section>
 
+      {/* 操作 */}
       <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
         <h2 className="font-semibold mb-3">操作</h2>
         <div className="flex gap-3 flex-wrap">
@@ -444,6 +545,23 @@ export default function TargetPage() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={scopeConfirmOpen}
+        onClose={() => {
+          setScopeConfirmOpen(false);
+          setPendingScopeConfirm(null);
+        }}
+        onConfirm={handleConfirmScope}
+        title="Scope 确认"
+        description={
+          pendingScopeConfirm
+            ? `${pendingScopeConfirm.message}\n\n建议添加 Scope 规则: [${pendingScopeConfirm.suggested.action}] ${pendingScopeConfirm.suggested.type} = ${pendingScopeConfirm.suggested.value}\n\n是否自动添加该规则并重新添加目标？`
+            : ""
+        }
+        confirmText="添加规则并继续"
+        cancelText="取消"
+      />
     </div>
   );
 }

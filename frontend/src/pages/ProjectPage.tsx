@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 import { Button } from "../components/Button";
 import { StatusBadge } from "../components/Badge";
+import { useToast } from "../components";
 
 export default function ProjectPage() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     api.listProjects().then((data) => setProjects(data ?? [])).catch(console.error);
@@ -46,7 +48,7 @@ export default function ProjectPage() {
       setEndTime("");
       setRateLimit(0);
     } catch (err) {
-      alert(String(err));
+      toast("创建失败: " + String(err), "error");
     } finally {
       setLoading(false);
     }
@@ -185,7 +187,7 @@ export default function ProjectPage() {
                           setProjects(projects.filter((proj) => proj.id !== p.id));
                           setConfirmDeleteId(null);
                         } catch (err) {
-                          alert("删除失败: " + String(err));
+                          toast("删除失败: " + String(err), "error");
                         } finally {
                           setDeletingId(null);
                         }

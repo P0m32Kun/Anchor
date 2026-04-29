@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { useProjectId } from "../components";
+import { useProjectId, useToast, EmptyState, Table } from "../components";
 
 function AssetTypeBadge({ type }: { type: string }) {
   const colors: Record<string, string> = {
@@ -44,11 +44,24 @@ export default function AssetPage() {
 
   const [activeTab, setActiveTab] = useState<"assets" | "web" | "ports">("assets");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  const toast = useToast();
 
-  const loadAssets = useCallback(() => {
+  const loadAssets = useCallback(async () => {
     if (!projectId) return;
-    api.listAssets(projectId).then((data) => setAssets(data ?? [])).catch(console.error);
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.listAssets(projectId);
+      setAssets(data ?? []);
+    } catch (err) {
+      const msg = String(err);
+      setError(msg);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [projectId, setAssets]);
 
   const loadWebEndpoints = useCallback(() => {
@@ -74,30 +87,67 @@ export default function AssetPage() {
     setLoading(true);
     try {
       await api.startAssetDiscovery(projectId);
-      alert("资产发现工作流已启动");
+      toast("资产发现工作流已启动", "success");
     } catch (err) {
-      alert("启动失败: " + String(err));
+      toast("启动失败: " + String(err), "error");
     } finally {
       setLoading(false);
     }
   };
 
   const [filterTitle, setFilterTitle] = useState("");
-  const [filterTech, setFilterTech] = useState("");
+  const [filterAsset, setFilterAsset] = useState("");
 
-  const domainAssets = assets.filter((a) => a.type === "domain");
-  const ipAssets = assets.filter((a) => a.type === "ip");
-  const urlAssets = assets.filter((a) => a.type === "url");
+  const filteredAssets = assets.filter((a) => {
+    if (filterAsset && !a.value.toLowerCase().includes(filterAsset.toLowerCase())) return false;
+    return true;
+  });
 
   const filteredWeb = webEndpoints.filter((ep) => {
     if (filterTitle && !ep.title?.toLowerCase().includes(filterTitle.toLowerCase())) return false;
     return true;
   });
 
+  const assetColumns: { key: string; header: string; width?: string; render?: (row: Record<string, unknown>) => React.ReactNode }[] = [
+    {
+      key: "type",
+      header: "类型",
+      width: "100px",
+      render: (row) => <AssetTypeBadge type={String(row.type)} />,
+    },
+    { key: "value", header: "资产值" },
+    {
+      key: "normalized_value",
+      header: "归一化值",
+      render: (row) => (
+        <span className="text-zinc-500 text-xs">{String(row.normalized_value)}</span>
+      ),
+    },
+    {
+      key: "source_tools",
+      header: "来源工具",
+      width: "180px",
+      render: (row) => (
+        <span className="text-zinc-500 text-xs">
+          {Array.isArray(row.source_tools) ? row.source_tools.join(", ") : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "first_seen",
+      header: "首次发现",
+      width: "180px",
+      render: (row) => new Date(String(row.first_seen)).toLocaleString(),
+    },
+  ];
+
   if (!currentProject) {
     return (
       <div className="max-w-5xl space-y-6">
-        <h1 className="text-2xl font-bold">Assets</h1>
+        <div>
+          <h1 className="text-2xl font-bold">资产清单</h1>
+          <p className="text-zinc-400 text-sm mt-1">查看和管理项目发现的资产、Web 端点和端口信息</p>
+        </div>
         <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8 text-center">
           <p className="text-zinc-400 mb-4">请先从 Dashboard 选择一个项目</p>
           <Link to="/" className="text-blue-600 hover:underline">前往 Dashboard</Link>
@@ -108,13 +158,17 @@ export default function AssetPage() {
 
   return (
     <div className="max-w-5xl space-y-6">
+      {/* 标题区 */}
+      <div>
+        <h1 className="text-2xl font-bold">资产清单</h1>
+        <p className="text-zinc-400 text-sm mt-1">查看和管理项目发现的资产、Web 端点和端口信息</p>
+      </div>
+
+      {/* 操作区 */}
       <div className="flex items-center justify-between">
-        <div>
-          <Link to={`/projects/${currentProject.id}`} className="text-sm text-blue-600 hover:underline">
-            ← 返回目标管理
-          </Link>
-          <h1 className="text-2xl font-bold mt-1">{currentProject.name} — 资产</h1>
-        </div>
+        <Link to={`/projects/${currentProject.id}`} className="text-sm text-blue-600 hover:underline">
+          ← 返回目标管理
+        </Link>
         <button
           onClick={startDiscovery}
           disabled={loading}
@@ -145,83 +199,44 @@ export default function AssetPage() {
       </div>
 
       {activeTab === "assets" && (
-        <div className="space-y-4">
-          <div className="flex gap-2">
+        <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4">
+          <div className="flex gap-2 mb-4">
             <input
               type="text"
-              placeholder="筛选技术栈..."
-              value={filterTech}
-              onChange={(e) => setFilterTech(e.target.value)}
+              placeholder="筛选资产值..."
+              value={filterAsset}
+              onChange={(e) => setFilterAsset(e.target.value)}
               className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
             />
             <button
-              onClick={() => { setFilterTech(""); setFilterTitle(""); }}
+              onClick={() => { setFilterAsset(""); }}
               className="text-zinc-500 text-sm hover:text-zinc-300 px-2"
             >
               清除
             </button>
           </div>
-          {domainAssets.length > 0 && (
-            <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
-              <h3 className="font-semibold mb-2 text-sm text-zinc-400">域名 ({domainAssets.length})</h3>
-              <ul className="space-y-1">
-                {domainAssets.map((a) => (
-                  <li key={a.id} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded">
-                    <AssetTypeBadge type="domain" />
-                    <span className="font-medium">{a.value}</span>
-                    <span className="text-zinc-500 text-xs ml-auto">
-                      {a.source_tools?.join(", ") || "—"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {ipAssets.length > 0 && (
-            <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
-              <h3 className="font-semibold mb-2 text-sm text-zinc-400">IP ({ipAssets.length})</h3>
-              <ul className="space-y-1">
-                {ipAssets.map((a) => (
-                  <li
-                    key={a.id}
-                    className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded cursor-pointer hover:bg-zinc-800/60"
-                    onClick={() => {
-                      setSelectedAsset(a.id);
-                      loadPorts(a.id);
-                    }}
-                  >
-                    <AssetTypeBadge type="ip" />
-                    <span className="font-medium">{a.value}</span>
-                    <span className="text-zinc-500 text-xs ml-auto">
-                      {a.source_tools?.join(", ") || "—"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {urlAssets.length > 0 && (
-            <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
-              <h3 className="font-semibold mb-2 text-sm text-zinc-400">URL ({urlAssets.length})</h3>
-              <ul className="space-y-1">
-                {urlAssets.map((a) => (
-                  <li key={a.id} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded">
-                    <AssetTypeBadge type="url" />
-                    <span className="font-medium">{a.value}</span>
-                    <span className="text-zinc-500 text-xs ml-auto">
-                      {a.source_tools?.join(", ") || "—"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {assets.length === 0 && (
-            <div className="text-zinc-500 text-sm bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8 rounded text-center">
-              暂无资产，点击右上角「资产发现」开始扫描
+          {loading ? (
+            <div className="py-12 text-center text-zinc-400">加载中...</div>
+          ) : error ? (
+            <div className="py-12 text-center">
+              <p className="text-brand-danger mb-2">加载失败: {error}</p>
+              <button onClick={loadAssets} className="text-sm text-blue-600 hover:underline">
+                重试
+              </button>
             </div>
+          ) : filteredAssets.length === 0 ? (
+            <EmptyState
+              title="暂无资产"
+              description="当前项目还没有发现任何资产，点击右上角「资产发现」开始扫描。"
+            />
+          ) : (
+            <Table
+              columns={assetColumns}
+              data={filteredAssets as unknown as Record<string, unknown>[]}
+              emptyText="暂无匹配的资产"
+            />
           )}
-        </div>
+        </section>
       )}
 
       {activeTab === "web" && (
@@ -282,7 +297,7 @@ export default function AssetPage() {
           <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
             <h3 className="font-semibold mb-2 text-sm text-zinc-400">选择 IP 资产查看端口</h3>
             <div className="flex flex-wrap gap-2">
-              {ipAssets.map((a) => (
+              {assets.filter((a) => a.type === "ip").map((a) => (
                 <button
                   key={a.id}
                   onClick={() => {
