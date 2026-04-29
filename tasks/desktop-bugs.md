@@ -34,8 +34,8 @@
 | 10 | **P2** | Runs | **Runs 页面空态信息矛盾** — 无项目时显示 "共 0 次" 和 "请先选择一个项目" 同时出现，前者暗示有数据只是为空，后者说明无法加载。 | 1. 直接访问 `/runs`（不选项目）<br>2. 观察 "共 0 次" 和 "请先选择一个项目" 并列显示 | ✅ 已修复（移除 "共 0 次"，统一 EmptyState 引导） |
 | 11 | **P2** | Projects | **创建项目后不会自动选中** — `handleCreate` 只调用 `setProjects([p, ...projects])`，不调用 `setCurrentProject(p)`，用户创建后需手动点击项目卡片才能继续操作。 | 1. 在 Projects 页面创建新项目<br>2. 创建成功后页面仍留在 Projects，未自动跳转或选中 | ✅ 已修复（handleCreate 后 setCurrentProject(p)） |
 | 12 | **P2** | Settings | **Server 地址在 Web 模式下为空** — `config.ts` Web 模式返回 `""`（相对路径），但输入框 placeholder 为 `http://localhost:17421`，用户初次进入 Settings 看到空白输入框，无法直观知道当前是否已连接。 | 1. 清空 localStorage 后进入 Settings<br>2. 观察 Server 地址输入框为空 | ✅ 已修复（placeholder 动态显示实际 API base，增加说明文字） |
-| 13 | **P3** | Backend | **空集合返回 `null` 而非 `[]`** — `ListTargetsByProject`、`ListFindingsByProject` 等查询在没有记录时返回 Go 的 `nil` slice，JSON 序列化为 `null` 而非 `[]`。前端虽用 `?? []` 兜底，但 API 契约不一致。 | 1. `curl /projects/{id}/targets`（无目标的项目）<br>2. 观察返回 `null` | 🟡 未修复 |
-| 14 | **P3** | Projects | **datetime-local 输入框在某些浏览器中渲染为多个 spinbutton** — 在测试浏览器中，`<input type="datetime-local">` 被拆分为年/月/日/时/分五个独立 spinbutton，占用大量空间且体验不佳。 | 1. 打开 Projects 页面<br>2. 观察开始/结束时间输入区域 | 🟡 未修复 |
+| 13 | **P3** | Backend | **空集合返回 `null` 而非 `[]`** — `ListTargetsByProject`、`ListFindingsByProject` 等查询在没有记录时返回 Go 的 `nil` slice，JSON 序列化为 `null` 而非 `[]`。前端已用 `?? []` 兜底，不影响功能。 | 1. `curl /projects/{id}/targets`（无目标的项目）<br>2. 观察返回 `null` | **Won't Fix（当前 Sprint）** — 前端兜底生效，API 契约问题记录待后续统一修正 |
+| 14 | **P3** | Projects | **datetime-local 输入框在某些浏览器中渲染为多个 spinbutton** — 在测试浏览器中，`<input type="datetime-local">` 被拆分为年/月/日/时/分五个独立 spinbutton，占用大量空间且体验不佳。不影响功能，纯视觉问题。 | 1. 打开 Projects 页面<br>2. 观察开始/结束时间输入区域 | **Won't Fix（当前 Sprint）** — 不影响功能，自定义日期选择器作为后续功能迭代 |
 
 ---
 
@@ -229,6 +229,8 @@ api.listAssets(projectId).then((data) => setAssets(data ?? [])).catch(console.er
 | 第三批 | #5 P1 Scope 确认未处理 | ✅ | 2026-04-29 |
 | 第三批 | #8 P2 全局 API 静默失败 | ✅ | 2026-04-29 |
 | 第三批 | #9 P2 Dashboard 断开无提示 | ✅ | 2026-04-29 |
+| Sprint 4.5/4.6 | #13 P3 空集合返回 null | **Won't Fix** | 2026-04-29 |
+| Sprint 4.5/4.6 | #14 P3 datetime-local 渲染 | **Won't Fix** | 2026-04-29 |
 
 ---
 
@@ -236,6 +238,10 @@ api.listAssets(projectId).then((data) => setAssets(data ?? [])).catch(console.er
 - **P0 阻断**：0 个 ✅
 - **P1 严重**：0 个 ✅
 - **P2 一般**：0 个 ✅
-- **P3 细节**：2 个 🟡（留到 Sprint 4 集中处理）
+- **P3 细节**：2 个 **Won't Fix（当前 Sprint）** — 均不影响功能，记录说明如下
+
+**P3 处理说明**：
+- **#13 空集合返回 `null`**：前端已在 `api.ts` 中用 `data ?? []` 统一兜底，用户无感知。后续如需严格 API 契约，可在后端统一修正（将所有 `nil` slice 初始化为空数组）。
+- **#14 datetime-local 渲染**：浏览器原生控件差异，功能正常。如需优化体验，后续可引入自定义日期选择器组件（如 `react-day-picker` 或自研 Popover + 时间选择）。
 
 **主流程状态**：🟢 **可运行** — Web dev 模式下 API 调用正常，核心页面有错误提示和空态引导。
