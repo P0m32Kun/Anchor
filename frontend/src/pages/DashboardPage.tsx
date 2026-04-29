@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { API_BASE } from "../lib/api";
 import { useStore } from "../lib/store";
 
@@ -14,33 +14,47 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const currentProject = useStore((state) => state.currentProject);
   const [onlineWorkers, setOnlineWorkers] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  const fetchWorkers = useCallback(async () => {
+    setIsLoading(true);
+    setConnectionError(null);
+    try {
+      const res = await fetch(`${API_BASE}/workers`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data: Worker[] = await res.json();
+      const count = data.filter(
+        (w) => w.status === "online" || w.status === "busy"
+      ).length;
+      setOnlineWorkers(count);
+      setConnectionError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "网络连接失败";
+      setConnectionError(message);
+      setOnlineWorkers(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchWorkers() {
-      try {
-        const res = await fetch(`${API_BASE}/workers`);
-        if (!res.ok) return;
-        const data: Worker[] = await res.json();
-        if (!cancelled) {
-          const count = data.filter(
-            (w) => w.status === "online" || w.status === "busy"
-          ).length;
-          setOnlineWorkers(count);
-        }
-      } catch {
-        /* ignore */
-      }
+    async function poll() {
+      if (cancelled) return;
+      await fetchWorkers();
     }
 
-    fetchWorkers();
-    const interval = setInterval(fetchWorkers, 5000);
+    poll();
+    const interval = setInterval(poll, 5000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [fetchWorkers]);
 
   return (
     <div className="space-y-6">
@@ -70,9 +84,32 @@ export default function DashboardPage() {
           </div>
           <div>
             <div className="text-xs text-text-tertiary mb-1">在线 Worker</div>
-            <div className={`text-sm font-medium ${onlineWorkers > 0 ? 'text-green-400' : 'text-text-tertiary'}`}>
-              {onlineWorkers}
-            </div>
+            {isLoading ? (
+              <div className="text-sm font-medium text-text-tertiary animate-pulse">
+                加载中...
+              </div>
+            ) : connectionError ? (
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-red-400">
+                  连接失败
+                </div>
+                <button
+                  onClick={fetchWorkers}
+                  className="text-xs text-brand-primary hover:text-brand-secondary transition-colors"
+                  title={`错误: ${connectionError}`}
+                >
+                  重试
+                </button>
+              </div>
+            ) : (
+              <div
+                className={`text-sm font-medium ${
+                  onlineWorkers > 0 ? "text-green-400" : "text-text-tertiary"
+                }`}
+              >
+                {onlineWorkers}
+              </div>
+            )}
           </div>
           <div>
             <div className="text-xs text-text-tertiary mb-1">运行中任务</div>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, type ImportResult, type DryRunResult, type Project } from "../lib/api";
+import { api, type ImportResult, type DryRunResult, type Project, type Target } from "../lib/api";
 import { useStore } from "../lib/store";
 
 function ProjectInfo({ project }: { project: Project }) {
@@ -229,8 +229,34 @@ export default function TargetPage() {
   const addTarget = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId || !targetValue.trim()) return;
-    const t = await api.createTarget(projectId, { type: targetType, value: targetValue });
-    setTargets([...targets, t]);
+    const res = await api.createTarget(projectId, { type: targetType, value: targetValue });
+    if ("needs_scope_confirmation" in res && res.needs_scope_confirmation) {
+      const suggested = res.suggested_rule;
+      const confirmed = window.confirm(
+        `${res.message}\n\n建议添加 Scope 规则: [${suggested.action}] ${suggested.type} = ${suggested.value}\n\n是否自动添加该规则并重新添加目标？`
+      );
+      if (confirmed) {
+        try {
+          await api.createScopeRule({
+            project_id: projectId,
+            action: suggested.action,
+            type: suggested.type,
+            value: suggested.value,
+          });
+          const t = await api.createTarget(projectId, { type: targetType, value: targetValue });
+          if ("needs_scope_confirmation" in t && t.needs_scope_confirmation) {
+            alert("Scope 规则已添加，但目标仍需要确认，请手动检查。");
+          } else {
+            setTargets([...targets, t as Target]);
+            setTargetValue("");
+          }
+        } catch (err) {
+          alert("添加 Scope 规则失败: " + String(err));
+        }
+      }
+      return;
+    }
+    setTargets([...targets, res as Target]);
     setTargetValue("");
   };
 

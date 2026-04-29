@@ -9,17 +9,60 @@ export class APIError extends Error {
   }
 }
 
-async function fetchJSON<T>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...opts,
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    const message = data?.error?.message || `${res.status}: ${await res.text()}`;
-    throw new APIError(message, data?.error?.code);
+// Global error handler — registered by App.tsx
+let globalErrorHandler: ((err: APIError) => void) | null = null;
+export function setGlobalErrorHandler(handler: (err: APIError) => void) {
+  globalErrorHandler = handler;
+}
+export function clearGlobalErrorHandler() {
+  globalErrorHandler = null;
+}
+
+async function fetchJSON<T>(path: string, opts?: RequestInit & { timeout?: number }): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), opts?.timeout ?? 30000);
+
+  // Merge external signal if provided
+  if (opts?.signal) {
+    opts.signal.addEventListener("abort", () => controller.abort(), { once: true });
   }
-  return res.json();
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...opts,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      const message = data?.error?.message || `${res.status}: ${await res.text()}`;
+      throw new APIError(message, data?.error?.code);
+    }
+
+    return res.json();
+  } catch (err: any) {
+    let apiErr: APIError;
+
+    if (err instanceof APIError) {
+      apiErr = err;
+    } else if (err instanceof DOMException && err.name === "AbortError") {
+      apiErr = new APIError("请求超时，请检查网络", "TIMEOUT");
+    } else if (err instanceof TypeError) {
+      apiErr = new APIError("网络连接失败，请检查后端服务是否运行", "NETWORK_ERROR");
+    } else {
+      apiErr = new APIError(err?.message || "请求失败", "UNKNOWN");
+    }
+
+    // Notify global handler (e.g., Toast) without swallowing the error
+    if (globalErrorHandler) {
+      globalErrorHandler(apiErr);
+    }
+
+    throw apiErr;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export interface Project {
@@ -41,6 +84,16 @@ export interface Target {
   type: string;
   value: string;
   created_at: string;
+}
+
+export interface ScopeConfirmationResponse {
+  message: string;
+  needs_scope_confirmation: boolean;
+  suggested_rule: {
+    action: "include" | "exclude";
+    type: string;
+    value: string;
+  };
 }
 
 export interface ImportResult {
@@ -182,7 +235,7 @@ export const api = {
     fetchJSON<{ status: string }>(`/projects/${id}`, { method: "DELETE" }),
 
   createTarget: (projectId: string, data: { type: string; value: string }) =>
-    fetchJSON<Target>(`/projects/${projectId}/targets`, { method: "POST", body: JSON.stringify(data) }),
+    fetchJSON<Target | ScopeConfirmationResponse>(`/projects/${projectId}/targets`, { method: "POST", body: JSON.stringify(data) }),
 
   listTargets: (projectId: string) => fetchJSON<Target[]>(`/projects/${projectId}/targets`),
 
