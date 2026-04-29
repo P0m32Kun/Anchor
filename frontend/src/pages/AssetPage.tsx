@@ -1,14 +1,18 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 import { useProjectId, useToast, EmptyState, Table } from "../components";
+
+const ASSET_TYPES = ["all", "domain", "url", "ip", "cidr", "service"] as const;
 
 function AssetTypeBadge({ type }: { type: string }) {
   const colors: Record<string, string> = {
     domain: "bg-brand-primary/15 text-brand-primary",
     ip: "bg-purple-100 text-purple-700",
     url: "bg-brand-success/15 text-brand-success",
+    cidr: "bg-orange-100 text-orange-700",
+    service: "bg-sky-100 text-sky-700",
   };
   return (
     <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || "bg-zinc-800/60 text-zinc-400"}`}>
@@ -112,16 +116,36 @@ export default function AssetPage() {
 
   const [filterTitle, setFilterTitle] = useState("");
   const [filterAsset, setFilterAsset] = useState("");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterTech, setFilterTech] = useState("");
+  const [filterPort, setFilterPort] = useState("");
 
-  const filteredAssets = assets.filter((a) => {
-    if (filterAsset && !a.value.toLowerCase().includes(filterAsset.toLowerCase())) return false;
-    return true;
-  });
+  const filteredAssets = useMemo(() => {
+    return assets.filter((a) => {
+      if (filterType !== "all" && a.type !== filterType) return false;
+      if (filterAsset && !a.value.toLowerCase().includes(filterAsset.toLowerCase())) return false;
+      return true;
+    });
+  }, [assets, filterType, filterAsset]);
 
-  const filteredWeb = webEndpoints.filter((ep) => {
-    if (filterTitle && !ep.title?.toLowerCase().includes(filterTitle.toLowerCase())) return false;
-    return true;
-  });
+  const filteredWeb = useMemo(() => {
+    return webEndpoints.filter((ep) => {
+      if (filterTitle && !ep.title?.toLowerCase().includes(filterTitle.toLowerCase())) return false;
+      if (filterTech) {
+        const techs = (ep.technologies || []).join(" ").toLowerCase();
+        if (!techs.includes(filterTech.toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [webEndpoints, filterTitle, filterTech]);
+
+  const filteredPorts = useMemo(() => {
+    if (!selectedAsset || !ports[selectedAsset]) return [];
+    return ports[selectedAsset].filter((p) => {
+      if (filterPort && !String(p.port).includes(filterPort)) return false;
+      return true;
+    });
+  }, [ports, selectedAsset, filterPort]);
 
   const assetColumns: { key: string; header: string; width?: string; render?: (row: Record<string, unknown>) => React.ReactNode }[] = [
     {
@@ -215,20 +239,38 @@ export default function AssetPage() {
 
       {activeTab === "assets" && (
         <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4">
-          <div className="flex gap-2 mb-4">
-            <input
-              type="text"
-              placeholder="筛选资产值..."
-              value={filterAsset}
-              onChange={(e) => setFilterAsset(e.target.value)}
-              className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
-            />
-            <button
-              onClick={() => { setFilterAsset(""); }}
-              className="text-zinc-500 text-sm hover:text-zinc-300 px-2"
-            >
-              清除
-            </button>
+          <div className="flex flex-col gap-3 mb-4">
+            <div className="flex flex-wrap gap-2">
+              {ASSET_TYPES.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setFilterType(t)}
+                  className={`px-3 py-1 rounded text-xs font-medium border transition ${
+                    filterType === t
+                      ? "bg-green-600/20 border-green-600/50 text-green-400"
+                      : "bg-zinc-800/60 border-zinc-700/60 text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {t === "all" ? "全部" : t}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="筛选资产值..."
+                value={filterAsset}
+                onChange={(e) => setFilterAsset(e.target.value)}
+                className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
+              />
+              <button
+                onClick={() => { setFilterType("all"); setFilterAsset(""); }}
+                className="text-zinc-500 text-sm hover:text-zinc-300 px-2"
+              >
+                清除
+              </button>
+              <span className="text-zinc-500 text-xs ml-auto">共 {filteredAssets.length} 个资产</span>
+            </div>
           </div>
           {loading ? (
             <div className="py-12 text-center text-zinc-400">加载中...</div>
@@ -256,7 +298,7 @@ export default function AssetPage() {
 
       {activeTab === "web" && (
         <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
-          <div className="flex gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             <input
               type="text"
               placeholder="筛选标题..."
@@ -264,6 +306,20 @@ export default function AssetPage() {
               onChange={(e) => setFilterTitle(e.target.value)}
               className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
             />
+            <input
+              type="text"
+              placeholder="搜索技术栈..."
+              value={filterTech}
+              onChange={(e) => setFilterTech(e.target.value)}
+              className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
+            />
+            <button
+              onClick={() => { setFilterTitle(""); setFilterTech(""); }}
+              className="text-zinc-500 text-sm hover:text-zinc-300 px-2"
+            >
+              清除
+            </button>
+            <span className="text-zinc-500 text-xs ml-auto">共 {filteredWeb.length} 个端点</span>
           </div>
           {filteredWeb.length > 0 ? (
             <table className="w-full text-sm">
@@ -333,12 +389,28 @@ export default function AssetPage() {
 
           {selectedAsset && ports[selectedAsset] && (
             <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
-              <h3 className="font-semibold mb-2">
-                端口 ({ports[selectedAsset].length})
-              </h3>
-              {ports[selectedAsset].length > 0 ? (
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold">端口</h3>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="筛选端口..."
+                    value={filterPort}
+                    onChange={(e) => setFilterPort(e.target.value)}
+                    className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-32"
+                  />
+                  <button
+                    onClick={() => setFilterPort("")}
+                    className="text-zinc-500 text-sm hover:text-zinc-300 px-2"
+                  >
+                    清除
+                  </button>
+                </div>
+              </div>
+              <p className="text-zinc-500 text-xs mb-2">共 {filteredPorts.length} 个端口</p>
+              {filteredPorts.length > 0 ? (
                 <div className="grid grid-cols-4 gap-2">
-                  {ports[selectedAsset].map((p) => (
+                  {filteredPorts.map((p) => (
                     <div
                       key={p.id}
                       className="border rounded p-2 text-center text-sm hover:bg-zinc-800/40"

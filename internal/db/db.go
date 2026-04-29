@@ -27,6 +27,8 @@ func Open(dataDir string) (*sql.DB, error) {
 	return db, nil
 }
 
+func Migrate(db *sql.DB) error { return migrate(db) }
+
 func migrate(db *sql.DB) error {
 	schema := `
 PRAGMA foreign_keys = ON;

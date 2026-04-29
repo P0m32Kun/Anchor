@@ -377,6 +377,9 @@ export const api = {
   patchFindingStatus: (id: string, status: string, signal?: AbortSignal) =>
     fetchAPI<{ status: string }>(`/findings/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }), signal }),
 
+  updateFindingStatus: (id: string, status: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/findings/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }), signal }),
+
   addEvidence: (findingId: string, data: { type: string; excerpt: string; created_by?: string }, signal?: AbortSignal) =>
     fetchAPI<Evidence>(`/findings/${findingId}/evidence`, { method: "POST", body: JSON.stringify(data), signal }),
 

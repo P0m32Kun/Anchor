@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState, Input, useProjectId, useToast } from "../components";
+import { EmptyState, Input, Select, useProjectId, useToast } from "../components";
 import type { Finding, Evidence } from "../lib/api";
 
 const severityColors: Record<string, string> = {
@@ -21,14 +21,6 @@ const statusLabels: Record<string, string> = {
   ignored: "已忽略",
 };
 
-const statusColors: Record<string, string> = {
-  pending_review: "bg-accent-yellow/15 text-accent-yellow",
-  confirmed: "bg-brand-success/15 text-brand-success",
-  false_positive: "bg-white/[0.04] text-text-tertiary",
-  accepted_risk: "bg-brand-primary/15 text-brand-primary",
-  ignored: "bg-white/[0.04] text-text-tertiary",
-};
-
 export default function FindingsPage() {
   const projectId = useProjectId();
   const findings = useStore((state) => state.findings) ?? [];
@@ -43,6 +35,11 @@ export default function FindingsPage() {
   const [keyword, setKeyword] = useState<string>("");
   const [debouncedKeyword, setDebouncedKeyword] = useState<string>("");
   const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchStatus, setBatchStatus] = useState<string>("");
+  const [batchUpdating, setBatchUpdating] = useState(false);
+  const findingStatusHistory = useStore((state) => state.findingStatusHistory);
+  const recordStatusChange = useStore((state) => state.recordStatusChange);
   const toast = useToast();
 
   // Debounce keyword input by 300ms
@@ -80,14 +77,58 @@ export default function FindingsPage() {
   };
 
   const changeStatus = async (findingId: string, status: string) => {
-    await api.patchFindingStatus(findingId, status);
-    if (projectId) {
-      const updated = await api.listFindings(projectId, undefined);
-      setFindings(updated ?? []);
+    try {
+      await api.updateFindingStatus(findingId, status);
+      recordStatusChange(findingId, status);
+      toast("状态已更新", "success");
+      if (projectId) {
+        const updated = await api.listFindings(projectId, undefined);
+        setFindings(updated ?? []);
+      }
+      if (currentFinding) {
+        const data = await api.getFinding(findingId);
+        setCurrentFinding(data);
+      }
+    } catch (err) {
+      toast("状态更新失败: " + (err instanceof Error ? err.message : String(err)), "error");
+      throw err;
     }
-    if (currentFinding) {
-      const data = await api.getFinding(findingId);
-      setCurrentFinding(data);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredFindings.length && filteredFindings.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredFindings.map((f) => f.id)));
+    }
+  };
+
+  const batchChangeStatus = async () => {
+    if (!batchStatus || selectedIds.size === 0) return;
+    setBatchUpdating(true);
+    try {
+      await api.batchUpdateFindingStatus(Array.from(selectedIds), batchStatus);
+      selectedIds.forEach((id) => recordStatusChange(id, batchStatus));
+      toast(`已批量更新 ${selectedIds.size} 条 finding 状态`, "success");
+      setSelectedIds(new Set());
+      setBatchStatus("");
+      if (projectId) {
+        const updated = await api.listFindings(projectId, undefined);
+        setFindings(updated ?? []);
+      }
+    } catch (err) {
+      toast("批量更新失败: " + (err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setBatchUpdating(false);
     }
   };
 
@@ -182,23 +223,70 @@ export default function FindingsPage() {
         {(statusFilter || severityFilter || debouncedKeyword) && "（已筛选）"}
       </div>
 
+      {/* Batch operations */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 bg-zinc-800/40 border border-zinc-700/50 rounded-lg px-4 py-2">
+          <span className="text-sm text-zinc-300">已选择 {selectedIds.size} 项</span>
+          <select
+            value={batchStatus}
+            onChange={(e) => setBatchStatus(e.target.value)}
+            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200"
+          >
+            <option value="">选择状态...</option>
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <button
+            onClick={batchChangeStatus}
+            disabled={!batchStatus || batchUpdating}
+            className="px-3 py-1 bg-slate-800 text-white rounded text-xs disabled:opacity-50"
+          >
+            {batchUpdating ? "更新中..." : "批量修改"}
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-zinc-400 hover:text-zinc-200 text-xs"
+          >
+            取消选择
+          </button>
+        </div>
+      )}
+
       {loading && <p className="text-zinc-400 text-sm">加载中...</p>}
 
       <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-zinc-800/40 text-zinc-400">
             <tr>
+              <th className="px-3 py-2 text-left w-10">
+                <input
+                  type="checkbox"
+                  checked={filteredFindings.length > 0 && selectedIds.size === filteredFindings.length}
+                  onChange={toggleSelectAll}
+                  className="rounded border-zinc-600 bg-zinc-800 text-blue-600 focus:ring-0"
+                />
+              </th>
               <th className="px-4 py-2 text-left">标题</th>
               <th className="px-4 py-2 text-left">严重级别</th>
               <th className="px-4 py-2 text-left">可信度</th>
               <th className="px-4 py-2 text-left">优先级</th>
               <th className="px-4 py-2 text-left">状态</th>
+              <th className="px-4 py-2 text-left">上次修改</th>
               <th className="px-4 py-2 text-left">操作</th>
             </tr>
           </thead>
           <tbody>
             {filteredFindings.map((f) => (
               <tr key={f.id} className="border-t hover:bg-zinc-800/40">
+                <td className="px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(f.id)}
+                    onChange={() => toggleSelect(f.id)}
+                    className="rounded border-zinc-600 bg-zinc-800 text-blue-600 focus:ring-0"
+                  />
+                </td>
                 <td className="px-4 py-2 font-medium">{f.title}</td>
                 <td className="px-4 py-2">
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityColors[f.severity] || "bg-zinc-800/60"}`}>
@@ -208,9 +296,17 @@ export default function FindingsPage() {
                 <td className="px-4 py-2">{f.confidence}</td>
                 <td className="px-4 py-2">{f.priority}</td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[f.status] || "bg-zinc-800/60"}`}>
-                    {statusLabels[f.status] || f.status}
-                  </span>
+                  <Select
+                    value={f.status}
+                    options={statusOptions}
+                    onChange={(value) => changeStatus(f.id, value)}
+                    className="w-28"
+                  />
+                </td>
+                <td className="px-4 py-2 text-xs text-zinc-500">
+                  {findingStatusHistory[f.id]
+                    ? formatTimeAgo(findingStatusHistory[f.id].updatedAt)
+                    : "—"}
                 </td>
                 <td className="px-4 py-2 flex gap-2">
                   <button
@@ -237,7 +333,7 @@ export default function FindingsPage() {
             ))}
             {filteredFindings.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
                   暂无 Finding
                 </td>
               </tr>
@@ -379,4 +475,24 @@ function FindingDetail({
       </div>
     </div>
   );
+}
+
+const statusOptions = [
+  { value: "pending_review", label: "待审核" },
+  { value: "confirmed", label: "已确认" },
+  { value: "false_positive", label: "误报" },
+  { value: "accepted_risk", label: "已接受风险" },
+  { value: "ignored", label: "已忽略" },
+];
+
+function formatTimeAgo(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  return `${days} 天前`;
 }

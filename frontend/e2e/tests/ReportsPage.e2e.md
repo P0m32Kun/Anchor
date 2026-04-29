@@ -1,106 +1,70 @@
-# ReportsPage E2E Tests
+# ReportsPage E2E Test Plan
+
+## Test Purpose
+Verify the Markdown preview, findings summary, outline navigation, and preview/raw toggle on the ReportsPage.
 
 ## Prerequisites
-- Dev server: `npm run dev` (http://localhost:1420)
-- Backend API available
+1. Backend API is running and accessible at `http://localhost:8080`
+2. At least one project exists with findings in `confirmed` or `accepted_risk` status
+3. The `/projects/:projectId/reports/export.md` endpoint returns a valid Markdown report
 
-## Test 1: Page loads with reports
+## Test Steps
 
-### Steps
-
-```bash
-agent-browser navigate http://localhost:1420/reports
-agent-browser screenshot
+### 1. Navigation
+```
+navigate http://localhost:1420/projects/:projectId/reports
 ```
 
-### Expected Results
-- [ ] Page renders without errors
-- [ ] Reports list or empty state visible
-- [ ] "安全评估报告" title visible
-
-## Test 2: Export buttons disabled when no findings
-
-### Steps
-
-```bash
-agent-browser navigate http://localhost:1420/reports
-agent-browser snapshot
-
-# When no confirmed/accepted findings exist
-agent-browser click @e<N> "导出 Markdown"
+### 2. Findings Summary Display
+```
+expect text "安全评估报告"
+expect text "严重"
+expect text "高危"
+expect text "中危"
+expect text "低危"
+expect text "信息"
 ```
 
-### Expected Results
-- [ ] Toast warning "无 findings 可导出" appears
-- [ ] No network request to export endpoint fired
-
-## Test 3: Markdown export success (browser fallback)
-
-### Steps
-
-```bash
-agent-browser navigate http://localhost:1420/reports
-agent-browser snapshot
-
-# When findings exist
-agent-browser click @e<N> "导出 Markdown"
-agent-browser screenshot
+### 3. Report Outline
+```
+expect text "报告大纲"
+expect text "Findings 列表"
+click text "Findings 列表" button[title^="查看"]:first
 ```
 
-### Expected Results
-- [ ] Button shows "导出中..." during request
-- [ ] Toast success "下载已启动" appears
-- [ ] Blob download triggered (check Network tab for /reports/export.md)
-
-## Test 4: JSON export success (browser fallback)
-
-### Steps
-
-```bash
-agent-browser navigate http://localhost:1420/reports
-agent-browser snapshot
-
-# When findings exist
-agent-browser click @e<N> "导出 JSON"
-agent-browser screenshot
+### 4. Markdown Preview - Rendered Mode
+```
+click button "Markdown 预览"
+wait 1000
+expect text "Markdown 报告预览"
+expect element div.prose
 ```
 
-### Expected Results
-- [ ] Button shows "导出中..." during request
-- [ ] Toast success "下载已启动" appears
-- [ ] Blob download triggered (check Network tab for /reports/export.json)
-
-## Test 5: Markdown preview
-
-### Steps
-
-```bash
-agent-browser navigate http://localhost:1420/reports
-agent-browser snapshot
-
-agent-browser click @e<N> "Markdown 预览"
-agent-browser screenshot
+### 5. Preview/Raw Toggle
+```
+click button "原始"
+expect element pre
+click button "预览"
+expect element div.prose
 ```
 
-### Expected Results
-- [ ] Preview panel appears with "Markdown 报告预览" header
-- [ ] Close button (✕) visible
-- [ ] Raw markdown content rendered in <pre> block
-
-## Test 6: Error handling on export failure
-
-### Steps
-
-```bash
-# Stop backend API or block /reports/export.md
-agent-browser navigate http://localhost:1420/reports
-agent-browser snapshot
-
-agent-browser click @e<N> "导出 Markdown"
-agent-browser screenshot
+### 6. Close Preview
+```
+click button[aria-label="关闭预览"]
+expect no text "Markdown 报告预览"
 ```
 
-### Expected Results
-- [ ] Toast error "导出失败：" appears
-- [ ] Error banner visible on page
-- [ ] Button returns to idle state (not stuck in "导出中...")
+### 7. Export Buttons
+```
+expect button "导出 Markdown"
+expect button "导出 JSON"
+```
+
+## Expected Results
+- Findings summary cards show correct counts per severity level
+- Report outline lists all findings with severity badges
+- Clicking an outline item smooth-scrolls to the corresponding finding card
+- Markdown preview renders HTML with proper typography and no raw script injection
+- Raw mode shows the original Markdown source in a `<pre>` block
+- Toggle between rendered and raw modes works instantly
+- Close button dismisses the preview panel

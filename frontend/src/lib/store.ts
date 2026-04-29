@@ -2,6 +2,11 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Project, Target, ScanTask, Asset, WebEndpoint, Port, Service, Finding, Evidence, Run } from "./api";
 
+interface FindingStatusRecord {
+  status: string;
+  updatedAt: number;
+}
+
 interface AppState {
   projects: Project[];
   projectsLoading: boolean;
@@ -22,6 +27,7 @@ interface AppState {
   findingsLoading: boolean;
   findingsError: string | null;
   currentFinding: { finding: Finding; evidence: Evidence[] } | null;
+  findingStatusHistory: Record<string, FindingStatusRecord>;
   runs: Run[];
   runsLoading: boolean;
   runsError: string | null;
@@ -45,6 +51,7 @@ interface AppState {
   setFindingsLoading: (loading: boolean) => void;
   setFindingsError: (error: string | null) => void;
   setCurrentFinding: (f: { finding: Finding; evidence: Evidence[] } | null) => void;
+  recordStatusChange: (id: string, status: string) => void;
   setRuns: (runs: Run[]) => void;
   setRunsLoading: (loading: boolean) => void;
   setRunsError: (error: string | null) => void;
@@ -72,6 +79,7 @@ export const useStore = create<AppState>()(
       findingsLoading: false,
       findingsError: null,
       currentFinding: null,
+      findingStatusHistory: {},
       runs: [],
       runsLoading: false,
       runsError: null,
@@ -129,6 +137,13 @@ export const useStore = create<AppState>()(
       setFindingsLoading: (findingsLoading) => set({ findingsLoading }),
       setFindingsError: (findingsError) => set({ findingsError }),
       setCurrentFinding: (currentFinding) => set({ currentFinding }),
+      recordStatusChange: (id, status) =>
+        set((state) => ({
+          findingStatusHistory: {
+            ...state.findingStatusHistory,
+            [id]: { status, updatedAt: Date.now() },
+          },
+        })),
 
       setRuns: (runs) => set({ runs }),
       setRunsLoading: (runsLoading) => set({ runsLoading }),
