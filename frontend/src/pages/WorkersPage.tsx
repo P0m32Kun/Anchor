@@ -12,9 +12,9 @@ interface Worker {
 function statusColor(status: string): string {
   switch (status) {
     case "online":
-      return "bg-green-400";
+      return "bg-brand-success";
     case "busy":
-      return "bg-yellow-400";
+      return "bg-accent-yellow";
     case "offline":
     default:
       return "bg-text-tertiary";

@@ -4,15 +4,25 @@
 In Progress
 
 ## Tasks
-- [x] P1-1: Dashboard 不显示当前项目 — 修复完成
-- [x] P1-6: Reports 页面允许无项目 ID 访问 — 修复完成
-- [x] P2-9: Runs 页面空态信息矛盾 — 修复完成
+
+### Sprint 1.3 + 1.6 — 颜色审计 + 组件微调 ✅
+
+- [x] 搜索 `frontend/src/` 下所有硬编码颜色值（`bg-yellow-500/15`, `text-yellow-300`, `bg-blue-500/15`, `bg-zinc-800/60` 等）
+- [x] 将硬编码颜色替换为语义 Token（RunsPage / AssetPage / FindingsPage / TargetPage / WorkersPage / ReportsPage）
+- [x] Badge StatusBadge 补充 run status 映射（running→info, failed→danger, completed→success, pending→warning）
+- [x] 排查原生 alert/confirm，产出使用清单（共 12 处，供 Sprint 1.8 替换）
+- [x] 产出 `docs/design-tokens.md`
+- [x] `npm run typecheck` 零错误
 
 ## Files Changed
-- `frontend/src/pages/DashboardPage.tsx`：导入 `useStore`，读取 `currentProject`，在"当前项目"区域根据有无项目动态显示项目名称（可跳转）或"前往创建 →"
-- `frontend/src/pages/ReportsPage.tsx`：移除 `id!` 非空断言，增加 `projectId` 为空时的 `EmptyState` 引导页，避免 API 调用 `/projects/undefined/...`
+
+- `frontend/src/pages/RunsPage.tsx`
+- `frontend/src/pages/AssetPage.tsx`
+- `frontend/src/pages/FindingsPage.tsx`
+- `frontend/src/pages/TargetPage.tsx`
+- `frontend/src/pages/WorkersPage.tsx`
+- `frontend/src/pages/ReportsPage.tsx`
+- `frontend/src/components/Badge.tsx`
+- `frontend/docs/design-tokens.md`
 
 ## Notes
-- 项目 node_modules 缺失，`npm run typecheck` 全局报错（React/JSX 类型缺失），修改文件本身无新增类型错误
-- Dashboard 修改逻辑：存在 `currentProject` 时显示 `{name} →` 并跳转 `/projects/${id}`；不存在时保持原行为跳转 `/projects`
-- Reports 修改逻辑：`projectId` 为 `undefined` 时显示 EmptyState 引导用户前往 `/projects`；有 ID 时保持原报告页面

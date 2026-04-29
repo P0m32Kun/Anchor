@@ -127,6 +127,9 @@ export function StatusBadge({
     active: "success",
     expired: "danger",
     pending: "warning",
+    running: "info",
+    failed: "danger",
+    completed: "success",
   };
   const label: Record<string, string> = {
     confirmed: "已确认",
@@ -137,6 +140,9 @@ export function StatusBadge({
     active: "进行中",
     expired: "已过期",
     pending: "未开始",
+    running: "运行中",
+    failed: "失败",
+    completed: "已完成",
   };
   return (
     <Badge variant={map[status] || "default"} className={className}>

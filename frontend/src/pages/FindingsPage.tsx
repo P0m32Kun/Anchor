@@ -6,11 +6,11 @@ import { EmptyState } from "../components";
 import type { Finding, Evidence } from "../lib/api";
 
 const severityColors: Record<string, string> = {
-  critical: "bg-red-600 text-white",
-  high: "bg-orange-500 text-white",
-  medium: "bg-yellow-400 text-black",
-  low: "bg-blue-300 text-black",
-  info: "bg-gray-200 text-zinc-300",
+  critical: "bg-brand-danger text-white",
+  high: "bg-brand-warning text-white",
+  medium: "bg-accent-yellow text-black",
+  low: "bg-accent-teal text-black",
+  info: "bg-white/[0.04] text-text-tertiary",
 };
 
 const statusLabels: Record<string, string> = {
@@ -22,11 +22,11 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  pending_review: "bg-yellow-500/15 text-yellow-300",
-  confirmed: "bg-green-500/15 text-green-300",
-  false_positive: "bg-zinc-800/60 text-zinc-400",
-  accepted_risk: "bg-blue-100 text-blue-800",
-  ignored: "bg-zinc-800/60 text-zinc-400",
+  pending_review: "bg-accent-yellow/15 text-accent-yellow",
+  confirmed: "bg-brand-success/15 text-brand-success",
+  false_positive: "bg-white/[0.04] text-text-tertiary",
+  accepted_risk: "bg-brand-primary/15 text-brand-primary",
+  ignored: "bg-white/[0.04] text-text-tertiary",
 };
 
 export default function FindingsPage() {

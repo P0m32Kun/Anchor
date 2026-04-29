@@ -129,7 +129,7 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link to={`/projects/${projectId}`} className="text-sm text-blue-400 hover:text-blue-300 mb-1 block transition-colors">
+          <Link to={`/projects/${projectId}`} className="text-sm text-brand-primary hover:text-brand-primary/80 mb-1 block transition-colors">
             ← 返回项目
           </Link>
           <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">安全评估报告</h1>
@@ -168,7 +168,7 @@ export default function ReportsPage() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg mb-4">
+        <div className="bg-brand-danger/10 border border-brand-danger/20 text-brand-danger px-4 py-3 rounded-lg mb-4">
           {error}
         </div>
       )}

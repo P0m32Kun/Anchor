@@ -5,9 +5,9 @@ import { useStore } from "../lib/store";
 
 function AssetTypeBadge({ type }: { type: string }) {
   const colors: Record<string, string> = {
-    domain: "bg-blue-500/15 text-blue-300",
+    domain: "bg-brand-primary/15 text-brand-primary",
     ip: "bg-purple-100 text-purple-700",
-    url: "bg-green-500/15 text-green-300",
+    url: "bg-brand-success/15 text-brand-success",
   };
   return (
     <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || "bg-zinc-800/60 text-zinc-400"}`}>
@@ -20,10 +20,10 @@ function StatusCodeBadge({ code }: { code?: number }) {
   if (!code) return <span className="text-zinc-500 text-xs">—</span>;
   const color =
     code >= 200 && code < 300
-      ? "bg-green-500/15 text-green-300"
+      ? "bg-brand-success/15 text-brand-success"
       : code >= 300 && code < 400
-      ? "bg-yellow-500/15 text-yellow-300"
-      : "bg-red-500/15 text-red-300";
+      ? "bg-accent-yellow/15 text-accent-yellow"
+      : "bg-brand-danger/15 text-brand-danger";
   return (
     <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>
       {code}

@@ -29,17 +29,17 @@ function ProjectInfo({ project }: { project: Project }) {
               时间窗口: {start.toLocaleDateString()} ~ {end.toLocaleDateString()}
             </span>
             {isExpired && (
-              <span className="text-xs bg-red-500/15 text-red-300 px-2 py-0.5 rounded font-medium">
+              <span className="text-xs bg-brand-danger/15 text-brand-danger px-2 py-0.5 rounded font-medium">
                 已过期
               </span>
             )}
             {isPending && (
-              <span className="text-xs bg-yellow-500/15 text-yellow-300 px-2 py-0.5 rounded font-medium">
+              <span className="text-xs bg-accent-yellow/15 text-accent-yellow px-2 py-0.5 rounded font-medium">
                 未开始
               </span>
             )}
             {isActive && (
-              <span className="text-xs bg-green-500/15 text-green-300 px-2 py-0.5 rounded font-medium">
+              <span className="text-xs bg-brand-success/15 text-brand-success px-2 py-0.5 rounded font-medium">
                 进行中
               </span>
             )}
@@ -184,10 +184,10 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
 
 function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
   const colors: Record<string, string> = {
-    green: "bg-green-500/15 text-green-300",
-    gray: "bg-gray-200 text-zinc-400",
-    yellow: "bg-yellow-500/15 text-yellow-300",
-    red: "bg-red-500/15 text-red-300",
+    green: "bg-brand-success/15 text-brand-success",
+    gray: "bg-white/[0.04] text-text-tertiary",
+    yellow: "bg-accent-yellow/15 text-accent-yellow",
+    red: "bg-brand-danger/15 text-brand-danger",
   };
   return (
     <div className="flex items-center gap-1">

@@ -6,11 +6,11 @@ import { EmptyState } from "../components";
 import type { Run, ScanTask, ToolTemplate } from "../lib/api";
 
 const statusColors: Record<string, string> = {
-  pending: "bg-yellow-500/15 text-yellow-300",
-  running: "bg-blue-500/15 text-blue-300",
-  completed: "bg-green-500/15 text-green-300",
-  failed: "bg-red-500/15 text-red-300",
-  cancelled: "bg-zinc-800/60 text-zinc-400",
+  pending: "bg-accent-yellow/15 text-accent-yellow",
+  running: "bg-brand-primary/15 text-brand-primary",
+  completed: "bg-brand-success/15 text-brand-success",
+  failed: "bg-brand-danger/15 text-brand-danger",
+  cancelled: "bg-white/[0.04] text-text-tertiary",
 };
 
 const statusLabels: Record<string, string> = {
@@ -22,11 +22,11 @@ const statusLabels: Record<string, string> = {
 };
 
 const taskStatusColors: Record<string, string> = {
-  created: "bg-zinc-800/60 text-zinc-400",
-  queued: "bg-yellow-500/15 text-yellow-300",
-  running: "bg-blue-500/15 text-blue-300",
-  completed: "bg-green-500/15 text-green-300",
-  failed: "bg-red-500/15 text-red-300",
+  created: "bg-white/[0.04] text-text-tertiary",
+  queued: "bg-accent-yellow/15 text-accent-yellow",
+  running: "bg-brand-primary/15 text-brand-primary",
+  completed: "bg-brand-success/15 text-brand-success",
+  failed: "bg-brand-danger/15 text-brand-danger",
 };
 
 export default function RunsPage() {

@@ -5,3 +5,6 @@ export { ToastProvider, useToast } from "./Toast";
 export { Navbar } from "./Navbar";
 export { EmptyState } from "./EmptyState";
 export { Skeleton, SkeletonCard, SkeletonList } from "./Skeleton";
+export { Input } from "./Input";
+export { Select } from "./Select";
+export { Table } from "./Table";
