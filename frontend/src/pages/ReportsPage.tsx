@@ -114,9 +114,10 @@ export default function ReportsPage() {
       }
 
       setFindings(enriched);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof DOMException && e.name === "AbortError") return;
-      setReportsError(e.message || "Failed to load findings");
+      const msg = e instanceof Error ? e.message : "Failed to load findings";
+      setReportsError(msg);
     } finally {
       setReportsLoading(false);
     }
@@ -136,9 +137,10 @@ export default function ReportsPage() {
       setPreviewText(text);
       setShowPreview(true);
       setPreviewMode("rendered");
-    } catch (e: any) {
-      setReportsError(e.message || "Failed to generate preview");
-      toast("预览生成失败：" + (e.message || "未知错误"), "error");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to generate preview";
+      setReportsError(msg);
+      toast("预览生成失败：" + msg, "error");
     }
   }, [projectId, toast]);
 
@@ -169,8 +171,8 @@ export default function ReportsPage() {
         downloadWithAnchor(blob, filename);
         toast("下载已启动", "success");
       }
-    } catch (e: any) {
-      const msg = e.message || `Export ${format.toUpperCase()} failed`;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : `Export ${format.toUpperCase()} failed`;
       setReportsError(msg);
       toast("导出失败：" + msg, "error");
     } finally {
