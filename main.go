@@ -18,8 +18,12 @@ import (
 func main() {
 	workerMode := flag.Bool("worker", false, "run in worker mode")
 	coreURL := flag.String("core-url", "", "core server URL (worker mode)")
-	noLocalWorker := flag.Bool("no-local-worker", false, "do not auto-start local worker (server mode)")
 	flag.Parse()
+
+	// 如果 flag 未设置，从环境变量读取（Docker 场景下环境变量优先）
+	if *coreURL == "" {
+		*coreURL = os.Getenv("ANCHOR_CORE_URL")
+	}
 
 	dataDir := os.Getenv("ANCHOR_DATA_DIR")
 	if dataDir == "" {
@@ -35,10 +39,10 @@ func main() {
 		return
 	}
 
-	runServer(dataDir, !*noLocalWorker)
+	runServer(dataDir)
 }
 
-func runServer(dataDir string, autoStartWorker bool) {
+func runServer(dataDir string) {
 	sqliteDB, err := db.Open(dataDir)
 	if err != nil {
 		log.Fatal("open db:", err)
@@ -46,7 +50,7 @@ func runServer(dataDir string, autoStartWorker bool) {
 	defer sqliteDB.Close()
 
 	queries := db.New(sqliteDB)
-	server := api.NewServer(queries, sqliteDB, dataDir, autoStartWorker)
+	server := api.NewServer(queries, sqliteDB, dataDir)
 
 	mux := http.NewServeMux()
 	server.Register(mux)
@@ -100,8 +104,22 @@ func runWorker(dataDir, coreURL string) {
 	if coreURL != "" {
 		log.Printf("[worker] connecting to core: %s", coreURL)
 		remoteClient = worker.NewRemoteClient(coreURL, endpoint)
-		if err := remoteClient.Register("remote-worker"); err != nil {
-			log.Printf("[worker] registration failed: %v", err)
+
+		// 指数退避重试注册（最多 5 次，Server 可能还没启动）
+		var regErr error
+		for attempt := 1; attempt <= 5; attempt++ {
+			regErr = remoteClient.Register("remote-worker")
+			if regErr == nil {
+				break
+			}
+			log.Printf("[worker] registration attempt %d/5 failed: %v", attempt, regErr)
+			if attempt < 5 {
+				time.Sleep(time.Duration(attempt) * 2 * time.Second)
+			}
+		}
+
+		if regErr != nil {
+			log.Printf("[worker] registration failed after 5 attempts: %v", regErr)
 			log.Printf("[worker] continuing in standalone mode")
 		} else {
 			remoteClient.StartHeartbeat(30 * time.Second)

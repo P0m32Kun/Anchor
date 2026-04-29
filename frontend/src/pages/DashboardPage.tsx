@@ -1,7 +1,44 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { API_BASE } from "../lib/api";
+
+interface Worker {
+  id: string;
+  name: string;
+  mode: string;
+  status: string;
+}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const [onlineWorkers, setOnlineWorkers] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchWorkers() {
+      try {
+        const res = await fetch(`${API_BASE}/workers`);
+        if (!res.ok) return;
+        const data: Worker[] = await res.json();
+        if (!cancelled) {
+          const count = data.filter(
+            (w) => w.status === "online" || w.status === "busy"
+          ).length;
+          setOnlineWorkers(count);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    fetchWorkers();
+    const interval = setInterval(fetchWorkers, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -9,18 +46,22 @@ export default function DashboardPage() {
       <div className="liquid-glass rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-text-secondary">项目状态</h2>
-          <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
-            外网
-          </span>
         </div>
         <div className="grid grid-cols-4 gap-4">
           <div>
             <div className="text-xs text-text-tertiary mb-1">当前项目</div>
-            <div className="text-sm font-medium">未选择</div>
+            <button
+              onClick={() => navigate("/projects")}
+              className="text-sm font-medium text-brand-primary hover:text-brand-secondary transition-colors"
+            >
+              前往创建 →
+            </button>
           </div>
           <div>
             <div className="text-xs text-text-tertiary mb-1">在线 Worker</div>
-            <div className="text-sm font-medium text-green-400">0</div>
+            <div className={`text-sm font-medium ${onlineWorkers > 0 ? 'text-green-400' : 'text-text-tertiary'}`}>
+              {onlineWorkers}
+            </div>
           </div>
           <div>
             <div className="text-xs text-text-tertiary mb-1">运行中任务</div>

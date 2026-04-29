@@ -9,6 +9,7 @@ export default function ProjectPage() {
   const navigate = useNavigate();
   const projects = useStore((state) => state.projects) ?? [];
   const setProjects = useStore((state) => state.setProjects);
+  const setCurrentProject = useStore((state) => state.setCurrentProject);
   const [name, setName] = useState("");
   const [org, setOrg] = useState("");
   const [purpose, setPurpose] = useState("");
@@ -16,6 +17,8 @@ export default function ProjectPage() {
   const [endTime, setEndTime] = useState("");
   const [rateLimit, setRateLimit] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     api.listProjects().then((data) => setProjects(data ?? [])).catch(console.error);
@@ -131,35 +134,87 @@ export default function ProjectPage() {
           return (
             <div
               key={p.id}
-              onClick={() => navigate(`/projects/${p.id}`)}
-              className="card-dark p-5 cursor-pointer group"
+              className="card-dark p-5 group relative"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="font-semibold text-text-primary group-hover:text-brand-primary transition-colors text-base">{p.name}</div>
-                  <StatusBadge status={status} />
+              <div
+                onClick={() => {
+                  setCurrentProject(p);
+                  navigate("/");
+                }}
+                className="cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="font-semibold text-text-primary group-hover:text-brand-primary transition-colors text-base">{p.name}</div>
+                    <StatusBadge status={status} />
+                  </div>
+                  <div className="text-text-quaternary opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </div>
-                <div className="text-text-quaternary opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
+                <div className="text-[13px] text-text-tertiary mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-text-quaternary">组织:</span>
+                    <span className="text-text-secondary">{p.organization || "—"}</span>
+                  </div>
+                  {p.purpose && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-text-quaternary">目的:</span>
+                      <span className="text-text-secondary">{p.purpose}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-text-quaternary">创建:</span>
+                    <span className="text-text-secondary">{new Date(p.created_at).toLocaleDateString()}</span>
+                  </div>
                 </div>
               </div>
-              <div className="text-[13px] text-text-tertiary mt-3 flex flex-wrap gap-x-4 gap-y-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-text-quaternary">组织:</span>
-                  <span className="text-text-secondary">{p.organization || "—"}</span>
-                </div>
-                {p.purpose && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-text-quaternary">目的:</span>
-                    <span className="text-text-secondary">{p.purpose}</span>
+              {/* 删除按钮 */}
+              <div className="absolute top-3 right-3">
+                {confirmDeleteId === p.id ? (
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-xs text-red-400">确认删除？</span>
+                    <button
+                      onClick={async () => {
+                        setDeletingId(p.id);
+                        try {
+                          await api.deleteProject(p.id);
+                          setProjects(projects.filter((proj) => proj.id !== p.id));
+                          setConfirmDeleteId(null);
+                        } catch (err) {
+                          alert("删除失败: " + String(err));
+                        } finally {
+                          setDeletingId(null);
+                        }
+                      }}
+                      disabled={deletingId === p.id}
+                      className="px-2 py-0.5 text-xs rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-50"
+                    >
+                      {deletingId === p.id ? "删除中..." : "确认"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="px-2 py-0.5 text-xs rounded bg-white/5 text-text-tertiary hover:bg-white/10"
+                    >
+                      取消
+                    </button>
                   </div>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDeleteId(p.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-500/10 text-text-quaternary hover:text-red-400"
+                    title="删除项目"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 )}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-text-quaternary">创建:</span>
-                  <span className="text-text-secondary">{new Date(p.created_at).toLocaleDateString()}</span>
-                </div>
               </div>
             </div>
           );

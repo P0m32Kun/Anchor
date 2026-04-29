@@ -87,6 +87,33 @@ M0-M3 已完成。当前已有：
 
 ---
 
+## v0.2 路线图
+
+### Phase 1: 容器化与远程 Worker ✅
+
+| 任务 | 状态 | 文件 |
+|------|------|------|
+| Docker 镜像构建（server / worker） | ✅ | `Dockerfile.server`, `Dockerfile.worker` |
+| Docker Compose 编排 | ✅ | `docker-compose.yml`, `docker-rangefield/docker-compose.yml` |
+| 远程 Worker 注册/心跳/长轮询 | ✅ | `internal/api/worker_handlers.go`, `internal/worker/remote_client.go` |
+| Worker 超时自动清理 | ✅ | `internal/api/handlers.go` `cleanupStaleWorkers()` |
+| WorkersPage 实时列表 | ✅ | `frontend/src/pages/WorkersPage.tsx` |
+| Makefile 容器化命令 | ✅ | `Makefile` |
+
+### Phase 2: 模板管理（进行中）
+
+- [ ] Server 端模板仓库管理（上传/版本/校验）
+- [ ] Worker 模板更新指令下发（通过 poll 通道）
+- [ ] 模板版本同步与差异检测
+
+### Phase 3: 任务调度增强
+
+- [ ] Worker 能力上报（工具版本、并发限制、网络环境）
+- [ ] 多 Worker 任务负载均衡
+- [ ] 任务优先级队列
+
+---
+
 ## Sprint 日志
 
 ### 2026-04-26
@@ -251,3 +278,38 @@ M0-M3 已完成。当前已有：
 - 测试覆盖：15 个 report 单元测试
 - 端到端：创建项目 → 导入 9 目标 → 资产发现 → Nuclei 扫描 → 人工确认 → Markdown/JSON 报告导出
 - Bug 修复：Evidence `created_by` NULL 处理（ListEvidenceByFinding Scan 错误）
+
+---
+
+## v0.2 路线图
+
+> 目标：从单机 MVP 过渡到可分布式部署的生产就绪扫描平台
+
+### Phase 1: 容器化与远程 Worker ✅
+- Docker 镜像构建（server / worker 双镜像）
+- Docker Compose 编排（anchor-net 统一网络）
+- Worker 注册 / 心跳 / 长轮询机制
+- 幽灵 Worker 自动清理（心跳超时标记 offline）
+- 部署场景支持：内网 Docker、公网 VPS、家庭 WiFi 笔记本
+
+### Phase 2: 模板管理（进行中）
+- Server 端模板仓库管理（上传 / 版本 / 分类）
+- Worker 模板更新指令下发（通过 poll channel）
+- 模板版本同步与校验（SHA256 / 签名）
+
+### Phase 3: 任务调度增强
+- Worker 能力上报（工具版本、并发限制、网络画像）
+- 多 Worker 任务负载均衡（最少连接 / 轮询）
+- 任务优先级队列（紧急扫描优先）
+
+### Phase 4: 可观测性与运维
+- Worker 日志流回传（SSE / WebSocket）
+- 任务执行链路追踪（task_id → run_id → worker_id）
+-  metrics 接口（Prometheus 格式）
+
+### 风险与阻塞项
+| 风险 | 级别 | 应对措施 |
+|------|------|----------|
+| Worker 在内网无公网 IP，Server 无法主动推送 | 低 | 长轮询 + 指令队列已解决 |
+| 大量 Worker 同时轮询导致 Server 负载高 | 中 | v0.2 Phase 3 引入 WebSocket 替代长轮询 |
+| Nuclei 模板体积大，分发慢 | 中 | 增量更新 + diff 同步 |

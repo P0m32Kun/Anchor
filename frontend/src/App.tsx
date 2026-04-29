@@ -25,6 +25,7 @@ function App() {
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/workers" element={<WorkersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/projects" element={<ProjectPage />} />
             {/* Legacy routes for backward compat */}
             <Route path="/projects/:id" element={<ProjectPage />} />
             <Route path="/projects/:id/assets" element={<AssetPage />} />

@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,21 +29,23 @@ const (
 
 // Runner executes CLI tools in isolated workdirs.
 type Runner struct {
-	queries  *db.Queries
-	scopeEng *scope.Engine
-	dataDir  string
-	procs    map[string]*exec.Cmd
-	doneChs  map[string]chan struct{} // closed when process exits
-	mu       sync.RWMutex
+	queries    *db.Queries
+	scopeEng   *scope.Engine
+	dataDir    string
+	httpClient *http.Client
+	procs      map[string]*exec.Cmd
+	doneChs    map[string]chan struct{} // closed when process exits
+	mu         sync.RWMutex
 }
 
 func NewRunner(q *db.Queries, scopeEng *scope.Engine, dataDir string) *Runner {
 	return &Runner{
-		queries:  q,
-		scopeEng: scopeEng,
-		dataDir:  dataDir,
-		procs:    make(map[string]*exec.Cmd),
-		doneChs:  make(map[string]chan struct{}),
+		queries:    q,
+		scopeEng:   scopeEng,
+		dataDir:    dataDir,
+		httpClient: &http.Client{Timeout: 30 * time.Second},
+		procs:      make(map[string]*exec.Cmd),
+		doneChs:    make(map[string]chan struct{}),
 	}
 }
 
@@ -107,6 +112,16 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 	if project == nil {
 		_ = r.queries.UpdateScanTaskStatus(task.ID, models.TaskFailed, nil, &now)
 		return fmt.Errorf("project not found: %s", task.ProjectID)
+	}
+
+	// Try to dispatch to a remote worker first.
+	if worker := r.pickOnlineWorker(); worker != nil {
+		log.Printf("[runner] dispatching task %s to worker %s (%s)", task.ID, worker.ID, worker.Endpoint)
+		if err := r.dispatchToWorker(ctx, task, worker, workdir, project); err != nil {
+			log.Printf("[runner] remote dispatch failed: %v, falling back to local", err)
+		} else {
+			return nil
+		}
 	}
 
 	binary := args[0]
@@ -344,5 +359,68 @@ func appendRateLimitArgs(args []string, tool string, rate int) []string {
 	default:
 		// Subfinder and others don't support rate limiting; skip.
 		return args
+	}
+}
+
+// pickOnlineWorker returns the most recently seen online remote worker, or nil if none.
+func (r *Runner) pickOnlineWorker() *models.WorkerNode {
+	workers, err := r.queries.ListWorkerNodes()
+	if err != nil {
+		return nil
+	}
+	var latest *models.WorkerNode
+	for _, w := range workers {
+		if w.Status == models.WorkerStatusOnline && w.Endpoint != "" && w.RevokedAt == nil {
+			if latest == nil || (w.LastSeen != nil && latest.LastSeen != nil && w.LastSeen.After(*latest.LastSeen)) {
+				latest = w
+			}
+		}
+	}
+	return latest
+}
+
+// dispatchToWorker sends a task to a remote worker and polls until completion.
+func (r *Runner) dispatchToWorker(ctx context.Context, task *models.ScanTask, worker *models.WorkerNode, workdir string, project *models.Project) error {
+	args := strings.Fields(task.CommandTemplate)
+	reqBody, _ := json.Marshal(map[string]interface{}{
+		"task_id":    task.ID,
+		"tool":       task.Tool,
+		"command":    args,
+		"workdir":    workdir,
+		"rate_limit": project.RateLimit,
+	})
+
+	resp, err := r.httpClient.Post(worker.Endpoint+"/tasks", "application/json", bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("post task to worker: %w", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("worker rejected task: %s", resp.Status)
+	}
+
+	// Poll for task completion (up to 10 minutes).
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	timeout := time.After(10 * time.Minute)
+
+	for {
+		select {
+		case <-ticker.C:
+			t, err := r.queries.GetScanTask(task.ID)
+			if err != nil || t == nil {
+				continue
+			}
+			if t.Status == models.TaskCompleted {
+				return nil
+			}
+			if t.Status == models.TaskFailed || t.Status == models.TaskScopeDenied || t.Status == models.TaskCancelled {
+				return fmt.Errorf("task %s finished with status: %s", task.ID, t.Status)
+			}
+		case <-timeout:
+			return fmt.Errorf("task %s timeout waiting for worker", task.ID)
+		case <-ctx.Done():
+			return fmt.Errorf("task %s cancelled", task.ID)
+		}
 	}
 }

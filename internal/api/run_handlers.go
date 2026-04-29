@@ -1,12 +1,10 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/errors"
@@ -116,18 +114,10 @@ func (s *Server) dispatchRun(run *models.Run) {
 	s.dispatchTasksToWorkers(tasks)
 }
 
-// dispatchTasksToWorkers assigns tasks to available workers (local or remote).
+// dispatchTasksToWorkers assigns tasks to available workers.
 func (s *Server) dispatchTasksToWorkers(tasks []*models.ScanTask) {
 	for _, task := range tasks {
-		// Try local worker first
-		if s.workerProc != nil && s.workerEndpoint != "" {
-			if s.enqueueToLocalWorker(task) {
-				continue
-			}
-		}
-
-		// Try remote workers
-		if s.enqueueToRemoteWorker(task) {
+		if s.enqueueToWorker(task) {
 			continue
 		}
 
@@ -136,31 +126,7 @@ func (s *Server) dispatchTasksToWorkers(tasks []*models.ScanTask) {
 	}
 }
 
-func (s *Server) enqueueToLocalWorker(task *models.ScanTask) bool {
-	// Local worker expects: task_id, tool, command, workdir, rate_limit
-	payload := map[string]interface{}{
-		"task_id": task.ID,
-		"tool":    task.Tool,
-		"command": []string{task.Tool, "-d", "{{target}}"},
-		"workdir": filepath.Join(s.dataDir, "workdirs", task.ID),
-	}
-	b, _ := json.Marshal(payload)
-	resp, err := s.workerHTTPClient.Post(
-		s.workerEndpoint+"/tasks",
-		"application/json",
-		bytes.NewBuffer(b),
-	)
-	if err != nil {
-		return false
-	}
-	resp.Body.Close()
-	if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
-		return true
-	}
-	return false
-}
-
-func (s *Server) enqueueToRemoteWorker(task *models.ScanTask) bool {
+func (s *Server) enqueueToWorker(task *models.ScanTask) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -4,6 +4,62 @@
 
 ---
 
+## 2026-04-29
+
+### v0.2 Phase 2: 项目管理功能修复与体验优化完成 ✅
+- **项目管理入口修复**：Navbar 添加 "Projects" 导航项，App.tsx 注册 `/projects` 路由
+- **项目创建**：ProjectPage 支持创建项目（名称、组织、目的、时间窗口、速率限制）
+- **项目删除**：支持删除项目，二次确认对话框，级联删除所有关联数据（数据库 `ON DELETE CASCADE`）
+- **项目选择**：点击项目卡片 → 设置 `currentProject` → 跳转 Dashboard，后续页面基于此项目操作
+- **Dashboard 快捷入口**："当前项目: 未选择" → 可点击 "前往创建 →" 跳转到项目管理
+
+**后端变更：**
+- `internal/db/queries.go` — 新增 `DeleteProject(id)` 方法
+- `internal/api/handlers.go` — 新增 `DELETE /projects/{id}` 路由 + `handleDeleteProject` handler（含审计日志）
+
+**前端变更：**
+- `frontend/src/lib/api.ts` — 新增 `deleteProject(id)` API 方法
+- `frontend/src/pages/ProjectPage.tsx` — 删除按钮（hover 显示）+ 确认对话框 + 级联删除
+- `frontend/src/components/Navbar.tsx` — 添加 "Projects" 导航入口
+- `frontend/src/App.tsx` — 注册 `/projects` 路由
+- `frontend/src/pages/DashboardPage.tsx` — "前往创建" 快捷链接
+
+**验证：**
+- `go build` ✅ / `go test` ✅ / `go vet` ✅
+- `npx tsc --noEmit` ✅
+
+**Tag:** `v0.2.0-p2`
+
+---
+
+## 2026-04-28
+
+### v0.2 Phase 1: 容器化与远程 Worker 架构完成 ✅
+- Docker 容器化：`Dockerfile.server` / `Dockerfile.worker` 多阶段构建
+- `docker-compose.yml`：Server + Worker 分离，共享 `anchor-net` 网络
+- `docker-rangefield/docker-compose.yml`：靶场环境接入 anchor-net
+- `Makefile`：新增 `up` / `down` / `up-all` / `down-all` / `range-up` / `range-down` / `shell-server` / `shell-worker`
+- 远程 Worker 注册/心跳/长轮询：`internal/api/worker_handlers.go`
+- Worker 超时自动清理：`cleanupStaleWorkers()` goroutine，120s 阈值
+- Ghost worker bug 修复：`internal/api/handlers.go` 过滤 offline worker，`internal/api/worker_handlers.go` 注册逻辑
+- WorkersPage 前端修复：`frontend/src/pages/WorkersPage.tsx` 实时拉取 `/workers`，5s 轮询，状态指示灯
+- Docker Compose 网络修复：worker 通过 service 名 `server:17421` 连接（非 localhost）
+- 新增 Scope 确认流程：首次导入无 scope 规则时自动提示确认
+- 目标导入扩展：逗号分隔展开、IP 连字符范围展开、自动类型推断
+
+**相关文件：**
+- `docker-compose.yml`
+- `Dockerfile.server` / `Dockerfile.worker`
+- `internal/api/handlers.go`
+- `internal/api/worker_handlers.go`
+- `internal/db/queries.go`
+- `frontend/src/pages/WorkersPage.tsx`
+- `Makefile`
+
+**Tag:** `v0.2.0-p1`
+
+---
+
 ## 2026-04-27
 
 ### M4 报告导出 + 端到端验收完成 ✅

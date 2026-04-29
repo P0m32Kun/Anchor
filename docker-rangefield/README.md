@@ -10,11 +10,11 @@
 
 | 服务 | 宿主机端口 | 容器 IP | 技术栈 | 预期指纹 | 测试场景 |
 |------|-----------|---------|--------|---------|---------|
-| nginx | 18080 | 172.20.0.10 | nginx:alpine | `nginx` | 基准正常服务 |
-| tomcat | 18081 | 172.20.0.11 | Tomcat 9 (Java) | `tomcat` | Manager 弱口令 tomcat/tomcat |
-| grafana | 18082 | 172.20.0.12 | Grafana | `grafana` | 弱口令 admin/admin |
-| redis | 16379 | 172.20.0.13 | Redis 5 | `redis` | 未授权访问 |
-| mysql | 13306 | 172.20.0.14 | MySQL 5.7 | `mysql` | 弱口令 root/root |
+| nginx | 18080 | 172.30.0.10 | nginx:alpine | `nginx` | 基准正常服务 |
+| tomcat | 18081 | 172.30.0.11 | Tomcat 9 (Java) | `tomcat` | Manager 弱口令 tomcat/tomcat |
+| grafana | 18082 | 172.30.0.12 | Grafana | `grafana` | 弱口令 admin/admin |
+| redis | 16379 | 172.30.0.13 | Redis 5 | `redis` | 未授权访问 |
+| mysql | 13306 | 172.30.0.14 | MariaDB 10.6 | `mysql` | 弱口令 root/root |
 
 ---
 

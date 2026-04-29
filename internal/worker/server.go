@@ -55,7 +55,8 @@ func (ws *WorkerServer) handleTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute task asynchronously
-	go ws.executeTask(r.Context(), req.TaskID, req.Tool, req.Command, req.Workdir, req.RateLimit)
+	// Use background context so task execution survives HTTP connection close.
+	go ws.executeTask(context.Background(), req.TaskID, req.Tool, req.Command, req.Workdir, req.RateLimit)
 
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]string{"status": "accepted"})
@@ -161,6 +162,14 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 			"name": name,
 			"data": data,
 		})
+	}
+
+	// Write stdout/stderr to workdir so Server can parse tool output.
+	if stdoutBuf.Len() > 0 {
+		os.WriteFile(filepath.Join(workdir, "stdout.txt"), stdoutBuf.Bytes(), 0640)
+	}
+	if stderrBuf.Len() > 0 {
+		os.WriteFile(filepath.Join(workdir, "stderr.txt"), stderrBuf.Bytes(), 0640)
 	}
 
 	status := "completed"

@@ -21,7 +21,7 @@
 | 前端框架 | React 18 + TypeScript | 18+ |
 | 样式 | Tailwind CSS v3 + shadcn/ui | v3 (当前) |
 | 状态管理 | Zustand | — |
-| 本地服务 | Go | 1.22+ |
+| 本地/远程服务 | Go | 1.26+ |
 | 数据库 | SQLite (WAL 模式) | — |
 | 实时推送 | SSE (Server-Sent Events) | — |
 | 语法高亮 | Prism.js | — |
@@ -34,15 +34,21 @@
 
 ```
 .
-├── main.go                     # Go 服务入口
+├── main.go                     # Go 服务入口（单二进制，server/worker 双模式）
 ├── go.mod / go.sum            # Go 模块
-├── Makefile                    # 构建脚本
+├── Makefile                    # 构建脚本 + Docker 生命周期
+├── docker-compose.yml          # Server + Worker 编排
+├── Dockerfile.server           # Server 镜像
+├── Dockerfile.worker           # Worker 镜像
 ├── 设计.md                      # PRD
-├── plan.md                      # 开发计划
-├── README.md                    # 项目说明
-├── docs/                        # 技术文档
-│   ├── API.md                  # API 参考
-│   └── ARCHITECTURE.md         # 架构说明
+├── 第二阶段设计.md               # v0.2 设计文档
+├── plan.md                     # 开发计划
+├── README.md                   # 项目说明
+├── docs/                       # 技术文档
+│   ├── API.md                 # API 参考
+│   ├── ARCHITECTURE.md        # 架构说明
+│   ├── ADR-v0.2.md            # v0.2 架构决策
+│   └── 部署指南.md             # 部署指南
 ├── internal/                    # Go 内部包
 │   ├── api/                    # HTTP API handlers
 │   ├── asset/                  # 资产归一化与去重
@@ -95,9 +101,19 @@
 - **理由**: 读写并发性能更好，适合桌面应用本地存储
 - **当前状态**: 已实现，data_dir = ~/.anchor
 
-### ADR-005: Worker 同进程模型 (MVP)
-- **决策**: Worker 作为 Control Plane 内的 goroutine 运行
+### ADR-005: Worker 同进程模型 (MVP，已演进)
+- **决策**: ~~Worker 作为 Control Plane 内的 goroutine 运行~~ → v0.2 演进为单二进制双模式
 - **理由**: MVP 复杂度最低，v0.2 再考虑拆分为独立进程
+- **当前状态**: 已演进为 ADR-009/010
+
+### ADR-009: 远程 Worker 架构（出站连接）
+- **决策**: Worker 主动发起 outbound HTTP 连接到 Server，通过长轮询拉取任务
+- **理由**: NAT 友好，Worker 不需要公网 IP，符合分布式扫描/C2 行业标准
+- **当前状态**: 已实现
+
+### ADR-010: Docker 容器化部署
+- **决策**: 单二进制通过 `--worker` 标志区分模式，Docker 镜像分别构建 Server 和 Worker
+- **理由**: 减少维护负担，Docker Compose 简化本地开发和生产部署
 - **当前状态**: 已实现
 
 ### ADR-006: Scope Check 强制门控
@@ -126,6 +142,8 @@
 | M2 资产发现 | ✅ 已完成 | `v0.1.0-m2` | Subfinder/httpx/Naabu + 资产归一 |
 | M3 Nuclei 初筛 | ✅ 已完成 | `v0.1.0-m3` | 指纹驱动模板筛选 + Finding + 评分 + 证据 |
 | M4 报告导出 | ✅ 已完成 | `v0.1.0-m4` | Markdown/JSON 报告 + 前端预览 + 端到端验收 |
+| v0.2 Phase 1 容器化与远程 Worker | ✅ 已完成 | `v0.2.0-p1` | Docker + 远程 Worker + 心跳清理 + WorkersPage |
+| v0.2 Phase 2 项目管理与体验修复 | ✅ 已完成 | `v0.2.0-p2` | 项目创建/删除/级联清理 + 导航修复 + Dashboard 快捷入口 |
 
 ---
 
@@ -170,6 +188,7 @@
 - `wiki/pitfalls/20260426-raw-artifact-redaction-loss.md` — 原始证据被脱敏覆盖
 - `wiki/pitfalls/20260427-null-scan-crash.md` — NULL 列 Scan 到 string 崩溃
 - `wiki/pitfalls/20260427-markdown-pipe-corruption.md` — Markdown 表格被 `|` 破坏
+- `wiki/pitfalls/20260428-ghost-worker-cleanup.md` — Worker 重启产生幽灵记录（无心跳超时清理）
 
 ---
 

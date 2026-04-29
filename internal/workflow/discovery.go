@@ -18,7 +18,8 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
-// AssetDiscoveryWorkflow runs subfinder → httpx → naabu in sequence for each domain target.
+// AssetDiscoveryWorkflow runs subfinder → httpx → naabu in sequence for each domain target,
+// and supports direct IP and CIDR scanning as well.
 type AssetDiscoveryWorkflow struct {
 	queries *db.Queries
 	runner  *worker.Runner
@@ -50,29 +51,51 @@ func NewAssetDiscoveryWorkflow(queries *db.Queries, runner *worker.Runner, scope
 }
 
 // Run executes the asset discovery workflow for the given project.
+// It processes domain, IP, and CIDR targets through their respective chains.
 func (w *AssetDiscoveryWorkflow) Run(ctx context.Context, projectID string) (*DiscoveryResult, error) {
 	result := &DiscoveryResult{}
 
-	// 1. Get domain targets.
 	targets, err := w.queries.ListTargetsByProject(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("list targets: %w", err)
 	}
 
-	var domainTargets []*models.Target
+	var domainTargets, ipTargets, cidrTargets []*models.Target
 	for _, t := range targets {
-		if t.Type == models.TargetTypeDomain {
+		switch t.Type {
+		case models.TargetTypeDomain:
 			domainTargets = append(domainTargets, t)
+		case models.TargetTypeIP:
+			ipTargets = append(ipTargets, t)
+		case models.TargetTypeCIDR:
+			cidrTargets = append(cidrTargets, t)
 		}
 	}
 
-	if len(domainTargets) == 0 {
-		return result, nil
+	if len(domainTargets) > 0 {
+		if err := w.runDomainChain(ctx, projectID, domainTargets, result); err != nil {
+			log.Printf("domain chain error: %v", err)
+		}
 	}
 
-	// 2. For each domain target run subfinder → httpx → naabu serially.
+	if len(ipTargets) > 0 {
+		if err := w.runIPChain(ctx, projectID, ipTargets, result); err != nil {
+			log.Printf("ip chain error: %v", err)
+		}
+	}
+
+	if len(cidrTargets) > 0 {
+		if err := w.runCIDRChain(ctx, projectID, cidrTargets, result); err != nil {
+			log.Printf("cidr chain error: %v", err)
+		}
+	}
+
+	return result, nil
+}
+
+// runDomainChain runs subfinder → httpx → naabu for each domain target.
+func (w *AssetDiscoveryWorkflow) runDomainChain(ctx context.Context, projectID string, domainTargets []*models.Target, result *DiscoveryResult) error {
 	for _, dt := range domainTargets {
-		// a. Scope check.
 		decision, err := w.scope.Check(ctx, projectID, dt)
 		if err != nil {
 			continue
@@ -81,14 +104,12 @@ func (w *AssetDiscoveryWorkflow) Run(ctx context.Context, projectID string) (*Di
 			continue
 		}
 
-		// b. Run Subfinder.
 		subfinderTask, err := w.createAndRunTask(ctx, projectID, dt.ID, "subfinder", worker.BuildSubfinderCommand(dt.Value))
 		if err != nil {
 			continue
 		}
 		result.SubfinderTaskCount++
 
-		// c. Parse Subfinder output and create domain assets.
 		discoveredDomains, err := w.parseSubfinderOutput(subfinderTask.ID)
 		if err != nil {
 			continue
@@ -108,7 +129,6 @@ func (w *AssetDiscoveryWorkflow) Run(ctx context.Context, projectID string) (*Di
 			result.DomainsFound++
 		}
 
-		// d. Run httpx on all discovered domain assets.
 		if len(domainAssets) == 0 {
 			continue
 		}
@@ -123,7 +143,6 @@ func (w *AssetDiscoveryWorkflow) Run(ctx context.Context, projectID string) (*Di
 		}
 		result.HttpxTaskCount++
 
-		// e. Parse httpx output and create web endpoints + url assets.
 		webResults, err := w.parseHttpxOutput(httpxTask.ID)
 		if err != nil {
 			continue
@@ -134,12 +153,10 @@ func (w *AssetDiscoveryWorkflow) Run(ctx context.Context, projectID string) (*Di
 			if err != nil || decision.Decision == models.ScopeDeny {
 				continue
 			}
-			// Ensure URL asset exists.
 			urlAsset, _, err := w.merger.MergeOrCreateAsset(projectID, "url", hr.URL, "httpx")
 			if err != nil {
 				continue
 			}
-			// Create or get domain asset for host.
 			hostAsset, _, err := w.merger.MergeOrCreateAsset(projectID, "domain", hr.Host, "httpx")
 			if err != nil {
 				continue
@@ -155,7 +172,6 @@ func (w *AssetDiscoveryWorkflow) Run(ctx context.Context, projectID string) (*Di
 				sc := hr.StatusCode
 				statusCode = &sc
 			}
-			// Merge webserver into technologies.
 			techs := hr.Tech
 			if hr.WebServer != "" {
 				techs = append(techs, hr.WebServer)
@@ -170,48 +186,228 @@ func (w *AssetDiscoveryWorkflow) Run(ctx context.Context, projectID string) (*Di
 			_ = urlAsset
 		}
 
-		// f. Run Naabu on all discovered domain assets.
 		naabuHostFile, err := writeHostsFile(w.dataDir, projectID, extractValues(domainAssets))
 		if err != nil {
 			log.Printf("write naabu host file: %v", err)
 			continue
 		}
-		naabuTask, err := w.createAndRunTask(ctx, projectID, dt.ID, "naabu", worker.BuildNaabuCommand(naabuHostFile))
+		portRange := w.getPortRange(projectID)
+		naabuArgs := buildNaabuArgsWithPortRange(naabuHostFile, portRange)
+		naabuTask, err := w.createAndRunTask(ctx, projectID, dt.ID, "naabu", naabuArgs)
 		if err != nil {
 			continue
 		}
 		result.NaabuTaskCount++
 
-		// g. Parse Naabu output and create IP assets + ports.
 		naabuResults, err := w.parseNaabuOutput(naabuTask.ID)
 		if err != nil {
 			continue
 		}
-		for _, nr := range naabuResults {
-			if nr.IP == "" {
-				continue
-			}
-			tmpTarget := &models.Target{Type: models.TargetTypeIP, Value: nr.IP}
-			decision, err := w.scope.Check(ctx, projectID, tmpTarget)
+		if err := w.runPostDiscovery(ctx, projectID, dt.ID, naabuResults, result, true); err != nil {
+			log.Printf("post-discovery for domain %s: %v", dt.Value, err)
+		}
+	}
+	return nil
+}
+
+// runIPChain runs naabu → post-discovery for each IP target.
+func (w *AssetDiscoveryWorkflow) runIPChain(ctx context.Context, projectID string, ipTargets []*models.Target, result *DiscoveryResult) error {
+	for _, target := range ipTargets {
+		decision, err := w.scope.Check(ctx, projectID, target)
+		if err != nil {
+			continue
+		}
+		if decision.Decision == models.ScopeDeny {
+			continue
+		}
+
+		hostFile, err := writeHostsFile(w.dataDir, projectID, []string{target.Value})
+		if err != nil {
+			log.Printf("write host file for ip %s: %v", target.Value, err)
+			continue
+		}
+
+		portRange := w.getPortRange(projectID)
+		args := buildNaabuArgsWithPortRange(hostFile, portRange)
+		naabuTask, err := w.createAndRunTask(ctx, projectID, target.ID, "naabu", args)
+		if err != nil {
+			continue
+		}
+		result.NaabuTaskCount++
+
+		naabuResults, err := w.parseNaabuOutput(naabuTask.ID)
+		if err != nil {
+			continue
+		}
+		if err := w.runPostDiscovery(ctx, projectID, target.ID, naabuResults, result, false); err != nil {
+			log.Printf("post-discovery for ip %s: %v", target.Value, err)
+		}
+	}
+	return nil
+}
+
+// runCIDRChain expands each CIDR, runs naabu, and processes results with secondary scope checks.
+func (w *AssetDiscoveryWorkflow) runCIDRChain(ctx context.Context, projectID string, cidrTargets []*models.Target, result *DiscoveryResult) error {
+	for _, target := range cidrTargets {
+		decision, err := w.scope.Check(ctx, projectID, target)
+		if err != nil {
+			continue
+		}
+		if decision.Decision == models.ScopeDeny {
+			continue
+		}
+
+		ips, err := scope.ExpandCIDR(target.Value)
+		if err != nil {
+			log.Printf("expand CIDR %s: %v", target.Value, err)
+			continue
+		}
+
+		hostFile, err := writeHostsFile(w.dataDir, projectID, ips)
+		if err != nil {
+			log.Printf("write host file for cidr %s: %v", target.Value, err)
+			continue
+		}
+
+		portRange := w.getPortRange(projectID)
+		args := buildNaabuArgsWithPortRange(hostFile, portRange)
+		naabuTask, err := w.createAndRunTask(ctx, projectID, target.ID, "naabu", args)
+		if err != nil {
+			continue
+		}
+		result.NaabuTaskCount++
+
+		naabuResults, err := w.parseNaabuOutput(naabuTask.ID)
+		if err != nil {
+			continue
+		}
+		if err := w.runPostDiscovery(ctx, projectID, target.ID, naabuResults, result, true); err != nil {
+			log.Printf("post-discovery for cidr %s: %v", target.Value, err)
+		}
+	}
+	return nil
+}
+
+// runPostDiscovery processes Naabu results, creates IP/port assets, and runs httpx on alive IPs.
+func (w *AssetDiscoveryWorkflow) runPostDiscovery(ctx context.Context, projectID, targetID string, naabuResults []parser.NaabuResult, result *DiscoveryResult, needsScopeCheck bool) error {
+	var aliveIPs []string
+	seen := make(map[string]bool)
+
+	for _, nr := range naabuResults {
+		if nr.IP == "" {
+			continue
+		}
+		if needsScopeCheck {
+			decision, err := w.scope.CheckIP(ctx, projectID, nr.IP)
 			if err != nil || decision.Decision == models.ScopeDeny {
 				continue
 			}
-			ipAsset, _, err := w.merger.MergeOrCreateAsset(projectID, "ip", nr.IP, "naabu")
-			if err != nil {
-				continue
-			}
-			_, _, err = w.merger.CreatePortIfNotExists(ipAsset.ID, nr.Port, "tcp", "naabu")
-			if err != nil {
-				continue
-			}
-			result.IPsFound++
-			result.PortsFound++
+		}
+		ipAsset, _, err := w.merger.MergeOrCreateAsset(projectID, "ip", nr.IP, "naabu")
+		if err != nil {
+			continue
+		}
+		_, _, err = w.merger.CreatePortIfNotExists(ipAsset.ID, nr.Port, "tcp", "naabu")
+		if err != nil {
+			continue
+		}
+		result.IPsFound++
+		result.PortsFound++
+
+		if !seen[nr.IP] {
+			seen[nr.IP] = true
+			aliveIPs = append(aliveIPs, nr.IP)
 		}
 	}
 
-	return result, nil
+	if len(aliveIPs) == 0 {
+		return nil
+	}
+
+	httpxHostFile, err := writeHostsFile(w.dataDir, projectID, aliveIPs)
+	if err != nil {
+		return fmt.Errorf("write httpx host file: %w", err)
+	}
+
+	httpxTask, err := w.createAndRunTask(ctx, projectID, targetID, "httpx", worker.BuildHttpxCommand(httpxHostFile))
+	if err != nil {
+		return fmt.Errorf("run httpx: %w", err)
+	}
+	result.HttpxTaskCount++
+
+	webResults, err := w.parseHttpxOutput(httpxTask.ID)
+	if err != nil {
+		return fmt.Errorf("parse httpx: %w", err)
+	}
+
+	for _, hr := range webResults {
+		tmpTarget := &models.Target{Type: models.TargetTypeURL, Value: hr.URL}
+		decision, err := w.scope.Check(ctx, projectID, tmpTarget)
+		if err != nil || decision.Decision == models.ScopeDeny {
+			continue
+		}
+		urlAsset, _, err := w.merger.MergeOrCreateAsset(projectID, "url", hr.URL, "httpx")
+		if err != nil {
+			continue
+		}
+		hostAsset, _, err := w.merger.MergeOrCreateAsset(projectID, "domain", hr.Host, "httpx")
+		if err != nil {
+			continue
+		}
+		var port *int
+		if hr.Port != "" {
+			if p, err := parseInt(hr.Port); err == nil {
+				port = &p
+			}
+		}
+		var statusCode *int
+		if hr.StatusCode > 0 {
+			sc := hr.StatusCode
+			statusCode = &sc
+		}
+		techs := hr.Tech
+		if hr.WebServer != "" {
+			techs = append(techs, hr.WebServer)
+		}
+		_, _, err = w.merger.CreateWebEndpointIfNotExists(
+			projectID, hostAsset.ID, hr.URL, hr.Scheme, hr.Host, port, hr.Path, hr.Title, statusCode, techs, "httpx",
+		)
+		if err != nil {
+			continue
+		}
+		result.WebEndpointsFound++
+		_ = urlAsset
+	}
+
+	return nil
 }
 
+// getPortRange returns the project's configured port range or the default "tp100".
+func (w *AssetDiscoveryWorkflow) getPortRange(projectID string) string {
+	project, _ := w.queries.GetProject(projectID)
+	if project != nil && project.PortRange != nil && *project.PortRange != "" {
+		return *project.PortRange
+	}
+	return "tp100"
+}
+
+// buildNaabuArgsWithPortRange builds Naabu command arguments with the specified port range.
+func buildNaabuArgsWithPortRange(hostFile, portRange string) []string {
+	args := []string{"naabu", "-json", "-list", hostFile}
+	switch strings.ToLower(portRange) {
+	case "", "tp100", "top100":
+		// default top 100, no extra args needed
+	case "tp1000", "top1000":
+		args = append(args, "-tp", "1000")
+	case "tpfull", "topfull", "full":
+		args = append(args, "-tp", "full")
+	default:
+		args = append(args, "-p", portRange)
+	}
+	return args
+}
+
+// createAndRunTask creates a scan plan and task, then runs it.
 func (w *AssetDiscoveryWorkflow) createAndRunTask(ctx context.Context, projectID, targetID, tool string, args []string) (*models.ScanTask, error) {
 	plan := &models.ScanPlan{
 		ID:           util.GenerateID(),
@@ -327,6 +523,7 @@ func (w *AssetDiscoveryWorkflow) parseNaabuOutput(taskID string) ([]parser.Naabu
 }
 
 func (w *AssetDiscoveryWorkflow) findArtifactPath(taskID string, artifactType models.ArtifactType) (string, error) {
+	// 1. Try database first (local execution path)
 	artifacts, err := w.queries.ListRawArtifactsByTask(taskID)
 	if err != nil {
 		return "", err
@@ -334,6 +531,26 @@ func (w *AssetDiscoveryWorkflow) findArtifactPath(taskID string, artifactType mo
 	for _, a := range artifacts {
 		if a.Type == artifactType {
 			return a.Path, nil
+		}
+	}
+
+	// 2. Fallback: check workdir for remote worker output files
+	task, err := w.queries.GetScanTask(taskID)
+	if err != nil || task == nil {
+		return "", nil
+	}
+	workdir := filepath.Join(w.dataDir, "workdirs", task.ProjectID, taskID)
+
+	switch artifactType {
+	case models.ArtifactStdout, models.ArtifactJSONL:
+		stdoutPath := filepath.Join(workdir, "stdout.txt")
+		if _, err := os.Stat(stdoutPath); err == nil {
+			return stdoutPath, nil
+		}
+	case models.ArtifactStderr:
+		stderrPath := filepath.Join(workdir, "stderr.txt")
+		if _, err := os.Stat(stderrPath); err == nil {
+			return stderrPath, nil
 		}
 	}
 	return "", nil

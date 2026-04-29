@@ -23,16 +23,16 @@ func New(db DBTX) *Queries { return &Queries{db: db} }
 
 func (q *Queries) CreateProject(p *models.Project) error {
 	_, err := q.db.Exec(`
-		INSERT INTO projects (id, name, organization, purpose, start_time, end_time, rate_limit, default_profile, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Name, p.Organization, p.Purpose, p.StartTime, p.EndTime, p.RateLimit, p.DefaultProfile, p.CreatedAt, p.UpdatedAt)
+		INSERT INTO projects (id, name, organization, purpose, start_time, end_time, rate_limit, port_range, default_profile, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Name, p.Organization, p.Purpose, p.StartTime, p.EndTime, p.RateLimit, p.PortRange, p.DefaultProfile, p.CreatedAt, p.UpdatedAt)
 	return err
 }
 
 func (q *Queries) GetProject(id string) (*models.Project, error) {
-	row := q.db.QueryRow(`SELECT id, name, organization, purpose, start_time, end_time, rate_limit, default_profile, created_at, updated_at FROM projects WHERE id = ?`, id)
+	row := q.db.QueryRow(`SELECT id, name, organization, purpose, start_time, end_time, rate_limit, port_range, default_profile, created_at, updated_at FROM projects WHERE id = ?`, id)
 	p := &models.Project{}
-	err := row.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.RateLimit, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt)
+	err := row.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -40,7 +40,7 @@ func (q *Queries) GetProject(id string) (*models.Project, error) {
 }
 
 func (q *Queries) ListProjects() ([]*models.Project, error) {
-	rows, err := q.db.Query(`SELECT id, name, organization, purpose, start_time, end_time, rate_limit, default_profile, created_at, updated_at FROM projects ORDER BY created_at DESC`)
+	rows, err := q.db.Query(`SELECT id, name, organization, purpose, start_time, end_time, rate_limit, port_range, default_profile, created_at, updated_at FROM projects ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -48,12 +48,17 @@ func (q *Queries) ListProjects() ([]*models.Project, error) {
 	var list []*models.Project
 	for rows.Next() {
 		p := &models.Project{}
-		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.RateLimit, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, p)
 	}
 	return list, rows.Err()
+}
+
+func (q *Queries) DeleteProject(id string) error {
+	_, err := q.db.Exec(`DELETE FROM projects WHERE id = ?`, id)
+	return err
 }
 
 // --- Targets ---
@@ -110,6 +115,58 @@ func (q *Queries) ListTargetsByProject(projectID string) ([]*models.Target, erro
 			return nil, err
 		}
 		list = append(list, t)
+	}
+	return list, rows.Err()
+}
+
+// --- IP Discovery Results ---
+
+func (q *Queries) CreateIPDiscoveryResult(r *models.IPDiscoveryResult) error {
+	_, err := q.db.Exec(`
+		INSERT INTO ip_discovery_results (id, project_id, target_id, ip, hostname, source, alive, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ProjectID, r.TargetID, r.IP, r.Hostname, r.Source, r.Alive, r.CreatedAt)
+	return err
+}
+
+func (q *Queries) ListIPDiscoveryResultsByProject(projectID string) ([]*models.IPDiscoveryResult, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, target_id, ip, hostname, source, alive, created_at
+		FROM ip_discovery_results
+		WHERE project_id = ?
+		ORDER BY created_at DESC`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.IPDiscoveryResult
+	for rows.Next() {
+		r := &models.IPDiscoveryResult{}
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.TargetID, &r.IP, &r.Hostname, &r.Source, &r.Alive, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) ListIPDiscoveryResultsByTarget(targetID string) ([]*models.IPDiscoveryResult, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, target_id, ip, hostname, source, alive, created_at
+		FROM ip_discovery_results
+		WHERE target_id = ?
+		ORDER BY created_at DESC`, targetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.IPDiscoveryResult
+	for rows.Next() {
+		r := &models.IPDiscoveryResult{}
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.TargetID, &r.IP, &r.Hostname, &r.Source, &r.Alive, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
 	}
 	return list, rows.Err()
 }

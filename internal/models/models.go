@@ -17,12 +17,24 @@ type Project struct {
 	StartTime      *time.Time `json:"start_time" db:"start_time"`
 	EndTime        *time.Time `json:"end_time" db:"end_time"`
 	RateLimit      int        `json:"rate_limit" db:"rate_limit"`
+	PortRange      *string    `json:"port_range,omitempty" db:"port_range"`
 	DefaultProfile string     `json:"default_profile" db:"default_profile"`
 	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // --- Target ---
+
+type IPDiscoveryResult struct {
+	ID        string    `json:"id" db:"id"`
+	ProjectID string    `json:"project_id" db:"project_id"`
+	TargetID  string    `json:"target_id" db:"target_id"`
+	IP        string    `json:"ip" db:"ip"`
+	Hostname  *string   `json:"hostname,omitempty" db:"hostname"`
+	Source    string    `json:"source" db:"source"` // naabu | nmap | manual
+	Alive     bool      `json:"alive" db:"alive"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
 
 type TargetType string
 
@@ -611,7 +623,6 @@ func (n *StepName) Scan(value interface{}) error {
 type WorkerMode string
 
 const (
-	WorkerModeLocal  WorkerMode = "local"
 	WorkerModeRemote WorkerMode = "remote"
 )
 

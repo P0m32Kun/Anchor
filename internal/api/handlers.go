@@ -1,15 +1,12 @@
 package api
 
 import (
-	"bufio"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -27,65 +24,98 @@ import (
 
 // Server holds API dependencies.
 type Server struct {
-	queries          *db.Queries
-	rawDB            *sql.DB
-	scopeEng         *scope.Engine
-	worker           *worker.Runner
-	health           *health.Checker
-	dataDir          string
-	sseClients       map[string]chan []byte
-	workerEndpoint   string
-	workerHTTPClient *http.Client
-	workerProc       *os.Process
-	taskQueue        map[string]chan *models.ScanTask
-	taskResults      map[string]chan map[string]interface{}
-	mu               sync.Mutex
+	queries     *db.Queries
+	rawDB       *sql.DB
+	scopeEng    *scope.Engine
+	worker      *worker.Runner
+	health      *health.Checker
+	dataDir     string
+	sseClients  map[string]chan []byte
+	taskQueue   map[string]chan *models.ScanTask
+	taskResults map[string]chan map[string]interface{}
+	mu          sync.Mutex
 }
 
-func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string, autoStartWorker bool) *Server {
+func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	scopeEng := scope.NewEngine(queries)
 	s := &Server{
-		queries:    queries,
-		rawDB:      rawDB,
-		scopeEng:   scopeEng,
-		worker:     worker.NewRunner(queries, scopeEng, dataDir),
-		health:     health.NewChecker(queries),
-		dataDir:    dataDir,
-		sseClients: make(map[string]chan []byte),
-		workerHTTPClient: &http.Client{Timeout: 30 * time.Second},
+		queries:     queries,
+		rawDB:       rawDB,
+		scopeEng:    scopeEng,
+		worker:      worker.NewRunner(queries, scopeEng, dataDir),
+		health:      health.NewChecker(queries),
+		dataDir:     dataDir,
+		sseClients:  make(map[string]chan []byte),
 		taskQueue:   make(map[string]chan *models.ScanTask),
 		taskResults: make(map[string]chan map[string]interface{}),
 	}
-	if autoStartWorker {
-		// Auto-start local worker
-		go func() {
-			time.Sleep(1 * time.Second)
-			if err := s.spawnLocalWorker(); err != nil {
-				log.Printf("[server] auto-start local worker failed: %v", err)
-			}
-		}()
-		// Monitor worker and auto-restart
-		go s.monitorWorker()
-	}
+	// Mark all existing workers as offline on startup (they'll re-register if active)
+	s.markAllWorkersOffline()
+	// Clean up stale workers every 60s
+	go s.cleanupStaleWorkers()
 	return s
 }
 
-func (s *Server) monitorWorker() {
-	restartCount := 0
-	for {
-		time.Sleep(5 * time.Second)
-		if s.workerProc == nil {
-			if restartCount >= 3 {
-				log.Printf("[server] worker restart limit reached, giving up")
-				return
+func (s *Server) markAllWorkersOffline() {
+	workers, err := s.queries.ListWorkerNodes()
+	if err != nil {
+		log.Printf("[server] mark all workers offline: list failed: %v", err)
+		return
+	}
+	now := time.Now().UTC()
+	for _, w := range workers {
+		if w.Status == models.WorkerStatusOffline {
+			continue
+		}
+		if err := s.queries.UpdateWorkerNodeStatus(w.ID, models.WorkerStatusOffline, now); err != nil {
+			log.Printf("[server] mark all workers offline: update failed for %s: %v", w.ID, err)
+			continue
+		}
+		s.mu.Lock()
+		if ch, ok := s.taskQueue[w.ID]; ok {
+			close(ch)
+		}
+		delete(s.taskQueue, w.ID)
+		delete(s.taskResults, w.ID)
+		s.mu.Unlock()
+		log.Printf("[server] worker %s marked offline on startup", w.ID)
+	}
+}
+
+func (s *Server) cleanupStaleWorkers() {
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		workers, err := s.queries.ListWorkerNodes()
+		if err != nil {
+			log.Printf("[server] cleanup stale workers: list failed: %v", err)
+			continue
+		}
+		now := time.Now().UTC()
+		for _, w := range workers {
+			if w.Status == models.WorkerStatusOffline {
+				continue
 			}
-			restartCount++
-			log.Printf("[server] worker not running, restarting (attempt %d/3)", restartCount)
-			if err := s.spawnLocalWorker(); err != nil {
-				log.Printf("[server] worker restart failed: %v", err)
+			if w.RevokedAt != nil {
+				continue
 			}
-		} else {
-			restartCount = 0
+			if w.LastSeen == nil {
+				continue
+			}
+			if now.Sub(*w.LastSeen) > 120*time.Second {
+				if err := s.queries.UpdateWorkerNodeStatus(w.ID, models.WorkerStatusOffline, now); err != nil {
+					log.Printf("[server] cleanup stale workers: update status failed for %s: %v", w.ID, err)
+					continue
+				}
+				s.mu.Lock()
+				if ch, ok := s.taskQueue[w.ID]; ok {
+					close(ch)
+				}
+				delete(s.taskQueue, w.ID)
+				delete(s.taskResults, w.ID)
+				s.mu.Unlock()
+				log.Printf("[server] worker %s marked offline (last seen %v ago)", w.ID, now.Sub(*w.LastSeen))
+			}
 		}
 	}
 }
@@ -94,6 +124,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /projects", s.handleCreateProject)
 	mux.HandleFunc("GET /projects", s.handleListProjects)
 	mux.HandleFunc("GET /projects/{id}", s.handleGetProject)
+	mux.HandleFunc("DELETE /projects/{id}", s.handleDeleteProject)
 	mux.HandleFunc("POST /projects/{id}/targets", s.handleCreateTarget)
 	mux.HandleFunc("POST /projects/{id}/targets/import", s.handleImportTargets)
 	mux.HandleFunc("GET /projects/{id}/targets", s.handleListTargets)
@@ -117,6 +148,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /findings/{id}/curl", s.handleGetFindingCurl)
 	mux.HandleFunc("POST /scope-rules", s.handleCreateScopeRule)
 	mux.HandleFunc("GET /scope-rules", s.handleListScopeRules)
+	mux.HandleFunc("POST /projects/{id}/scope-rules/batch", s.handleBatchCreateScopeRules)
 	mux.HandleFunc("POST /scan-plans", s.handleCreateScanPlan)
 	mux.HandleFunc("POST /scan-plans/{id}/approve", s.handleApprovePlan)
 	mux.HandleFunc("POST /scan-plans/dry-run", s.handleDryRun)
@@ -134,10 +166,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /tool-templates", s.handleListToolTemplates)
 	mux.HandleFunc("GET /tool-templates/{id}", s.handleGetToolTemplate)
 	mux.HandleFunc("GET /workers", s.handleListWorkers)
-	mux.HandleFunc("POST /workers/local/start", s.handleStartLocalWorker)
-	mux.HandleFunc("POST /workers/local/stop", s.handleStopLocalWorker)
-	mux.HandleFunc("GET /workers/health", s.handleWorkerHealth)
-	// Remote worker APIs
+	// Worker APIs
 	mux.HandleFunc("POST /workers/register", s.handleRegisterWorker)
 	mux.HandleFunc("POST /workers/{id}/heartbeat", s.handleWorkerHeartbeat)
 	mux.HandleFunc("GET /workers/{id}/tasks/poll", s.handlePollTasks)
@@ -252,6 +281,36 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, p)
 }
 
+func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	p, err := s.queries.GetProject(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get project failed: %v", err))
+		return
+	}
+	if p == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "project not found"))
+		return
+	}
+	if err := s.queries.DeleteProject(id); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "delete project failed: %v", err))
+		return
+	}
+
+	_ = s.queries.CreateAuditLog(&models.AuditLog{
+		ID:           util.GenerateID(),
+		ProjectID:    id,
+		Actor:        "user",
+		Action:       "project.delete",
+		ResourceType: "project",
+		ResourceID:   id,
+		Summary:      fmt.Sprintf("Deleted project %s", p.Name),
+		CreatedAt:    time.Now().UTC(),
+	})
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
 // --- Targets ---
 
 func (s *Server) handleCreateTarget(w http.ResponseWriter, r *http.Request) {
@@ -263,6 +322,27 @@ func (s *Server) handleCreateTarget(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	// 检查项目是否已有 scope 规则
+	rules, err := s.queries.ListScopeRulesByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list scope rules failed: %v", err))
+		return
+	}
+
+	// 无 scope 规则 → 提示用户确认是否自动加入授权范围
+	if len(rules) == 0 {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"needs_scope_confirmation": true,
+			"message":                  "当前项目未设置授权范围，是否将此目标自动加入授权范围？",
+			"suggested_rule": map[string]string{
+				"action": "include",
+				"type":   req.Type,
+				"value":  req.Value,
+			},
+		})
 		return
 	}
 
@@ -350,6 +430,37 @@ func (s *Server) handleImportTargets(w http.ResponseWriter, r *http.Request) {
 		}
 		seen[t.Value] = true
 		uniqueTargets = append(uniqueTargets, t)
+	}
+
+	// Check if project has any scope rules.
+	rules, err := s.queries.ListScopeRulesByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list scope rules failed: %v", err))
+		return
+	}
+
+	// 无 scope 规则 → 提示用户确认是否自动加入授权范围
+	if len(rules) == 0 {
+		var suggested []map[string]string
+		seenRule := make(map[string]bool)
+		for _, pt := range uniqueTargets {
+			key := string(pt.Type) + ":" + pt.Value
+			if seenRule[key] {
+				continue
+			}
+			seenRule[key] = true
+			suggested = append(suggested, map[string]string{
+				"action": "include",
+				"type":   string(pt.Type),
+				"value":  pt.Value,
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"needs_scope_confirmation": true,
+			"message":                  "当前项目未设置授权范围，是否将导入的目标自动加入授权范围？",
+			"suggested_rules":          suggested,
+		})
+		return
 	}
 
 	// Scope-check each target and build result.
@@ -458,6 +569,52 @@ func (s *Server) handleListScopeRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, rules)
+}
+
+// handleBatchCreateScopeRules 批量创建 scope include 规则（用于用户确认自动加入授权范围）
+func (s *Server) handleBatchCreateScopeRules(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+
+	var req struct {
+		Rules []struct {
+			Action string `json:"action"`
+			Type   string `json:"type"`
+			Value  string `json:"value"`
+			Reason string `json:"reason"`
+		} `json:"rules"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	now := time.Now().UTC()
+	var created []*models.ScopeRule
+	for _, ruleReq := range req.Rules {
+		if ruleReq.Action == "" {
+			ruleReq.Action = "include"
+		}
+		sr := &models.ScopeRule{
+			ID:        util.GenerateID(),
+			ProjectID: projectID,
+			Action:    models.ScopeAction(ruleReq.Action),
+			Type:      models.TargetType(ruleReq.Type),
+			Value:     ruleReq.Value,
+			Reason:    ruleReq.Reason,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := s.queries.CreateScopeRule(sr); err != nil {
+			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "create scope rule failed: %v", err))
+			return
+		}
+		created = append(created, sr)
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"created": len(created),
+		"rules":   created,
+	})
 }
 
 // --- Scan Plans ---
@@ -790,81 +947,9 @@ func (s *Server) broadcastSSE(data map[string]interface{}) {
 
 // --- Helpers ---
 
-func (s *Server) spawnLocalWorker() error {
-	if s.workerProc != nil {
-		return nil // already running
-	}
-
-	execPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("get executable: %w", err)
-	}
-
-	cmd := exec.Command(execPath, "--worker", "--core-url", "http://localhost:17421")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("stdout pipe: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start worker: %w", err)
-	}
-
-	s.workerProc = cmd.Process
-
-	// Parse WORKER_READY line
-	scanner := bufio.NewScanner(stdout)
-	if scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "WORKER_READY ") {
-			s.workerEndpoint = strings.TrimPrefix(line, "WORKER_READY ")
-			log.Printf("[server] local worker ready at %s", s.workerEndpoint)
-		}
-	}
-
-	go func() {
-		cmd.Wait()
-		log.Printf("[server] local worker exited")
-		s.workerProc = nil
-		s.workerEndpoint = ""
-	}()
-
-	return nil
-}
-
-func (s *Server) stopLocalWorker() error {
-	if s.workerProc == nil {
-		return nil
-	}
-	if err := s.workerProc.Signal(os.Interrupt); err != nil {
-		return err
-	}
-	time.Sleep(2 * time.Second)
-	if s.workerProc != nil {
-		s.workerProc.Kill()
-	}
-	s.workerProc = nil
-	s.workerEndpoint = ""
-	return nil
-}
-
 func (s *Server) handleListWorkers(w http.ResponseWriter, r *http.Request) {
 	workers := []map[string]interface{}{}
 
-	// Local worker
-	localStatus := "stopped"
-	if s.workerProc != nil {
-		localStatus = "running"
-	}
-	workers = append(workers, map[string]interface{}{
-		"id":       "local",
-		"name":     "本地 Worker",
-		"mode":     "local",
-		"status":   localStatus,
-		"endpoint": s.workerEndpoint,
-	})
-
-	// Remote workers from database
 	dbWorkers, err := s.queries.ListWorkerNodes()
 	if err == nil {
 		for _, w := range dbWorkers {
@@ -879,52 +964,6 @@ func (s *Server) handleListWorkers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, workers)
-}
-
-func (s *Server) handleStartLocalWorker(w http.ResponseWriter, r *http.Request) {
-	if err := s.spawnLocalWorker(); err != nil {
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "spawn worker: %v", err))
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "starting"})
-}
-
-func (s *Server) handleStopLocalWorker(w http.ResponseWriter, r *http.Request) {
-	if err := s.stopLocalWorker(); err != nil {
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "stop worker: %v", err))
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
-}
-
-func (s *Server) handleWorkerHealth(w http.ResponseWriter, r *http.Request) {
-	if s.workerEndpoint == "" {
-		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"status": "no_worker",
-			"tools":  []map[string]string{},
-		})
-		return
-	}
-
-	resp, err := s.workerHTTPClient.Get(s.workerEndpoint + "/health")
-	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"status": "unreachable",
-			"error":  err.Error(),
-		})
-		return
-	}
-	defer resp.Body.Close()
-
-	var health map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
-		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"status": "error",
-			"error":  err.Error(),
-		})
-		return
-	}
-	writeJSON(w, http.StatusOK, health)
 }
 
 func (s *Server) handleListToolTemplates(w http.ResponseWriter, r *http.Request) {

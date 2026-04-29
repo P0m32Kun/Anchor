@@ -1,7 +1,70 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { API_BASE } from "../lib/api";
+
+interface Worker {
+  id: string;
+  name: string;
+  mode: string;
+  status: string;
+  endpoint: string;
+}
+
+function statusColor(status: string): string {
+  switch (status) {
+    case "online":
+      return "bg-green-400";
+    case "busy":
+      return "bg-yellow-400";
+    case "offline":
+    default:
+      return "bg-text-tertiary";
+  }
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case "online":
+      return "在线";
+    case "busy":
+      return "运行中";
+    case "offline":
+      return "离线";
+    default:
+      return status;
+  }
+}
 
 export default function WorkersPage() {
-  const [localWorkerRunning, setLocalWorkerRunning] = useState(false);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchWorkers() {
+      try {
+        const res = await fetch(`${API_BASE}/workers`);
+        if (!res.ok) throw new Error("fetch failed");
+        const data: Worker[] = await res.json();
+        if (!cancelled) {
+          setWorkers(data.filter((w) => w.status === "online" || w.status === "busy"));
+          setError(null);
+        }
+      } catch {
+        if (!cancelled) setError("连接失败，请检查服务是否运行");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchWorkers();
+    const interval = setInterval(fetchWorkers, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -14,61 +77,52 @@ export default function WorkersPage() {
         </div>
       </div>
 
-      {/* 本地 Worker */}
-      <div className="liquid-glass rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-2.5 h-2.5 rounded-full ${localWorkerRunning ? 'bg-green-400' : 'bg-text-tertiary'}`} />
-            <div>
-              <div className="text-sm font-medium">本地 Worker</div>
-              <div className="text-xs text-text-tertiary">localhost</div>
-            </div>
-          </div>
-          <button
-            onClick={() => setLocalWorkerRunning(!localWorkerRunning)}
-            className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-              localWorkerRunning
-                ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20'
-                : 'bg-brand-primary text-white hover:bg-brand-secondary'
-            }`}
-          >
-            {localWorkerRunning ? '停止' : '启动'}
-          </button>
-        </div>
-
-        {localWorkerRunning ? (
-          <div className="grid grid-cols-5 gap-3">
-            {['Subfinder', 'httpx', 'Naabu', 'Nuclei', 'Rod'].map((tool) => (
-              <div key={tool} className="bg-white/[0.03] rounded-lg p-3 text-center">
-                <div className="text-xs font-medium text-text-secondary">{tool}</div>
-                <div className="text-[10px] text-green-400 mt-1">就绪</div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-text-tertiary py-4 text-center bg-white/[0.02] rounded-lg">
-            Worker 未运行
-            <div className="mt-2 text-xs text-text-tertiary">
-              点击"启动"启动本地 Worker 进程
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 远程 Worker */}
       <div className="liquid-glass rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="text-sm font-medium">远程 Worker</div>
-            <div className="text-xs text-text-tertiary mt-1">外网场景：在云主机上部署 Worker</div>
+            <div className="text-sm font-medium">已注册 Worker</div>
+            <div className="text-xs text-text-tertiary mt-1">
+              通过 Docker 部署 Worker，注册到 Server 后显示在此
+            </div>
           </div>
         </div>
-        <div className="text-sm text-text-tertiary py-6 text-center bg-white/[0.02] rounded-lg">
-          暂无远程 Worker
-          <div className="mt-2 text-xs text-text-tertiary">
-            在 Workers 页面生成 token，复制到远程机器上启动
+
+        {loading ? (
+          <div className="text-sm text-text-tertiary py-6 text-center bg-white/[0.02] rounded-lg">
+            加载中...
           </div>
-        </div>
+        ) : error ? (
+          <div className="text-sm text-red-400 py-6 text-center bg-white/[0.02] rounded-lg">
+            {error}
+          </div>
+        ) : workers.length === 0 ? (
+          <div className="text-sm text-text-tertiary py-6 text-center bg-white/[0.02] rounded-lg">
+            暂无 Worker
+            <div className="mt-2 text-xs text-text-tertiary">
+              通过 Docker 部署 Worker，使用 Server 生成的 token 注册
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {workers.map((w) => (
+              <div
+                key={w.id}
+                className="flex items-center justify-between bg-white/[0.02] rounded-lg px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-2.5 h-2.5 rounded-full ${statusColor(w.status)}`} />
+                  <div>
+                    <div className="text-sm font-medium">{w.name}</div>
+                    <div className="text-xs text-text-tertiary mt-0.5">{w.endpoint || w.id}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-text-tertiary">
+                  {statusLabel(w.status)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -31,6 +31,7 @@ export interface Project {
   end_time?: string;
   rate_limit?: number;
   default_profile?: string;
+  port_range?: string;
   created_at: string;
 }
 
@@ -47,6 +48,7 @@ export interface ImportResult {
   duplicates: number;
   denied: number;
   errors: number;
+  expanded?: number;
   targets: Target[];
   denied_targets: { value: string; reason: string }[];
 }
@@ -172,6 +174,12 @@ export const api = {
   listProjects: () => fetchJSON<Project[]>("/projects"),
 
   getProject: (id: string) => fetchJSON<Project>(`/projects/${id}`),
+
+  updateProject: (id: string, data: Partial<Omit<Project, "id" | "created_at">>) =>
+    fetchJSON<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+
+  deleteProject: (id: string) =>
+    fetchJSON<{ status: string }>(`/projects/${id}`, { method: "DELETE" }),
 
   createTarget: (projectId: string, data: { type: string; value: string }) =>
     fetchJSON<Target>(`/projects/${projectId}/targets`, { method: "POST", body: JSON.stringify(data) }),

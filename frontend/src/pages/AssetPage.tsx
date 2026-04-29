@@ -46,15 +46,17 @@ export default function AssetPage() {
   const [loading, setLoading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
 
+  const projectId = id || currentProject?.id;
+
   const loadAssets = useCallback(() => {
-    if (!id) return;
-    api.listAssets(id).then((data) => setAssets(data ?? [])).catch(console.error);
-  }, [id, setAssets]);
+    if (!projectId) return;
+    api.listAssets(projectId).then((data) => setAssets(data ?? [])).catch(console.error);
+  }, [projectId, setAssets]);
 
   const loadWebEndpoints = useCallback(() => {
-    if (!id) return;
-    api.listWebEndpoints(id).then((data) => setWebEndpoints(data ?? [])).catch(console.error);
-  }, [id, setWebEndpoints]);
+    if (!projectId) return;
+    api.listWebEndpoints(projectId).then((data) => setWebEndpoints(data ?? [])).catch(console.error);
+  }, [projectId, setWebEndpoints]);
 
   const loadPorts = useCallback(
     (assetId: string) => {
@@ -64,17 +66,19 @@ export default function AssetPage() {
   );
 
   useEffect(() => {
-    if (!id) return;
-    api.getProject(id).then(setCurrentProject).catch(console.error);
+    if (!projectId) return;
+    if (id) {
+      api.getProject(id).then(setCurrentProject).catch(console.error);
+    }
     loadAssets();
     loadWebEndpoints();
-  }, [id, setCurrentProject, loadAssets, loadWebEndpoints]);
+  }, [id, projectId, setCurrentProject, loadAssets, loadWebEndpoints]);
 
   const startDiscovery = async () => {
-    if (!id) return;
+    if (!projectId) return;
     setLoading(true);
     try {
-      await api.startAssetDiscovery(id);
+      await api.startAssetDiscovery(projectId);
       alert("资产发现工作流已启动");
     } catch (err) {
       alert("启动失败: " + String(err));
@@ -95,7 +99,17 @@ export default function AssetPage() {
     return true;
   });
 
-  if (!currentProject) return <div>加载中...</div>;
+  if (!currentProject) {
+    return (
+      <div className="max-w-5xl space-y-6">
+        <h1 className="text-2xl font-bold">Assets</h1>
+        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8 text-center">
+          <p className="text-zinc-400 mb-4">请先从 Dashboard 选择一个项目</p>
+          <Link to="/" className="text-blue-600 hover:underline">前往 Dashboard</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl space-y-6">

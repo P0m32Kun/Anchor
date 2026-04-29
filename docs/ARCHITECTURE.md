@@ -22,12 +22,12 @@
 │                    └────┬────┘                               │
 └─────────────────────────┼────────────────────────────────────┘
                           │
-                          ▼ HTTP API (:8080)
+                          ▼ HTTP API (:17421)
 ┌─────────────────────────────────────────────────────────────┐
-│                  Local Control Plane (Go)                    │
+│                     Control Plane (Go)                       │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌───────────────┐  │
 │  │  API    │  │  Scope  │  │ Worker  │  │   Health      │  │
-│  │ Handlers│  │ Engine  │  │ Runner  │  │   Checker     │  │
+│  │ Handlers│  │ Engine  │  │ Mgmt    │  │   Checker     │  │
 │  └────┬────┘  └────┬────┘  └────┬────┘  └───────┬───────┘  │
 │       │            │            │                │          │
 │  ┌────┴────┐  ┌────┴────┐  ┌────┴────┐  ┌───────┴───────┐  │
@@ -42,8 +42,20 @@
 │                    │ Queries │                               │
 │                    └─────────┘                               │
 └─────────────────────────────────────────────────────────────┘
-                          │
-                          ▼ subprocess
+        │                                      ▲
+        │ subprocess                           │ HTTP long-poll
+        ▼                                      │ (tasks/heartbeat)
+┌─────────────────┐              ┌─────────────┴─────────────┐
+│  Local Worker   │              │     Remote Worker(s)      │
+│  (subprocess)   │              │  ┌─────────────────────┐  │
+│                 │              │  │  Outbound HTTP only │  │
+│  Subfinder      │              │  │  No public IP needed│  │
+│  httpx          │              │  │  Register → Poll    │  │
+│  Naabu          │              │  │  → Execute → Report │  │
+│  Nuclei         │              │  └─────────────────────┘  │
+└─────────────────┘              └───────────────────────────┘
+        │
+        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              External CLI Tools (Subfinder, etc.)            │
 └─────────────────────────────────────────────────────────────┘
@@ -63,24 +75,54 @@
                               → 返回 allow/deny
 ```
 
-### 2. 资产发现工作流（M2）
+### 2. Worker 注册与心跳（v0.2）
+
+**本地 Worker**（同机/同容器）：
+```
+Server 启动 → spawnLocalWorker() → exec.Command("./anchor", "--worker", "--core-url", "http://localhost:17421")
+                  ↓
+              Worker 进程 → POST /workers/register {name, endpoint}
+                  ↓
+              Server 返回 {worker_id, token}
+                  ↓
+              Worker 启动心跳 goroutine (30s) + 长轮询 goroutine
+```
+
+**远程 Worker**（独立主机/VPS/笔记本）：
+```
+用户在远程机器启动 → ./anchor --worker --core-url http://server:17421
+                  ↓
+              Worker 进程 → POST /workers/register {name, endpoint}
+                  ↓
+              Server 返回 {worker_id, token}
+                  ↓
+              Worker 启动心跳 goroutine (30s) + 长轮询 goroutine
+                  ↓
+              Server 启动 cleanupStaleWorkers() goroutine (60s)
+                  → 心跳超时 120s 自动标记 offline + 清理 taskQueue
+```
+
+### 3. 资产发现工作流（M2）
 
 ```
 用户点击"资产发现" → AssetPage → POST /projects/:id/workflows/asset-discovery
                                           → DB (scan_tasks 表)
                                           → goroutine: AssetDiscoveryWorkflow
                                           → TOCTOU Scope Check
+                                          → enqueueTask(workerID, task)
+                                          → Worker 长轮询 GET /workers/:id/tasks/poll ← 获取任务
                                           → Worker.Run(Subfinder)
                                           → 解析 JSONL → MergeOrCreateAsset(domain)
                                           → Worker.Run(httpx)
                                           → 解析 JSONL → CreateWebEndpoint + MergeOrCreateAsset(url)
                                           → Worker.Run(Naabu)
                                           → 解析 JSONL → MergeOrCreateAsset(ip) + CreatePort
+                                          → Worker POST /tasks/:id/result
                                           → DB (scan_tasks 表, status=completed)
                                           → SSE broadcast
 ```
 
-### 3. Web 初筛工作流（M3）
+### 4. Web 初筛工作流（M3）
 
 ```
 用户点击"Web 初筛" → FindingsPage → POST /projects/:id/workflows/web-screening
@@ -88,16 +130,19 @@
                                           → goroutine: WebScreeningWorkflow
                                           → 查询 WebEndpoint 列表
                                           → 按技术指纹分组 → BuildNucleiCommand(按 tag)
+                                          → enqueueTask(workerID, task)
+                                          → Worker 长轮询获取任务
                                           → Worker.Run(Nuclei) 每 tag 一组
                                           → 解析 JSONL → dedup_key 去重
                                           → ScoreFinding(confidence/priority)
                                           → CreateFinding / UpdateFindingEvidence
                                           → saveEvidenceArtifact(原始数据 + 脱敏 excerpt)
+                                          → Worker POST /tasks/:id/result
                                           → DB (scan_tasks 表, status=completed)
                                           → SSE broadcast
 ```
 
-### 4. Finding 验证 → 报告导出（M4）
+### 5. Finding 验证 → 报告导出（M4）
 
 ```
 用户打开 FindingsPage → GET /projects/:id/findings
@@ -122,8 +167,11 @@
 | 模块 | 文件 | 职责 |
 |------|------|------|
 | API | `internal/api/handlers.go` | HTTP 路由、请求解析、响应序列化、错误包装 |
+| Worker Mgmt | `internal/api/worker_handlers.go` | Worker 注册、心跳、任务轮询、撤销、状态清理 |
 | Scope | `internal/scope/scope.go` | 域名/URL/IP 匹配、排除优先、TOCTOU 校验 |
-| Worker | `internal/worker/worker.go` | 子进程执行、workdir 隔离、超时、取消、Artifact 保存 |
+| Worker Runner | `internal/worker/worker.go` | 子进程执行、workdir 隔离、超时、取消、Artifact 保存 |
+| Worker Server | `internal/worker/server.go` | Worker 模式的 HTTP 服务、工具注册、任务执行回调 |
+| Remote Client | `internal/worker/remote_client.go` | 远程 Worker 注册、心跳、长轮询、任务上报 |
 | Health | `internal/health/health.go` | 工具 binary/version/DNS/network 检测 |
 | DB | `internal/db/db.go` | SQLite 初始化、schema、迁移 |
 | Queries | `internal/db/queries.go` | 所有 CRUD 操作 |
@@ -153,10 +201,18 @@
 
 ## 进程模型
 
-MVP（v0.1）：
+### v0.1（MVP）
 - Worker 作为 Control Plane 内的 goroutine 运行（同进程）
 - 工具子进程通过 `os/exec` 启动
-- v0.2 计划拆分为独立进程通过 HTTP 通信
+
+### v0.2（当前）
+- **单二进制，双模式**：同一个 `./anchor` 二进制通过 flag 区分模式
+  - `./anchor` — 核心服务器（HTTP API + SQLite + 任务调度）
+  - `./anchor --worker --core-url http://server:17421` — 扫描节点（无 API，纯任务执行）
+- **本地 Worker**：Server 通过 `exec.Command` 启动子进程，通过 `localhost:17421` 回连
+- **远程 Worker**：独立部署，通过 `--core-url` 指向 Server 可达地址，使用长轮询获取任务
+- **任务调度**：Server 维护 `taskQueue` map，Worker 通过 `GET /workers/:id/tasks/poll` 阻塞获取任务
+- **心跳保活**：Worker 每 30s POST `/workers/:id/heartbeat`，Server 每 60s 清理超时（>120s）Worker
 
 ---
 

@@ -24,7 +24,7 @@
 |------|------|
 | 桌面客户端 | Tauri 2.x + React 18 + TypeScript + Tailwind CSS |
 | 状态管理 | Zustand |
-| 本地服务 | Go 1.22+ |
+| 本地/远程服务 | Go 1.26 |
 | 数据库 | SQLite (WAL 模式) |
 | 实时推送 | SSE (Server-Sent Events) |
 | 语法高亮 | Prism.js |
@@ -33,7 +33,7 @@
 
 ### 依赖
 
-- Go 1.22+
+- Go 1.26+
 - Node.js 18+
 - 外部安全工具
   ```bash
@@ -43,16 +43,30 @@
   go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
   ```
 
-### 运行后端
+### Docker 一键部署（推荐）
 
 ```bash
-cd /Users/kun/DEV/p0m32kun
-go run main.go
-# 服务监听 :8080，数据目录 ~/.anchor
+# 启动 Server + Worker + 靶场（可选）
+make up-all
+
+# 停止所有服务
+make down-all
+
+# 查看状态
+docker compose ps
 ```
 
-### 运行前端
+Server 监听 `:17421`，Worker 自动注册并拉取任务。
 
+### 本地开发
+
+**运行后端：**
+```bash
+go run main.go
+# 服务监听 :17421，数据目录 ~/.anchor
+```
+
+**运行前端：**
 ```bash
 cd frontend
 npm install
@@ -60,27 +74,59 @@ npm run dev
 # 打开 http://localhost:1420
 ```
 
-### 构建
-
+**构建：**
 ```bash
 make build    # 构建 Go 后端
 make test     # 运行测试
 tauri build   # 构建 Tauri 桌面应用
 ```
 
+## Worker 架构
+
+Anchor 支持两种 Worker 部署模式，均使用**同一个二进制**：
+
+### 本地 Worker（开发/单主机）
+
+```
+[桌面端 Tauri] --HTTP--> [Server :17421] --spawn--> [本地 Worker 进程]
+                                               ↑___________↓
+                                                localhost 回连
+```
+
+Server 通过 `exec.Command` 启动本地 Worker 子进程，Worker 通过 `--core-url http://localhost:17421` 回连。
+
+### 远程 Worker（生产/分布式）
+
+```
+[桌面端/Web] --HTTP--> [Server :17421] <--HTTP 长轮询-- [远程 Worker（VPS/笔记本）]
+```
+
+远程 Worker 主动注册到 Server，通过长轮询拉取任务。Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
+
+**典型场景：**
+- 公网 VPS 部署 Server，家庭 WiFi 笔记本运行 Worker
+- 内网渗透测试笔记本同时运行 Server + Worker
+- 多云 Worker 统一接入中心 Server
+
 ## 目录结构
 
 ```
 .
-├── main.go                     # Go 服务入口
+├── main.go                     # Go 服务入口（单二进制，server/worker 双模式）
 ├── go.mod / go.sum            # Go 模块
-├── Makefile                    # 构建脚本
+├── Makefile                    # 构建脚本 + Docker 生命周期命令
+├── docker-compose.yml          # Server + Worker + 网络编排
+├── Dockerfile.server           # Server 镜像（纯管理面）
+├── Dockerfile.worker           # Worker 镜像（含安全工具）
 ├── 设计.md                      # PRD（产品需求文档）
+├── 第二阶段设计.md               # v0.2 设计文档
 ├── plan.md                     # 开发执行计划与进度
 ├── README.md                   # 本文件
 ├── docs/                       # 技术文档
 │   ├── API.md                 # API 参考
-│   └── ARCHITECTURE.md        # 架构说明
+│   ├── ARCHITECTURE.md        # 架构说明
+│   ├── ADR-v0.2.md            # v0.2 架构决策
+│   └── 部署指南.md             # 部署指南
 ├── internal/                   # Go 内部包
 │   ├── api/                   # HTTP API handlers
 │   ├── asset/                 # 资产归一化与去重
@@ -94,32 +140,30 @@ tauri build   # 构建 Tauri 桌面应用
 │   │   ├── httpx.go           # httpx JSONL 解析
 │   │   ├── naabu.go           # Naabu 输出解析
 │   │   └── nuclei.go          # Nuclei JSONL 解析
+│   ├── report/                # Markdown / JSON 报告生成
 │   ├── scope/                 # Scope Check 引擎
 │   ├── scoring/               # Finding confidence/priority 评分
 │   ├── util/                  # 工具函数（脱敏、ID 生成等）
-│   ├── worker/                # Worker subprocess runner
+│   ├── worker/                # Worker subprocess runner + 远程客户端
 │   └── workflow/              # 工作流编排
 │       ├── discovery.go       # 资产发现工作流
 │       └── screenshot.go      # Web 初筛工作流
 ├── frontend/                   # Tauri + React 前端
 │   ├── src/
 │   │   ├── lib/              # API 客户端 + Zustand store
+│   │   ├── components/       # 共享 UI 组件
 │   │   ├── pages/            # 页面组件
-│   │   │   ├── ProjectPage.tsx
-│   │   │   ├── TargetPage.tsx
-│   │   │   ├── RunsPage.tsx
-│   │   │   ├── AssetPage.tsx      # 资产列表（M2）
-│   │   │   ├── FindingsPage.tsx   # Finding 验证队列（M3）
-│   │   │   └── ReportsPage.tsx    # 报告导出（M4）
 │   │   └── App.tsx           # 路由与布局
 │   └── package.json
 ├── src-tauri/                  # Tauri 配置
-│   ├── Cargo.toml
-│   └── tauri.conf.json
+├── docker-rangefield/          # 靶场环境（用于测试）
+│   ├── docker-compose.yml
+│   └── README.md
 └── wiki/                       # 项目知识库
     ├── SCHEMA.md              # AI 指令文件（必读）
     ├── decisions/             # 架构决策记录 (ADR)
     ├── conventions/           # 编码约定
+    ├── pitfalls/              # 踩坑记录
     └── log.md                 # 变更日志
 ```
 
@@ -135,7 +179,8 @@ tauri build   # 构建 Tauri 桌面应用
 
 ### M1: 目标与 Scope 增强 ✅
 
-- [x] 目标批量导入（TXT/CSV）
+- [x] 目标批量导入（TXT/CSV），支持逗号展开、IP 连字符范围、自动类型推断
+- [x] 首次导入自动提示 Scope 确认
 - [x] 时间窗口校验
 - [x] 速率限制配置
 - [x] 执行计划预览增强
@@ -146,11 +191,12 @@ tauri build   # 构建 Tauri 桌面应用
 - [x] httpx 存活探测 + 指纹采集 → WebEndpoint + Asset(url)
 - [x] Naabu 端口扫描 → Asset(ip) + Port
 - [x] 资产归一化（normalized_value 去重）
+- [x] CIDR 展开支持（Scope Check）
 
 ### M3: Nuclei 初筛 ✅
 
 - [x] **指纹驱动模板筛选** — httpx technologies → 精确 Nuclei `-tags`
-- [x] 按 Tag 分组扫描 — 进程数 = 唯一 tag 集合数（不是 URL 数）
+- [x] 按 Tag 分组扫描 — 进程数 = 唯一 tag 集合数
 - [x] 无指纹目标自动跳过
 - [x] Nuclei JSONL 解析 → Finding 去重（dedup_key）
 - [x] confidence/priority 规则评分引擎
@@ -159,10 +205,23 @@ tauri build   # 构建 Tauri 桌面应用
 
 ### M4: 报告导出 ✅
 
-- [x] Markdown 报告生成（8 章节硬编码模板：摘要/范围/方法/风险统计/漏洞详情/接受风险/附录）
-- [x] JSON 数据导出（meta/project/targets/scope/assets/findings/evidence/tools）
-- [x] 前端报告预览页面（ReportsPage.tsx：Finding 列表 + Markdown 预览 + 导出按钮）
-- [x] 端到端验收通过（9 目标 → 86 资产 → 人工确认 → 报告导出）
+- [x] Markdown 报告生成（8 章节模板）
+- [x] JSON 数据导出
+- [x] 前端报告预览页面
+- [x] 端到端验收通过
+
+### v0.2 Phase 1: 容器化与远程 Worker ✅
+
+- [x] Docker 镜像（server / worker）
+- [x] Docker Compose 编排
+- [x] 远程 Worker 注册/心跳/长轮询
+- [x] Worker 超时自动清理
+- [x] WorkersPage 实时列表
+
+### v0.2 Phase 2: 模板管理（进行中）
+
+- [ ] Server 端模板仓库管理
+- [ ] Worker 模板更新指令下发
 
 ## 外部工具依赖
 
@@ -178,11 +237,12 @@ tauri build   # 构建 Tauri 桌面应用
 
 | Tag | 说明 |
 |-----|------|
-| `v0.1.0-m0` | 工程骨架（Scope Check + Worker + 最小闭环） |
-| `v0.1.0-m1` | 目标与 Scope 增强（批量导入 + 时间窗口 + 速率限制） |
-| `v0.1.0-m2` | 资产发现（Subfinder/httpx/Naabu + 归一） |
-| `v0.1.0-m3` | Nuclei 初筛（指纹驱动模板筛选 + Finding + 评分） |
-| `v0.1.0-m4` | 报告导出（Markdown/JSON + 前端报告页面 + 端到端验收） |
+| `v0.1.0-m0` | 工程骨架 |
+| `v0.1.0-m1` | 目标与 Scope 增强 |
+| `v0.1.0-m2` | 资产发现 |
+| `v0.1.0-m3` | Nuclei 初筛 |
+| `v0.1.0-m4` | 报告导出 |
+| `v0.2.0-p1` | Docker 容器化 + 远程 Worker 架构 |
 
 ## 许可
 

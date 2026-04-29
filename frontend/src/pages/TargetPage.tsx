@@ -152,8 +152,11 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
       {result && (
         <div className="bg-gray-50 p-3 rounded text-sm space-y-2">
           <div className="font-semibold">导入结果</div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-wrap">
             <StatBadge label="成功导入" value={result.imported} color="green" />
+            {result.expanded !== undefined && result.expanded > 0 && (
+              <StatBadge label="展开后目标" value={result.expanded} color="blue" />
+            )}
             <StatBadge label="重复跳过" value={result.duplicates} color="gray" />
             <StatBadge label="Scope 拒绝" value={result.denied} color="yellow" />
             <StatBadge label="错误" value={result.errors} color="red" />
@@ -203,35 +206,39 @@ export default function TargetPage() {
   const currentProject = useStore((state) => state.currentProject);
   const setCurrentProject = useStore((state) => state.setCurrentProject);
   const [targetValue, setTargetValue] = useState("");
-  const [targetType, setTargetType] = useState("domain");
+  const [targetType, setTargetType] = useState("auto");
   const [scopeAction, setScopeAction] = useState<"include" | "exclude">("include");
   const [scopeValue, setScopeValue] = useState("");
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
 
+  const projectId = id || currentProject?.id;
+
   const loadTargets = useCallback(() => {
-    if (!id) return;
-    api.listTargets(id).then((data) => setTargets(data ?? [])).catch(console.error);
-  }, [id, setTargets]);
+    if (!projectId) return;
+    api.listTargets(projectId).then((data) => setTargets(data ?? [])).catch(console.error);
+  }, [projectId, setTargets]);
 
   useEffect(() => {
-    if (!id) return;
-    api.getProject(id).then(setCurrentProject).catch(console.error);
+    if (!projectId) return;
+    if (id) {
+      api.getProject(id).then(setCurrentProject).catch(console.error);
+    }
     loadTargets();
-  }, [id, setCurrentProject, loadTargets]);
+  }, [id, projectId, setCurrentProject, loadTargets]);
 
   const addTarget = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !targetValue.trim()) return;
-    const t = await api.createTarget(id, { type: targetType, value: targetValue });
+    if (!projectId || !targetValue.trim()) return;
+    const t = await api.createTarget(projectId, { type: targetType, value: targetValue });
     setTargets([...targets, t]);
     setTargetValue("");
   };
 
   const addScopeRule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !scopeValue.trim()) return;
+    if (!projectId || !scopeValue.trim()) return;
     await api.createScopeRule({
-      project_id: id,
+      project_id: projectId,
       action: scopeAction,
       type: "domain",
       value: scopeValue,
@@ -241,20 +248,20 @@ export default function TargetPage() {
   };
 
   const runDryRun = async () => {
-    if (!id) return;
-    const res = await api.dryRun(id);
+    if (!projectId) return;
+    const res = await api.dryRun(projectId);
     setDryRunResult(res);
   };
 
   const runSubfinder = async () => {
-    if (!id) return;
+    if (!projectId) return;
     const domain = targets.find((t) => t.type === "domain");
     if (!domain) {
       alert("请先添加一个域名目标");
       return;
     }
     const task = await api.runTask({
-      project_id: id,
+      project_id: projectId,
       tool: "subfinder",
       target_id: domain.id,
       command: `subfinder -d ${domain.value} -oJ -o subfinder_output.jsonl`,
@@ -262,7 +269,17 @@ export default function TargetPage() {
     alert(`任务已启动: ${task.id}`);
   };
 
-  if (!currentProject) return <div>加载中...</div>;
+  if (!currentProject) {
+    return (
+      <div className="max-w-4xl space-y-6">
+        <h1 className="text-2xl font-bold">Targets</h1>
+        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8 text-center">
+          <p className="text-zinc-400 mb-4">请先从 Dashboard 选择一个项目</p>
+          <Link to="/" className="text-blue-600 hover:underline">前往 Dashboard</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -279,18 +296,19 @@ export default function TargetPage() {
         <h2 className="font-semibold mb-3">目标</h2>
         <form onSubmit={addTarget} className="flex gap-2 mb-3">
           <select
-            className="border rounded px-2"
+            className="border rounded px-2 bg-zinc-800 border-zinc-700 text-zinc-200"
             value={targetType}
             onChange={(e) => setTargetType(e.target.value)}
           >
+            <option value="auto">自动检测</option>
             <option value="domain">域名</option>
             <option value="url">URL</option>
             <option value="ip">IP</option>
             <option value="cidr">CIDR</option>
           </select>
           <input
-            className="flex-1 border rounded px-3 py-2"
-            placeholder="目标值"
+            className="flex-1 border rounded px-3 py-2 bg-zinc-800 border-zinc-700 text-zinc-200 placeholder-zinc-500"
+            placeholder="example.com 或 192.168.1.1 或 10.0.0.0/24 或 192.168.0.1-10"
             value={targetValue}
             onChange={(e) => setTargetValue(e.target.value)}
           />

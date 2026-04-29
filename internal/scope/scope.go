@@ -237,6 +237,47 @@ func matchDomainRule(domain, ruleValue string) bool {
 	return false
 }
 
+// ExpandCIDR expands a CIDR notation into all usable host IP addresses.
+// It skips the network and broadcast addresses for subnets /30 and larger.
+func ExpandCIDR(cidr string) ([]string, error) {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, fmt.Errorf("parse CIDR %q: %w", cidr, err)
+	}
+
+	var ips []string
+	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
+		ips = append(ips, ip.String())
+	}
+
+	// Remove network address and broadcast address for subnets larger than /30.
+	ones, bits := ipnet.Mask.Size()
+	if ones <= bits-2 && len(ips) >= 2 {
+		ips = ips[1 : len(ips)-1]
+	}
+
+	return ips, nil
+}
+
+// inc increments an IP address.
+func inc(ip net.IP) {
+	for j := len(ip) - 1; j >= 0; j-- {
+		ip[j]++
+		if ip[j] > 0 {
+			break
+		}
+	}
+}
+
+// CheckIP is a convenience wrapper around Check for IP targets.
+func (e *Engine) CheckIP(ctx context.Context, projectID, ip string) (*models.ScopeDecision, error) {
+	target := &models.Target{
+		Type:  models.TargetTypeIP,
+		Value: ip,
+	}
+	return e.Check(ctx, projectID, target)
+}
+
 func (e *Engine) matchURL(targetURL string, rule *models.ScopeRule) bool {
 	switch rule.Type {
 	case models.TargetTypeURL:
@@ -247,6 +288,26 @@ func (e *Engine) matchURL(targetURL string, rule *models.ScopeRule) bool {
 			return false
 		}
 		return matchDomainRule(u.Host, rule.Value)
+	case models.TargetTypeIP:
+		u, err := url.Parse(targetURL)
+		if err != nil {
+			return false
+		}
+		host := u.Host
+		if idx := strings.Index(host, ":"); idx >= 0 {
+			host = host[:idx]
+		}
+		return host == rule.Value
+	case models.TargetTypeCIDR:
+		u, err := url.Parse(targetURL)
+		if err != nil {
+			return false
+		}
+		host := u.Host
+		if idx := strings.Index(host, ":"); idx >= 0 {
+			host = host[:idx]
+		}
+		return e.matchIP(host, rule)
 	}
 	return false
 }
@@ -254,17 +315,37 @@ func (e *Engine) matchURL(targetURL string, rule *models.ScopeRule) bool {
 func (e *Engine) matchIP(ipStr string, rule *models.ScopeRule) bool {
 	switch rule.Type {
 	case models.TargetTypeIP:
-		return ipStr == rule.Value
+		// 精确匹配单个 IP
+		if ipStr == rule.Value {
+			return true
+		}
+		// 如果目标是 CIDR（如 /32），检查其网络地址是否匹配
+		if strings.Contains(ipStr, "/") {
+			_, cidr, err := net.ParseCIDR(ipStr)
+			if err == nil && cidr.IP.String() == rule.Value {
+				return true
+			}
+		}
+		return false
 	case models.TargetTypeCIDR:
-		_, cidr, err := net.ParseCIDR(rule.Value)
+		_, ruleCIDR, err := net.ParseCIDR(rule.Value)
 		if err != nil {
 			return false
 		}
+		// 如果目标也是 CIDR，检查是否完全相同
+		if strings.Contains(ipStr, "/") {
+			_, targetCIDR, err := net.ParseCIDR(ipStr)
+			if err != nil {
+				return false
+			}
+			return ruleCIDR.IP.Equal(targetCIDR.IP) && ruleCIDR.Mask.String() == targetCIDR.Mask.String()
+		}
+		// 目标是单个 IP，检查是否在 CIDR 范围内
 		ip := net.ParseIP(ipStr)
 		if ip == nil {
 			return false
 		}
-		return cidr.Contains(ip)
+		return ruleCIDR.Contains(ip)
 	}
 	return false
 }

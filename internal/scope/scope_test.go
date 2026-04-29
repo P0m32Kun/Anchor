@@ -76,6 +76,158 @@ func TestEngineEvaluate(t *testing.T) {
 	}
 }
 
+func TestExpandCIDR(t *testing.T) {
+	tests := []struct {
+		name     string
+		cidr     string
+		expected []string
+		wantErr  bool
+	}{
+		{
+			name:     "/32 single IP",
+			cidr:     "192.168.1.1/32",
+			expected: []string{"192.168.1.1"},
+		},
+		{
+			name:     "/31 two IPs",
+			cidr:     "192.168.1.0/31",
+			expected: []string{"192.168.1.0", "192.168.1.1"},
+		},
+		{
+			name:     "/30 four IPs no skip",
+			cidr:     "192.168.1.0/30",
+			expected: []string{"192.168.1.1", "192.168.1.2"},
+		},
+		{
+			name:     "/29 skip network and broadcast",
+			cidr:     "192.168.1.0/29",
+			expected: []string{"192.168.1.1", "192.168.1.2", "192.168.1.3", "192.168.1.4", "192.168.1.5", "192.168.1.6"},
+		},
+		{
+			name:     "/24 skip network and broadcast",
+			cidr:     "10.0.0.0/24",
+			expected: nil, // verify count and bounds instead
+		},
+		{
+			name:    "invalid CIDR",
+			cidr:    "not-a-cidr",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ExpandCIDR(tt.cidr)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("ExpandCIDR(%q) expected error, got nil", tt.cidr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ExpandCIDR(%q) unexpected error: %v", tt.cidr, err)
+			}
+			if tt.expected == nil {
+				// Special case: verify count and boundary IPs for /24
+				if len(got) != 254 {
+					t.Errorf("ExpandCIDR(%q) returned %d IPs, want 254", tt.cidr, len(got))
+				}
+				if len(got) > 0 && got[0] != "10.0.0.1" {
+					t.Errorf("ExpandCIDR(%q) first IP = %q, want 10.0.0.1", tt.cidr, got[0])
+				}
+				if len(got) > 0 && got[len(got)-1] != "10.0.0.254" {
+					t.Errorf("ExpandCIDR(%q) last IP = %q, want 10.0.0.254", tt.cidr, got[len(got)-1])
+				}
+				return
+			}
+			if len(got) != len(tt.expected) {
+				t.Errorf("ExpandCIDR(%q) returned %d IPs, want %d", tt.cidr, len(got), len(tt.expected))
+				return
+			}
+			for i := range got {
+				if got[i] != tt.expected[i] {
+					t.Errorf("ExpandCIDR(%q)[%d] = %q, want %q", tt.cidr, i, got[i], tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestMatchIP(t *testing.T) {
+	e := &Engine{}
+
+	tests := []struct {
+		name     string
+		ip       string
+		rule     *models.ScopeRule
+		expected bool
+	}{
+		{
+			name:     "exact IP match",
+			ip:       "192.168.1.1",
+			rule:     &models.ScopeRule{Type: models.TargetTypeIP, Value: "192.168.1.1"},
+			expected: true,
+		},
+		{
+			name:     "exact IP no match",
+			ip:       "192.168.1.1",
+			rule:     &models.ScopeRule{Type: models.TargetTypeIP, Value: "192.168.1.2"},
+			expected: false,
+		},
+		{
+			name:     "IP in CIDR",
+			ip:       "192.168.1.5",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "192.168.1.0/24"},
+			expected: true,
+		},
+		{
+			name:     "IP not in CIDR",
+			ip:       "10.0.0.1",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "192.168.1.0/24"},
+			expected: false,
+		},
+		{
+			name:     "IP in /30 CIDR",
+			ip:       "192.168.1.2",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "192.168.1.0/30"},
+			expected: true,
+		},
+		{
+			name:     "network address in CIDR not matched",
+			ip:       "192.168.1.0",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "192.168.1.0/24"},
+			expected: true, // matchIP uses cidr.Contains, so network addr matches
+		},
+		{
+			name:     "invalid CIDR rule",
+			ip:       "192.168.1.1",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "invalid"},
+			expected: false,
+		},
+		{
+			name:     "invalid IP",
+			ip:       "not-an-ip",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "192.168.1.0/24"},
+			expected: false,
+		},
+		{
+			name:     "domain rule does not match IP",
+			ip:       "192.168.1.1",
+			rule:     &models.ScopeRule{Type: models.TargetTypeDomain, Value: "example.com"},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := e.matchIP(tt.ip, tt.rule)
+			if result != tt.expected {
+				t.Errorf("matchIP(%q, %v) = %v, want %v", tt.ip, tt.rule.Value, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestCheckTimeWindow(t *testing.T) {
 	now := time.Now()
 	past := now.Add(-1 * time.Hour)

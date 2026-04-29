@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS projects (
 	start_time DATETIME,
 	end_time DATETIME,
 	default_profile TEXT DEFAULT 'standard',
+	port_range TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -295,7 +296,7 @@ CREATE TABLE IF NOT EXISTS worker_nodes (
 	id TEXT PRIMARY KEY,
 	name TEXT NOT NULL,
 	endpoint TEXT,
-	mode TEXT NOT NULL CHECK(mode IN ('local','remote')),
+	mode TEXT NOT NULL DEFAULT 'remote',
 	status TEXT DEFAULT 'offline' CHECK(status IN ('online','offline','busy','error')),
 	trust_level TEXT DEFAULT 'standard' CHECK(trust_level IN ('low','standard','high')),
 	network_profile TEXT DEFAULT 'external',
@@ -332,6 +333,21 @@ CREATE TABLE IF NOT EXISTS runs (
 	finished_at DATETIME,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- v0.2 M4: ip_discovery_results
+CREATE TABLE IF NOT EXISTS ip_discovery_results (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+	target_id TEXT REFERENCES targets(id) ON DELETE SET NULL,
+	ip TEXT NOT NULL,
+	hostname TEXT,
+	source TEXT DEFAULT 'naabu',
+	alive BOOLEAN DEFAULT TRUE,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ip_discovery_project ON ip_discovery_results(project_id);
+CREATE INDEX IF NOT EXISTS idx_ip_discovery_target ON ip_discovery_results(target_id);
 
 -- v0.2 M3: screenshots
 CREATE TABLE IF NOT EXISTS screenshots (
@@ -393,6 +409,7 @@ func migrateV02(db *sql.DB) error {
 		name  string
 		def   string
 	}{
+		{"projects", "port_range", "TEXT"},
 		{"scan_tasks", "steps_json", "TEXT"},
 		{"scan_tasks", "tool_template_id", "TEXT"},
 		{"findings", "raw_request", "TEXT"},
