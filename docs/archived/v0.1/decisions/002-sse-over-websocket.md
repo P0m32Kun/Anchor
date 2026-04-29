@@ -1,3 +1,13 @@
+---
+archived: true
+archived_at: "2026-04-29"
+archived_by: doc-archivist
+version: "v0.1"
+original_path: "wiki/decisions/002-sse-over-websocket.md"
+status: "completed"
+reason: "v0.1 架构决策记录，v0.2 阶段结束"
+---
+
 # ADR-002: SSE 替代 WebSocket
 
 ## 状态

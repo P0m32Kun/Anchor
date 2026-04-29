@@ -1,3 +1,28 @@
+/**
+ * Route Registry — ALL application routes must be defined here.
+ * When adding a new page, update this table and ensure the component file exists.
+ *
+ * | Path                     | Component      | Purpose                          | Navbar Link |
+ * |--------------------------|----------------|----------------------------------|-------------|
+ * | /                        | DashboardPage  | Main dashboard with stats        | Yes         |
+ * | /projects                | ProjectPage    | Project list & creation          | Yes         |
+ * | /targets                 | TargetPage     | Target management & import       | Yes         |
+ * | /assets                  | AssetPage      | Asset inventory                  | Yes         |
+ * | /runs                    | RunsPage       | Scan run history & controls      | Yes         |
+ * | /findings                | FindingsPage   | Security findings list           | Yes         |
+ * | /reports                 | ReportsPage    | Report generation & export       | Yes         |
+ * | /workers                 | WorkersPage    | Worker node management           | Yes         |
+ * | /settings                | SettingsPage   | App configuration                | Yes         |
+ * | /projects/:id            | ProjectPage    | Legacy project detail (params    | No          |
+ * | /projects/:id/assets     | AssetPage      | not fully handled)               | No          |
+ * | /projects/:id/findings   | FindingsPage   |                                  | No          |
+ * | /projects/:id/reports    | ReportsPage    |                                  | No          |
+ *
+ * TODO: Legacy routes (/projects/:id/*) do not use useParams() in their
+ * components. They render the same content as the base page. Consider
+ * removing or properly implementing them.
+ */
+
 import { Routes, Route } from "react-router-dom";
 import { ToastProvider, Navbar } from "./components";
 import DashboardPage from "./pages/DashboardPage";

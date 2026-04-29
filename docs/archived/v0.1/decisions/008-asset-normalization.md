@@ -1,3 +1,13 @@
+---
+archived: true
+archived_at: "2026-04-29"
+archived_by: doc-archivist
+version: "v0.1"
+original_path: "wiki/decisions/008-asset-normalization.md"
+status: "completed"
+reason: "v0.1 架构决策记录，v0.2 阶段结束"
+---
+
 # ADR-008: 资产归一化与去重
 
 ## 状态

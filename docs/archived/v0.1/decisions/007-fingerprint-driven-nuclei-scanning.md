@@ -1,3 +1,13 @@
+---
+archived: true
+archived_at: "2026-04-29"
+archived_by: doc-archivist
+version: "v0.1"
+original_path: "wiki/decisions/007-fingerprint-driven-nuclei-scanning.md"
+status: "completed"
+reason: "v0.1 架构决策记录，v0.2 阶段结束"
+---
+
 # ADR-007: 指纹驱动 Nuclei 模板精确筛选
 
 ## 状态

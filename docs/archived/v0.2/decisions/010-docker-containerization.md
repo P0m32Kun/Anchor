@@ -1,3 +1,13 @@
+---
+archived: true
+archived_at: "2026-04-29"
+archived_by: doc-archivist
+version: "v0.2"
+original_path: "wiki/decisions/010-docker-containerization.md"
+status: "completed"
+reason: "v0.2 架构决策记录"
+---
+
 # ADR-010: Docker 容器化部署
 
 ## 状态

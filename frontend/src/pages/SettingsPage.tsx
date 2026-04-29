@@ -103,13 +103,10 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
-            {/*
-              项目上下文不明确时，先保留 UI，API 调用部分注释：
-              const handleSaveScanConfig = async () => {
-                // 需要当前 projectID 才能调用 api.updateProject(id, { port_range: ... })
-                // setScanSaved(true);
-                // setTimeout(() => setScanSaved(false), 2000);
-              };
+            {/* TODO: Enable when project context is available.
+              Requires: current project ID + api.updateProject(id, { port_range: ... })
+              Blocked by: No global current-project selector in Zustand store.
+              See: e2e/tests/SettingsPage.e2e.md Test 4
             */}
             <button
               disabled
@@ -131,6 +128,11 @@ export default function SettingsPage() {
                     应用启动时自动启动本地 Worker（仅本地模式）
                   </div>
                 </div>
+                {/* TODO: Static UI only — no state binding or click handler.
+                  Requires: Tauri config store or backend preference API.
+                  Currently always shows "ON" with no way to toggle.
+                  See: e2e/tests/SettingsPage.e2e.md Test 4
+                */}
                 <div className="w-10 h-5 bg-brand-primary rounded-full relative cursor-pointer">
                   <div className="w-4 h-4 bg-white rounded-full absolute right-0.5 top-0.5" />
                 </div>
