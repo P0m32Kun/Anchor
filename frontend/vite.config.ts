@@ -8,5 +8,11 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     watch: { ignored: ["**/src-tauri/**"] },
+    proxy: {
+      "/api": {
+        target: "http://localhost:17421",
+        changeOrigin: true,
+      },
+    },
   },
 }));

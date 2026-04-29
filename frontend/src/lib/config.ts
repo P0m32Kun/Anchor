@@ -11,8 +11,8 @@ export function getApiBase(): string {
     return "http://localhost:17421";
   }
 
-  // Web: try current host (if served from same origin as API)
-  return "http://localhost:17421";
+  // Web: use relative path so Vite proxy forwards /api to backend
+  return "";
 }
 
 export function setApiBase(url: string) {
