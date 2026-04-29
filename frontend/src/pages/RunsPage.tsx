@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { EmptyState, useProjectId } from "../components";
+import { useSSE, usePolling } from "../hooks";
+import { getApiBase } from "../lib/config";
 import type { Run, ScanTask, ToolTemplate } from "../lib/api";
 
 const statusColors: Record<string, string> = {
@@ -39,11 +41,24 @@ export default function RunsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
+  const loadRuns = async () => {
     if (!projectId) return;
-    api.listRuns(projectId).then((data) => setRuns(data ?? [])).catch(console.error);
-    api.listToolTemplates().then((data) => setTemplates(data ?? [])).catch(console.error);
-  }, [projectId]);
+    try {
+      const data = await api.listRuns(projectId);
+      setRuns(data ?? []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const loadTemplates = async () => {
+    try {
+      const data = await api.listToolTemplates();
+      setTemplates(data ?? []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const loadTasks = async (runId: string) => {
     setSelectedRun(runId);
@@ -55,6 +70,39 @@ export default function RunsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!projectId) return;
+    loadRuns();
+    loadTemplates();
+  }, [projectId]);
+
+  // SSE for real-time updates
+  const { status: sseStatus } = useSSE(`${getApiBase()}/events`, {
+    projectId: projectId ?? undefined,
+    onMessage: (raw) => {
+      const msg = raw as { event?: string; run_id?: string; project_id?: string };
+      if (msg.event === "task_update" || msg.event === "asset_discovery_complete" || msg.event === "web_screening_complete") {
+        loadRuns();
+        if (selectedRun && msg.run_id === selectedRun) {
+          loadTasks(selectedRun);
+        }
+      }
+    },
+  });
+
+  // Polling fallback when SSE is unavailable
+  const isLive = sseStatus === "open";
+  const shouldPoll = !isLive && !!projectId;
+
+  usePolling(() => api.listRuns(projectId!).then((data) => {
+    setRuns(data ?? []);
+    return data ?? [];
+  }), {
+    interval: 5000,
+    enabled: shouldPoll,
+    pauseOnHidden: true,
+  });
 
   const handleCreate = async (templateId: string, name: string) => {
     if (!projectId) return;
@@ -92,6 +140,29 @@ export default function RunsPage() {
       <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-base font-medium text-zinc-200">执行历史</h2>
+          {projectId && (
+            <div className="flex items-center gap-2">
+              {sseStatus === "open" ? (
+                <span className="flex items-center gap-1.5 text-xs text-brand-success">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-success opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-success" />
+                  </span>
+                  实时连接
+                </span>
+              ) : shouldPoll ? (
+                <span className="flex items-center gap-1.5 text-xs text-accent-yellow">
+                  <span className="inline-flex rounded-full h-2 w-2 bg-accent-yellow" />
+                  轮询中
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+                  <span className="inline-flex rounded-full h-2 w-2 bg-zinc-500" />
+                  未连接
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="divide-y divide-zinc-800/60">
           {runs.map((run) => (
