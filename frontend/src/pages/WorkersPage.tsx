@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API_BASE } from "../lib/api";
+import { EmptyState } from "../components";
 
 interface Worker {
   id: string;
@@ -38,30 +39,46 @@ export default function WorkersPage() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [offlineCount, setOfflineCount] = useState(0);
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
     let ctrl = new AbortController();
 
     async function fetchWorkers() {
+      if (fetchingRef.current) return; // Prevent request storm
+      fetchingRef.current = true;
+
       try {
         const res = await fetch(`${API_BASE}/workers`, { signal: ctrl.signal });
         if (!res.ok) throw new Error("fetch failed");
         const data: Worker[] = await res.json();
-        setWorkers(data.filter((w) => w.status === "online" || w.status === "busy"));
+
+        const onlineOrBusy = data.filter(
+          (w) => w.status === "online" || w.status === "busy"
+        );
+        const offline = data.filter((w) => w.status === "offline").length;
+
+        setWorkers(onlineOrBusy);
+        setOfflineCount(offline);
         setError(null);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setError("连接失败，请检查服务是否运行");
       } finally {
         setLoading(false);
+        fetchingRef.current = false;
       }
     }
 
     fetchWorkers();
     const interval = setInterval(() => {
+      // Abort any pending request before starting a new one to prevent overlap
+      ctrl.abort();
       ctrl = new AbortController();
       fetchWorkers();
     }, 5000);
+
     return () => {
       ctrl.abort();
       clearInterval(interval);
@@ -98,24 +115,35 @@ export default function WorkersPage() {
             {error}
           </div>
         ) : workers.length === 0 ? (
-          <div className="text-sm text-text-tertiary py-6 text-center bg-white/[0.02] rounded-lg">
-            暂无 Worker
-            <div className="mt-2 text-xs text-text-tertiary">
-              通过 Docker 部署 Worker，使用 Server 生成的 token 注册
-            </div>
-          </div>
+          <EmptyState
+            title="暂无 Worker"
+            description="通过 Docker 部署 Worker，使用 Server 生成的 token 注册后显示在此"
+          />
         ) : (
           <div className="space-y-3">
+            {offlineCount > 0 && (
+              <div
+                className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2"
+                role="status"
+              >
+                ⚠️ 检测到 {offlineCount} 个 Worker 离线
+              </div>
+            )}
             {workers.map((w) => (
               <div
                 key={w.id}
                 className="flex items-center justify-between bg-white/[0.02] rounded-lg px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-2.5 h-2.5 rounded-full ${statusColor(w.status)}`} />
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full ${statusColor(w.status)}`}
+                    aria-hidden="true"
+                  />
                   <div>
                     <div className="text-sm font-medium">{w.name}</div>
-                    <div className="text-xs text-text-tertiary mt-0.5">{w.endpoint || w.id}</div>
+                    <div className="text-xs text-text-tertiary mt-0.5">
+                      {w.endpoint || w.id}
+                    </div>
                   </div>
                 </div>
                 <div className="text-xs text-text-tertiary">

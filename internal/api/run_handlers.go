@@ -230,3 +230,46 @@ func (s *Server) handleGetRunTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, tasks)
 }
+
+func (s *Server) handleCancelRun(w http.ResponseWriter, r *http.Request) {
+	runID := r.PathValue("id")
+	run, err := s.queries.GetRun(runID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get run: %v", err))
+		return
+	}
+	if run == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "run not found"))
+		return
+	}
+
+	if run.Status == models.RunCompleted || run.Status == models.RunFailed || run.Status == models.RunCancelled {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "run already finished"))
+		return
+	}
+
+	tasks, err := s.queries.ListScanTasksByRun(runID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list tasks: %v", err))
+		return
+	}
+
+	now := time.Now().UTC()
+	for _, task := range tasks {
+		if task.Status == models.TaskCompleted || task.Status == models.TaskFailed || task.Status == models.TaskCancelled {
+			continue
+		}
+		_ = s.queries.UpdateScanTaskStatus(task.ID, models.TaskCancelled, nil, &now)
+		_ = s.worker.Cancel(task.ID)
+	}
+
+	s.updateRunStatus(runID, models.RunCancelled, nil)
+
+	// Notify SSE clients.
+	s.broadcastProjectSSE(run.ProjectID, map[string]interface{}{
+		"event":   "task_update",
+		"run_id":  runID,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}

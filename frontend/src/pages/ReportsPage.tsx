@@ -4,7 +4,7 @@ import { api, Finding, API_BASE } from "../lib/api";
 import { Button } from "../components/Button";
 import { SeverityBadge, StatusBadge } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
-import { useProjectId } from "../components";
+import { useProjectId, useToast } from "../components";
 
 // Extended type to include finding details.
 interface FindingDetail {
@@ -12,9 +12,50 @@ interface FindingDetail {
   evidence: { id: string; type: string; excerpt?: string }[];
 }
 
+function isTauri(): boolean {
+  return !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__;
+}
+
+async function saveWithTauriDialog(blob: Blob, defaultName: string): Promise<void> {
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const { invoke } = await import("@tauri-apps/api/core");
+
+  const ext = defaultName.split(".").pop() || "";
+  const filters =
+    ext === "md"
+      ? [{ name: "Markdown", extensions: ["md"] }]
+      : [{ name: "JSON", extensions: ["json"] }];
+
+  const filePath = await save({
+    defaultPath: defaultName,
+    filters,
+  });
+
+  if (!filePath) {
+    // User cancelled
+    return;
+  }
+
+  const arrayBuffer = await blob.arrayBuffer();
+  const contents = Array.from(new Uint8Array(arrayBuffer));
+  await invoke("save_file", { path: filePath, contents });
+}
+
+function downloadWithAnchor(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export default function ReportsPage() {
   const projectId = useProjectId();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [findings, setFindings] = useState<FindingDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,11 +122,18 @@ export default function ReportsPage() {
       setShowPreview(true);
     } catch (e: any) {
       setError(e.message || "Failed to generate preview");
+      toast("预览生成失败：" + (e.message || "未知错误"), "error");
     }
-  }, [projectId]);
+  }, [projectId, toast]);
 
   const handleExport = async (format: "md" | "json") => {
     if (!projectId) return;
+
+    if (findings.length === 0) {
+      toast("无 findings 可导出", "warning");
+      return;
+    }
+
     try {
       setExporting(format);
       setError(null);
@@ -94,16 +142,19 @@ export default function ReportsPage() {
           ? await api.exportReportMD(projectId)
           : await api.exportReportJSON(projectId);
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `report_${projectId}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const filename = `report_${projectId}.${format}`;
+
+      if (isTauri()) {
+        await saveWithTauriDialog(blob, filename);
+        toast("导出成功", "success");
+      } else {
+        downloadWithAnchor(blob, filename);
+        toast("下载已启动", "success");
+      }
     } catch (e: any) {
-      setError(e.message || `Export ${format.toUpperCase()} failed`);
+      const msg = e.message || `Export ${format.toUpperCase()} failed`;
+      setError(msg);
+      toast("导出失败：" + msg, "error");
     } finally {
       setExporting(null);
     }
@@ -111,8 +162,6 @@ export default function ReportsPage() {
 
   const confirmedCount = findings.filter((f) => f.finding.status === "confirmed").length;
   const acceptedCount = findings.filter((f) => f.finding.status === "accepted_risk").length;
-
-
 
   if (!projectId) {
     return (
@@ -148,6 +197,7 @@ export default function ReportsPage() {
           size="sm"
           onClick={handlePreviewMarkdown}
           disabled={loading || showPreview}
+          title={showPreview ? "预览已打开" : "生成 Markdown 预览"}
         >
           {showPreview ? "已生成预览" : "Markdown 预览"}
         </Button>
@@ -156,6 +206,7 @@ export default function ReportsPage() {
           size="sm"
           onClick={() => handleExport("md")}
           disabled={exporting !== null}
+          title={findings.length === 0 ? "无 findings 可导出" : "导出 Markdown 报告"}
         >
           {exporting === "md" ? "导出中..." : "导出 Markdown"}
         </Button>
@@ -164,6 +215,7 @@ export default function ReportsPage() {
           size="sm"
           onClick={() => handleExport("json")}
           disabled={exporting !== null}
+          title={findings.length === 0 ? "无 findings 可导出" : "导出 JSON 报告"}
         >
           {exporting === "json" ? "导出中..." : "导出 JSON"}
         </Button>
@@ -239,6 +291,7 @@ export default function ReportsPage() {
             <button
               onClick={() => { setShowPreview(false); setPreviewText(null); setPreviewRawText(null); }}
               className="text-zinc-500 hover:text-zinc-300 transition-colors"
+              aria-label="关闭预览"
             >
               ✕
             </button>

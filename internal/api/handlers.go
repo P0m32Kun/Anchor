@@ -132,6 +132,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects/{id}/runs", s.handleListRuns)
 	mux.HandleFunc("GET /runs/{id}", s.handleGetRun)
 	mux.HandleFunc("GET /runs/{id}/tasks", s.handleGetRunTasks)
+	mux.HandleFunc("POST /runs/{id}/cancel", s.handleCancelRun)
 	mux.HandleFunc("POST /projects/{id}/workflows/asset-discovery", s.handleStartAssetDiscovery)
 	mux.HandleFunc("GET /projects/{id}/assets", s.handleListAssetsFiltered)
 	mux.HandleFunc("GET /projects/{id}/web-endpoints", s.handleListWebEndpointsByProject)
@@ -157,6 +158,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /tasks/run", s.handleRunTask)
 	mux.HandleFunc("GET /tasks/{id}/artifacts", s.handleListArtifacts)
 	mux.HandleFunc("GET /health/tools", s.handleToolHealth)
+	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("POST /health/check", s.handleHealthCheck)
 	mux.HandleFunc("GET /projects/{id}/events", s.handleProjectSSE)
 	mux.HandleFunc("GET /projects/{id}/reports/export.md", s.handleExportReportMD)
@@ -192,9 +194,28 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 
 // --- CORS middleware ---
 
+var allowedOrigins = []string{
+	"http://localhost:1420",
+	"http://localhost:5173",
+	"tauri://localhost",
+}
+
+func isAllowedOrigin(origin string) bool {
+	for _, o := range allowedOrigins {
+		if origin == o {
+			return true
+		}
+	}
+	return false
+}
+
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if isAllowedOrigin(origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == "OPTIONS" {
@@ -893,6 +914,11 @@ func (s *Server) handleToolHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, h)
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {

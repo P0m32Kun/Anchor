@@ -352,6 +352,8 @@ export const api = {
 
   runHealthCheck: (signal?: AbortSignal) => fetchAPI<ToolHealth[]>("/health/check", { method: "POST", signal }),
 
+  healthCheck: async () => fetchAPI<{ status: string }>("/health", { timeout: 5000 }),
+
   startAssetDiscovery: (projectId: string, signal?: AbortSignal) =>
     fetchAPI<{ status: string }>(`/projects/${projectId}/workflows/asset-discovery`, { method: "POST", signal }),
 
@@ -393,6 +395,8 @@ export const api = {
     fetchAPI<Run>(`/runs/${id}`, { signal }),
   getRunTasks: (id: string, signal?: AbortSignal) =>
     fetchAPI<ScanTask[]>(`/runs/${id}/tasks`, { signal }),
+  cancelRun: (id: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/runs/${id}/cancel`, { method: "POST", signal }),
 
   // --- Tool Templates ---
   listToolTemplates: (signal?: AbortSignal) =>

@@ -68,30 +68,30 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
   const [dragOver, setDragOver] = useState(false);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.name.endsWith(".txt") && !file.name.endsWith(".csv")) {
-        setError("仅支持 .txt 或 .csv 文件");
+        toast("仅支持 .txt 或 .csv 文件", "warning");
         return;
       }
       setImporting(true);
-      setError(null);
       setResult(null);
       try {
         const res = await api.importTargets(projectId, file);
         setResult(res);
         onImported();
+        toast(`导入完成: 成功 ${res.imported} 个`, "success");
       } catch (err) {
-        setError(String(err));
+        toast("导入失败: " + (err instanceof Error ? err.message : String(err)), "error");
       } finally {
         setImporting(false);
         setDragOver(false);
       }
     },
-    [projectId, onImported],
+    [projectId, onImported, toast],
   );
 
   const handleDrop = useCallback(
@@ -145,10 +145,6 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
           </div>
         )}
       </div>
-
-      {error && (
-        <div className="bg-red-50 text-red-700 px-3 py-2 rounded text-sm">{error}</div>
-      )}
 
       {result && (
         <div className="bg-gray-50 p-3 rounded text-sm space-y-2">
@@ -222,6 +218,13 @@ export default function TargetPage() {
     pendingType: string;
     pendingValue: string;
   } | null>(null);
+  const [scopeConfirmLoading, setScopeConfirmLoading] = useState(false);
+
+  const [addingTarget, setAddingTarget] = useState(false);
+  const [dryRunLoading, setDryRunLoading] = useState(false);
+  const [dryRunConfirmOpen, setDryRunConfirmOpen] = useState(false);
+  const [subfinderLoading, setSubfinderLoading] = useState(false);
+  const [subfinderConfirmOpen, setSubfinderConfirmOpen] = useState(false);
 
   const toast = useToast();
 
@@ -251,7 +254,12 @@ export default function TargetPage() {
 
   const addTarget = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId || !targetValue.trim()) return;
+    if (!projectId || !targetValue.trim()) {
+      toast("请输入目标值", "warning");
+      return;
+    }
+    if (addingTarget) return;
+    setAddingTarget(true);
     try {
       const res = await api.createTarget(projectId, { type: targetType, value: targetValue });
       if ("needs_scope_confirmation" in res && res.needs_scope_confirmation) {
@@ -268,12 +276,15 @@ export default function TargetPage() {
       setTargetValue("");
       toast("目标已添加", "success");
     } catch (err) {
-      toast("添加目标失败: " + String(err), "error");
+      toast("添加目标失败: " + (err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setAddingTarget(false);
     }
   };
 
   const handleConfirmScope = async () => {
     if (!pendingScopeConfirm || !projectId) return;
+    setScopeConfirmLoading(true);
     try {
       const { suggested, pendingType, pendingValue } = pendingScopeConfirm;
       await api.createScopeRule({
@@ -291,8 +302,9 @@ export default function TargetPage() {
         toast("目标已添加", "success");
       }
     } catch (err) {
-      toast("添加 Scope 规则失败: " + String(err), "error");
+      toast("添加 Scope 规则失败: " + (err instanceof Error ? err.message : String(err)), "error");
     } finally {
+      setScopeConfirmLoading(false);
       setScopeConfirmOpen(false);
       setPendingScopeConfirm(null);
     }
@@ -300,7 +312,10 @@ export default function TargetPage() {
 
   const addScopeRule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId || !scopeValue.trim()) return;
+    if (!projectId || !scopeValue.trim()) {
+      toast("请输入 Scope 规则值", "warning");
+      return;
+    }
     try {
       await api.createScopeRule({
         project_id: projectId,
@@ -311,28 +326,33 @@ export default function TargetPage() {
       setScopeValue("");
       toast("规则已添加", "success");
     } catch (err) {
-      toast("添加规则失败: " + String(err), "error");
+      toast("添加规则失败: " + (err instanceof Error ? err.message : String(err)), "error");
     }
   };
 
   const runDryRun = async () => {
-    if (!projectId) return;
+    if (!projectId || dryRunLoading) return;
+    setDryRunLoading(true);
     try {
       const res = await api.dryRun(projectId);
       setDryRunResult(res);
       toast("授权检测完成", "success");
     } catch (err) {
-      toast("授权检测失败: " + String(err), "error");
+      toast("授权检测失败: " + (err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setDryRunLoading(false);
+      setDryRunConfirmOpen(false);
     }
   };
 
   const runSubfinder = async () => {
-    if (!projectId) return;
+    if (!projectId || subfinderLoading) return;
     const domain = targets.find((t) => t.type === "domain");
     if (!domain) {
       toast("请先添加一个域名目标", "warning");
       return;
     }
+    setSubfinderLoading(true);
     try {
       const task = await api.runTask({
         project_id: projectId,
@@ -342,7 +362,10 @@ export default function TargetPage() {
       });
       toast(`任务已启动: ${task.id}`, "success");
     } catch (err) {
-      toast("启动任务失败: " + String(err), "error");
+      toast("启动任务失败: " + (err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setSubfinderLoading(false);
+      setSubfinderConfirmOpen(false);
     }
   };
 
@@ -412,8 +435,12 @@ export default function TargetPage() {
             value={targetValue}
             onChange={(e) => setTargetValue(e.target.value)}
           />
-          <button type="submit" className="bg-slate-700 text-white px-4 py-2 rounded">
-            添加
+          <button
+            type="submit"
+            disabled={addingTarget}
+            className="bg-slate-700 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {addingTarget ? "添加中..." : "添加"}
           </button>
         </form>
 
@@ -478,11 +505,19 @@ export default function TargetPage() {
       <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
         <h2 className="font-semibold mb-3">操作</h2>
         <div className="flex gap-3 flex-wrap">
-          <button onClick={runDryRun} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500">
-            授权检测 (Scope Check)
+          <button
+            onClick={() => setDryRunConfirmOpen(true)}
+            disabled={dryRunLoading}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {dryRunLoading ? "检测中..." : "授权检测 (Scope Check)"}
           </button>
-          <button onClick={runSubfinder} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500">
-            运行 Subfinder
+          <button
+            onClick={() => setSubfinderConfirmOpen(true)}
+            disabled={subfinderLoading}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {subfinderLoading ? "启动中..." : "运行 Subfinder"}
           </button>
           <Link to={`/projects/${currentProject.id}/assets`} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-500">
             查看资产
@@ -566,6 +601,29 @@ export default function TargetPage() {
         }
         confirmText="添加规则并继续"
         cancelText="取消"
+        loading={scopeConfirmLoading}
+      />
+
+      <ConfirmDialog
+        open={dryRunConfirmOpen}
+        onClose={() => setDryRunConfirmOpen(false)}
+        onConfirm={runDryRun}
+        title="授权检测"
+        description="即将对当前项目的所有目标执行授权检测（Dry Run），确认时间窗口和 Scope 规则是否有效。是否继续？"
+        confirmText="开始检测"
+        cancelText="取消"
+        loading={dryRunLoading}
+      />
+
+      <ConfirmDialog
+        open={subfinderConfirmOpen}
+        onClose={() => setSubfinderConfirmOpen(false)}
+        onConfirm={runSubfinder}
+        title="运行 Subfinder"
+        description="即将使用 subfinder 对当前项目的域名目标进行子域名发现。此操作将创建一个新的扫描任务。是否继续？"
+        confirmText="启动任务"
+        cancelText="取消"
+        loading={subfinderLoading}
       />
     </div>
   );

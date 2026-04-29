@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 import { Button } from "../components/Button";
 import { StatusBadge } from "../components/Badge";
-import { useToast } from "../components";
+import { useToast, ConfirmDialog } from "../components";
 
 export default function ProjectPage() {
   const navigate = useNavigate();
@@ -19,7 +19,8 @@ export default function ProjectPage() {
   const [rateLimit, setRateLimit] = useState(0);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<typeof projects[0] | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -28,14 +29,19 @@ export default function ProjectPage() {
       .then((data) => setProjects(data ?? []))
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
+        toast("加载项目列表失败: " + (err instanceof Error ? err.message : String(err)), "error");
         console.error(err);
       });
     return () => ctrl.abort();
-  }, [setProjects]);
+  }, [setProjects, toast]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      toast("项目名称不能为空", "warning");
+      return;
+    }
+    if (loading) return;
     setLoading(true);
     try {
       const p = await api.createProject({
@@ -183,48 +189,19 @@ export default function ProjectPage() {
               </div>
               {/* 删除按钮 */}
               <div className="absolute top-3 right-3">
-                {confirmDeleteId === p.id ? (
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-xs text-red-400">确认删除？</span>
-                    <button
-                      onClick={async () => {
-                        setDeletingId(p.id);
-                        try {
-                          await api.deleteProject(p.id);
-                          setProjects(projects.filter((proj) => proj.id !== p.id));
-                          setConfirmDeleteId(null);
-                        } catch (err) {
-                          toast("删除失败: " + String(err), "error");
-                        } finally {
-                          setDeletingId(null);
-                        }
-                      }}
-                      disabled={deletingId === p.id}
-                      className="px-2 py-0.5 text-xs rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-50"
-                    >
-                      {deletingId === p.id ? "删除中..." : "确认"}
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(null)}
-                      className="px-2 py-0.5 text-xs rounded bg-white/5 text-text-tertiary hover:bg-white/10"
-                    >
-                      取消
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setConfirmDeleteId(p.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-500/10 text-text-quaternary hover:text-red-400"
-                    title="删除项目"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteTarget(p);
+                    setDeleteDialogOpen(true);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-500/10 text-text-quaternary hover:text-red-400"
+                  title="删除项目"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
             </div>
           );
@@ -236,6 +213,35 @@ export default function ProjectPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setDeleteTarget(null);
+        }}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          setDeletingId(deleteTarget.id);
+          try {
+            await api.deleteProject(deleteTarget.id);
+            setProjects(projects.filter((proj) => proj.id !== deleteTarget.id));
+            setDeleteDialogOpen(false);
+            setDeleteTarget(null);
+            toast("项目已删除", "success");
+          } catch (err) {
+            toast("删除失败: " + (err instanceof Error ? err.message : String(err)), "error");
+          } finally {
+            setDeletingId(null);
+          }
+        }}
+        title="删除项目"
+        description={deleteTarget ? `确认删除项目 "${deleteTarget.name}"？此操作不可恢复。` : ""}
+        confirmText="删除"
+        cancelText="取消"
+        variant="danger"
+        loading={deletingId !== null}
+      />
     </div>
   );
 }
