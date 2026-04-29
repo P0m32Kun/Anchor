@@ -221,6 +221,7 @@ export default function TargetPage() {
   const [scopeConfirmLoading, setScopeConfirmLoading] = useState(false);
 
   const [addingTarget, setAddingTarget] = useState(false);
+  const [addingScope, setAddingScope] = useState(false);
   const [dryRunLoading, setDryRunLoading] = useState(false);
   const [dryRunConfirmOpen, setDryRunConfirmOpen] = useState(false);
   const [subfinderLoading, setSubfinderLoading] = useState(false);
@@ -239,6 +240,7 @@ export default function TargetPage() {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : String(err);
       setTargetsError(msg);
+      toast("加载目标失败: " + msg, "error");
       console.error(err);
     } finally {
       setTargetsLoading(false);
@@ -316,6 +318,8 @@ export default function TargetPage() {
       toast("请输入 Scope 规则值", "warning");
       return;
     }
+    if (addingScope) return;
+    setAddingScope(true);
     try {
       await api.createScopeRule({
         project_id: projectId,
@@ -327,6 +331,8 @@ export default function TargetPage() {
       toast("规则已添加", "success");
     } catch (err) {
       toast("添加规则失败: " + (err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setAddingScope(false);
     }
   };
 
@@ -495,8 +501,8 @@ export default function TargetPage() {
             value={scopeValue}
             onChange={(e) => setScopeValue(e.target.value)}
           />
-          <button type="submit" className="bg-slate-700 text-white px-4 py-2 rounded">
-            添加
+          <button type="submit" disabled={addingScope} className="bg-slate-700 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed">
+            {addingScope ? "添加中..." : "添加"}
           </button>
         </form>
       </section>

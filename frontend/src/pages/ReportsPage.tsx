@@ -16,7 +16,7 @@ function isTauri(): boolean {
   return !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__;
 }
 
-async function saveWithTauriDialog(blob: Blob, defaultName: string): Promise<void> {
+async function saveWithTauriDialog(blob: Blob, defaultName: string): Promise<boolean> {
   const { save } = await import("@tauri-apps/plugin-dialog");
   const { invoke } = await import("@tauri-apps/api/core");
 
@@ -33,23 +33,28 @@ async function saveWithTauriDialog(blob: Blob, defaultName: string): Promise<voi
 
   if (!filePath) {
     // User cancelled
-    return;
+    return false;
   }
 
   const arrayBuffer = await blob.arrayBuffer();
   const contents = Array.from(new Uint8Array(arrayBuffer));
   await invoke("save_file", { path: filePath, contents });
+  return true;
 }
 
 function downloadWithAnchor(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    throw new Error("浏览器下载失败: " + (e instanceof Error ? e.message : String(e)));
+  }
 }
 
 export default function ReportsPage() {
@@ -145,8 +150,10 @@ export default function ReportsPage() {
       const filename = `report_${projectId}.${format}`;
 
       if (isTauri()) {
-        await saveWithTauriDialog(blob, filename);
-        toast("导出成功", "success");
+        const saved = await saveWithTauriDialog(blob, filename);
+        if (saved) {
+          toast("导出成功", "success");
+        }
       } else {
         downloadWithAnchor(blob, filename);
         toast("下载已启动", "success");

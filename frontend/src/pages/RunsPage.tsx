@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
@@ -55,6 +55,23 @@ export default function RunsPage() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTargetRun, setCancelTargetRun] = useState<Run | null>(null);
 
+  // Prevent duplicate toasts from SSE/polling rapid failures
+  const lastToastErrorRef = useRef<string | null>(null);
+
+  const maybeToastError = useCallback(
+    (msg: string) => {
+      if (lastToastErrorRef.current !== msg) {
+        toast(msg, "error");
+        lastToastErrorRef.current = msg;
+      }
+    },
+    [toast]
+  );
+
+  const clearToastError = useCallback(() => {
+    lastToastErrorRef.current = null;
+  }, []);
+
   const loadRuns = useCallback(
     async (signal?: AbortSignal) => {
       if (!projectId) return;
@@ -63,15 +80,18 @@ export default function RunsPage() {
       try {
         const data = await api.listRuns(projectId, signal);
         setRuns(data ?? []);
+        clearToastError();
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
-        setRunsError(err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        setRunsError(msg);
+        maybeToastError(msg);
         console.error(err);
       } finally {
         setRunsLoading(false);
       }
     },
-    [projectId, setRuns, setRunsLoading, setRunsError]
+    [projectId, setRuns, setRunsLoading, setRunsError, maybeToastError, clearToastError]
   );
 
   const loadTemplates = async (signal?: AbortSignal) => {
@@ -80,6 +100,8 @@ export default function RunsPage() {
       setTemplates(data ?? []);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
+      const msg = err instanceof Error ? err.message : "加载工具模板失败";
+      toast(msg, "error");
       console.error(err);
     }
   };
@@ -92,6 +114,8 @@ export default function RunsPage() {
       setTasks(data ?? []);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
+      const msg = err instanceof Error ? err.message : "加载任务详情失败";
+      toast(msg, "error");
       console.error(err);
     } finally {
       setTasksLoading(false);
@@ -133,11 +157,21 @@ export default function RunsPage() {
   const shouldPoll = !isLive && !!projectId;
 
   usePolling(
-    () =>
-      api.listRuns(projectId!).then((data) => {
+    async () => {
+      try {
+        const data = await api.listRuns(projectId!);
         setRuns(data ?? []);
+        setRunsError(null);
+        clearToastError();
         return data ?? [];
-      }),
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return [];
+        const msg = err instanceof Error ? err.message : "轮询运行状态失败";
+        setRunsError(msg);
+        maybeToastError(msg);
+        return [];
+      }
+    },
     {
       interval: 5000,
       enabled: shouldPoll,

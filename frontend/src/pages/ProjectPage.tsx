@@ -61,7 +61,7 @@ export default function ProjectPage() {
       setEndTime("");
       setRateLimit(0);
     } catch (err) {
-      toast("创建失败: " + String(err), "error");
+      toast("创建失败: " + (err instanceof Error ? err.message : String(err)), "error");
     } finally {
       setLoading(false);
     }
