@@ -17,11 +17,11 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  const fetchWorkers = useCallback(async () => {
+  const fetchWorkers = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     setConnectionError(null);
     try {
-      const res = await fetch(`${API_BASE}/workers`);
+      const res = await fetch(`${API_BASE}/workers`, { signal });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
@@ -32,6 +32,7 @@ export default function DashboardPage() {
       setOnlineWorkers(count);
       setConnectionError(null);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       const message = err instanceof Error ? err.message : "网络连接失败";
       setConnectionError(message);
       setOnlineWorkers(0);
@@ -41,17 +42,17 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    const ctrl = new AbortController();
 
     async function poll() {
-      if (cancelled) return;
-      await fetchWorkers();
+      if (ctrl.signal.aborted) return;
+      await fetchWorkers(ctrl.signal);
     }
 
     poll();
     const interval = setInterval(poll, 5000);
     return () => {
-      cancelled = true;
+      ctrl.abort();
       clearInterval(interval);
     };
   }, [fetchWorkers]);
@@ -94,7 +95,7 @@ export default function DashboardPage() {
                   连接失败
                 </div>
                 <button
-                  onClick={fetchWorkers}
+                  onClick={() => fetchWorkers()}
                   className="text-xs text-brand-primary hover:text-brand-secondary transition-colors"
                   title={`错误: ${connectionError}`}
                 >

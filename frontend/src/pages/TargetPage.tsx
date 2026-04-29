@@ -206,13 +206,15 @@ export default function TargetPage() {
   const targets = useStore((state) => state.targets) ?? [];
   const setTargets = useStore((state) => state.setTargets);
   const currentProject = useStore((state) => state.currentProject);
+  const loading = useStore((state) => state.targetsLoading);
+  const error = useStore((state) => state.targetsError);
+  const setTargetsLoading = useStore((state) => state.setTargetsLoading);
+  const setTargetsError = useStore((state) => state.setTargetsError);
   const [targetValue, setTargetValue] = useState("");
   const [targetType, setTargetType] = useState("auto");
   const [scopeAction, setScopeAction] = useState<"include" | "exclude">("include");
   const [scopeValue, setScopeValue] = useState("");
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [scopeConfirmOpen, setScopeConfirmOpen] = useState(false);
   const [pendingScopeConfirm, setPendingScopeConfirm] = useState<{
     message: string;
@@ -223,25 +225,28 @@ export default function TargetPage() {
 
   const toast = useToast();
 
-  const loadTargets = useCallback(async () => {
+  const loadTargets = useCallback(async (signal?: AbortSignal) => {
     if (!projectId) return;
-    setLoading(true);
-    setError(null);
+    setTargetsLoading(true);
+    setTargetsError(null);
     try {
-      const data = await api.listTargets(projectId);
+      const data = await api.listTargets(projectId, signal);
       setTargets(data ?? []);
     } catch (err) {
-      const msg = String(err);
-      setError(msg);
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      const msg = err instanceof Error ? err.message : String(err);
+      setTargetsError(msg);
       console.error(err);
     } finally {
-      setLoading(false);
+      setTargetsLoading(false);
     }
-  }, [projectId, setTargets]);
+  }, [projectId, setTargets, setTargetsLoading, setTargetsError]);
 
   useEffect(() => {
     if (!projectId) return;
-    loadTargets();
+    const ctrl = new AbortController();
+    loadTargets(ctrl.signal);
+    return () => ctrl.abort();
   }, [projectId, loadTargets]);
 
   const addTarget = async (e: React.FormEvent) => {
@@ -425,7 +430,7 @@ export default function TargetPage() {
           <div className="py-12 text-center">
             <p className="text-brand-danger mb-2">加载失败: {error}</p>
             <button
-              onClick={loadTargets}
+              onClick={() => loadTargets()}
               className="text-sm text-blue-600 hover:underline"
             >
               重试

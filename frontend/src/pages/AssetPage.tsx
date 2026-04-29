@@ -43,55 +43,70 @@ export default function AssetPage() {
   const setPorts = useStore((state) => state.setPorts);
 
   const [activeTab, setActiveTab] = useState<"assets" | "web" | "ports">("assets");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const loading = useStore((state) => state.assetsLoading);
+  const error = useStore((state) => state.assetsError);
+  const setAssetsLoading = useStore((state) => state.setAssetsLoading);
+  const setAssetsError = useStore((state) => state.setAssetsError);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const toast = useToast();
 
-  const loadAssets = useCallback(async () => {
+  const loadAssets = useCallback(async (signal?: AbortSignal) => {
     if (!projectId) return;
-    setLoading(true);
-    setError(null);
+    setAssetsLoading(true);
+    setAssetsError(null);
     try {
-      const data = await api.listAssets(projectId);
+      const data = await api.listAssets(projectId, signal);
       setAssets(data ?? []);
     } catch (err) {
-      const msg = String(err);
-      setError(msg);
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      const msg = err instanceof Error ? err.message : String(err);
+      setAssetsError(msg);
       console.error(err);
     } finally {
-      setLoading(false);
+      setAssetsLoading(false);
     }
-  }, [projectId, setAssets]);
+  }, [projectId, setAssets, setAssetsLoading, setAssetsError]);
 
-  const loadWebEndpoints = useCallback(() => {
+  const loadWebEndpoints = useCallback((signal?: AbortSignal) => {
     if (!projectId) return;
-    api.listWebEndpoints(projectId).then((data) => setWebEndpoints(data ?? [])).catch(console.error);
+    api.listWebEndpoints(projectId, signal)
+      .then((data) => setWebEndpoints(data ?? []))
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error(err);
+      });
   }, [projectId, setWebEndpoints]);
 
   const loadPorts = useCallback(
-    (assetId: string) => {
-      api.listPorts(assetId).then((p) => setPorts(assetId, p)).catch(console.error);
+    (assetId: string, signal?: AbortSignal) => {
+      api.listPorts(assetId, signal)
+        .then((p) => setPorts(assetId, p))
+        .catch((err) => {
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          console.error(err);
+        });
     },
     [setPorts]
   );
 
   useEffect(() => {
     if (!projectId) return;
-    loadAssets();
-    loadWebEndpoints();
+    const ctrl = new AbortController();
+    loadAssets(ctrl.signal);
+    loadWebEndpoints(ctrl.signal);
+    return () => ctrl.abort();
   }, [projectId, loadAssets, loadWebEndpoints]);
 
   const startDiscovery = async () => {
     if (!projectId) return;
-    setLoading(true);
+    setAssetsLoading(true);
     try {
       await api.startAssetDiscovery(projectId);
       toast("资产发现工作流已启动", "success");
     } catch (err) {
       toast("启动失败: " + String(err), "error");
     } finally {
-      setLoading(false);
+      setAssetsLoading(false);
     }
   };
 
@@ -220,7 +235,7 @@ export default function AssetPage() {
           ) : error ? (
             <div className="py-12 text-center">
               <p className="text-brand-danger mb-2">加载失败: {error}</p>
-              <button onClick={loadAssets} className="text-sm text-blue-600 hover:underline">
+              <button onClick={() => loadAssets()} className="text-sm text-blue-600 hover:underline">
                 重试
               </button>
             </div>

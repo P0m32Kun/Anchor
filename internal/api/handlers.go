@@ -30,7 +30,7 @@ type Server struct {
 	worker      *worker.Runner
 	health      *health.Checker
 	dataDir     string
-	sseClients  map[string]chan []byte
+	sseClients  map[string]map[string]chan []byte
 	taskQueue   map[string]chan *models.ScanTask
 	taskResults map[string]chan map[string]interface{}
 	mu          sync.Mutex
@@ -45,7 +45,7 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 		worker:      worker.NewRunner(queries, scopeEng, dataDir),
 		health:      health.NewChecker(queries),
 		dataDir:     dataDir,
-		sseClients:  make(map[string]chan []byte),
+		sseClients:  make(map[string]map[string]chan []byte),
 		taskQueue:   make(map[string]chan *models.ScanTask),
 		taskResults: make(map[string]chan map[string]interface{}),
 	}
@@ -158,7 +158,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /tasks/{id}/artifacts", s.handleListArtifacts)
 	mux.HandleFunc("GET /health/tools", s.handleToolHealth)
 	mux.HandleFunc("POST /health/check", s.handleHealthCheck)
-	mux.HandleFunc("GET /events", s.handleSSE)
+	mux.HandleFunc("GET /projects/{id}/events", s.handleProjectSSE)
 	mux.HandleFunc("GET /projects/{id}/reports/export.md", s.handleExportReportMD)
 	mux.HandleFunc("GET /projects/{id}/reports/export.json", s.handleExportReportJSON)
 	mux.HandleFunc("POST /projects/{id}/archive", s.handleCreateArchive)
@@ -843,7 +843,7 @@ func (s *Server) handleRunTask(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		// Notify SSE clients.
-		s.broadcastSSE(map[string]interface{}{
+		s.broadcastProjectSSE(task.ProjectID, map[string]interface{}{
 			"event":   "task_update",
 			"task_id": task.ID,
 		})
@@ -904,15 +904,35 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 
 // --- SSE ---
 
-func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleProjectSSE(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	if projectID == "" {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "missing project id"))
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
 	clientID := util.GenerateID()
 	ch := make(chan []byte, 10)
-	s.sseClients[clientID] = ch
-	defer delete(s.sseClients, clientID)
+
+	s.mu.Lock()
+	if s.sseClients[projectID] == nil {
+		s.sseClients[projectID] = make(map[string]chan []byte)
+	}
+	s.sseClients[projectID][clientID] = ch
+	s.mu.Unlock()
+
+	defer func() {
+		s.mu.Lock()
+		delete(s.sseClients[projectID], clientID)
+		if len(s.sseClients[projectID]) == 0 {
+			delete(s.sseClients, projectID)
+		}
+		s.mu.Unlock()
+	}()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -924,10 +944,16 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "data: %s\n\n", `{"event":"connected"}`)
 	flusher.Flush()
 
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case msg := <-ch:
 			fmt.Fprintf(w, "data: %s\n\n", msg)
+			flusher.Flush()
+		case <-ticker.C:
+			fmt.Fprintf(w, "data: %s\n\n", `{"event":"ping"}`)
 			flusher.Flush()
 		case <-r.Context().Done():
 			return
@@ -935,9 +961,15 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) broadcastSSE(data map[string]interface{}) {
+func (s *Server) broadcastProjectSSE(projectID string, data map[string]interface{}) {
 	b, _ := json.Marshal(data)
-	for _, ch := range s.sseClients {
+	s.mu.Lock()
+	clients, ok := s.sseClients[projectID]
+	s.mu.Unlock()
+	if !ok {
+		return
+	}
+	for _, ch := range clients {
 		select {
 		case ch <- b:
 		default:
@@ -1060,7 +1092,7 @@ func (s *Server) handleStartAssetDiscovery(w http.ResponseWriter, r *http.Reques
 		if err != nil {
 			log.Printf("asset discovery workflow failed for project %s: %v", projectID, err)
 		}
-		s.broadcastSSE(map[string]interface{}{
+		s.broadcastProjectSSE(projectID, map[string]interface{}{
 			"event":      "asset_discovery_complete",
 			"project_id": projectID,
 			"result":     result,
@@ -1139,7 +1171,7 @@ func (s *Server) handleStartWebScreening(w http.ResponseWriter, r *http.Request)
 		if err != nil {
 			log.Printf("web screening workflow failed for project %s: %v", projectID, err)
 		}
-		s.broadcastSSE(map[string]interface{}{
+		s.broadcastProjectSSE(projectID, map[string]interface{}{
 			"event":      "web_screening_complete",
 			"project_id": projectID,
 			"result":     result,

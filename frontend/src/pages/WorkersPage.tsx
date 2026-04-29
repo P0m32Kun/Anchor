@@ -40,28 +40,30 @@ export default function WorkersPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    let ctrl = new AbortController();
 
     async function fetchWorkers() {
       try {
-        const res = await fetch(`${API_BASE}/workers`);
+        const res = await fetch(`${API_BASE}/workers`, { signal: ctrl.signal });
         if (!res.ok) throw new Error("fetch failed");
         const data: Worker[] = await res.json();
-        if (!cancelled) {
-          setWorkers(data.filter((w) => w.status === "online" || w.status === "busy"));
-          setError(null);
-        }
-      } catch {
-        if (!cancelled) setError("连接失败，请检查服务是否运行");
+        setWorkers(data.filter((w) => w.status === "online" || w.status === "busy"));
+        setError(null);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError("连接失败，请检查服务是否运行");
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     }
 
     fetchWorkers();
-    const interval = setInterval(fetchWorkers, 5000);
+    const interval = setInterval(() => {
+      ctrl = new AbortController();
+      fetchWorkers();
+    }, 5000);
     return () => {
-      cancelled = true;
+      ctrl.abort();
       clearInterval(interval);
     };
   }, []);

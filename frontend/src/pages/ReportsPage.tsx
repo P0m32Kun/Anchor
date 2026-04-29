@@ -26,17 +26,19 @@ export default function ReportsPage() {
 
   useEffect(() => {
     if (!projectId) return;
-    loadData();
+    const ctrl = new AbortController();
+    loadData(ctrl.signal);
+    return () => ctrl.abort();
   }, [projectId]);
 
-  const loadData = async () => {
+  const loadData = async (signal?: AbortSignal) => {
     if (!projectId) return;
     try {
       setLoading(true);
       setError(null);
 
       // Fetch report-eligible findings (confirmed + accepted_risk).
-      const allFindings = await api.listFindings(projectId);
+      const allFindings = await api.listFindings(projectId, undefined, signal);
       const reportFindings = (allFindings ?? []).filter(
         (f) => f.status === "confirmed" || f.status === "accepted_risk"
       );
@@ -45,7 +47,7 @@ export default function ReportsPage() {
       const enriched: FindingDetail[] = [];
       for (const f of reportFindings) {
         try {
-          const detail = await api.getFinding(f.id);
+          const detail = await api.getFinding(f.id, signal);
           enriched.push({
             finding: f,
             evidence: detail.evidence || [],
@@ -57,6 +59,7 @@ export default function ReportsPage() {
 
       setFindings(enriched);
     } catch (e: any) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError(e.message || "Failed to load findings");
     } finally {
       setLoading(false);

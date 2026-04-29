@@ -23,7 +23,14 @@ export default function ProjectPage() {
   const toast = useToast();
 
   useEffect(() => {
-    api.listProjects().then((data) => setProjects(data ?? [])).catch(console.error);
+    const ctrl = new AbortController();
+    api.listProjects(ctrl.signal)
+      .then((data) => setProjects(data ?? []))
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error(err);
+      });
+    return () => ctrl.abort();
   }, [setProjects]);
 
   const handleCreate = async (e: React.FormEvent) => {

@@ -35,19 +35,29 @@ export default function FindingsPage() {
   const setFindings = useStore((state) => state.setFindings);
   const currentFinding = useStore((state) => state.currentFinding);
   const setCurrentFinding = useStore((state) => state.setCurrentFinding);
+  const loading = useStore((state) => state.findingsLoading);
+  const setFindingsLoading = useStore((state) => state.setFindingsLoading);
+  const setFindingsError = useStore((state) => state.setFindingsError);
   const [filter, setFilter] = useState<string>("");
-  const [loading, setLoading] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
     if (!projectId) return;
-    setLoading(true);
+    const ctrl = new AbortController();
+    setFindingsLoading(true);
+    setFindingsError(null);
     api
-      .listFindings(projectId, filter)
+      .listFindings(projectId, filter, ctrl.signal)
       .then((data) => setFindings(data ?? []))
-      .finally(() => setLoading(false));
-  }, [projectId, filter, setFindings]);
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setFindingsError(err instanceof Error ? err.message : String(err));
+        console.error(err);
+      })
+      .finally(() => setFindingsLoading(false));
+    return () => ctrl.abort();
+  }, [projectId, filter, setFindings, setFindingsLoading, setFindingsError]);
 
   const openDetail = async (findingId: string) => {
     const data = await api.getFinding(findingId);
