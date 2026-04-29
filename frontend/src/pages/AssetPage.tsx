@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
+import { useProjectId } from "../components";
 
 function AssetTypeBadge({ type }: { type: string }) {
   const colors: Record<string, string> = {
@@ -32,9 +33,8 @@ function StatusCodeBadge({ code }: { code?: number }) {
 }
 
 export default function AssetPage() {
-  const { id } = useParams<{ id: string }>();
+  const projectId = useProjectId();
   const currentProject = useStore((state) => state.currentProject);
-  const setCurrentProject = useStore((state) => state.setCurrentProject);
   const assets = useStore((state) => state.assets) ?? [];
   const setAssets = useStore((state) => state.setAssets);
   const webEndpoints = useStore((state) => state.webEndpoints) ?? [];
@@ -45,8 +45,6 @@ export default function AssetPage() {
   const [activeTab, setActiveTab] = useState<"assets" | "web" | "ports">("assets");
   const [loading, setLoading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
-
-  const projectId = id || currentProject?.id;
 
   const loadAssets = useCallback(() => {
     if (!projectId) return;
@@ -67,12 +65,9 @@ export default function AssetPage() {
 
   useEffect(() => {
     if (!projectId) return;
-    if (id) {
-      api.getProject(id).then(setCurrentProject).catch(console.error);
-    }
     loadAssets();
     loadWebEndpoints();
-  }, [id, projectId, setCurrentProject, loadAssets, loadWebEndpoints]);
+  }, [projectId, loadAssets, loadWebEndpoints]);
 
   const startDiscovery = async () => {
     if (!projectId) return;

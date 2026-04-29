@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import { useStore } from "../lib/store";
-import { EmptyState } from "../components";
+import { EmptyState, useProjectId } from "../components";
 import type { Run, ScanTask, ToolTemplate } from "../lib/api";
 
 const statusColors: Record<string, string> = {
@@ -30,9 +29,8 @@ const taskStatusColors: Record<string, string> = {
 };
 
 export default function RunsPage() {
-  const { id } = useParams<{ id: string }>();
+  const projectId = useProjectId();
   const navigate = useNavigate();
-  const currentProject = useStore((s) => s.currentProject);
   const [runs, setRuns] = useState<Run[]>([]);
   const [templates, setTemplates] = useState<ToolTemplate[]>([]);
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
@@ -40,8 +38,6 @@ export default function RunsPage() {
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-
-  const projectId = id || currentProject?.id;
 
   useEffect(() => {
     if (!projectId) return;

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, Finding, API_BASE } from "../lib/api";
 import { Button } from "../components/Button";
 import { SeverityBadge, StatusBadge } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
+import { useProjectId } from "../components";
 
 // Extended type to include finding details.
 interface FindingDetail {
@@ -12,8 +13,7 @@ interface FindingDetail {
 }
 
 export default function ReportsPage() {
-  const { id } = useParams<{ id: string }>();
-  const projectId = id;
+  const projectId = useProjectId();
   const navigate = useNavigate();
 
   const [findings, setFindings] = useState<FindingDetail[]>([]);

@@ -13,12 +13,18 @@
  * | /reports                 | ReportsPage    | Report generation & export       | Yes         |
  * | /workers                 | WorkersPage    | Worker node management           | Yes         |
  * | /settings                | SettingsPage   | App configuration                | Yes         |
- * | /projects/:id            | ProjectPage    | Legacy project detail (params    | No          |
- * | /projects/:id/assets     | AssetPage      | not fully handled)               | No          |
- * | /projects/:id/targets    | TargetPage     |                                  | No          |
- * | /projects/:id/runs       | RunsPage       |                                  | No          |
- * | /projects/:id/findings   | FindingsPage   |                                  | No          |
- * | /projects/:id/reports    | ReportsPage    |                                  | No          |
+ * | /projects/:projectId     | ProjectLayout  | Project wrapper + redirect       | No          |
+ * | /projects/:projectId/targets | TargetPage   | Nested: targets                  | No          |
+ * | /projects/:projectId/assets  | AssetPage    | Nested: assets                   | No          |
+ * | /projects/:projectId/runs    | RunsPage     | Nested: runs                     | No          |
+ * | /projects/:projectId/findings| FindingsPage | Nested: findings                 | No          |
+ * | /projects/:projectId/reports | ReportsPage  | Nested: reports                  | No          |
+ * | /projects/:id            | ProjectPage    | Legacy project detail            | No          |
+ * | /projects/:id/assets     | AssetPage      | Legacy (same as nested)          | No          |
+ * | /projects/:id/targets    | TargetPage     | Legacy (same as nested)          | No          |
+ * | /projects/:id/runs       | RunsPage       | Legacy (same as nested)          | No          |
+ * | /projects/:id/findings   | FindingsPage   | Legacy (same as nested)          | No          |
+ * | /projects/:id/reports    | ReportsPage    | Legacy (same as nested)          | No          |
  *
  * TODO: Legacy routes (/projects/:id/*) do not use useParams() in their
  * components. They render the same content as the base page. Consider
@@ -29,6 +35,7 @@ import { Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import { ToastProvider, Navbar, useToast } from "./components";
 import { setGlobalErrorHandler } from "./lib/api";
+import ProjectLayout from "./components/ProjectLayout";
 import DashboardPage from "./pages/DashboardPage";
 import ProjectPage from "./pages/ProjectPage";
 import TargetPage from "./pages/TargetPage";
@@ -65,7 +72,14 @@ function AppContent() {
           <Route path="/workers" element={<WorkersPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/projects" element={<ProjectPage />} />
-          {/* Legacy routes for backward compat */}
+          <Route path="/projects/:projectId" element={<ProjectLayout />}>
+            <Route path="targets" element={<TargetPage />} />
+            <Route path="assets" element={<AssetPage />} />
+            <Route path="runs" element={<RunsPage />} />
+            <Route path="findings" element={<FindingsPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+          </Route>
+          {/* Legacy routes for backward compat — Sprint 1.11 will remove */}
           <Route path="/projects/:id" element={<ProjectPage />} />
           <Route path="/projects/:id/assets" element={<AssetPage />} />
           <Route path="/projects/:id/targets" element={<TargetPage />} />

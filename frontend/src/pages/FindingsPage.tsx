@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState } from "../components";
+import { EmptyState, useProjectId } from "../components";
 import type { Finding, Evidence } from "../lib/api";
 
 const severityColors: Record<string, string> = {
@@ -30,7 +30,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function FindingsPage() {
-  const { id: projectId } = useParams<{ id: string }>();
+  const projectId = useProjectId();
   const findings = useStore((state) => state.findings) ?? [];
   const setFindings = useStore((state) => state.setFindings);
   const currentFinding = useStore((state) => state.currentFinding);

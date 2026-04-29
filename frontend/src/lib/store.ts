@@ -4,6 +4,7 @@ import type { Project, Target, ScanTask, Asset, WebEndpoint, Port, Service, Find
 
 interface AppState {
   projects: Project[];
+  currentProjectId: string | null;
   currentProject: Project | null;
   targets: Target[];
   tasks: ScanTask[];
@@ -14,6 +15,7 @@ interface AppState {
   findings: Finding[];
   currentFinding: { finding: Finding; evidence: Evidence[] } | null;
   setProjects: (p: Project[]) => void;
+  setCurrentProjectId: (id: string | null) => void;
   setCurrentProject: (p: Project | null) => void;
   setTargets: (t: Target[]) => void;
   addTask: (t: ScanTask) => void;
@@ -30,6 +32,7 @@ export const useStore = create<AppState>()(
   persist(
     (set) => ({
       projects: [],
+      currentProjectId: null,
       currentProject: null,
       targets: [],
       tasks: [],
@@ -40,6 +43,7 @@ export const useStore = create<AppState>()(
       findings: [],
       currentFinding: null,
       setProjects: (projects) => set({ projects }),
+      setCurrentProjectId: (currentProjectId) => set({ currentProjectId }),
       setCurrentProject: (currentProject) =>
         set({
           currentProject,
@@ -69,7 +73,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "app-store",
-      partialize: (state) => ({ currentProject: state.currentProject }),
+      partialize: (state) => ({ currentProject: state.currentProject, currentProjectId: state.currentProjectId }),
     }
   )
 );

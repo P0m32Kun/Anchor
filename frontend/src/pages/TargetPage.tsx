@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api, type ImportResult, type DryRunResult, type Project, type Target } from "../lib/api";
 import { useStore } from "../lib/store";
+import { useProjectId } from "../components";
 
 function ProjectInfo({ project }: { project: Project }) {
   const now = new Date();
@@ -200,18 +201,15 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 }
 
 export default function TargetPage() {
-  const { id } = useParams<{ id: string }>();
+  const projectId = useProjectId();
   const targets = useStore((state) => state.targets) ?? [];
   const setTargets = useStore((state) => state.setTargets);
   const currentProject = useStore((state) => state.currentProject);
-  const setCurrentProject = useStore((state) => state.setCurrentProject);
   const [targetValue, setTargetValue] = useState("");
   const [targetType, setTargetType] = useState("auto");
   const [scopeAction, setScopeAction] = useState<"include" | "exclude">("include");
   const [scopeValue, setScopeValue] = useState("");
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
-
-  const projectId = id || currentProject?.id;
 
   const loadTargets = useCallback(() => {
     if (!projectId) return;
@@ -220,11 +218,8 @@ export default function TargetPage() {
 
   useEffect(() => {
     if (!projectId) return;
-    if (id) {
-      api.getProject(id).then(setCurrentProject).catch(console.error);
-    }
     loadTargets();
-  }, [id, projectId, setCurrentProject, loadTargets]);
+  }, [projectId, loadTargets]);
 
   const addTarget = async (e: React.FormEvent) => {
     e.preventDefault();
