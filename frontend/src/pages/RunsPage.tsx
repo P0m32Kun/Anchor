@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
+import { EmptyState } from "../components";
 import type { Run, ScanTask, ToolTemplate } from "../lib/api";
 
 const statusColors: Record<string, string> = {
@@ -30,6 +31,7 @@ const taskStatusColors: Record<string, string> = {
 
 export default function RunsPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const currentProject = useStore((s) => s.currentProject);
   const [runs, setRuns] = useState<Run[]>([]);
   const [templates, setTemplates] = useState<ToolTemplate[]>([]);
@@ -80,17 +82,14 @@ export default function RunsPage() {
       <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-base font-medium text-zinc-200">执行历史</h2>
-          <div className="flex items-center gap-3">
-            <span className="text-zinc-500 text-sm">共 {runs.length} 次</span>
-            {projectId && (
-              <button
-                onClick={() => setShowCreate(true)}
-                className="bg-brand-primary text-white text-xs px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-              >
-                新建扫描
-              </button>
-            )}
-          </div>
+          {projectId && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="bg-brand-primary text-white text-xs px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+            >
+              新建扫描
+            </button>
+          )}
         </div>
         <div className="divide-y divide-zinc-800/60">
           {runs.map((run) => (
@@ -115,10 +114,21 @@ export default function RunsPage() {
               </div>
             </div>
           ))}
-          {runs.length === 0 && (
-            <div className="py-8 text-center text-zinc-500">
-              {projectId ? "暂无扫描执行记录" : "请先选择一个项目"}
-            </div>
+          {runs.length === 0 && !projectId && (
+            <EmptyState
+              title="请先选择一个项目"
+              description="选择一个项目后查看扫描任务"
+              actionLabel="前往项目列表"
+              onAction={() => navigate("/projects")}
+            />
+          )}
+          {runs.length === 0 && projectId && (
+            <EmptyState
+              title="暂无扫描任务"
+              description="该项目下还没有扫描执行记录"
+              actionLabel="新建扫描"
+              onAction={() => setShowCreate(true)}
+            />
           )}
         </div>
       </section>

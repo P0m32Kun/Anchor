@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, Finding, API_BASE } from "../lib/api";
 import { Button } from "../components/Button";
 import { SeverityBadge, StatusBadge } from "../components/Badge";
+import { EmptyState } from "../components/EmptyState";
 
 // Extended type to include finding details.
 interface FindingDetail {
@@ -12,7 +13,8 @@ interface FindingDetail {
 
 export default function ReportsPage() {
   const { id } = useParams<{ id: string }>();
-  const projectId = id!;
+  const projectId = id;
+  const navigate = useNavigate();
 
   const [findings, setFindings] = useState<FindingDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,10 +25,12 @@ export default function ReportsPage() {
   const [exporting, setExporting] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!projectId) return;
     loadData();
   }, [projectId]);
 
   const loadData = async () => {
+    if (!projectId) return;
     try {
       setLoading(true);
       setError(null);
@@ -60,6 +64,7 @@ export default function ReportsPage() {
   };
 
   const handlePreviewMarkdown = useCallback(async () => {
+    if (!projectId) return;
     try {
       setPreviewRawText(null);
       const res = await fetch(`${API_BASE}/projects/${projectId}/reports/export.md`);
@@ -77,6 +82,7 @@ export default function ReportsPage() {
   }, [projectId]);
 
   const handleExport = async (format: "md" | "json") => {
+    if (!projectId) return;
     try {
       setExporting(format);
       setError(null);
@@ -104,6 +110,19 @@ export default function ReportsPage() {
   const acceptedCount = findings.filter((f) => f.finding.status === "accepted_risk").length;
 
 
+
+  if (!projectId) {
+    return (
+      <div className="max-w-5xl mx-auto">
+        <EmptyState
+          title="请先选择一个项目"
+          description="选择一个项目后生成和导出报告"
+          actionLabel="前往项目列表"
+          onAction={() => navigate("/projects")}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto">

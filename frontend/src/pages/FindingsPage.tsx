@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
+import { EmptyState } from "../components";
 import type { Finding, Evidence } from "../lib/api";
 
 const severityColors: Record<string, string> = {
@@ -69,6 +70,21 @@ export default function FindingsPage() {
       setCurrentFinding(data);
     }
   };
+
+  const navigate = useNavigate();
+
+  if (!projectId) {
+    return (
+      <div className="p-8">
+        <EmptyState
+          title="请先选择一个项目"
+          description="选择一个项目后查看安全发现"
+          actionLabel="前往项目列表"
+          onAction={() => navigate("/projects")}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

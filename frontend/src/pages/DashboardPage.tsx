@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { API_BASE } from "../lib/api";
+import { useStore } from "../lib/store";
 
 interface Worker {
   id: string;
@@ -11,6 +12,7 @@ interface Worker {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const currentProject = useStore((state) => state.currentProject);
   const [onlineWorkers, setOnlineWorkers] = useState(0);
 
   useEffect(() => {
@@ -50,12 +52,21 @@ export default function DashboardPage() {
         <div className="grid grid-cols-4 gap-4">
           <div>
             <div className="text-xs text-text-tertiary mb-1">当前项目</div>
-            <button
-              onClick={() => navigate("/projects")}
-              className="text-sm font-medium text-brand-primary hover:text-brand-secondary transition-colors"
-            >
-              前往创建 →
-            </button>
+            {currentProject ? (
+              <button
+                onClick={() => navigate(`/projects/${currentProject.id}`)}
+                className="text-sm font-medium text-brand-primary hover:text-brand-secondary transition-colors"
+              >
+                {currentProject.name} →
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate("/projects")}
+                className="text-sm font-medium text-brand-primary hover:text-brand-secondary transition-colors"
+              >
+                前往创建 →
+              </button>
+            )}
           </div>
           <div>
             <div className="text-xs text-text-tertiary mb-1">在线 Worker</div>
