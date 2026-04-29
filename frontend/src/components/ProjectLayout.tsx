@@ -1,4 +1,4 @@
-import { useEffect, useState, createContext, useContext } from "react";
+import { useEffect, useState, useRef, createContext, useContext } from "react";
 import { useParams, Outlet, useNavigate } from "react-router-dom";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
@@ -15,6 +15,7 @@ export default function ProjectLayout() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentProjectId = useStore((s) => s.currentProjectId);
   const setCurrentProjectId = useStore((s) => s.setCurrentProjectId);
@@ -45,8 +46,11 @@ export default function ProjectLayout() {
         setLoading(false);
         setCurrentProject(null);
         toast("项目不存在或已被删除", "error");
-        setTimeout(() => navigate("/projects"), 2000);
+        timerRef.current = setTimeout(() => navigate("/projects"), 2000);
       });
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [projectId, currentProjectId, setCurrentProjectId, setCurrentProject, navigate, toast]);
 
   if (loading) {

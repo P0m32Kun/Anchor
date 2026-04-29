@@ -106,9 +106,8 @@ export default function DashboardPage() {
     const ctrl = new AbortController();
     fetchDashboardData(ctrl.signal);
     const interval = setInterval(() => {
-      if (!ctrl.signal.aborted) {
-        fetchDashboardData(ctrl.signal);
-      }
+      const pollCtrl = new AbortController();
+      fetchDashboardData(pollCtrl.signal);
     }, 10000);
     return () => {
       ctrl.abort();

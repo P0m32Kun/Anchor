@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/errors"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/util"
@@ -63,11 +64,45 @@ func (s *Server) handleBatchUpdateFindingStatus(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	if len(req.IDs) == 0 {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "ids required"))
+		return
+	}
+	if len(req.IDs) > 1000 {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "max 1000 ids"))
+		return
+	}
+	validStatuses := map[string]bool{
+		"pending_review": true,
+		"confirmed":      true,
+		"false_positive": true,
+		"accepted_risk":  true,
+		"resolved":       true,
+	}
+	if !validStatuses[req.Status] {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid status"))
+		return
+	}
+
+	tx, err := s.rawDB.Begin()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "begin tx: %v", err))
+		return
+	}
+	defer tx.Rollback()
+
+	txQueries := db.New(tx)
+	now := time.Now().UTC()
 	for _, id := range req.IDs {
-		if err := s.queries.UpdateFindingStatus(id, models.FindingStatus(req.Status), time.Now().UTC()); err != nil {
+		if err := txQueries.UpdateFindingStatus(id, models.FindingStatus(req.Status), now); err != nil {
 			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update finding %s: %v", id, err))
 			return
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "commit tx: %v", err))
+		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{

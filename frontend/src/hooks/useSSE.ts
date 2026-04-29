@@ -62,6 +62,10 @@ export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
     callbacksRef.current = { onMessage, onError, onConnect, onDisconnect };
   }, [onMessage, onError, onConnect, onDisconnect]);
 
+  // Use refs to break circular dependency between connect ↔ scheduleReconnect
+  const connectRef = useRef<(() => void) | undefined>(undefined);
+  const scheduleReconnectRef = useRef<(() => void) | undefined>(undefined);
+
   const clearTimers = useCallback(() => {
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
@@ -81,6 +85,19 @@ export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
     }
   }, [clearTimers]);
 
+  const scheduleReconnect = useCallback(() => {
+    if (reconnectTimerRef.current) return; // already scheduled
+
+    const delay = retryDelayRef.current;
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      connectRef.current?.();
+    }, delay);
+
+    // Exponential backoff
+    retryDelayRef.current = Math.min(retryDelayRef.current * 2, MAX_RETRY_DELAY);
+  }, []);
+
   const resetHeartbeat = useCallback(() => {
     if (heartbeatTimerRef.current) {
       clearTimeout(heartbeatTimerRef.current);
@@ -93,23 +110,10 @@ export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
       wasOpenRef.current = false;
       // Trigger reconnect if enabled
       if (enableReconnect && retryCountRef.current < maxRetries) {
-        scheduleReconnect();
+        scheduleReconnectRef.current?.();
       }
     }, heartbeatTimeout);
   }, [closeConnection, enableReconnect, maxRetries, heartbeatTimeout]);
-
-  const scheduleReconnect = useCallback(() => {
-    if (reconnectTimerRef.current) return; // already scheduled
-
-    const delay = retryDelayRef.current;
-    reconnectTimerRef.current = setTimeout(() => {
-      reconnectTimerRef.current = null;
-      connect();
-    }, delay);
-
-    // Exponential backoff
-    retryDelayRef.current = Math.min(retryDelayRef.current * 2, MAX_RETRY_DELAY);
-  }, []);
 
   const connect = useCallback(() => {
     if (esRef.current) return; // already connected or connecting
@@ -170,7 +174,7 @@ export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
         wasOpenRef.current = false;
 
         if (enableReconnect && !isManualCloseRef.current) {
-          scheduleReconnect();
+          scheduleReconnectRef.current?.();
         }
       };
     } catch (err) {
@@ -179,15 +183,11 @@ export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
         err instanceof Error ? err : new Error(String(err))
       );
     }
-  }, [
-    url,
-    projectId,
-    maxRetries,
-    enableReconnect,
-    closeConnection,
-    resetHeartbeat,
-    scheduleReconnect,
-  ]);
+  }, [url, projectId, maxRetries, enableReconnect, closeConnection, resetHeartbeat]);
+
+  // Bind refs to latest function instances (breaks circular dependency)
+  connectRef.current = connect;
+  scheduleReconnectRef.current = scheduleReconnect;
 
   const reconnect = useCallback(() => {
     isManualCloseRef.current = false;

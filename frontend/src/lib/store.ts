@@ -51,7 +51,7 @@ interface AppState {
   setWebEndpoints: (w: WebEndpoint[]) => void;
   setPorts: (assetId: string, p: Port[]) => void;
   setServices: (assetId: string, s: Service[]) => void;
-  setFindings: (f: Finding[]) => void;
+  setFindings: (f: Finding[] | ((prev: Finding[]) => Finding[])) => void;
   setFindingsLoading: (loading: boolean) => void;
   setFindingsError: (error: string | null) => void;
   setCurrentFinding: (f: { finding: Finding; evidence: Evidence[] } | null) => void;
@@ -145,7 +145,13 @@ export const useStore = create<AppState>()(
       setServices: (assetId, services) =>
         set((state) => ({ services: { ...state.services, [assetId]: services } })),
 
-      setFindings: (findings) => set({ findings }),
+      setFindings: (findings) =>
+        set((state) => ({
+          findings:
+            typeof findings === "function"
+              ? findings(state.findings)
+              : findings,
+        })),
       setFindingsLoading: (findingsLoading) => set({ findingsLoading }),
       setFindingsError: (findingsError) => set({ findingsError }),
       setCurrentFinding: (currentFinding) => set({ currentFinding }),

@@ -31,7 +31,10 @@ export function resetConsecutiveErrors() {
   consecutiveErrors = 0;
 }
 
-async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number }): Promise<T> {
+async function request(
+  path: string,
+  opts?: RequestInit & { timeout?: number }
+): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), opts?.timeout ?? 30000);
 
@@ -42,7 +45,6 @@ async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
-      headers: { "Content-Type": "application/json" },
       ...opts,
       signal: controller.signal,
     });
@@ -60,17 +62,7 @@ async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number
     }
 
     resetConsecutiveErrors();
-
-    if (res.status === 204) {
-      return null as T;
-    }
-
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      throw new APIError("服务器返回了非 JSON 响应", "NON_JSON_RESPONSE");
-    }
-
-    return res.json();
+    return res;
   } catch (err: any) {
     let apiErr: APIError;
 
@@ -100,54 +92,30 @@ async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number
   }
 }
 
+async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number }): Promise<T> {
+  const isFormData = opts?.body instanceof FormData;
+  const headers: Record<string, string> = isFormData ? {} : { "Content-Type": "application/json" };
+  if (opts?.headers) {
+    Object.assign(headers, opts.headers as Record<string, string>);
+  }
+
+  const res = await request(path, { ...opts, headers, timeout: opts?.timeout ?? 30000 });
+
+  if (res.status === 204) {
+    return null as T;
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new APIError("服务器返回了非 JSON 响应", "NON_JSON_RESPONSE");
+  }
+
+  return res.json();
+}
+
 export async function fetchBlob(path: string, opts?: RequestInit & { timeout?: number }): Promise<Blob> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), opts?.timeout ?? 60000);
-
-  if (opts?.signal) {
-    opts.signal.addEventListener("abort", () => controller.abort(), { once: true });
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      ...opts,
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      let message: string;
-      try {
-        const data = await res.json();
-        message = data?.error?.message || `${res.status}: ${res.statusText}`;
-      } catch {
-        message = `${res.status}: ${res.statusText}`;
-      }
-      const code = res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx";
-      throw new APIError(message, code);
-    }
-
-    return res.blob();
-  } catch (err: any) {
-    let apiErr: APIError;
-
-    if (err instanceof APIError) {
-      apiErr = err;
-    } else if (err instanceof DOMException && err.name === "AbortError") {
-      apiErr = new APIError("请求超时，请检查网络", "TIMEOUT");
-    } else if (err instanceof TypeError) {
-      apiErr = new APIError("网络连接失败，请检查后端服务是否运行", "NETWORK_ERROR");
-    } else {
-      apiErr = new APIError(err?.message || "请求失败", "UNKNOWN");
-    }
-
-    if (globalErrorHandler) {
-      globalErrorHandler(apiErr);
-    }
-
-    throw apiErr;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  const res = await request(path, { ...opts, timeout: opts?.timeout ?? 60000 });
+  return res.blob();
 }
 
 export interface Project {
@@ -333,26 +301,14 @@ export const api = {
   dryRun: (projectId: string, signal?: AbortSignal) =>
     fetchAPI<DryRunResult>(`/scan-plans/dry-run?project_id=${projectId}`, { method: "POST", signal }),
 
-  importTargets: async (projectId: string, file: File, signal?: AbortSignal): Promise<ImportResult> => {
+  importTargets: (projectId: string, file: File, signal?: AbortSignal) => {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch(`${API_BASE}/projects/${projectId}/targets/import`, {
+    return fetchAPI<ImportResult>(`/projects/${projectId}/targets/import`, {
       method: "POST",
       body: formData,
       signal,
     });
-    if (!res.ok) {
-      let message: string;
-      try {
-        const data = await res.json();
-        message = data?.error?.message || `${res.status}: ${res.statusText}`;
-      } catch {
-        message = `${res.status}: ${res.statusText}`;
-      }
-      const code = res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx";
-      throw new APIError(message, code);
-    }
-    return res.json();
   },
 
   runTask: (data: { project_id: string; plan_id?: string; tool: string; target_id: string; command: string }, signal?: AbortSignal) =>

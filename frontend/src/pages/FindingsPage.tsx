@@ -66,9 +66,13 @@ export default function FindingsPage() {
   }, [projectId, setFindings, setFindingsLoading, setFindingsError]);
 
   const openDetail = async (findingId: string) => {
-    const data = await api.getFinding(findingId);
-    setCurrentFinding(data);
-    setDetailOpen(true);
+    try {
+      const data = await api.getFinding(findingId);
+      setCurrentFinding(data);
+      setDetailOpen(true);
+    } catch (err) {
+      toast("加载详情失败: " + (err instanceof Error ? err.message : String(err)), "error");
+    }
   };
 
   const closeDetail = () => {
@@ -79,19 +83,13 @@ export default function FindingsPage() {
   const changeStatus = async (findingId: string, status: string) => {
     try {
       await api.updateFindingStatus(findingId, status);
+      setFindings((prev) =>
+        prev.map((f) => (f.id === findingId ? { ...f, status } : f))
+      );
       recordStatusChange(findingId, status);
       toast("状态已更新", "success");
-      if (projectId) {
-        const updated = await api.listFindings(projectId, undefined);
-        setFindings(updated ?? []);
-      }
-      if (currentFinding) {
-        const data = await api.getFinding(findingId);
-        setCurrentFinding(data);
-      }
     } catch (err) {
-      toast("状态更新失败: " + (err instanceof Error ? err.message : String(err)), "error");
-      throw err;
+      toast("更新失败: " + String(err), "error");
     }
   };
 

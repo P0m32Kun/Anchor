@@ -216,8 +216,9 @@ func CORSMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Max-Age", "86400")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -239,6 +240,16 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	// Validate name.
+	if strings.TrimSpace(req.Name) == "" {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "name is required"))
+		return
+	}
+	if len(req.Name) > 200 {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "name too long (max 200)"))
 		return
 	}
 
@@ -930,6 +941,8 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 
 // --- SSE ---
 
+const maxSSEClientsPerProject = 100
+
 func (s *Server) handleProjectSSE(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
 	if projectID == "" {
@@ -945,6 +958,11 @@ func (s *Server) handleProjectSSE(w http.ResponseWriter, r *http.Request) {
 	ch := make(chan []byte, 10)
 
 	s.mu.Lock()
+	if len(s.sseClients[projectID]) >= maxSSEClientsPerProject {
+		s.mu.Unlock()
+		writeError(w, http.StatusServiceUnavailable, errors.New(errors.ErrInternal, "too many SSE connections"))
+		return
+	}
 	if s.sseClients[projectID] == nil {
 		s.sseClients[projectID] = make(map[string]chan []byte)
 	}

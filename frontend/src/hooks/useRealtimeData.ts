@@ -51,6 +51,7 @@ export function useRealtimeData<T>(
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [sseFailed, setSseFailed] = useState(false);
+  const [pollingEnabled, setPollingEnabled] = useState(false);
 
   const onDataRef = useRef(onData);
   useEffect(() => {
@@ -104,8 +105,14 @@ export function useRealtimeData<T>(
     },
   });
 
-  // Polling is enabled only when SSE has definitively failed
-  const pollingEnabled = sseFailed && status === "error";
+  // Delay polling startup by 3s when SSE fails to avoid jitter
+  useEffect(() => {
+    if (sseFailed && status === "error") {
+      const timer = setTimeout(() => setPollingEnabled(true), 3000);
+      return () => clearTimeout(timer);
+    }
+    setPollingEnabled(false);
+  }, [sseFailed, status]);
 
   const pollingResult = usePolling<T>(pollFn, {
     interval: pollInterval,
