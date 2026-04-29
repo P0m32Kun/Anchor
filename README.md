@@ -83,30 +83,21 @@ tauri build   # 构建 Tauri 桌面应用
 
 ## Worker 架构
 
-Anchor 支持两种 Worker 部署模式，均使用**同一个二进制**：
-
-### 本地 Worker（开发/单主机）
+Worker 完全容器化，通过 Docker Compose 编排：
 
 ```
-[桌面端 Tauri] --HTTP--> [Server :17421] --spawn--> [本地 Worker 进程]
-                                               ↑___________↓
-                                                localhost 回连
+[客户端] --HTTP--> [Server :17421] <--HTTP 长轮询-- [Worker 容器]
 ```
 
-Server 通过 `exec.Command` 启动本地 Worker 子进程，Worker 通过 `--core-url http://localhost:17421` 回连。
+- **Server**：纯管理面，负责 API、任务调度、数据持久化
+- **Worker**：主动注册到 Server，通过长轮询拉取任务，执行安全工具（subfinder/httpx/naabu/nuclei）
 
-### 远程 Worker（生产/分布式）
-
-```
-[桌面端/Web] --HTTP--> [Server :17421] <--HTTP 长轮询-- [远程 Worker（VPS/笔记本）]
-```
-
-远程 Worker 主动注册到 Server，通过长轮询拉取任务。Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
+Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 
 **典型场景：**
 - 公网 VPS 部署 Server，家庭 WiFi 笔记本运行 Worker
-- 内网渗透测试笔记本同时运行 Server + Worker
 - 多云 Worker 统一接入中心 Server
+- 单机开发：`make up-all` 一键启动完整环境
 
 ## 目录结构
 
@@ -119,7 +110,6 @@ Server 通过 `exec.Command` 启动本地 Worker 子进程，Worker 通过 `--co
 ├── Dockerfile.server           # Server 镜像（纯管理面）
 ├── Dockerfile.worker           # Worker 镜像（含安全工具）
 ├── 设计.md                      # PRD（产品需求文档）
-├── 第二阶段设计.md               # v0.2 设计文档
 ├── plan.md                     # 开发执行计划与进度
 ├── README.md                   # 本文件
 ├── docs/                       # 技术文档
