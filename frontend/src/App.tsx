@@ -33,7 +33,7 @@
 
 import { Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
-import { ToastProvider, Navbar, useToast } from "./components";
+import { ToastProvider, Navbar, useToast, ErrorBoundary } from "./components";
 import { setGlobalErrorHandler } from "./lib/api";
 import ProjectLayout from "./components/ProjectLayout";
 import DashboardPage from "./pages/DashboardPage";
@@ -62,31 +62,33 @@ function AppContent() {
     <div className="min-h-screen flex flex-col bg-surface text-text-primary">
       <Navbar />
       <main className="flex-1 px-6 py-6 max-w-7xl mx-auto w-full">
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/targets" element={<TargetPage />} />
-          <Route path="/assets" element={<AssetPage />} />
-          <Route path="/runs" element={<RunsPage />} />
-          <Route path="/findings" element={<FindingsPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/workers" element={<WorkersPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/projects" element={<ProjectPage />} />
-          <Route path="/projects/:projectId" element={<ProjectLayout />}>
-            <Route path="targets" element={<TargetPage />} />
-            <Route path="assets" element={<AssetPage />} />
-            <Route path="runs" element={<RunsPage />} />
-            <Route path="findings" element={<FindingsPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-          </Route>
-          {/* Legacy routes for backward compat — Sprint 1.11 will remove */}
-          <Route path="/projects/:id" element={<ProjectPage />} />
-          <Route path="/projects/:id/assets" element={<AssetPage />} />
-          <Route path="/projects/:id/targets" element={<TargetPage />} />
-          <Route path="/projects/:id/runs" element={<RunsPage />} />
-          <Route path="/projects/:id/findings" element={<FindingsPage />} />
-          <Route path="/projects/:id/reports" element={<ReportsPage />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/targets" element={<TargetPage />} />
+            <Route path="/assets" element={<AssetPage />} />
+            <Route path="/runs" element={<RunsPage />} />
+            <Route path="/findings" element={<FindingsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/workers" element={<WorkersPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/projects" element={<ProjectPage />} />
+            <Route path="/projects/:projectId" element={<ProjectLayout />}>
+              <Route path="targets" element={<TargetPage />} />
+              <Route path="assets" element={<AssetPage />} />
+              <Route path="runs" element={<RunsPage />} />
+              <Route path="findings" element={<FindingsPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+            </Route>
+            {/* Legacy routes for backward compat — Sprint 1.11 will remove */}
+            <Route path="/projects/:id" element={<ProjectPage />} />
+            <Route path="/projects/:id/assets" element={<AssetPage />} />
+            <Route path="/projects/:id/targets" element={<TargetPage />} />
+            <Route path="/projects/:id/runs" element={<RunsPage />} />
+            <Route path="/projects/:id/findings" element={<FindingsPage />} />
+            <Route path="/projects/:id/reports" element={<ReportsPage />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
     </div>
   );
