@@ -31,6 +31,17 @@ export function resetConsecutiveErrors() {
   consecutiveErrors = 0;
 }
 
+function classifyError(err: unknown): APIError {
+  if (err instanceof APIError) return err;
+  if (err instanceof DOMException && err.name === "AbortError") {
+    return new APIError("请求超时，请检查网络", "TIMEOUT");
+  }
+  if (err instanceof TypeError) {
+    return new APIError("网络连接失败，请检查后端服务是否运行", "NETWORK_ERROR");
+  }
+  return new APIError((err as any)?.message || "请求失败", "UNKNOWN");
+}
+
 async function request(
   path: string,
   opts?: RequestInit & { timeout?: number }
@@ -38,7 +49,6 @@ async function request(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), opts?.timeout ?? 30000);
 
-  // Merge external signal if provided
   if (opts?.signal) {
     opts.signal.addEventListener("abort", () => controller.abort(), { once: true });
   }
@@ -57,29 +67,15 @@ async function request(
       } catch {
         message = `${res.status}: ${res.statusText}`;
       }
-      const code = res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx";
-      throw new APIError(message, code);
+      throw new APIError(message, res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx");
     }
 
     resetConsecutiveErrors();
     return res;
-  } catch (err: any) {
-    let apiErr: APIError;
+  } catch (err) {
+    const apiErr = classifyError(err);
 
-    if (err instanceof APIError) {
-      apiErr = err;
-    } else if (err instanceof DOMException && err.name === "AbortError") {
-      apiErr = new APIError("请求超时，请检查网络", "TIMEOUT");
-    } else if (err instanceof TypeError) {
-      apiErr = new APIError("网络连接失败，请检查后端服务是否运行", "NETWORK_ERROR");
-    } else {
-      apiErr = new APIError(err?.message || "请求失败", "UNKNOWN");
-    }
-
-    // Notify global handler (e.g., Toast) without swallowing the error
-    if (globalErrorHandler) {
-      globalErrorHandler(apiErr);
-    }
+    if (globalErrorHandler) globalErrorHandler(apiErr);
 
     consecutiveErrors++;
     if (consecutiveErrors >= 3 && consecutiveErrorCallback) {
@@ -94,16 +90,14 @@ async function request(
 
 async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number }): Promise<T> {
   const isFormData = opts?.body instanceof FormData;
-  const headers: Record<string, string> = isFormData ? {} : { "Content-Type": "application/json" };
-  if (opts?.headers) {
-    Object.assign(headers, opts.headers as Record<string, string>);
-  }
+  const headers: Record<string, string> = {
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    ...(opts?.headers as Record<string, string>),
+  };
 
-  const res = await request(path, { ...opts, headers, timeout: opts?.timeout ?? 30000 });
+  const res = await request(path, { ...opts, headers });
 
-  if (res.status === 204) {
-    return null as T;
-  }
+  if (res.status === 204) return null as T;
 
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
@@ -347,9 +341,6 @@ export const api = {
 
   getFinding: (id: string, signal?: AbortSignal) =>
     fetchAPI<{ finding: Finding; evidence: Evidence[] }>(`/findings/${id}`, { signal }),
-
-  patchFindingStatus: (id: string, status: string, signal?: AbortSignal) =>
-    fetchAPI<{ status: string }>(`/findings/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }), signal }),
 
   updateFindingStatus: (id: string, status: string, signal?: AbortSignal) =>
     fetchAPI<{ status: string }>(`/findings/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }), signal }),

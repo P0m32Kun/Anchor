@@ -49,8 +49,10 @@ export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
   const [retryCount, setRetryCount] = useState(0);
 
   const esRef = useRef<EventSource | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const heartbeatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timersRef = useRef({
+    reconnect: null as ReturnType<typeof setTimeout> | null,
+    heartbeat: null as ReturnType<typeof setTimeout> | null,
+  });
   const retryDelayRef = useRef(INITIAL_RETRY_DELAY);
   const retryCountRef = useRef(0);
   const isManualCloseRef = useRef(false);
@@ -67,14 +69,10 @@ export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
   const scheduleReconnectRef = useRef<(() => void) | undefined>(undefined);
 
   const clearTimers = useCallback(() => {
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
-    if (heartbeatTimerRef.current) {
-      clearTimeout(heartbeatTimerRef.current);
-      heartbeatTimerRef.current = null;
-    }
+    Object.values(timersRef.current).forEach((id) => {
+      if (id) clearTimeout(id);
+    });
+    timersRef.current = { reconnect: null, heartbeat: null };
   }, []);
 
   const closeConnection = useCallback(() => {
@@ -86,29 +84,24 @@ export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
   }, [clearTimers]);
 
   const scheduleReconnect = useCallback(() => {
-    if (reconnectTimerRef.current) return; // already scheduled
+    if (timersRef.current.reconnect) return;
 
-    const delay = retryDelayRef.current;
-    reconnectTimerRef.current = setTimeout(() => {
-      reconnectTimerRef.current = null;
+    timersRef.current.reconnect = setTimeout(() => {
+      timersRef.current.reconnect = null;
       connectRef.current?.();
-    }, delay);
+    }, retryDelayRef.current);
 
-    // Exponential backoff
     retryDelayRef.current = Math.min(retryDelayRef.current * 2, MAX_RETRY_DELAY);
   }, []);
 
   const resetHeartbeat = useCallback(() => {
-    if (heartbeatTimerRef.current) {
-      clearTimeout(heartbeatTimerRef.current);
-    }
-    heartbeatTimerRef.current = setTimeout(() => {
-      // No message received within heartbeatTimeout — treat as dead
+    if (timersRef.current.heartbeat) clearTimeout(timersRef.current.heartbeat);
+
+    timersRef.current.heartbeat = setTimeout(() => {
       closeConnection();
       setStatus("closed");
       callbacksRef.current.onDisconnect?.();
       wasOpenRef.current = false;
-      // Trigger reconnect if enabled
       if (enableReconnect && retryCountRef.current < maxRetries) {
         scheduleReconnectRef.current?.();
       }

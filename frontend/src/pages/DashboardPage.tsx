@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { API_BASE, api } from "../lib/api";
 import { useStore } from "../lib/store";
 import { EmptyState, StatusBadge, SeverityBadge } from "../components";
@@ -38,6 +38,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const fetchDashboardData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
@@ -47,43 +49,27 @@ export default function DashboardPage() {
       const validProjects = projectsList ?? [];
       setProjects(validProjects);
 
-      // Fetch workers independently — don't block dashboard on worker failure
       fetch(`${API_BASE}/workers`, { signal })
         .then((res) => (res.ok ? res.json() : []))
-        .then((workers: Worker[]) => {
-          const count = workers.filter(
-            (w) => w.status === "online" || w.status === "busy"
-          ).length;
-          setOnlineWorkers(count);
-        })
+        .then((workers: Worker[]) =>
+          setOnlineWorkers(workers.filter((w) => w.status === "online" || w.status === "busy").length)
+        )
         .catch(() => setOnlineWorkers(0));
 
       if (validProjects.length > 0) {
-        const runsPromises = validProjects.map((p) =>
-          api.listRuns(p.id, signal).catch(() => [] as Run[])
-        );
-        const findingsPromises = validProjects.map((p) =>
-          api
-            .listFindings(p.id, "pending_review", signal)
-            .catch(() => [] as Finding[])
-        );
-
         const [runsResults, findingsResults] = await Promise.all([
-          Promise.all(runsPromises),
-          Promise.all(findingsPromises),
+          Promise.all(validProjects.map((p) => api.listRuns(p.id, signal).catch(() => [] as Run[]))),
+          Promise.all(validProjects.map((p) => api.listFindings(p.id, "pending_review", signal).catch(() => [] as Finding[]))),
         ]);
 
-        const allRuns = runsResults.flat();
-        allRuns.sort((a, b) => {
+        const allRuns = runsResults.flat().sort((a, b) => {
           const aTime = a.started_at || a.created_at;
           const bTime = b.started_at || b.created_at;
           return new Date(bTime).getTime() - new Date(aTime).getTime();
         });
 
-        const allFindings = findingsResults.flat();
-        allFindings.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        const allFindings = findingsResults.flat().sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
         setRuns(allRuns);
@@ -94,8 +80,7 @@ export default function DashboardPage() {
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      const message = err instanceof Error ? err.message : "加载数据失败";
-      setError(message);
+      setError(err instanceof Error ? err.message : "加载数据失败");
       console.error(err);
     } finally {
       setLoading(false);
@@ -103,14 +88,17 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const ctrl = new AbortController();
-    fetchDashboardData(ctrl.signal);
+    abortRef.current = new AbortController();
+    fetchDashboardData(abortRef.current.signal);
+
     const interval = setInterval(() => {
-      const pollCtrl = new AbortController();
-      fetchDashboardData(pollCtrl.signal);
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+      fetchDashboardData(abortRef.current.signal);
     }, 10000);
+
     return () => {
-      ctrl.abort();
+      abortRef.current?.abort();
       clearInterval(interval);
     };
   }, [fetchDashboardData]);

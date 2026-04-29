@@ -81,14 +81,24 @@ export default function FindingsPage() {
   };
 
   const changeStatus = async (findingId: string, status: string) => {
+    const previousStatus = findings.find((f) => f.id === findingId)?.status;
+
+    // Optimistic update
+    setFindings((prev) =>
+      prev.map((f) => (f.id === findingId ? { ...f, status } : f))
+    );
+    recordStatusChange(findingId, status);
+
     try {
       await api.updateFindingStatus(findingId, status);
-      setFindings((prev) =>
-        prev.map((f) => (f.id === findingId ? { ...f, status } : f))
-      );
-      recordStatusChange(findingId, status);
       toast("状态已更新", "success");
     } catch (err) {
+      // Rollback on failure
+      if (previousStatus !== undefined) {
+        setFindings((prev) =>
+          prev.map((f) => (f.id === findingId ? { ...f, status: previousStatus } : f))
+        );
+      }
       toast("更新失败: " + String(err), "error");
     }
   };
@@ -96,8 +106,7 @@ export default function FindingsPage() {
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next[next.has(id) ? "delete" : "add"](id);
       return next;
     });
   };
@@ -369,15 +378,21 @@ function FindingDetail({
 }) {
   const [note, setNote] = useState("");
   const [adding, setAdding] = useState(false);
+  const toast = useToast();
 
   const addNote = async () => {
     if (!note.trim()) return;
     setAdding(true);
-    await api.addEvidence(finding.id, { type: "note", excerpt: note.trim() });
-    setNote("");
-    setAdding(false);
-    const data = await api.getFinding(finding.id);
-    useStore.getState().setCurrentFinding(data);
+    try {
+      await api.addEvidence(finding.id, { type: "note", excerpt: note.trim() });
+      setNote("");
+      const data = await api.getFinding(finding.id);
+      useStore.getState().setCurrentFinding(data);
+    } catch (err) {
+      toast("保存备注失败: " + String(err), "error");
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
