@@ -38,6 +38,7 @@ export default function ProjectPage() {
         rate_limit: rateLimit,
       });
       setProjects([p, ...projects]);
+      setCurrentProject(p);
       setName("");
       setOrg("");
       setPurpose("");

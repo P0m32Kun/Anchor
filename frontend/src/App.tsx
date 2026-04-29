@@ -15,6 +15,8 @@
  * | /settings                | SettingsPage   | App configuration                | Yes         |
  * | /projects/:id            | ProjectPage    | Legacy project detail (params    | No          |
  * | /projects/:id/assets     | AssetPage      | not fully handled)               | No          |
+ * | /projects/:id/targets    | TargetPage     |                                  | No          |
+ * | /projects/:id/runs       | RunsPage       |                                  | No          |
  * | /projects/:id/findings   | FindingsPage   |                                  | No          |
  * | /projects/:id/reports    | ReportsPage    |                                  | No          |
  *
@@ -54,6 +56,8 @@ function App() {
             {/* Legacy routes for backward compat */}
             <Route path="/projects/:id" element={<ProjectPage />} />
             <Route path="/projects/:id/assets" element={<AssetPage />} />
+            <Route path="/projects/:id/targets" element={<TargetPage />} />
+            <Route path="/projects/:id/runs" element={<RunsPage />} />
             <Route path="/projects/:id/findings" element={<FindingsPage />} />
             <Route path="/projects/:id/reports" element={<ReportsPage />} />
           </Routes>

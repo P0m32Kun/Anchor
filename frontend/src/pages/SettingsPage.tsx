@@ -2,8 +2,14 @@ import { useState, useEffect } from "react";
 import { getApiBase, setApiBase, resetApiBase } from "../lib/config";
 
 export default function SettingsPage() {
-  const [apiBase, setApiBaseState] = useState(getApiBase());
+  const rawBase = getApiBase();
+  const [apiBase, setApiBaseState] = useState(rawBase);
   const [saved, setSaved] = useState(false);
+
+  const isDefaultRelative = rawBase === "/api" || rawBase === "";
+  const placeholderText = isDefaultRelative
+    ? "http://localhost:17421 (auto)"
+    : rawBase || "http://localhost:17421";
   const [portRangePreset, setPortRangePreset] = useState<"top100" | "top1000" | "common" | "custom">("top100");
   const [customPortRange, setCustomPortRange] = useState("");
   const isTauri = !!(window as any).__TAURI__;
@@ -51,7 +57,7 @@ export default function SettingsPage() {
               type="text"
               value={apiBase}
               onChange={(e) => setApiBaseState(e.target.value)}
-              placeholder="http://localhost:17421"
+              placeholder={placeholderText}
               className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary/50"
             />
             <button
@@ -67,6 +73,11 @@ export default function SettingsPage() {
               重置
             </button>
           </div>
+          {isDefaultRelative && (
+            <div className="text-xs text-text-tertiary mt-1.5">
+              当前实际 API Base：{rawBase}（Vite proxy 自动转发到 http://localhost:17421）
+            </div>
+          )}
         </div>
 
         <div className="border-t border-white/[0.06] pt-4">
