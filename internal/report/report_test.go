@@ -160,6 +160,13 @@ func TestGenerateMarkdown_NoFindings(t *testing.T) {
 	if !strings.Contains(md, "No vulnerabilities confirmed") {
 		t.Error("expected 'No vulnerabilities confirmed' message when there are no findings")
 	}
+
+	// Severity table should still be present with all-zero counts.
+	for _, sev := range []string{"critical", "high", "medium", "low", "info"} {
+		if !strings.Contains(md, "| "+sev+" | 0 |") {
+			t.Errorf("expected severity table row for %s with count 0", sev)
+		}
+	}
 }
 
 func TestGenerateMarkdown_NoToolInvocations(t *testing.T) {

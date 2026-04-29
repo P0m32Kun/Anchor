@@ -31,10 +31,10 @@
  * removing or properly implementing them.
  */
 
-import { Routes, Route, useLocation, Navigate } from "react-router-dom";
-import { useEffect } from "react";
-import { ToastProvider, Navbar, useToast, ErrorBoundary } from "./components";
-import { setGlobalErrorHandler } from "./lib/api";
+import { Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { ToastProvider, Navbar, useToast, ErrorBoundary, Button } from "./components";
+import { setGlobalErrorHandler, setConsecutiveErrorCallback, api } from "./lib/api";
 import { useStore } from "./lib/store";
 import ProjectLayout from "./components/ProjectLayout";
 import DashboardPage from "./pages/DashboardPage";
@@ -69,6 +69,39 @@ function LegacyRouteGuard() {
   return redirectTo ? <Navigate to={redirectTo} replace /> : <Navigate to="/projects" replace />;
 }
 
+function AppHealthCheck({ children }: { children: React.ReactNode }) {
+  const [healthy, setHealthy] = useState<boolean | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    api.healthCheck().then(() => setHealthy(true)).catch(() => setHealthy(false));
+  }, []);
+
+  if (healthy === null) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-surface text-text-primary">
+        <div className="text-center">
+          <div className="animate-pulse text-2xl mb-4">🔄</div>
+          <p className="text-text-secondary">检查服务状态中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!healthy) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-surface text-text-primary">
+        <div className="text-4xl mb-4">🔌</div>
+        <h1 className="text-xl font-semibold mb-2">后端服务未启动</h1>
+        <p className="text-text-secondary mb-6">请确认 Anchor 服务正在运行</p>
+        <Button onClick={() => navigate(0)}>重试</Button>
+      </div>
+    );
+  }
+
+  return children;
+}
+
 function AppContent() {
   const toast = useToast();
 
@@ -85,6 +118,13 @@ function AppContent() {
     return () => {
       setGlobalErrorHandler(() => {});
     };
+  }, [toast]);
+
+  useEffect(() => {
+    setConsecutiveErrorCallback(() => {
+      toast("后端服务异常，请检查服务状态", "error");
+    });
+    return () => setConsecutiveErrorCallback(() => {});
   }, [toast]);
 
   return (
@@ -126,7 +166,9 @@ function AppContent() {
 function App() {
   return (
     <ToastProvider>
-      <AppContent />
+      <AppHealthCheck>
+        <AppContent />
+      </AppHealthCheck>
     </ToastProvider>
   );
 }

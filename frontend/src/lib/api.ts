@@ -20,6 +20,17 @@ export function clearGlobalErrorHandler() {
   globalErrorHandler = null;
 }
 
+let consecutiveErrors = 0;
+let consecutiveErrorCallback: (() => void) | null = null;
+
+export function setConsecutiveErrorCallback(cb: () => void) {
+  consecutiveErrorCallback = cb;
+}
+
+export function resetConsecutiveErrors() {
+  consecutiveErrors = 0;
+}
+
 async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number }): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), opts?.timeout ?? 30000);
@@ -48,6 +59,8 @@ async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number
       throw new APIError(message, code);
     }
 
+    resetConsecutiveErrors();
+
     if (res.status === 204) {
       return null as T;
     }
@@ -74,6 +87,11 @@ async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number
     // Notify global handler (e.g., Toast) without swallowing the error
     if (globalErrorHandler) {
       globalErrorHandler(apiErr);
+    }
+
+    consecutiveErrors++;
+    if (consecutiveErrors >= 3 && consecutiveErrorCallback) {
+      consecutiveErrorCallback();
     }
 
     throw apiErr;

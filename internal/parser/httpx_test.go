@@ -76,3 +76,21 @@ func TestParseHTTPXTechnologies(t *testing.T) {
 		t.Errorf("expected 0 errors, got %d", len(errs))
 	}
 }
+
+func TestParseHTTPXTechnologiesFallback(t *testing.T) {
+	input := `{"url":"http://example.com","technologies":["Vue","Nginx"],"status-code":200}`
+	results, errs := ParseHTTPX(strings.NewReader(input))
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	res := results[0]
+	if len(res.Tech) != 2 || res.Tech[0] != "Vue" || res.Tech[1] != "Nginx" {
+		t.Errorf("expected tech [Vue Nginx], got %v", res.Tech)
+	}
+	if res.StatusCode != 200 {
+		t.Errorf("expected status 200, got %d", res.StatusCode)
+	}
+}

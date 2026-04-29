@@ -216,6 +216,78 @@ func TestMatchIP(t *testing.T) {
 			rule:     &models.ScopeRule{Type: models.TargetTypeDomain, Value: "example.com"},
 			expected: false,
 		},
+		{
+			name:     "IPv6 exact match",
+			ip:       "2001:db8::1",
+			rule:     &models.ScopeRule{Type: models.TargetTypeIP, Value: "2001:db8::1"},
+			expected: true,
+		},
+		{
+			name:     "IPv6 no match",
+			ip:       "2001:db8::1",
+			rule:     &models.ScopeRule{Type: models.TargetTypeIP, Value: "2001:db8::2"},
+			expected: false,
+		},
+		{
+			name:     "IPv6 in CIDR",
+			ip:       "2001:db8::1",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "2001:db8::/32"},
+			expected: true,
+		},
+		{
+			name:     "IPv6 not in CIDR",
+			ip:       "2001:db9::1",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "2001:db8::/32"},
+			expected: false,
+		},
+		{
+			name:     "invalid IP against CIDR",
+			ip:       "not-an-ip",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "192.168.1.0/24"},
+			expected: false,
+		},
+		{
+			name:     "invalid IP against IP rule",
+			ip:       "not-an-ip",
+			rule:     &models.ScopeRule{Type: models.TargetTypeIP, Value: "192.168.1.1"},
+			expected: false,
+		},
+		{
+			name:     "empty IP",
+			ip:       "",
+			rule:     &models.ScopeRule{Type: models.TargetTypeIP, Value: "192.168.1.1"},
+			expected: false,
+		},
+		{
+			name:     "CIDR target against IP rule matching",
+			ip:       "192.168.1.1/32",
+			rule:     &models.ScopeRule{Type: models.TargetTypeIP, Value: "192.168.1.1"},
+			expected: true,
+		},
+		{
+			name:     "CIDR target against IP rule not matching",
+			ip:       "192.168.1.2/32",
+			rule:     &models.ScopeRule{Type: models.TargetTypeIP, Value: "192.168.1.1"},
+			expected: false,
+		},
+		{
+			name:     "CIDR target against CIDR rule matching",
+			ip:       "192.168.1.0/24",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "192.168.1.0/24"},
+			expected: true,
+		},
+		{
+			name:     "CIDR target against CIDR rule not matching",
+			ip:       "192.168.2.0/24",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "192.168.1.0/24"},
+			expected: false,
+		},
+		{
+			name:     "invalid CIDR target",
+			ip:       "invalid/24",
+			rule:     &models.ScopeRule{Type: models.TargetTypeCIDR, Value: "192.168.1.0/24"},
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {
