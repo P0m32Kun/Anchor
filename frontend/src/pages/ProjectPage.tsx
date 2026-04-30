@@ -174,7 +174,7 @@ export default function ProjectPage() {
                 <div
                   onClick={() => {
                     setCurrentProject(p);
-                    navigate("/");
+                    navigate(`/projects/${p.id}`);
                   }}
                   className="cursor-pointer"
                 >

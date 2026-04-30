@@ -62,15 +62,22 @@ export default function DashboardPage() {
           Promise.all(validProjects.map((p) => api.listFindings(p.id, "pending_review", signal).catch(() => [] as Finding[]))),
         ]);
 
-        const allRuns = runsResults.flat().sort((a, b) => {
-          const aTime = a.started_at || a.created_at;
-          const bTime = b.started_at || b.created_at;
-          return new Date(bTime).getTime() - new Date(aTime).getTime();
-        });
+        // Filter out null values and flatten
+        const allRuns = runsResults
+          .flat()
+          .filter((r): r is Run => r != null)
+          .sort((a, b) => {
+            const aTime = a.started_at || a.created_at;
+            const bTime = b.started_at || b.created_at;
+            return new Date(bTime).getTime() - new Date(aTime).getTime();
+          });
 
-        const allFindings = findingsResults.flat().sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
+        const allFindings = findingsResults
+          .flat()
+          .filter((f): f is Finding => f != null)
+          .sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
 
         setRuns(allRuns);
         setPendingFindings(allFindings);

@@ -45,7 +45,7 @@ func (q *Queries) ListProjects() ([]*models.Project, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Project
+	list := make([]*models.Project, 0)
 	for rows.Next() {
 		p := &models.Project{}
 		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt); err != nil {
@@ -108,7 +108,7 @@ func (q *Queries) ListTargetsByProject(projectID string) ([]*models.Target, erro
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Target
+	list := make([]*models.Target, 0)
 	for rows.Next() {
 		t := &models.Target{}
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.Type, &t.Value, &t.Source, &t.Status, &t.CreatedAt); err != nil {
@@ -139,7 +139,7 @@ func (q *Queries) ListIPDiscoveryResultsByProject(projectID string) ([]*models.I
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.IPDiscoveryResult
+	list := make([]*models.IPDiscoveryResult, 0)
 	for rows.Next() {
 		r := &models.IPDiscoveryResult{}
 		if err := rows.Scan(&r.ID, &r.ProjectID, &r.TargetID, &r.IP, &r.Hostname, &r.Source, &r.Alive, &r.CreatedAt); err != nil {
@@ -160,7 +160,7 @@ func (q *Queries) ListIPDiscoveryResultsByTarget(targetID string) ([]*models.IPD
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.IPDiscoveryResult
+	list := make([]*models.IPDiscoveryResult, 0)
 	for rows.Next() {
 		r := &models.IPDiscoveryResult{}
 		if err := rows.Scan(&r.ID, &r.ProjectID, &r.TargetID, &r.IP, &r.Hostname, &r.Source, &r.Alive, &r.CreatedAt); err != nil {
@@ -185,7 +185,7 @@ func (q *Queries) ListScopeRulesByProject(projectID string) ([]*models.ScopeRule
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.ScopeRule
+	list := make([]*models.ScopeRule, 0)
 	for rows.Next() {
 		r := &models.ScopeRule{}
 		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Action, &r.Type, &r.Value, &r.Reason, &r.CreatedAt, &r.UpdatedAt); err != nil {
@@ -289,7 +289,7 @@ func (q *Queries) ListScanTasksByPlan(planID string) ([]*models.ScanTask, error)
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.ScanTask
+	list := make([]*models.ScanTask, 0)
 	for rows.Next() {
 		t := &models.ScanTask{}
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.PlanID, &t.DependsOnTaskID, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &t.StartedAt, &t.FinishedAt, &t.ExitCode, &t.WorkerID, &t.CreatedAt); err != nil {
@@ -324,7 +324,7 @@ func (q *Queries) ListScopeDecisionsByPlan(projectID string) ([]*models.ScopeDec
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.ScopeDecision
+	list := make([]*models.ScopeDecision, 0)
 	for rows.Next() {
 		d := &models.ScopeDecision{}
 		if err := rows.Scan(&d.ID, &d.ProjectID, &d.TargetValue, &d.TaskID, &d.Decision, &d.MatchedRuleID, &d.Reason, &d.CreatedAt); err != nil {
@@ -349,7 +349,7 @@ func (q *Queries) ListRawArtifactsByTask(taskID string) ([]*models.RawArtifact, 
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.RawArtifact
+	list := make([]*models.RawArtifact, 0)
 	for rows.Next() {
 		a := &models.RawArtifact{}
 		if err := rows.Scan(&a.ID, &a.ProjectID, &a.TaskID, &a.Type, &a.Path, &a.SHA256, &a.Size, &a.RedactionStatus, &a.CreatedAt); err != nil {
@@ -393,7 +393,7 @@ func (q *Queries) ListToolHealth() ([]*models.ToolHealth, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.ToolHealth
+	list := make([]*models.ToolHealth, 0)
 	for rows.Next() {
 		h := &models.ToolHealth{}
 		var proxyReachable sql.NullBool
@@ -429,7 +429,7 @@ func (q *Queries) ListToolInvocationsByProject(projectID string) ([]*models.Tool
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.ToolInvocation
+	list := make([]*models.ToolInvocation, 0)
 	for rows.Next() {
 		inv := &models.ToolInvocation{}
 		if err := rows.Scan(&inv.ID, &inv.ProjectID, &inv.TaskID, &inv.Tool, &inv.BinaryPath, &inv.Version, &inv.CommandRedacted, &inv.Workdir, &inv.StartedAt, &inv.FinishedAt, &inv.ExitCode); err != nil {
@@ -515,7 +515,7 @@ func (q *Queries) ListAssetsByProject(projectID string) ([]*models.Asset, error)
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Asset
+	list := make([]*models.Asset, 0)
 	for rows.Next() {
 		a, err := scanAsset(rows)
 		if err != nil {
@@ -561,7 +561,7 @@ func (q *Queries) ListPortsByAsset(assetID string) ([]*models.Port, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Port
+	list := make([]*models.Port, 0)
 	for rows.Next() {
 		p := &models.Port{}
 		if err := rows.Scan(&p.ID, &p.AssetID, &p.Port, &p.Protocol, &p.State, &p.SourceTool, &p.CreatedAt); err != nil {
@@ -595,7 +595,7 @@ func (q *Queries) ListServicesByAsset(assetID string) ([]*models.Service, error)
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Service
+	list := make([]*models.Service, 0)
 	for rows.Next() {
 		s := &models.Service{}
 		var portID sql.NullString
@@ -651,7 +651,7 @@ func (q *Queries) WebEndpointExists(projectID, url string) (bool, error) {
 }
 
 func scanWebEndpoints(rows *sql.Rows) ([]*models.WebEndpoint, error) {
-	var list []*models.WebEndpoint
+	list := make([]*models.WebEndpoint, 0)
 	for rows.Next() {
 		we := &models.WebEndpoint{}
 		var port sql.NullInt64
@@ -722,7 +722,7 @@ func (q *Queries) ListFindingsByProject(projectID string) ([]*models.Finding, er
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Finding
+	list := make([]*models.Finding, 0)
 	for rows.Next() {
 		f, err := scanFinding(rows)
 		if err != nil {
@@ -741,7 +741,7 @@ func (q *Queries) ListFindingsByStatus(projectID string, status models.FindingSt
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Finding
+	list := make([]*models.Finding, 0)
 	for rows.Next() {
 		f, err := scanFinding(rows)
 		if err != nil {
@@ -780,7 +780,7 @@ func (q *Queries) ListFindingsForReport(projectID string) ([]*models.Finding, er
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Finding
+	list := make([]*models.Finding, 0)
 	for rows.Next() {
 		f, err := scanFinding(rows)
 		if err != nil {
@@ -809,7 +809,7 @@ func (q *Queries) ListEvidenceByFinding(findingID string) ([]*models.Evidence, e
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Evidence
+	list := make([]*models.Evidence, 0)
 	for rows.Next() {
 		e := &models.Evidence{}
 		var artifactID, createdBy sql.NullString
@@ -835,7 +835,7 @@ func (q *Queries) ListToolTemplates() ([]*models.ToolTemplate, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.ToolTemplate
+	list := make([]*models.ToolTemplate, 0)
 	for rows.Next() {
 		t := &models.ToolTemplate{}
 		if err := rows.Scan(
@@ -893,7 +893,7 @@ func (q *Queries) ListScanStepsByTask(taskID string) ([]*models.ScanStep, error)
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.ScanStep
+	list := make([]*models.ScanStep, 0)
 	for rows.Next() {
 		s := &models.ScanStep{}
 		if err := rows.Scan(&s.ID, &s.TaskID, &s.Name, &s.Status, &s.StartedAt, &s.FinishedAt, &s.ErrorCode, &s.ErrorSummary, &s.CreatedAt); err != nil {
@@ -943,7 +943,7 @@ func (q *Queries) ListWorkerNodes() ([]*models.WorkerNode, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.WorkerNode
+	list := make([]*models.WorkerNode, 0)
 	for rows.Next() {
 		w := &models.WorkerNode{}
 		var lastSeen, revokedAt sql.NullTime
@@ -989,7 +989,7 @@ func (q *Queries) ListWorkerHealthChecks(workerID string) ([]*models.WorkerHealt
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.WorkerHealthCheck
+	list := make([]*models.WorkerHealthCheck, 0)
 	for rows.Next() {
 		h := &models.WorkerHealthCheck{}
 		if err := rows.Scan(&h.ID, &h.WorkerID, &h.Tool, &h.Status, &h.Version, &h.Details, &h.CheckedAt); err != nil {
@@ -1043,7 +1043,7 @@ func (q *Queries) ListRunsByProject(projectID string) ([]*models.Run, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Run
+	list := make([]*models.Run, 0)
 	for rows.Next() {
 		r := &models.Run{}
 		var templateID sql.NullString
@@ -1083,7 +1083,7 @@ func (q *Queries) ListScreenshotsByProject(projectID string) ([]*models.Screensh
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.Screenshot
+	list := make([]*models.Screenshot, 0)
 	for rows.Next() {
 		s := &models.Screenshot{}
 		var assetID, taskID sql.NullString
@@ -1119,7 +1119,7 @@ func (q *Queries) ListRetestRunsByFinding(findingID string) ([]*models.RetestRun
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.RetestRun
+	list := make([]*models.RetestRun, 0)
 	for rows.Next() {
 		r := &models.RetestRun{}
 		var evidenceID sql.NullString
@@ -1144,7 +1144,7 @@ func (q *Queries) ListScanTasksByRun(runID string) ([]*models.ScanTask, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*models.ScanTask
+	list := make([]*models.ScanTask, 0)
 	for rows.Next() {
 		t := &models.ScanTask{}
 		var rid, pid, dep, tid, wid sql.NullString
