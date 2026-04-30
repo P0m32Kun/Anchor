@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { API_BASE, request } from "../lib/api";
+import { getApiToken } from "../lib/config";
 import { useStore } from "../lib/store";
 import { EmptyState, SkeletonList, useToast } from "../components";
 
@@ -95,7 +96,9 @@ export default function WorkersPage() {
         setWorkersLoading(true);
       }
       try {
-        const res = await fetch(`${API_BASE}/workers`, { signal: ctrl.signal });
+        const token = getApiToken();
+        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch(`${API_BASE}/workers`, { signal: ctrl.signal, headers });
         if (!res.ok) throw new Error("fetch failed");
         const data: Worker[] = await res.json();
 

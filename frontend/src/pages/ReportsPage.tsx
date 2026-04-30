@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, Finding, API_BASE } from "../lib/api";
+import { getApiToken } from "../lib/config";
 import { renderMarkdown } from "../lib/markdown";
 import { Button } from "../components/Button";
 import { SeverityBadge, StatusBadge } from "../components/Badge";
@@ -127,7 +128,9 @@ export default function ReportsPage() {
     if (!projectId) return;
     try {
       setPreviewRawText(null);
-      const res = await fetch(`${API_BASE}/projects/${projectId}/reports/export.md`);
+      const token = getApiToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${API_BASE}/projects/${projectId}/reports/export.md`, { headers });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         throw new Error(data?.error?.message || `Failed: ${res.status}`);

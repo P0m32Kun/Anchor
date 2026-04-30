@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { API_BASE, api } from "../lib/api";
+import { getApiToken } from "../lib/config";
 import { useStore } from "../lib/store";
 import { EmptyState, StatusBadge, SeverityBadge } from "../components";
 import type { Project, Run, Finding } from "../lib/api";
@@ -49,7 +50,9 @@ export default function DashboardPage() {
       const validProjects = projectsList ?? [];
       setProjects(validProjects);
 
-      fetch(`${API_BASE}/workers`, { signal })
+      const token = getApiToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      fetch(`${API_BASE}/workers`, { signal, headers })
         .then((res) => (res.ok ? res.json() : []))
         .then((workers: Worker[]) =>
           setOnlineWorkers(workers.filter((w) => w.status === "online" || w.status === "busy").length)
