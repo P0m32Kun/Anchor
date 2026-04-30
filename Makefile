@@ -36,6 +36,10 @@ clean:
 up:
 	docker compose -f docker-compose.yml up -d --build
 
+# 快速启动（开发用，复用已有镜像不强制 build）
+up-fast:
+	docker compose -f docker-compose.yml up -d
+
 down:
 	docker compose -f docker-compose.yml down --remove-orphans
 
@@ -76,14 +80,14 @@ logs-worker-solo:
 
 # --- Development Modes ---
 
-dev-desktop: up
+dev-desktop:
 	@echo "Starting Tauri dev..."
 	@pkill -f "vite" 2>/dev/null || true
 	@pkill -f "target/debug/anchor" 2>/dev/null || true
 	cd frontend && npm install
 	./frontend/node_modules/.bin/tauri dev
 
-dev-web: up
+dev-web:
 	@echo "Starting Vite dev server..."
 	cd frontend && npm install
 	./frontend/node_modules/.bin/vite --host
