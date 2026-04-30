@@ -1,5 +1,5 @@
 .PHONY: build run dev test clean
-.PHONY: up down status logs logs-server logs-worker
+.PHONY: up up-server up-worker down down-server down-worker restart-worker status logs logs-server logs-worker logs-server-solo logs-worker-solo
 .PHONY: dev-desktop dev-web tauri-dev tauri-build
 .PHONY: range-up range-down range-status range-logs
 .PHONY: up-all down-all
@@ -24,17 +24,37 @@ test:
 
 clean:
 	rm -rf bin/
-		docker compose down --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.yml down --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.server.yml down --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.worker.yml down --volumes --remove-orphans 2>/dev/null || true
 	docker compose -f docker-rangefield/docker-compose.yml down --volumes --remove-orphans 2>/dev/null || true
 	docker network rm anchor-net 2>/dev/null || true
 
 # --- Docker Compose Lifecycle ---
 
+# 单机全栈（server + worker）
 up:
-	docker compose up -d
+	docker compose -f docker-compose.yml up -d --build
 
 down:
-	docker compose down --remove-orphans
+	docker compose -f docker-compose.yml down --remove-orphans
+
+# 单独 Server
+up-server:
+	docker compose -f docker-compose.server.yml up -d --build
+
+down-server:
+	docker compose -f docker-compose.server.yml down --remove-orphans
+
+# 单独 Worker（需设置 ANCHOR_CORE_URL 指向远端 server）
+up-worker:
+	docker compose -f docker-compose.worker.yml up -d --build
+
+down-worker:
+	docker compose -f docker-compose.worker.yml down --remove-orphans
+
+restart-worker: down-worker up-worker
+	@echo "Worker restarted"
 
 status:
 	docker compose ps
@@ -47,6 +67,12 @@ logs-server:
 
 logs-worker:
 	docker compose logs -f worker
+
+logs-server-solo:
+	docker compose -f docker-compose.server.yml logs -f server
+
+logs-worker-solo:
+	docker compose -f docker-compose.worker.yml logs -f worker
 
 # --- Development Modes ---
 

@@ -1,0 +1,25 @@
+services:
+  # --- Core Server ---
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: anchor-server
+    ports:
+      - "17421:17421"
+    volumes:
+      - anchor-data:/data
+    environment:
+      - ANCHOR_DATA_DIR=/data
+      - ANCHOR_PORT=17421
+      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:17421/health >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  anchor-data:

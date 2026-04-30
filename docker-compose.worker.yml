@@ -1,0 +1,23 @@
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: anchor-worker
+    environment:
+      - ANCHOR_DATA_DIR=/data
+      - ANCHOR_CORE_URL=${ANCHOR_CORE_URL}
+      - ANCHOR_WORKER_HOST=${ANCHOR_WORKER_HOST:-worker}
+      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN}
+    volumes:
+      - anchor-worker-data:/data
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+      - NET_RAW
+      - NET_ADMIN
+    command: ["--worker", "--core-url", "${ANCHOR_CORE_URL}"]
+
+volumes:
+  anchor-worker-data:

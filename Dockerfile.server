@@ -29,4 +29,3 @@ EXPOSE 17421
 VOLUME ["/data"]
 
 ENTRYPOINT ["./anchor"]
-CMD ["--no-local-worker"]
