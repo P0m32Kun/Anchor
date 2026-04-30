@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
-import { getApiBase, setApiBase, resetApiBase } from "../lib/config";
+import { getApiBase, setApiBase, resetApiBase, getApiToken, setApiToken, resetApiToken } from "../lib/config";
 
 export default function SettingsPage() {
   const rawBase = getApiBase();
+  const rawToken = getApiToken();
   const [apiBase, setApiBaseState] = useState(rawBase);
+  const [apiToken, setApiTokenState] = useState(rawToken);
+  const [showToken, setShowToken] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const isDefaultRelative = rawBase === "/api" || rawBase === "";
@@ -16,19 +19,23 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setApiBaseState(getApiBase());
+    setApiTokenState(getApiToken());
   }, []);
 
   const handleSave = () => {
     setApiBase(apiBase);
+    setApiToken(apiToken);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-    // Force reload to pick up new API_BASE
+    // Force reload to pick up new API_BASE and API token
     window.location.reload();
   };
 
   const handleReset = () => {
     resetApiBase();
+    resetApiToken();
     setApiBaseState("http://localhost:17421");
+    setApiTokenState("");
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
     window.location.reload();
@@ -78,6 +85,33 @@ export default function SettingsPage() {
               当前实际 API Base：{rawBase}（Vite proxy 自动转发到 http://localhost:17421）
             </div>
           )}
+        </div>
+
+        <div className="border-t border-white/[0.06] pt-4">
+          <div className="text-sm font-medium mb-2">API Token</div>
+          <div className="text-xs text-text-tertiary mb-2">
+            连接 Server 所需的认证 Token（由 Server 管理员提供）
+          </div>
+
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <input
+                type={showToken ? "text" : "password"}
+                value={apiToken}
+                onChange={(e) => setApiTokenState(e.target.value)}
+                placeholder="输入新的 API Token"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary/50 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-tertiary hover:text-text-secondary"
+                title={showToken ? "隐藏" : "显示"}
+              >
+                {showToken ? "🙈" : "👁️"}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="border-t border-white/[0.06] pt-4">

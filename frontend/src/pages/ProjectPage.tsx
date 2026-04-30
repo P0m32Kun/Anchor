@@ -183,11 +183,7 @@ export default function ProjectPage() {
                       <div className="font-semibold text-text-primary group-hover:text-brand-primary transition-colors text-base">{p.name}</div>
                       <StatusBadge status={status} />
                     </div>
-                    <div className="text-text-quaternary opacity-0 group-hover:opacity-100 transition-opacity">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
+
                   </div>
                   <div className="text-[13px] text-text-tertiary mt-3 flex flex-wrap gap-x-4 gap-y-1">
                     <div className="flex items-center gap-1.5">

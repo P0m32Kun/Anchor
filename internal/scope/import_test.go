@@ -213,9 +213,9 @@ func TestDetectType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := detectType(tt.input)
+			got := DetectType(tt.input)
 			if got != tt.want {
-				t.Errorf("detectType(%q) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf("DetectType(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}

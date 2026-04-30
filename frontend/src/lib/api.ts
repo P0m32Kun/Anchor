@@ -1,4 +1,4 @@
-import { getApiBase } from "./config";
+import { getApiBase, getApiToken } from "./config";
 export const API_BASE = getApiBase();
 
 export class APIError extends Error {
@@ -33,16 +33,13 @@ export function resetConsecutiveErrors() {
 
 function classifyError(err: unknown): APIError {
   if (err instanceof APIError) return err;
-  if (err instanceof DOMException && err.name === "AbortError") {
-    return new APIError("请求超时，请检查网络", "TIMEOUT");
-  }
   if (err instanceof TypeError) {
     return new APIError("网络连接失败，请检查后端服务是否运行", "NETWORK_ERROR");
   }
   return new APIError((err as any)?.message || "请求失败", "UNKNOWN");
 }
 
-async function request(
+export async function request(
   path: string,
   opts?: RequestInit & { timeout?: number }
 ): Promise<Response> {
@@ -53,9 +50,16 @@ async function request(
     opts.signal.addEventListener("abort", () => controller.abort(), { once: true });
   }
 
+  const token = getApiToken();
+  const headers: Record<string, string> = {
+    ...(opts?.headers as Record<string, string> || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       ...opts,
+      headers,
       signal: controller.signal,
     });
 
@@ -67,12 +71,18 @@ async function request(
       } catch {
         message = `${res.status}: ${res.statusText}`;
       }
+      if (res.status === 401) {
+        message = "认证失败，请检查 API Token";
+      }
       throw new APIError(message, res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx");
     }
 
     resetConsecutiveErrors();
     return res;
   } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw err;
+    }
     const apiErr = classifyError(err);
 
     if (globalErrorHandler) globalErrorHandler(apiErr);
@@ -101,6 +111,19 @@ async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number
 
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
+    // Some proxies (e.g. Vite dev proxy, system HTTP proxy) may strip or
+    // rewrite the Content-Type header. If the body looks like JSON, parse it
+    // anyway rather than failing the health check.
+    const clone = res.clone();
+    const text = await clone.text();
+    const trimmed = text.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return JSON.parse(trimmed) as T;
+      } catch {
+        throw new APIError("服务器返回了非 JSON 响应", "NON_JSON_RESPONSE");
+      }
+    }
     throw new APIError("服务器返回了非 JSON 响应", "NON_JSON_RESPONSE");
   }
 

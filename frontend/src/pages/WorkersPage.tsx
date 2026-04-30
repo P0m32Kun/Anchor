@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { API_BASE } from "../lib/api";
+import { API_BASE, request } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState, SkeletonList } from "../components";
+import { EmptyState, SkeletonList, useToast } from "../components";
 
 interface Worker {
   id: string;
@@ -45,6 +45,44 @@ export default function WorkersPage() {
   const setWorkersError = useStore((state) => state.setWorkersError);
   const fetchingRef = useRef(false);
   const isInitialRef = useRef(true);
+  const toast = useToast();
+  const [deletingWorkerId, setDeletingWorkerId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  async function handleDeleteWorker(w: Worker) {
+    if (!window.confirm(`确认删除离线 Worker "${w.name}"？此操作不可恢复。`)) return;
+    setDeletingWorkerId(w.id);
+    try {
+      await request(`/workers/${w.id}`, { method: "DELETE" });
+      setOfflineWorkers((prev) => prev.filter((x) => x.id !== w.id));
+      toast("Worker 已删除", "success");
+    } catch (err) {
+      toast("删除失败: " + (err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setDeletingWorkerId(null);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!window.confirm(`确认删除全部 ${offlineWorkers.length} 个离线 Worker？此操作不可恢复。`)) return;
+    setBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(
+        offlineWorkers.map((w) => request(`/workers/${w.id}`, { method: "DELETE" }))
+      );
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length > 0) {
+        toast(`清理完成，${failed.length} 个删除失败`, "warning");
+      } else {
+        toast("已清理全部离线 Worker", "success");
+      }
+      setOfflineWorkers([]);
+    } catch (err) {
+      toast("清理失败: " + (err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
 
   useEffect(() => {
     let ctrl = new AbortController();
@@ -91,6 +129,7 @@ export default function WorkersPage() {
 
     return () => {
       ctrl.abort();
+      fetchingRef.current = false;
       clearInterval(interval);
     };
   }, [setWorkersLoading, setWorkersError]);
@@ -131,10 +170,20 @@ export default function WorkersPage() {
           <div className="space-y-3">
             {offlineWorkers.length > 0 && (
               <div
-                className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2"
+                className="flex items-center gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2"
                 role="status"
               >
-                ⚠️ 检测到 {offlineWorkers.length} 个 Worker 离线（{offlineWorkers.map(w => w.name).join("、")}）
+                <span className="flex-1">
+                  ⚠️ 检测到 {offlineWorkers.length} 个 Worker 离线（{offlineWorkers.map(w => w.name).join("、")}）
+                </span>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="text-xs text-red-400 border border-red-400/30 rounded px-2 py-0.5 hover:bg-red-400/10 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  title="删除全部离线 Worker"
+                >
+                  {bulkDeleting ? "清理中..." : "一键清理"}
+                </button>
               </div>
             )}
             {workers.map((w) => (
@@ -162,7 +211,7 @@ export default function WorkersPage() {
             {offlineWorkers.map((w) => (
               <div
                 key={w.id}
-                className="flex items-center justify-between bg-white/[0.02] rounded-lg px-4 py-3 opacity-50"
+                className="flex items-center justify-between bg-white/[0.02] rounded-lg px-4 py-3 opacity-50 group"
                 title="该 Worker 当前离线"
               >
                 <div className="flex items-center gap-3">
@@ -177,8 +226,18 @@ export default function WorkersPage() {
                     </div>
                   </div>
                 </div>
-                <div className="text-xs text-accent-red">
-                  {statusLabel(w.status)}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleDeleteWorker(w)}
+                    disabled={deletingWorkerId === w.id}
+                    className="text-xs text-red-400 hover:text-red-300 hover:underline disabled:opacity-50 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="删除 Worker"
+                  >
+                    {deletingWorkerId === w.id ? "删除中..." : "删除"}
+                  </button>
+                  <div className="text-xs text-accent-red">
+                    {statusLabel(w.status)}
+                  </div>
                 </div>
               </div>
             ))}

@@ -2,11 +2,14 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -34,10 +37,27 @@ type Server struct {
 	taskQueue   map[string]chan *models.ScanTask
 	taskResults map[string]chan map[string]interface{}
 	mu          sync.Mutex
+	apiToken    string
+}
+
+func generateAPIToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback: use timestamp + random for safety
+		return fmt.Sprintf("%x%x", time.Now().UnixNano(), b)
+	}
+	return hex.EncodeToString(b)
 }
 
 func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	scopeEng := scope.NewEngine(queries)
+
+	token := os.Getenv("ANCHOR_API_TOKEN")
+	if token == "" {
+		token = generateAPIToken()
+	}
+	log.Printf("[server] API Token: %s  (set ANCHOR_API_TOKEN env to override)", token)
+
 	s := &Server{
 		queries:     queries,
 		rawDB:       rawDB,
@@ -48,6 +68,7 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 		sseClients:  make(map[string]map[string]chan []byte),
 		taskQueue:   make(map[string]chan *models.ScanTask),
 		taskResults: make(map[string]chan map[string]interface{}),
+		apiToken:    token,
 	}
 	// Mark all existing workers as offline on startup (they'll re-register if active)
 	s.markAllWorkersOffline()
@@ -94,6 +115,21 @@ func (s *Server) cleanupStaleWorkers() {
 		now := time.Now().UTC()
 		for _, w := range workers {
 			if w.Status == models.WorkerStatusOffline {
+				// Auto-delete offline workers that have been stale for 7 days
+				if w.LastSeen != nil && now.Sub(*w.LastSeen) > 168*time.Hour {
+					s.mu.Lock()
+					if ch, ok := s.taskQueue[w.ID]; ok {
+						close(ch)
+					}
+					delete(s.taskQueue, w.ID)
+					delete(s.taskResults, w.ID)
+					s.mu.Unlock()
+					if err := s.queries.DeleteWorkerNode(w.ID); err != nil {
+						log.Printf("[server] cleanup stale workers: delete worker %s failed: %v", w.ID, err)
+						continue
+					}
+					log.Printf("[server] worker %s deleted (offline for %v)", w.ID, now.Sub(*w.LastSeen))
+				}
 				continue
 			}
 			if w.RevokedAt != nil {
@@ -121,59 +157,64 @@ func (s *Server) cleanupStaleWorkers() {
 }
 
 func (s *Server) Register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /projects", s.handleCreateProject)
-	mux.HandleFunc("GET /projects", s.handleListProjects)
-	mux.HandleFunc("GET /projects/{id}", s.handleGetProject)
-	mux.HandleFunc("DELETE /projects/{id}", s.handleDeleteProject)
-	mux.HandleFunc("POST /projects/{id}/targets", s.handleCreateTarget)
-	mux.HandleFunc("POST /projects/{id}/targets/import", s.handleImportTargets)
-	mux.HandleFunc("GET /projects/{id}/targets", s.handleListTargets)
-	mux.HandleFunc("POST /projects/{id}/runs", s.handleCreateRun)
-	mux.HandleFunc("GET /projects/{id}/runs", s.handleListRuns)
-	mux.HandleFunc("GET /runs/{id}", s.handleGetRun)
-	mux.HandleFunc("GET /runs/{id}/tasks", s.handleGetRunTasks)
-	mux.HandleFunc("POST /runs/{id}/cancel", s.handleCancelRun)
-	mux.HandleFunc("POST /projects/{id}/workflows/asset-discovery", s.handleStartAssetDiscovery)
-	mux.HandleFunc("GET /projects/{id}/assets", s.handleListAssetsFiltered)
-	mux.HandleFunc("GET /projects/{id}/web-endpoints", s.handleListWebEndpointsByProject)
-	mux.HandleFunc("GET /assets/{id}/ports", s.handleListPorts)
-	mux.HandleFunc("GET /assets/{id}/services", s.handleListServices)
-	mux.HandleFunc("POST /projects/{id}/workflows/web-screening", s.handleStartWebScreening)
-	mux.HandleFunc("GET /projects/{id}/findings", s.handleListFindings)
-	mux.HandleFunc("GET /findings/{id}", s.handleGetFinding)
-	mux.HandleFunc("PATCH /findings/{id}/status", s.handlePatchFindingStatus)
-	mux.HandleFunc("POST /findings/{id}/evidence", s.handleAddEvidence)
-	mux.HandleFunc("POST /findings/{id}/retest", s.handleRetestFinding)
-	mux.HandleFunc("GET /findings/{id}/retests", s.handleListRetests)
-	mux.HandleFunc("PATCH /findings/batch-status", s.handleBatchUpdateFindingStatus)
-	mux.HandleFunc("GET /findings/{id}/curl", s.handleGetFindingCurl)
-	mux.HandleFunc("POST /scope-rules", s.handleCreateScopeRule)
-	mux.HandleFunc("GET /scope-rules", s.handleListScopeRules)
-	mux.HandleFunc("POST /projects/{id}/scope-rules/batch", s.handleBatchCreateScopeRules)
-	mux.HandleFunc("POST /scan-plans", s.handleCreateScanPlan)
-	mux.HandleFunc("POST /scan-plans/{id}/approve", s.handleApprovePlan)
-	mux.HandleFunc("POST /scan-plans/dry-run", s.handleDryRun)
-	mux.HandleFunc("GET /scan-tasks/{id}", s.handleGetTask)
-	mux.HandleFunc("POST /scan-tasks/{id}/cancel", s.handleCancelTask)
-	mux.HandleFunc("POST /tasks/run", s.handleRunTask)
-	mux.HandleFunc("GET /tasks/{id}/artifacts", s.handleListArtifacts)
-	mux.HandleFunc("GET /health/tools", s.handleToolHealth)
+	// Public routes (no token required)
 	mux.HandleFunc("GET /health", s.handleHealth)
-	mux.HandleFunc("POST /health/check", s.handleHealthCheck)
-	mux.HandleFunc("GET /projects/{id}/events", s.handleProjectSSE)
-	mux.HandleFunc("GET /projects/{id}/reports/export.md", s.handleExportReportMD)
-	mux.HandleFunc("GET /projects/{id}/reports/export.json", s.handleExportReportJSON)
-	mux.HandleFunc("POST /projects/{id}/archive", s.handleCreateArchive)
-	mux.HandleFunc("GET /projects/{id}/archive/download", s.handleDownloadArchive)
-	mux.HandleFunc("GET /tool-templates", s.handleListToolTemplates)
-	mux.HandleFunc("GET /tool-templates/{id}", s.handleGetToolTemplate)
-	mux.HandleFunc("GET /workers", s.handleListWorkers)
-	// Worker APIs
-	mux.HandleFunc("POST /workers/register", s.handleRegisterWorker)
-	mux.HandleFunc("POST /workers/{id}/heartbeat", s.handleWorkerHeartbeat)
-	mux.HandleFunc("GET /workers/{id}/tasks/poll", s.handlePollTasks)
-	mux.HandleFunc("POST /tasks/{id}/result", s.handleTaskResult)
-	mux.HandleFunc("POST /workers/{id}/revoke", s.handleRevokeWorker)
+
+	// Protected routes — wrapped with TokenAuthMiddleware
+	auth := s.TokenAuthMiddleware
+	mux.Handle("POST /projects", auth(http.HandlerFunc(s.handleCreateProject)))
+	mux.Handle("GET /projects", auth(http.HandlerFunc(s.handleListProjects)))
+	mux.Handle("GET /projects/{id}", auth(http.HandlerFunc(s.handleGetProject)))
+	mux.Handle("DELETE /projects/{id}", auth(http.HandlerFunc(s.handleDeleteProject)))
+	mux.Handle("POST /projects/{id}/targets", auth(http.HandlerFunc(s.handleCreateTarget)))
+	mux.Handle("POST /projects/{id}/targets/import", auth(http.HandlerFunc(s.handleImportTargets)))
+	mux.Handle("GET /projects/{id}/targets", auth(http.HandlerFunc(s.handleListTargets)))
+	mux.Handle("POST /projects/{id}/runs", auth(http.HandlerFunc(s.handleCreateRun)))
+	mux.Handle("GET /projects/{id}/runs", auth(http.HandlerFunc(s.handleListRuns)))
+	mux.Handle("GET /runs/{id}", auth(http.HandlerFunc(s.handleGetRun)))
+	mux.Handle("GET /runs/{id}/tasks", auth(http.HandlerFunc(s.handleGetRunTasks)))
+	mux.Handle("POST /runs/{id}/cancel", auth(http.HandlerFunc(s.handleCancelRun)))
+	mux.Handle("POST /projects/{id}/workflows/asset-discovery", auth(http.HandlerFunc(s.handleStartAssetDiscovery)))
+	mux.Handle("GET /projects/{id}/assets", auth(http.HandlerFunc(s.handleListAssetsFiltered)))
+	mux.Handle("GET /projects/{id}/web-endpoints", auth(http.HandlerFunc(s.handleListWebEndpointsByProject)))
+	mux.Handle("GET /assets/{id}/ports", auth(http.HandlerFunc(s.handleListPorts)))
+	mux.Handle("GET /assets/{id}/services", auth(http.HandlerFunc(s.handleListServices)))
+	mux.Handle("POST /projects/{id}/workflows/web-screening", auth(http.HandlerFunc(s.handleStartWebScreening)))
+	mux.Handle("GET /projects/{id}/findings", auth(http.HandlerFunc(s.handleListFindings)))
+	mux.Handle("GET /findings/{id}", auth(http.HandlerFunc(s.handleGetFinding)))
+	mux.Handle("PATCH /findings/{id}/status", auth(http.HandlerFunc(s.handlePatchFindingStatus)))
+	mux.Handle("POST /findings/{id}/evidence", auth(http.HandlerFunc(s.handleAddEvidence)))
+	mux.Handle("POST /findings/{id}/retest", auth(http.HandlerFunc(s.handleRetestFinding)))
+	mux.Handle("GET /findings/{id}/retests", auth(http.HandlerFunc(s.handleListRetests)))
+	mux.Handle("PATCH /findings/batch-status", auth(http.HandlerFunc(s.handleBatchUpdateFindingStatus)))
+	mux.Handle("GET /findings/{id}/curl", auth(http.HandlerFunc(s.handleGetFindingCurl)))
+	mux.Handle("POST /scope-rules", auth(http.HandlerFunc(s.handleCreateScopeRule)))
+	mux.Handle("GET /scope-rules", auth(http.HandlerFunc(s.handleListScopeRules)))
+	mux.Handle("POST /projects/{id}/scope-rules/batch", auth(http.HandlerFunc(s.handleBatchCreateScopeRules)))
+	mux.Handle("POST /scan-plans", auth(http.HandlerFunc(s.handleCreateScanPlan)))
+	mux.Handle("POST /scan-plans/{id}/approve", auth(http.HandlerFunc(s.handleApprovePlan)))
+	mux.Handle("POST /scan-plans/dry-run", auth(http.HandlerFunc(s.handleDryRun)))
+	mux.Handle("GET /scan-tasks/{id}", auth(http.HandlerFunc(s.handleGetTask)))
+	mux.Handle("POST /scan-tasks/{id}/cancel", auth(http.HandlerFunc(s.handleCancelTask)))
+	mux.Handle("POST /tasks/run", auth(http.HandlerFunc(s.handleRunTask)))
+	mux.Handle("GET /tasks/{id}/artifacts", auth(http.HandlerFunc(s.handleListArtifacts)))
+	mux.Handle("GET /health/tools", auth(http.HandlerFunc(s.handleToolHealth)))
+	mux.Handle("POST /health/check", auth(http.HandlerFunc(s.handleHealthCheck)))
+	mux.Handle("GET /projects/{id}/events", auth(http.HandlerFunc(s.handleProjectSSE)))
+	mux.Handle("GET /projects/{id}/reports/export.md", auth(http.HandlerFunc(s.handleExportReportMD)))
+	mux.Handle("GET /projects/{id}/reports/export.json", auth(http.HandlerFunc(s.handleExportReportJSON)))
+	mux.Handle("POST /projects/{id}/archive", auth(http.HandlerFunc(s.handleCreateArchive)))
+	mux.Handle("GET /projects/{id}/archive/download", auth(http.HandlerFunc(s.handleDownloadArchive)))
+	mux.Handle("GET /tool-templates", auth(http.HandlerFunc(s.handleListToolTemplates)))
+	mux.Handle("GET /tool-templates/{id}", auth(http.HandlerFunc(s.handleGetToolTemplate)))
+	mux.Handle("GET /workers", auth(http.HandlerFunc(s.handleListWorkers)))
+	// Worker APIs (also protected by global token)
+	mux.Handle("POST /workers/register", auth(http.HandlerFunc(s.handleRegisterWorker)))
+	mux.Handle("POST /workers/{id}/heartbeat", auth(http.HandlerFunc(s.handleWorkerHeartbeat)))
+	mux.Handle("GET /workers/{id}/tasks/poll", auth(http.HandlerFunc(s.handlePollTasks)))
+	mux.Handle("POST /tasks/{id}/result", auth(http.HandlerFunc(s.handleTaskResult)))
+	mux.Handle("POST /workers/{id}/revoke", auth(http.HandlerFunc(s.handleRevokeWorker)))
+	mux.Handle("DELETE /workers/{id}", auth(http.HandlerFunc(s.handleDeleteWorker)))
 }
 
 // --- Error helpers ---
@@ -194,25 +235,9 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 
 // --- CORS middleware ---
 
-var allowedOrigins = []string{
-	"http://localhost:1420",
-	"http://localhost:5173",
-	"tauri://localhost",
-}
-
-func isAllowedOrigin(origin string) bool {
-	for _, o := range allowedOrigins {
-		if origin == o {
-			return true
-		}
-	}
-	return false
-}
-
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if isAllowedOrigin(origin) {
+		if origin := r.Header.Get("Origin"); origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 		}
@@ -221,6 +246,29 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Max-Age", "86400")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// TokenAuthMiddleware verifies the Bearer token for all protected routes.
+func (s *Server) TokenAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip auth for health check and CORS preflight
+		if r.Method == "OPTIONS" || r.URL.Path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		auth := r.Header.Get("Authorization")
+		const prefix = "Bearer "
+		if !strings.HasPrefix(auth, prefix) || auth[len(prefix):] != s.apiToken {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error": map[string]string{"message": "Unauthorized: invalid or missing token"},
+			})
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -357,6 +405,12 @@ func (s *Server) handleCreateTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-detect target type when frontend sends "auto"
+	resolvedType := req.Type
+	if resolvedType == "auto" {
+		resolvedType = string(scope.DetectType(req.Value))
+	}
+
 	// 检查项目是否已有 scope 规则
 	rules, err := s.queries.ListScopeRulesByProject(projectID)
 	if err != nil {
@@ -371,7 +425,7 @@ func (s *Server) handleCreateTarget(w http.ResponseWriter, r *http.Request) {
 			"message":                  "当前项目未设置授权范围，是否将此目标自动加入授权范围？",
 			"suggested_rule": map[string]string{
 				"action": "include",
-				"type":   req.Type,
+				"type":   resolvedType,
 				"value":  req.Value,
 			},
 		})
@@ -381,7 +435,7 @@ func (s *Server) handleCreateTarget(w http.ResponseWriter, r *http.Request) {
 	t := &models.Target{
 		ID:        util.GenerateID(),
 		ProjectID: projectID,
-		Type:      models.TargetType(req.Type),
+		Type:      models.TargetType(resolvedType),
 		Value:     req.Value,
 		Source:    "manual",
 		Status:    "active",

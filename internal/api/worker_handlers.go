@@ -81,14 +81,9 @@ func (s *Server) handleRegisterWorker(w http.ResponseWriter, r *http.Request) {
 // POST /workers/{id}/heartbeat
 func (s *Server) handleWorkerHeartbeat(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	auth := r.Header.Get("Authorization")
-	if auth == "" {
-		writeError(w, http.StatusUnauthorized, errors.New(errors.ErrBadRequest, "missing authorization"))
-		return
-	}
 
 	var req struct {
-		Status      string   `json:"status"`
+		Status       string   `json:"status"`
 		Capabilities []string `json:"capabilities"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -199,4 +194,38 @@ func (s *Server) handleRevokeWorker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
+}
+
+// DELETE /workers/{id}
+func (s *Server) handleDeleteWorker(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	worker, err := s.queries.GetWorkerNode(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get worker: %v", err))
+		return
+	}
+	if worker == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "worker not found"))
+		return
+	}
+	if worker.Status != models.WorkerStatusOffline {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "只能删除离线的 Worker"))
+		return
+	}
+
+	s.mu.Lock()
+	if ch, ok := s.taskQueue[id]; ok {
+		close(ch)
+	}
+	delete(s.taskQueue, id)
+	delete(s.taskResults, id)
+	s.mu.Unlock()
+
+	if err := s.queries.DeleteWorkerNode(id); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "delete worker: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "deleted"})
 }

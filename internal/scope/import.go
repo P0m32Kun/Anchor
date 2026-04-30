@@ -172,7 +172,7 @@ func parseLine(line string) []ImportTarget {
 
 		typ := explicitType
 		if !hasExplicitType {
-			typ = detectType(part)
+			typ = DetectType(part)
 		}
 
 		// If type is ip, try expanding hyphen ranges.
@@ -206,14 +206,14 @@ func expandCommas(line string) []string {
 	return result
 }
 
-// detectType automatically infers the target type from a raw value.
+// DetectType automatically infers the target type from a raw value.
 //
 // Rules:
 //   - http:// or https:// prefix  → url
 //   - Contains "/" and valid CIDR → cidr
 //   - Valid IPv4 or IPv4 range    → ip
 //   - Otherwise                   → domain
-func detectType(val string) models.TargetType {
+func DetectType(val string) models.TargetType {
 	if strings.HasPrefix(val, "http://") || strings.HasPrefix(val, "https://") {
 		return models.TargetTypeURL
 	}

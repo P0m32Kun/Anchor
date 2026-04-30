@@ -14,6 +14,7 @@
  * | /workers                 | WorkersPage    | Worker node management           | Yes         |
  * | /settings                | SettingsPage   | App configuration                | Yes         |
  * | /projects/:projectId     | ProjectLayout  | Project wrapper + redirect       | No          |
+ * | /projects/:projectId     | Navigate       | Index → redirects to targets     | No          |
  * | /projects/:projectId/targets | TargetPage   | Nested: targets                  | No          |
  * | /projects/:projectId/assets  | AssetPage    | Nested: assets                   | No          |
  * | /projects/:projectId/runs    | RunsPage     | Nested: runs                     | No          |
@@ -34,7 +35,9 @@
 import { Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { ToastProvider, Navbar, useToast, ErrorBoundary, Button } from "./components";
-import { setGlobalErrorHandler, setConsecutiveErrorCallback, api } from "./lib/api";
+import { setGlobalErrorHandler, setConsecutiveErrorCallback, api, API_BASE } from "./lib/api";
+import { resetApiBase, needsApiBaseConfig, getApiToken, resetApiToken, needsApiToken } from "./lib/config";
+import ApiBaseSetup from "./components/ApiBaseSetup";
 import { useStore } from "./lib/store";
 import ProjectLayout from "./components/ProjectLayout";
 import DashboardPage from "./pages/DashboardPage";
@@ -71,11 +74,35 @@ function LegacyRouteGuard() {
 
 function AppHealthCheck({ children }: { children: React.ReactNode }) {
   const [healthy, setHealthy] = useState<boolean | null>(null);
+  const [errorInfo, setErrorInfo] = useState<{ message: string; url: string } | null>(null);
+  const [diagResult, setDiagResult] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  const healthUrl = `${API_BASE}/health`;
+
   useEffect(() => {
-    api.healthCheck().then(() => setHealthy(true)).catch(() => setHealthy(false));
+    api.healthCheck()
+      .then(() => setHealthy(true))
+      .catch((err: any) => {
+        const is401 = err?.code === "HTTP_4xx" && err?.message?.includes("认证失败");
+        const message = is401 ? "Token 无效，请检查输入的 API Token" : (err?.message || String(err));
+        setErrorInfo({ message, url: healthUrl });
+        setHealthy(false);
+      });
   }, []);
+
+  const runDiag = async () => {
+    setDiagResult("测试中...");
+    try {
+      const token = getApiToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(healthUrl, { method: "GET", mode: "cors", headers });
+      const text = await res.text();
+      setDiagResult(`HTTP ${res.status}: ${text}`);
+    } catch (e: any) {
+      setDiagResult(`Fetch 失败: ${e?.message || String(e)}`);
+    }
+  };
 
   if (healthy === null) {
     return (
@@ -90,11 +117,31 @@ function AppHealthCheck({ children }: { children: React.ReactNode }) {
 
   if (!healthy) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-surface text-text-primary">
+      <div className="flex flex-col items-center justify-center h-screen bg-surface text-text-primary px-4">
         <div className="text-4xl mb-4">🔌</div>
         <h1 className="text-xl font-semibold mb-2">后端服务未启动</h1>
-        <p className="text-text-secondary mb-6">请确认 Anchor 服务正在运行</p>
-        <Button onClick={() => navigate(0)}>重试</Button>
+        <p className="text-text-secondary mb-2">请确认 Anchor 服务正在运行</p>
+        {errorInfo && (
+          <div className="bg-surface-elevated border border-white/10 rounded-lg p-4 mb-4 max-w-md text-left text-sm">
+            <p className="text-text-secondary mb-1"><strong>请求 URL:</strong> {errorInfo.url}</p>
+            <p className="text-text-secondary"><strong>错误信息:</strong> {errorInfo.message}</p>
+          </div>
+        )}
+        <div className="flex gap-3 mb-4">
+          <Button onClick={() => navigate(0)}>重试</Button>
+          <Button variant="secondary" onClick={runDiag}>网络诊断</Button>
+        </div>
+        {diagResult && (
+          <div className="bg-surface-elevated border border-white/10 rounded-lg p-3 max-w-md text-left text-sm text-text-secondary">
+            <strong>诊断结果:</strong> {diagResult}
+          </div>
+        )}
+        <button
+          className="text-xs text-text-secondary underline mt-4"
+          onClick={() => { resetApiBase(); resetApiToken(); navigate(0); }}
+        >
+          重置 API 设置并刷新
+        </button>
       </div>
     );
   }
@@ -113,6 +160,9 @@ function AppContent() {
       else if (err.code === "HTTP_5xx") title = "服务器错误";
       else if (err.code === "HTTP_4xx") title = "请求错误";
       else if (err.code === "NON_JSON_RESPONSE") title = "响应格式错误";
+      if (err.message?.includes("认证失败")) {
+        title = "认证失败";
+      }
       toast(`${title}：${err.message}`, "error");
     });
     return () => {
@@ -143,6 +193,7 @@ function AppContent() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/projects" element={<ProjectPage />} />
             <Route path="/projects/:projectId" element={<ProjectLayout />}>
+              <Route index element={<Navigate to="targets" replace />} />
               <Route path="targets" element={<TargetPage />} />
               <Route path="assets" element={<AssetPage />} />
               <Route path="runs" element={<RunsPage />} />
@@ -164,6 +215,16 @@ function AppContent() {
 }
 
 function App() {
+  const needsConfig = needsApiBaseConfig() || needsApiToken();
+
+  if (needsConfig) {
+    return (
+      <ToastProvider>
+        <ApiBaseSetup />
+      </ToastProvider>
+    );
+  }
+
   return (
     <ToastProvider>
       <AppHealthCheck>

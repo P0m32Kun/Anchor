@@ -20,10 +20,12 @@ type RemoteClient struct {
 }
 
 // NewRemoteClient creates a client that registers with the core server.
-func NewRemoteClient(coreURL, endpoint string) *RemoteClient {
+// apiToken is the global server token required for all API calls.
+func NewRemoteClient(coreURL, endpoint, apiToken string) *RemoteClient {
 	return &RemoteClient{
 		coreURL:    coreURL,
 		endpoint:   endpoint,
+		token:      apiToken,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		stopCh:     make(chan struct{}),
 	}
@@ -35,26 +37,31 @@ func (c *RemoteClient) Register(name string) error {
 		"name":     name,
 		"endpoint": c.endpoint,
 	})
-	resp, err := c.httpClient.Post(c.coreURL+"/workers/register", "application/json", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", c.coreURL+"/workers/register", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("register request: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("register failed: unauthorized (invalid API token)")
+	}
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("register failed: %s", resp.Status)
 	}
 
 	var result struct {
 		WorkerID string `json:"worker_id"`
-		Token    string `json:"token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return fmt.Errorf("decode register response: %w", err)
 	}
 
 	c.workerID = result.WorkerID
-	c.token = result.Token
 	log.Printf("[worker] registered as %s", c.workerID)
 	return nil
 }
@@ -102,6 +109,7 @@ func (c *RemoteClient) StartPolling() {
 			}
 
 			req, _ := http.NewRequest("GET", fmt.Sprintf("%s/workers/%s/tasks/poll", c.coreURL, c.workerID), nil)
+			req.Header.Set("Authorization", "Bearer "+c.token)
 			resp, err := c.httpClient.Do(req)
 			if err != nil {
 				log.Printf("[worker] poll error: %v", err)
@@ -155,11 +163,10 @@ func (c *RemoteClient) executeTask(taskID, tool string, payload map[string]inter
 		"status":    "completed",
 		"artifacts": []map[string]interface{}{},
 	})
-	resp, err := c.httpClient.Post(
-		fmt.Sprintf("%s/tasks/%s/result", c.coreURL, taskID),
-		"application/json",
-		bytes.NewReader(resultBody),
-	)
+	req, _ := http.NewRequest("POST", fmt.Sprintf("%s/tasks/%s/result", c.coreURL, taskID), bytes.NewReader(resultBody))
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		log.Printf("[worker] report result error: %v", err)
 		return

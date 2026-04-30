@@ -971,6 +971,11 @@ func (q *Queries) RevokeWorkerNode(id string, revokedAt time.Time) error {
 	return err
 }
 
+func (q *Queries) DeleteWorkerNode(id string) error {
+	_, err := q.db.Exec(`DELETE FROM worker_nodes WHERE id = ?`, id)
+	return err
+}
+
 // --- WorkerHealthCheck ---
 
 func (q *Queries) CreateWorkerHealthCheck(h *models.WorkerHealthCheck) error {

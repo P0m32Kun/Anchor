@@ -99,11 +99,16 @@ func runWorker(dataDir, coreURL string) {
 	fmt.Printf("WORKER_READY %s\n", endpoint)
 	log.Printf("[worker] listening on %s", endpoint)
 
+	apiToken := os.Getenv("ANCHOR_API_TOKEN")
+
 	// Start remote client if core URL is provided
 	var remoteClient *worker.RemoteClient
 	if coreURL != "" {
 		log.Printf("[worker] connecting to core: %s", coreURL)
-		remoteClient = worker.NewRemoteClient(coreURL, endpoint)
+		if apiToken == "" {
+			log.Fatal("[worker] ANCHOR_API_TOKEN environment variable is required for remote mode")
+		}
+		remoteClient = worker.NewRemoteClient(coreURL, endpoint, apiToken)
 
 		// 指数退避重试注册（最多 5 次，Server 可能还没启动）
 		var regErr error

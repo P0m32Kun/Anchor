@@ -1,18 +1,17 @@
 const STORAGE_KEY = "anchor_api_base";
+const TOKEN_KEY = "anchor_api_token";
+
+export function isTauriEnv(): boolean {
+  // Tauri v1: window.__TAURI__, Tauri v2: globalThis.isTauri
+  return !!(window as any).__TAURI__ || !!(globalThis as any).isTauri;
+}
 
 export function getApiBase(): string {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) return stored;
+  return localStorage.getItem(STORAGE_KEY) || "";
+}
 
-  // Tauri desktop: check if we are in desktop mode
-  const isTauri = !!(window as any).__TAURI__;
-  if (isTauri) {
-    // Desktop defaults to embedded local server
-    return "http://localhost:17421";
-  }
-
-  // Web: use /api prefix so Vite proxy can forward to backend
-  return "/api";
+export function needsApiBaseConfig(): boolean {
+  return !localStorage.getItem(STORAGE_KEY);
 }
 
 export function setApiBase(url: string) {
@@ -22,3 +21,21 @@ export function setApiBase(url: string) {
 export function resetApiBase() {
   localStorage.removeItem(STORAGE_KEY);
 }
+
+export function getApiToken(): string {
+  return localStorage.getItem(TOKEN_KEY) || "";
+}
+
+export function setApiToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function resetApiToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+export function needsApiToken(): boolean {
+  return !localStorage.getItem(TOKEN_KEY);
+}
+
+export { STORAGE_KEY, TOKEN_KEY };
