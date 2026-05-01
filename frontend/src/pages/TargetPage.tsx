@@ -224,10 +224,7 @@ export default function TargetPage() {
   const [addingScope, setAddingScope] = useState(false);
   const [dryRunLoading, setDryRunLoading] = useState(false);
   const [dryRunConfirmOpen, setDryRunConfirmOpen] = useState(false);
-  const [scanLoading, setScanLoading] = useState(false);
-  const [scanConfirmOpen, setScanConfirmOpen] = useState(false);
-  const [webScreenLoading, setWebScreenLoading] = useState(false);
-  const [webScreenConfirmOpen, setWebScreenConfirmOpen] = useState(false);
+
 
   const toast = useToast();
 
@@ -353,41 +350,7 @@ export default function TargetPage() {
     }
   };
 
-  const startScan = async () => {
-    if (!projectId || scanLoading) return;
-    if (targets.length === 0) {
-      toast("请先添加至少一个目标", "warning");
-      return;
-    }
-    setScanLoading(true);
-    try {
-      await api.startAssetDiscovery(projectId);
-      toast("资产发现扫描已启动", "success");
-    } catch (err) {
-      toast("启动扫描失败: " + (err instanceof Error ? err.message : String(err)), "error");
-    } finally {
-      setScanLoading(false);
-      setScanConfirmOpen(false);
-    }
-  };
 
-  const startWebScreening = async () => {
-    if (!projectId || webScreenLoading) return;
-    if (targets.length === 0) {
-      toast("请先添加至少一个目标", "warning");
-      return;
-    }
-    setWebScreenLoading(true);
-    try {
-      await api.startWebScreening(projectId);
-      toast("Web 筛选扫描已启动", "success");
-    } catch (err) {
-      toast("启动扫描失败: " + (err instanceof Error ? err.message : String(err)), "error");
-    } finally {
-      setWebScreenLoading(false);
-      setWebScreenConfirmOpen(false);
-    }
-  };
 
   const targetColumns: { key: string; header: string; width?: string; render?: (row: Record<string, unknown>) => React.ReactNode }[] = [
     {
@@ -532,20 +495,9 @@ export default function TargetPage() {
           >
             {dryRunLoading ? "检测中..." : "授权检测 (Scope Check)"}
           </button>
-          <button
-            onClick={() => setScanConfirmOpen(true)}
-            disabled={scanLoading}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {scanLoading ? "启动中..." : "开始扫描"}
-          </button>
-          <button
-            onClick={() => setWebScreenConfirmOpen(true)}
-            disabled={webScreenLoading}
-            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {webScreenLoading ? "启动中..." : "Web 筛选"}
-          </button>
+          <Link to={`/projects/${currentProject.id}/runs`} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500">
+            前往扫描
+          </Link>
           <Link to={`/projects/${currentProject.id}/assets`} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-500">
             查看资产
           </Link>
@@ -642,27 +594,7 @@ export default function TargetPage() {
         loading={dryRunLoading}
       />
 
-      <ConfirmDialog
-        open={scanConfirmOpen}
-        onClose={() => setScanConfirmOpen(false)}
-        onConfirm={startScan}
-        title="开始扫描"
-        description="即将启动资产发现扫描。系统会根据目标类型自动选择扫描策略（子域名枚举 / 端口扫描 / 服务探测）。是否继续？"
-        confirmText="开始扫描"
-        cancelText="取消"
-        loading={scanLoading}
-      />
 
-      <ConfirmDialog
-        open={webScreenConfirmOpen}
-        onClose={() => setWebScreenConfirmOpen(false)}
-        onConfirm={startWebScreening}
-        title="Web 筛选"
-        description="即将启动 Web 筛选扫描。系统会对发现的 Web 资产进行截图和标题提取。是否继续？"
-        confirmText="开始筛选"
-        cancelText="取消"
-        loading={webScreenLoading}
-      />
     </div>
   );
 }
