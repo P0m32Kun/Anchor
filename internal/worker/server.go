@@ -19,15 +19,17 @@ import (
 type WorkerServer struct {
 	dataDir    string
 	coreURL    string
+	token      string
 	httpClient *http.Client
 	procs      map[string]*exec.Cmd
 	mu         sync.Mutex
 }
 
-func NewWorkerServer(dataDir string, coreURL string) *WorkerServer {
+func NewWorkerServer(dataDir string, coreURL string, token string) *WorkerServer {
 	return &WorkerServer{
 		dataDir:    dataDir,
 		coreURL:    coreURL,
+		token:      token,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		procs:      make(map[string]*exec.Cmd),
 	}
@@ -63,28 +65,37 @@ func (ws *WorkerServer) handleTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, command []string, workdir string, rateLimit int) {
+	log.Printf("[worker] executeTask begin: taskID=%s tool=%s workdir=%s command=%v", taskID, tool, workdir, command)
+
 	if workdir == "" {
 		workdir = filepath.Join(ws.dataDir, "workdirs", taskID)
+		log.Printf("[worker] task %s using default workdir: %s", taskID, workdir)
 	}
 	if err := os.MkdirAll(workdir, 0750); err != nil {
+		log.Printf("[worker] task %s mkdir failed: %v", taskID, err)
 		ws.reportResult(taskID, "failed", nil, fmt.Sprintf("create workdir: %v", err))
 		return
 	}
+	log.Printf("[worker] task %s workdir ready: %s", taskID, workdir)
 
 	if len(command) == 0 {
+		log.Printf("[worker] task %s empty command", taskID)
 		ws.reportResult(taskID, "failed", nil, "empty command")
 		return
 	}
 
 	binary := command[0]
 	if _, err := exec.LookPath(binary); err != nil {
+		log.Printf("[worker] task %s tool not found: %s", taskID, binary)
 		ws.reportResult(taskID, "failed", nil, fmt.Sprintf("tool not found: %s", binary))
 		return
 	}
+	log.Printf("[worker] task %s binary resolved: %s", taskID, binary)
 
 	// Apply rate limit
 	if rateLimit > 0 {
 		command = appendRateLimitArgs(command, tool, rateLimit)
+		log.Printf("[worker] task %s rate limit applied: %d", taskID, rateLimit)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, defaultToolTimeout(tool))
@@ -102,7 +113,7 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 	ws.procs[taskID] = cmd
 	ws.mu.Unlock()
 
-	log.Printf("[worker] task %s started: %s %s", taskID, binary, strings.Join(command[1:], " "))
+	log.Printf("[worker] task %s exec: %s %v", taskID, binary, command[1:])
 
 	err := cmd.Run()
 
@@ -114,10 +125,16 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
+			log.Printf("[worker] task %s exit error: code=%d", taskID, exitCode)
 		} else {
 			exitCode = -1
+			log.Printf("[worker] task %s run error: %v", taskID, err)
 		}
+	} else {
+		log.Printf("[worker] task %s exited cleanly", taskID)
 	}
+
+	log.Printf("[worker] task %s stdout=%dB stderr=%dB", taskID, stdoutBuf.Len(), stderrBuf.Len())
 
 	// Collect artifacts
 	artifacts := []map[string]interface{}{}
@@ -191,23 +208,33 @@ func (ws *WorkerServer) reportResult(taskID, status string, artifacts []map[stri
 	
 	// Write result file (always)
 	resultPath := filepath.Join(ws.dataDir, "workdirs", taskID, "_result.json")
-	os.WriteFile(resultPath, data, 0640)
+	if err := os.MkdirAll(filepath.Dir(resultPath), 0750); err != nil {
+		log.Printf("[worker] task %s mkdir for result failed: %v", taskID, err)
+	}
+	if err := os.WriteFile(resultPath, data, 0640); err != nil {
+		log.Printf("[worker] task %s write result failed: %v", taskID, err)
+	} else {
+		log.Printf("[worker] task %s result written: %s (%dB)", taskID, resultPath, len(data))
+	}
 	
 	// Report to core server if coreURL is set
 	if ws.coreURL != "" {
-		resp, err := ws.httpClient.Post(
-			fmt.Sprintf("%s/tasks/%s/result", ws.coreURL, taskID),
-			"application/json",
-			bytes.NewReader(data),
-		)
+		log.Printf("[worker] task %s reporting to core: %s", taskID, ws.coreURL)
+		req, _ := http.NewRequest("POST", fmt.Sprintf("%s/tasks/%s/result", ws.coreURL, taskID), bytes.NewReader(data))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+ws.token)
+		resp, err := ws.httpClient.Do(req)
 		if err != nil {
-			log.Printf("[worker] report result to core failed: %v", err)
+			log.Printf("[worker] task %s report result to core failed: %v", taskID, err)
 		} else {
+			log.Printf("[worker] task %s core reported: %d", taskID, resp.StatusCode)
 			resp.Body.Close()
 		}
+	} else {
+		log.Printf("[worker] task %s no coreURL, skipping core report", taskID)
 	}
 	
-	log.Printf("[worker] task %s finished: %s", taskID, status)
+	log.Printf("[worker] task %s finished: %s artifacts=%d error=%q", taskID, status, len(artifacts), errorMsg)
 }
 
 func (ws *WorkerServer) handleProgress(w http.ResponseWriter, r *http.Request) {

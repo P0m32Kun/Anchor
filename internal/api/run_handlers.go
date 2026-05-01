@@ -1,8 +1,8 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -10,6 +10,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/errors"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/util"
+	"github.com/P0m32Kun/Anchor/internal/workflow"
 )
 
 // POST /projects/{id}/runs
@@ -67,51 +68,35 @@ func (s *Server) dispatchRun(run *models.Run) {
 		return
 	}
 
-	// 2. Parse tools JSON
-	var tools []models.TemplateTool
-	if err := json.Unmarshal([]byte(template.ToolsJSON), &tools); err != nil {
-		log.Printf("[run] parse tools_json: %v", err)
-		s.updateRunStatus(run.ID, models.RunFailed, nil)
-		return
-	}
-
-	// 3. Update run to running
+	// 2. Mark run as running
 	now := time.Now().UTC()
 	if err := s.queries.UpdateRunStatus(run.ID, models.RunRunning, &now, nil); err != nil {
 		log.Printf("[run] update status: %v", err)
 		return
 	}
 
-	// 4. Create scan tasks for each tool
-	var tasks []*models.ScanTask
-	for _, tool := range tools {
-		if !tool.Enabled {
-			continue
-		}
-		task := &models.ScanTask{
-			ID:              util.GenerateID(),
-			ProjectID:       run.ProjectID,
-			RunID:           &run.ID,
-			Tool:            tool.Tool,
-			CommandTemplate: fmt.Sprintf("%s -d {{target}}", tool.Tool),
-			Status:          models.TaskCreated,
-			CreatedAt:       time.Now().UTC(),
-		}
-		if err := s.queries.CreateScanTask(task); err != nil {
-			log.Printf("[run] create scan task: %v", err)
-			continue
-		}
-		tasks = append(tasks, task)
-	}
+	// 3. Delegate to AssetDiscoveryWorkflow which handles:
+	//    - querying project targets and classifying by type
+	//    - building correct tool commands (subfinder -d, naabu -list, etc.)
+	//    - creating hostlist files for batch tools
+	//    - parsing tool output and creating assets/findings
+	wf := workflow.NewAssetDiscoveryWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir).WithRunID(run.ID)
 
-	if len(tasks) == 0 {
-		log.Printf("[run] no tasks created")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	result, err := wf.Run(ctx, run.ProjectID)
+	if err != nil {
+		log.Printf("[run] workflow failed for run %s: %v", run.ID, err)
 		s.updateRunStatus(run.ID, models.RunFailed, nil)
 		return
 	}
 
-	// 5. Dispatch tasks to available workers
-	s.dispatchTasksToWorkers(tasks)
+	log.Printf("[run] %s completed: domains=%d ips=%d ports=%d web=%d",
+		run.ID, result.DomainsFound, result.IPsFound, result.PortsFound, result.WebEndpointsFound)
+
+	// 4. Check final task states and update run status
+	s.checkRunCompletion(run.ID)
 }
 
 // dispatchTasksToWorkers assigns tasks to available workers.

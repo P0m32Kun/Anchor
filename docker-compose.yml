@@ -35,7 +35,7 @@ services:
       - ANCHOR_WORKER_HOST=worker
       - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
     volumes:
-      - anchor-worker-data:/data
+      - anchor-data:/data
     restart: unless-stopped
     privileged: true
     cap_add:

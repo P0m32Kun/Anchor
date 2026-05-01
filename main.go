@@ -70,7 +70,8 @@ func runServer(dataDir string) {
 }
 
 func runWorker(dataDir, coreURL string) {
-	ws := worker.NewWorkerServer(dataDir, coreURL)
+	apiToken := os.Getenv("ANCHOR_API_TOKEN")
+	ws := worker.NewWorkerServer(dataDir, coreURL, apiToken)
 
 	mux := http.NewServeMux()
 	ws.Register(mux)
@@ -98,8 +99,6 @@ func runWorker(dataDir, coreURL string) {
 	// Signal ready to parent process
 	fmt.Printf("WORKER_READY %s\n", endpoint)
 	log.Printf("[worker] listening on %s", endpoint)
-
-	apiToken := os.Getenv("ANCHOR_API_TOKEN")
 
 	// Start remote client if core URL is provided
 	var remoteClient *worker.RemoteClient

@@ -26,6 +26,13 @@ type AssetDiscoveryWorkflow struct {
 	scope   *scope.Engine
 	merger  *asset.Merger
 	dataDir string
+	runID   string // optional: links tasks to a Run record
+}
+
+// WithRunID sets the Run ID to link all created tasks to a Run record.
+func (w *AssetDiscoveryWorkflow) WithRunID(runID string) *AssetDiscoveryWorkflow {
+	w.runID = runID
+	return w
 }
 
 // DiscoveryResult holds the summary of an asset discovery run.
@@ -432,6 +439,9 @@ func (w *AssetDiscoveryWorkflow) createAndRunTask(ctx context.Context, projectID
 		ArgumentsRedacted: joinArgs(args[1:]),
 		Status:            models.TaskQueued,
 		CreatedAt:         time.Now().UTC(),
+	}
+	if w.runID != "" {
+		task.RunID = &w.runID
 	}
 	if err := w.queries.CreateScanTask(task); err != nil {
 		return nil, fmt.Errorf("create task: %w", err)
