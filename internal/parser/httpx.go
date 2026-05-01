@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"strconv"
+	"strings"
 )
 
 // ParseHTTPX reads httpx JSONL output and returns discovered web endpoints.
@@ -90,6 +91,25 @@ func ParseHTTPX(r io.Reader) ([]HTTPXResult, []ParseError) {
 			var tech []string
 			if err := json.Unmarshal(b, &tech); err == nil {
 				res.Tech = tech
+			}
+		}
+
+		// Extract product names from CPE when tech is sparse (e.g. 404/302 pages).
+		if b, ok := raw["cpe"]; ok {
+			var cpeList []struct {
+				Product string `json:"product"`
+			}
+			if err := json.Unmarshal(b, &cpeList); err == nil {
+				seen := make(map[string]bool, len(res.Tech))
+				for _, t := range res.Tech {
+					seen[strings.ToLower(t)] = true
+				}
+				for _, c := range cpeList {
+					if c.Product != "" && !seen[strings.ToLower(c.Product)] {
+						res.Tech = append(res.Tech, c.Product)
+						seen[strings.ToLower(c.Product)] = true
+					}
+			}
 			}
 		}
 

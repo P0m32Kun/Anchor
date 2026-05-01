@@ -1,11 +1,26 @@
 package nuclei
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/P0m32Kun/Anchor/internal/models"
 )
+
+// portToTag maps well-known service ports to Nuclei tags.
+var portToTag = map[int]string{
+	3306:  "mysql",
+	5432:  "postgresql",
+	6379:  "redis",
+	6380:  "redis",
+	9200:  "elasticsearch",
+	27017: "mongodb",
+	11211: "memcached",
+	5433:  "postgresql",
+	1433:  "mssql",
+	1521:  "oracle",
+}
 
 // techToTag maps normalized technology names to the most specific Nuclei tag.
 // One fingerprint → one specific tag. No parent/child expansion.
@@ -145,6 +160,14 @@ func MapPreciseTags(technologies []string, webserver string) []string {
 	return tags
 }
 
+// MapPortToTag returns the Nuclei tag for a well-known service port, or "" if unknown.
+func MapPortToTag(port int) string {
+	if tag, ok := portToTag[port]; ok {
+		return tag
+	}
+	return ""
+}
+
 // GroupEndpointsByTags groups WebEndpoints by their precise tag sets.
 // Returns a map where key is "tag1,tag2" (sorted) and value is list of URLs.
 // Endpoints with no tags are omitted.
@@ -157,6 +180,27 @@ func GroupEndpointsByTags(endpoints []*models.WebEndpoint) map[string][]string {
 		}
 		key := strings.Join(tags, ",")
 		groups[key] = append(groups[key], ep.URL)
+	}
+	return groups
+}
+
+// PortTarget represents a network service target (ip:port) with its mapped tag.
+type PortTarget struct {
+	IP     string
+	Port   int
+	Tag    string
+	AssetID string
+}
+
+// GroupPortsByTags groups port targets by their mapped Nuclei tags.
+// Returns a map where key is the tag and value is list of "ip:port" strings.
+func GroupPortsByTags(targets []PortTarget) map[string][]string {
+	groups := make(map[string][]string)
+	for _, t := range targets {
+		if t.Tag == "" {
+			continue
+		}
+		groups[t.Tag] = append(groups[t.Tag], fmt.Sprintf("%s:%d", t.IP, t.Port))
 	}
 	return groups
 }

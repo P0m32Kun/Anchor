@@ -180,7 +180,149 @@ func (w *WebScreeningWorkflow) Run(ctx context.Context, projectID string) (*Scre
 		}
 	}
 
+	// --- Network service scan (non-Web ports: Redis, MySQL, etc.) ---
+	if err := w.runNetworkServiceScan(ctx, projectID, rateLimit, result); err != nil {
+		log.Printf("network service scan for project %s: %v", projectID, err)
+	}
+
 	return result, nil
+}
+
+func (w *WebScreeningWorkflow) runNetworkServiceScan(ctx context.Context, projectID string, rateLimit int, result *ScreeningResult) error {
+	assets, err := w.queries.ListAssetsByProject(projectID)
+	if err != nil {
+		return fmt.Errorf("list assets: %w", err)
+	}
+
+	var portTargets []nuclei.PortTarget
+	hostToAssetID := make(map[string]string)
+
+	for _, asset := range assets {
+		if asset.Type != models.AssetTypeIP {
+			continue
+		}
+
+		decision, err := w.scope.CheckIP(ctx, projectID, asset.Value)
+		if err != nil || decision.Decision == models.ScopeDeny {
+			continue
+		}
+
+		hostToAssetID[asset.Value] = asset.ID
+
+		ports, err := w.queries.ListPortsByAsset(asset.ID)
+		if err != nil {
+			continue
+		}
+		for _, p := range ports {
+			if p.State != "open" {
+				continue
+			}
+			if tag := nuclei.MapPortToTag(p.Port); tag != "" {
+				portTargets = append(portTargets, nuclei.PortTarget{
+					IP:      asset.Value,
+					Port:    p.Port,
+					Tag:     tag,
+					AssetID: asset.ID,
+				})
+			}
+		}
+	}
+
+	if len(portTargets) == 0 {
+		return nil
+	}
+
+	groups := nuclei.GroupPortsByTags(portTargets)
+
+	for tag, targets := range groups {
+		if len(targets) == 0 {
+			continue
+		}
+
+		targetFile, err := writeTargetsFile(w.dataDir, projectID, targets)
+		if err != nil {
+			log.Printf("write network targets file for tag %s: %v", tag, err)
+			continue
+		}
+
+		task, err := w.createAndRunTask(ctx, projectID, "nuclei", worker.BuildNucleiCommand(targetFile, "standard", rateLimit, []string{tag}))
+		if err != nil {
+			log.Printf("nuclei network task for tag %s failed: %v", tag, err)
+			continue
+		}
+
+		nucleiResults, err := w.parseNucleiOutput(task.ID)
+		if err != nil {
+			log.Printf("parse nuclei network output for tag %s: %v", tag, err)
+			continue
+		}
+
+		for _, nr := range nucleiResults {
+			dedupKey := computeDedupKey(nr.TemplateID, nr.Host, nr.MatcherName)
+
+			existing, err := w.queries.GetFindingByDedupKey(projectID, dedupKey)
+			if err != nil {
+				continue
+			}
+
+			confidence, priority, _ := w.scoring.ScoreFinding(&nr)
+
+			var findingID string
+			if existing != nil {
+				findingID = existing.ID
+				result.FindingsUpdated++
+				now := time.Now().UTC()
+				severity := models.FindingSeverity(nr.Severity)
+				if nr.Severity == "" {
+					severity = existing.Severity
+				}
+				summary := fmt.Sprintf("Host: %s\nMatched: %s\nMatcher: %s", nr.Host, nr.MatchedAt, nr.MatcherName)
+				_ = w.queries.UpdateFindingEvidence(findingID, severity, confidence, priority, summary, existing.Remediation, now)
+			} else {
+				var assetID *string
+				if parts := strings.Split(nr.Host, ":"); len(parts) >= 1 {
+					if id, ok := hostToAssetID[parts[0]]; ok {
+						assetID = &id
+					}
+				}
+
+				f := &models.Finding{
+					ID:         util.GenerateID(),
+					ProjectID:  projectID,
+					AssetID:    assetID,
+					SourceTool: "nuclei",
+					SourceRuleID: nr.TemplateID,
+					DedupKey:   dedupKey,
+					Title:      nr.Name,
+					Severity:   models.FindingSeverity(nr.Severity),
+					Confidence: confidence,
+					Priority:   priority,
+					Status:     models.FindingPendingReview,
+					Summary:    fmt.Sprintf("Host: %s\nMatched: %s\nMatcher: %s", nr.Host, nr.MatchedAt, nr.MatcherName),
+					CreatedAt:  time.Now().UTC(),
+					UpdatedAt:  time.Now().UTC(),
+				}
+				if err := w.queries.CreateFinding(f); err != nil {
+					continue
+				}
+				findingID = f.ID
+				result.FindingsCreated++
+			}
+
+			if nr.Request != "" || nr.Response != "" {
+				workdir := filepath.Join(w.dataDir, "workdirs", projectID, task.ID)
+				_ = os.MkdirAll(workdir, 0750)
+				if nr.Request != "" {
+					_ = w.saveEvidenceArtifact(workdir, projectID, task.ID, findingID, models.EvidenceRequest, nr.Request)
+				}
+				if nr.Response != "" {
+					_ = w.saveEvidenceArtifact(workdir, projectID, task.ID, findingID, models.EvidenceResponse, nr.Response)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (w *WebScreeningWorkflow) createAndRunTask(ctx context.Context, projectID string, tool string, args []string) (*models.ScanTask, error) {

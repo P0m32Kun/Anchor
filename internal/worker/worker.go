@@ -308,7 +308,7 @@ func BuildSubfinderCommand(domain string) []string {
 // hostFile should contain one host per line.
 // Output goes to stdout as JSONL so the worker can capture it as an artifact.
 func BuildHttpxCommand(hostFile string) []string {
-	return []string{"httpx", "-json", "-l", hostFile}
+	return []string{"httpx", "-json", "-l", hostFile, "-follow-redirects"}
 }
 
 // BuildNaabuCommand builds a Naabu command that reads hosts from a file.

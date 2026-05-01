@@ -1,3 +1,11 @@
+---
+archived: true
+version: "0.3"
+status: completed
+reason: "v0.3 阶段已结束"
+archived_date: "2026-05-01"
+---
+
 # Progress
 
 ## Status

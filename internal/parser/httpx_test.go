@@ -94,3 +94,33 @@ func TestParseHTTPXTechnologiesFallback(t *testing.T) {
 		t.Errorf("expected status 200, got %d", res.StatusCode)
 	}
 }
+
+func TestParseHTTPXCPE(t *testing.T) {
+	input := `{"url":"http://127.0.0.1:8080","status-code":404,"cpe":[{"product":"tomcat","vendor":"apache","cpe":"cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*"}]}`
+	results, errs := ParseHTTPX(strings.NewReader(input))
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	res := results[0]
+	if len(res.Tech) != 1 || res.Tech[0] != "tomcat" {
+		t.Errorf("expected tech [tomcat] from cpe, got %v", res.Tech)
+	}
+}
+
+func TestParseHTTPXCPEMerge(t *testing.T) {
+	input := `{"url":"http://127.0.0.1:3000","tech":["grafana"],"cpe":[{"product":"grafana","vendor":"grafana","cpe":"cpe:2.3:a:grafana:grafana:*:*:*:*:*:*:*:*"}]}`
+	results, errs := ParseHTTPX(strings.NewReader(input))
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	res := results[0]
+	if len(res.Tech) != 1 || res.Tech[0] != "grafana" {
+		t.Errorf("expected tech [grafana] without duplication, got %v", res.Tech)
+	}
+}

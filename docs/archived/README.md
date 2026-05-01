@@ -1,11 +1,11 @@
 # 📦 文档归档
 
-> 归档日期：2026-04-29
+> 归档日期：2026-05-01
 > 归档人：doc-archivist
 
 ## 归档说明
 
-本目录存放 v0.1 和 v0.2 阶段的所有计划、设计、决策文档。这些文档在对应阶段结束后进行归档，保留完整历史记录。
+本目录存放 v0.1、v0.2 和 v0.3 阶段的所有计划、设计、决策文档。这些文档在对应阶段结束后进行归档，保留完整历史记录。
 
 ## 目录结构
 
@@ -38,6 +38,10 @@ archived/
     └── decisions/                  # v0.2 架构决策记录
         ├── 009-remote-worker-architecture.md
         └── 010-docker-containerization.md
+
+├── v0.3/                           # v0.3 阶段文档
+│   ├── v0.3-plan.md                # v0.3 执行计划（桌面可用性与可靠性）
+│   └── progress.md                 # v0.3 开发进度跟踪
 ```
 
 ## v0.1 阶段摘要
@@ -60,6 +64,17 @@ archived/
 | M3 | ✅ 完成 | 内网扫描增强 |
 | M4 | ✅ 完成 | 前端 UI 优化 |
 | M5 | ✅ 完成 | 部署验证 |
+
+## v0.3 阶段摘要
+
+| 里程碑 | 状态 | 内容 |
+|--------|------|------|
+| 网络服务扫描 | ✅ 完成 | 非 Web 端口（Redis/MySQL/PostgreSQL 等）→ Nuclei tag 映射 + 分组扫描 |
+| CPE 指纹补充 | ✅ 完成 | httpx CPE 解析 → tech fallback，解决 404/302 跳过问题 |
+| 扫描入口统一 | ✅ 完成 | TargetPage Subfinder 按钮 → Runs 导航，消除入口分裂 |
+| 路由统一 | ✅ 完成 | `/projects/:projectId/*` 嵌套路由 |
+| 靶场修复 | ✅ 完成 | Tomcat 靶场 Dockerfile 适配新版镜像 |
+| httpx 增强 | ✅ 完成 | `-follow-redirects` 参数 |
 
 ## 关键架构决策
 

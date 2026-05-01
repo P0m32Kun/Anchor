@@ -128,6 +128,33 @@
 
 ---
 
+## 2026-05-01
+
+### v0.3: 桌面可用性与可靠性完成 ✅
+- **网络服务扫描**：Web 初筛工作流扩展支持非 Web 端口（Redis/MySQL/PostgreSQL/Elasticsearch/MongoDB/Memcached/MSSQL/Oracle）
+  - 新增 `MapPortToTag` / `GroupPortsByTags` / `PortTarget`（`internal/nuclei/tagmapper.go`）
+  - 新增 `runNetworkServiceScan()` 集成到 `WebScreeningWorkflow`（`internal/workflow/screenshot.go`）
+  - 按服务标签分组执行 Nuclei，Finding 去重/评分/证据逻辑与 Web 端一致
+- **CPE 指纹补充**：httpx 解析器从 CPE 字段提取 product name 作为 tech fallback
+  - 解决 404/302 页面 tech 为空被跳过的问题（`internal/parser/httpx.go`）
+- **httpx 增强**：`-follow-redirects` 参数（`internal/worker/worker.go`）
+- **靶场修复**：Tomcat 靶场 Dockerfile 适配新版镜像（webapps.dist 复制、RemoteCIDRValve 放开、移除 LockOutRealm）
+
+**相关文件：**
+- `internal/nuclei/tagmapper.go` / `tagmapper_test.go`
+- `internal/parser/httpx.go` / `httpx_test.go`
+- `internal/workflow/screenshot.go`
+- `internal/worker/worker.go`
+- `docker-rangefield/apps/tomcat-vuln/Dockerfile`
+
+**验证：**
+- `go build` ✅ / `go vet` ✅ / `go test` ✅（新增 4 个单元测试全部通过）
+- `npx tsc --noEmit` ✅
+
+**Tag:** `v0.3.0`
+
+---
+
 ## 更早
 
 - 项目初始化（Tauri + Go 骨架）

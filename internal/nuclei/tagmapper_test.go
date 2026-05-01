@@ -80,3 +80,37 @@ func TestGroupEndpointsByTags(t *testing.T) {
 		t.Fatalf("unexpected nginx,wordpress group: %v", groups["nginx,wordpress"])
 	}
 }
+
+func TestMapPortToTag(t *testing.T) {
+	if tag := MapPortToTag(6379); tag != "redis" {
+		t.Errorf("expected redis for port 6379, got %s", tag)
+	}
+	if tag := MapPortToTag(3306); tag != "mysql" {
+		t.Errorf("expected mysql for port 3306, got %s", tag)
+	}
+	if tag := MapPortToTag(9200); tag != "elasticsearch" {
+		t.Errorf("expected elasticsearch for port 9200, got %s", tag)
+	}
+	if tag := MapPortToTag(9999); tag != "" {
+		t.Errorf("expected empty for unknown port 9999, got %s", tag)
+	}
+}
+
+func TestGroupPortsByTags(t *testing.T) {
+	targets := []PortTarget{
+		{IP: "127.0.0.1", Port: 6379, Tag: "redis"},
+		{IP: "127.0.0.1", Port: 3306, Tag: "mysql"},
+		{IP: "127.0.0.1", Port: 6380, Tag: "redis"},
+		{IP: "127.0.0.1", Port: 9999, Tag: ""},
+	}
+	groups := GroupPortsByTags(targets)
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 groups, got %d: %v", len(groups), groups)
+	}
+	if len(groups["redis"]) != 2 {
+		t.Errorf("expected 2 redis targets, got %d", len(groups["redis"]))
+	}
+	if len(groups["mysql"]) != 1 || groups["mysql"][0] != "127.0.0.1:3306" {
+		t.Errorf("unexpected mysql group: %v", groups["mysql"])
+	}
+}

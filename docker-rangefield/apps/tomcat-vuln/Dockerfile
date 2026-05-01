@@ -1,10 +1,27 @@
 FROM tomcat:9.0-jdk8-temurin
 
-# 开启 Tomcat Manager / Host-Manager，配置弱口令 tomcat/tomcat
-RUN sed -i 's|<\/tomcat-users>|<role rolename="manager-gui"\/>\n<role rolename="manager-script"\/>\n<role rolename="admin-gui"\/>\n<user username="tomcat" password="tomcat" roles="manager-gui,manager-script,admin-gui"\/>\n<\/tomcat-users>|' /usr/local/tomcat/conf/tomcat-users.xml
+# 复制默认 Web 应用（manager/host-manager/ROOT）到 webapps
+RUN cp -r /usr/local/tomcat/webapps.dist/* /usr/local/tomcat/webapps/
 
-# 允许远程访问 Manager（默认只允许 127.0.0.1）
-RUN sed -i 's|allow="127\\.\\d+\\.\\d+\\.\\d+|::1|0:0:0:0:0:0:0:1"|allow=".*"|g' /usr/local/tomcat/webapps/manager/META-INF/context.xml || true
-RUN sed -i 's|allow="127\\.\\d+\\.\\d+\\.\\d+|::1|0:0:0:0:0:0:0:1"|allow=".*"|g' /usr/local/tomcat/webapps/host-manager/META-INF/context.xml || true
+# 覆盖 tomcat-users.xml：配置弱口令 tomcat/tomcat，赋予 manager 角色
+RUN cat > /usr/local/tomcat/conf/tomcat-users.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<tomcat-users xmlns="http://tomcat.apache.org/xml"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://tomcat.apache.org/xml tomcat-users.xsd"
+              version="1.0">
+  <role rolename="manager-gui"/>
+  <role rolename="manager-script"/>
+  <role rolename="admin-gui"/>
+  <user username="tomcat" password="tomcat" roles="manager-gui,manager-script,admin-gui"/>
+</tomcat-users>
+EOF
+
+# 允许远程访问 Manager（替换 RemoteCIDRValve 的 allow 限制）
+RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/manager/META-INF/context.xml || true
+RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/host-manager/META-INF/context.xml || true
+
+# 移除 LockOutRealm（防止 nuclei 暴力扫描时锁定用户），保留 UserDatabaseRealm
+RUN perl -i -0pe 's|<Realm className="org\.apache\.catalina\.realm\.LockOutRealm">\s*<!--.*?-->\s*<Realm className="org\.apache\.catalina\.realm\.UserDatabaseRealm"\s+resourceName="UserDatabase"/>\s*</Realm>|<Realm className="org.apache.catalina.realm.UserDatabaseRealm" resourceName="UserDatabase"/>|s' /usr/local/tomcat/conf/server.xml
 
 EXPOSE 8080

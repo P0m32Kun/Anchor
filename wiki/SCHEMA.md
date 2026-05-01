@@ -144,6 +144,7 @@
 | M4 报告导出 | ✅ 已完成 | `v0.1.0-m4` | Markdown/JSON 报告 + 前端预览 + 端到端验收 |
 | v0.2 Phase 1 容器化与远程 Worker | ✅ 已完成 | `v0.2.0-p1` | Docker + 远程 Worker + 心跳清理 + WorkersPage |
 | v0.2 Phase 2 项目管理与体验修复 | ✅ 已完成 | `v0.2.0-p2` | 项目创建/删除/级联清理 + 导航修复 + Dashboard 快捷入口 |
+| v0.3 桌面可用性与可靠性 | ✅ 已完成 | `v0.3.0` | 网络服务扫描 + CPE 指纹补充 + 路由统一 + 扫描入口统一 + httpx follow-redirects + 靶场修复 |
 
 ---
 

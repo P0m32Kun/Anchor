@@ -208,10 +208,22 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 - [x] Worker 超时自动清理
 - [x] WorkersPage 实时列表
 
-### v0.2 Phase 2: 模板管理（进行中）
+### v0.2 Phase 2: 项目管理与体验修复 ✅
 
-- [ ] Server 端模板仓库管理
-- [ ] Worker 模板更新指令下发
+- [x] 项目创建/删除/级联清理
+- [x] 导航修复（Projects 入口、Legacy 路由清理）
+- [x] Dashboard 快捷入口
+- [x] 首次导入自动提示 Scope 确认
+
+### v0.3: 桌面可用性与可靠性 ✅
+
+- [x] 扫描入口统一（TargetPage Subfinder 按钮 → Runs 导航）
+- [x] 路由统一（`/projects/:projectId/*` 嵌套路由）
+- [x] 网络服务扫描（非 Web 端口：Redis/MySQL/PostgreSQL/Elasticsearch/MongoDB/Memcached/MSSQL/Oracle）
+- [x] CPE 指纹补充（404/302 页面 tech fallback）
+- [x] httpx `-follow-redirects`
+- [x] 靶场环境修复（Tomcat 弱口令/Manager 访问）
+- [x] Go 单元测试覆盖（tagmapper、httpx parser、parser 包）
 
 ## 外部工具依赖
 
@@ -233,6 +245,8 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 | `v0.1.0-m3` | Nuclei 初筛 |
 | `v0.1.0-m4` | 报告导出 |
 | `v0.2.0-p1` | Docker 容器化 + 远程 Worker 架构 |
+| `v0.2.0-p2` | 项目管理与体验修复 |
+| `v0.3.0` | 桌面可用性与可靠性 |
 
 ## 许可
 
