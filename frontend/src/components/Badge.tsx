@@ -75,7 +75,7 @@ export function Badge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full font-medium border backdrop-blur-sm ${styles.bg} ${styles.text} ${styles.border} ${styles.glow || ""} ${sizeCls} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-lg font-medium border backdrop-blur-sm ${styles.bg} ${styles.text} ${styles.border} ${styles.glow || ""} ${sizeCls} ${className}`}
       {...props}
     >
       {dot && (

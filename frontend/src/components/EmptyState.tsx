@@ -19,7 +19,7 @@ export function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
       {icon ? (
-        <div className="w-12 h-12 rounded-apple bg-white/[0.06] flex items-center justify-center text-text-quaternary mb-4 border border-white/[0.06]">
+        <div className="w-12 h-12 rounded-apple bg-white/[0.04] flex items-center justify-center text-text-quaternary mb-4 border border-white/[0.08]">
           {icon}
         </div>
       ) : (
@@ -37,7 +37,7 @@ export function EmptyState({
           <path d="M9 21V9" />
         </svg>
       )}
-      <h3 className="text-sm font-semibold text-text-secondary mb-1">{title}</h3>
+      <h3 className="text-sm font-medium text-text-secondary mb-1">{title}</h3>
       {description && (
         <p className="text-sm text-text-tertiary max-w-xs mb-4">{description}</p>
       )}
