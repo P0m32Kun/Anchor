@@ -80,9 +80,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-apple backdrop-blur-xl border ${bgMap[t.type]} animate-slide-down shadow-apple-lg`}
+            className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border ${bgMap[t.type]} animate-slide-down`}
             style={{
               background: "rgba(18, 18, 26, 0.85)",
+              backdropFilter: "saturate(200%) blur(60px)",
+              WebkitBackdropFilter: "saturate(200%) blur(60px)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 12px rgba(0,0,0,0.4), 0 16px 40px rgba(0,0,0,0.3)",
             }}
           >
             {iconMap[t.type]}
