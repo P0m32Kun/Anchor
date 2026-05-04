@@ -3,12 +3,12 @@ import React, { forwardRef } from "react";
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   hover?: boolean;
   padding?: "sm" | "md" | "lg";
-  glass?: boolean;
+  glow?: "blue" | "red" | "none";
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
   function Card(
-    { hover = true, padding = "md", glass = true, children, className = "", ...props },
+    { hover = true, padding = "md", glow = "none", children, className = "", ...props },
     ref
   ) {
     const paddings = {
@@ -17,18 +17,13 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       lg: "p-6",
     };
 
-    const baseClass = glass
-      ? "vision-glass"
-      : "bg-surface-elevated rounded-apple-xl border border-glass-border border-t-white/[0.05]";
-
-    const hoverCls = hover
-      ? "vision-glass-hover cursor-pointer"
-      : "";
+    const glowCls = glow === "blue" ? "glow-blue" : glow === "red" ? "glow-red" : "";
+    const hoverCls = hover ? "cyber-glass-hover cursor-pointer" : "";
 
     return (
       <div
         ref={ref}
-        className={`${baseClass} ${paddings[padding]} ${hoverCls} ${className}`}
+        className={`cyber-glass rounded-xl ${paddings[padding]} ${glowCls} ${hoverCls} ${className}`}
         {...props}
       >
         {children}
@@ -50,7 +45,7 @@ export const CardHeader = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 export const CardTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
   function CardTitle({ children, className = "", ...props }, ref) {
     return (
-      <h3 ref={ref} className={`text-base font-semibold text-text-primary ${className}`} {...props}>
+      <h3 ref={ref} className={`text-base font-semibold text-[#e6edf3] ${className}`} {...props}>
         {children}
       </h3>
     );
@@ -60,7 +55,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTM
 export const CardDescription = forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
   function CardDescription({ children, className = "", ...props }, ref) {
     return (
-      <p ref={ref} className={`text-sm text-text-tertiary mt-0.5 ${className}`} {...props}>
+      <p ref={ref} className={`text-sm text-[#8b949e] mt-0.5 ${className}`} {...props}>
         {children}
       </p>
     );
