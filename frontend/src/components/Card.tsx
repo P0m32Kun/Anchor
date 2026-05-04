@@ -18,11 +18,11 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     };
 
     const baseClass = glass
-      ? "liquid-glass rounded-apple"
-      : "bg-surface-elevated rounded-apple border border-glass-border border-t-white/[0.05]";
+      ? "vision-glass"
+      : "bg-surface-elevated rounded-apple-xl border border-glass-border border-t-white/[0.05]";
 
     const hoverCls = hover
-      ? "liquid-glass-hover cursor-pointer"
+      ? "vision-glass-hover cursor-pointer"
       : "";
 
     return (
