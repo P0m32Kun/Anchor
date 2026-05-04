@@ -156,6 +156,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", s.handleHealth)
 
 	auth := s.TokenAuthMiddleware
+	mux.Handle("GET /dashboard/stats", auth(http.HandlerFunc(s.handleGetDashboardStats)))
 	mux.Handle("POST /projects", auth(http.HandlerFunc(s.handleCreateProject)))
 	mux.Handle("GET /projects", auth(http.HandlerFunc(s.handleListProjects)))
 	mux.Handle("GET /projects/{id}", auth(http.HandlerFunc(s.handleGetProject)))
@@ -177,8 +178,12 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /projects/{id}/pipeline/run", auth(http.HandlerFunc(s.handleRunPipeline)))
 	mux.Handle("GET /projects/{id}/pipeline/runs", auth(http.HandlerFunc(s.handleListPipelineRuns)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}", auth(http.HandlerFunc(s.handleGetPipelineRun)))
+	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/stages", auth(http.HandlerFunc(s.handleGetPipelineRunStages)))
 	mux.Handle("GET /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleGetPipelineConfig)))
 	mux.Handle("POST /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleUpdatePipelineConfig)))
+	// Unified scan
+	mux.Handle("POST /projects/{id}/scan", auth(http.HandlerFunc(s.handleCreateScan)))
+	mux.Handle("GET /projects/{id}/scan/runs", auth(http.HandlerFunc(s.handleListScanRuns)))
 	mux.Handle("GET /projects/{id}/findings", auth(http.HandlerFunc(s.handleListFindings)))
 	mux.Handle("GET /findings/{id}", auth(http.HandlerFunc(s.handleGetFinding)))
 	mux.Handle("PATCH /findings/{id}/status", auth(http.HandlerFunc(s.handlePatchFindingStatus)))
