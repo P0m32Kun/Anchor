@@ -94,7 +94,7 @@ export function Table<T extends Record<string, unknown>>({
               <td colSpan={columns.length}>
                 <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
                   <svg
-                    className="w-12 h-12 text-text-quaternary mb-4"
+                    className="w-12 h-12 text-[#64748b] mb-4"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -106,7 +106,7 @@ export function Table<T extends Record<string, unknown>>({
                     <path d="M3 9h18" />
                     <path d="M9 21V9" />
                   </svg>
-                  <p className="text-sm text-text-tertiary">{emptyText}</p>
+                  <p className="text-sm text-[#94a3b8]">{emptyText}</p>
                 </div>
               </td>
             </tr>
