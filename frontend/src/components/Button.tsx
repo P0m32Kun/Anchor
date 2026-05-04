@@ -20,17 +20,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) {
     const base =
-      "inline-flex items-center justify-center gap-1.5 font-medium rounded-apple-sm transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100";
+      "inline-flex items-center justify-center gap-1.5 font-medium rounded-lg transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100";
 
     const variants = {
       primary:
-        "btn-dark-primary",
+        "btn-cyber-primary",
       secondary:
-        "btn-dark-secondary",
+        "btn-cyber-secondary",
       ghost:
-        "btn-dark-ghost",
+        "btn-cyber-ghost",
       danger:
-        "btn-dark-danger",
+        "btn-cyber-danger",
     };
 
     const sizes = {
