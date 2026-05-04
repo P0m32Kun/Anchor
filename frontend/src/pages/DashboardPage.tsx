@@ -77,12 +77,14 @@ export default function DashboardPage() {
           value={stats?.active_runs ?? 0}
           loading={loading}
           active={(stats?.active_runs ?? 0) > 0}
+          glow="blue"
         />
         <StatCard
           title="待处理 Findings"
           value={stats?.pending_findings ?? 0}
           loading={loading}
           active={(stats?.pending_findings ?? 0) > 0}
+          glow="blue"
         />
         <StatCard
           title="在线 Worker"
@@ -109,7 +111,7 @@ export default function DashboardPage() {
       <div className="flex gap-3">
         <button
           onClick={() => navigate("/projects")}
-          className="px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary/90 transition-colors"
+          className="btn-cyber-primary"
         >
           + 创建项目
         </button>
@@ -121,7 +123,7 @@ export default function DashboardPage() {
               navigate("/targets");
             }
           }}
-          className="px-4 py-2 rounded-lg vision-glass text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+          className="btn-cyber-secondary"
         >
           导入目标
         </button>
@@ -129,7 +131,7 @@ export default function DashboardPage() {
 
       {/* 主体内容 */}
       {isEmpty ? (
-        <div className="vision-glass p-8">
+        <div className="cyber-glass p-8">
           <EmptyState
             title="欢迎使用 Dashboard"
             description="创建项目并开始扫描，以查看跨项目统计和最近活动"
@@ -140,7 +142,7 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 最近活动 */}
-          <div className="vision-glass p-4">
+          <div className="cyber-glass p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-text-secondary">
                 最近活动
@@ -187,7 +189,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 待处理 Findings */}
-          <div className="vision-glass p-4">
+          <div className="cyber-glass p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-text-secondary">
                 待处理 Findings
@@ -243,14 +245,17 @@ function StatCard({
   value,
   loading,
   active,
+  glow,
 }: {
   title: string;
   value: number;
   loading: boolean;
   active?: boolean;
+  glow?: "blue" | "red";
 }) {
+  const glowClass = glow === "blue" && active ? " glow-blue" : "";
   return (
-    <div className="vision-glass p-4">
+    <div className={`cyber-glass p-4${glowClass}`}>
       <div className="text-xs text-text-tertiary mb-1">{title}</div>
       {loading && value === 0 ? (
         <div className="h-8 bg-white/[0.06] rounded-apple-sm animate-pulse w-16" />
