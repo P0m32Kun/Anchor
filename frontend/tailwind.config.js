@@ -26,12 +26,18 @@ export default {
         ],
       },
       colors: {
-        // Dark theme surface hierarchy (Electric Dark)
+        // Dark theme surface hierarchy (VisionOS)
         surface: {
-          DEFAULT: "#0B0E14", // Deep dark slate with a hint of navy
-          elevated: "#161B22",
-          "elevated-2": "#21262D",
-          "elevated-3": "#30363D",
+          DEFAULT: "#0A0C10",
+          elevated: "#13161C",
+          "elevated-2": "#1C1F26",
+          "elevated-3": "#262A33",
+        },
+        // Ambient light colors
+        ambient: {
+          blue: "rgba(100, 150, 255, 0.08)",
+          purple: "rgba(180, 130, 255, 0.06)",
+          glow: "rgba(255, 255, 255, 0.02)",
         },
         // Vibrant primary colors (Electric variants)
         brand: {
@@ -70,6 +76,14 @@ export default {
           "bg-active": "rgba(255,255,255,0.12)",
         },
       },
+      spacing: {
+        "apple-xs": "4px",
+        "apple-sm": "8px",
+        "apple-md": "16px",
+        "apple-lg": "24px",
+        "apple-xl": "32px",
+        "apple-2xl": "48px",
+      },
       borderRadius: {
         apple: "12px",
         "apple-sm": "8px",
@@ -78,12 +92,16 @@ export default {
         "apple-xl": "20px",
       },
       boxShadow: {
-        // Deep shadows with slight tint
         "apple-sm": "0 1px 2px rgba(0,0,0,0.5), 0 0 1px rgba(255,255,255,0.1)",
         apple: "0 4px 12px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.15)",
         "apple-md": "0 8px 24px rgba(0,0,0,0.7), 0 0 1px rgba(255,255,255,0.15)",
         "apple-lg": "0 16px 48px rgba(0,0,0,0.8), 0 0 1px rgba(255,255,255,0.2)",
-        // Glow shadows for vibrancy
+        island:
+          "0 0 0 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4), 0 24px 60px rgba(0,0,0,0.5)",
+        "island-hover":
+          "0 0 0 1px rgba(255,255,255,0.12), 0 4px 8px rgba(0,0,0,0.35), 0 16px 32px rgba(0,0,0,0.45), 0 32px 72px rgba(0,0,0,0.55)",
+        "island-glow":
+          "inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 20px rgba(255,255,255,0.02)",
         "glow-blue": "0 0 20px rgba(47,129,247,0.3), 0 0 40px rgba(47,129,247,0.1)",
         "glow-green": "0 0 20px rgba(63,185,80,0.3), 0 0 40px rgba(63,185,80,0.1)",
         "glow-red": "0 0 20px rgba(248,81,73,0.3), 0 0 40px rgba(248,81,73,0.1)",
@@ -94,11 +112,17 @@ export default {
       },
       transitionTimingFunction: {
         apple: "cubic-bezier(0.32, 0.72, 0, 1)",
+        "apple-bounce": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "apple-ease": "cubic-bezier(0.25, 0.1, 0.25, 1)",
       },
       animation: {
-        "fade-in": "fadeIn 0.25s ease-out",
+        "fade-in": "fadeIn 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)",
         "slide-up": "slideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
         "slide-down": "slideDown 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
+        "scale-in": "scaleIn 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+        "scale-out": "scaleOut 0.2s cubic-bezier(0.32, 0.72, 0, 1)",
+        "slide-in-right": "slideInRight 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
+        "glow-pulse": "glowPulse 3s ease-in-out infinite",
         shimmer: "shimmer 2s infinite linear",
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
       },
@@ -114,6 +138,22 @@ export default {
         slideDown: {
           from: { opacity: "0", transform: "translateY(-12px) scale(0.98)" },
           to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        scaleIn: {
+          from: { opacity: "0", transform: "scale(0.95) translateY(8px)" },
+          to: { opacity: "1", transform: "scale(1) translateY(0)" },
+        },
+        scaleOut: {
+          from: { opacity: "1", transform: "scale(1) translateY(0)" },
+          to: { opacity: "0", transform: "scale(0.95) translateY(8px)" },
+        },
+        slideInRight: {
+          from: { opacity: "0", transform: "translateX(20px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        glowPulse: {
+          "0%, 100%": { opacity: "0.6" },
+          "50%": { opacity: "1" },
         },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },
