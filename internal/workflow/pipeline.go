@@ -41,19 +41,23 @@ const (
 	StageVuln        StageID = "vuln"
 )
 
+// StageEventCallback is invoked when a pipeline stage changes state.
+type StageEventCallback func(runID string, stage StageID, status string, errMsg string)
+
 // Pipeline orchestrates the complete scan workflow.
 type Pipeline struct {
-	queries   *db.Queries
-	runner    *worker.Runner
-	scope     *scope.Engine
-	resolver  *resolve.Resolver
-	cdnDet    *cdn.Detector
-	fofa      *search.FofaClient
-	merger    *asset.Merger
-	dataDir   string
-	projectID string
-	config    models.PipelineConfig
-	runID     string
+	queries        *db.Queries
+	runner         *worker.Runner
+	scope          *scope.Engine
+	resolver       *resolve.Resolver
+	cdnDet         *cdn.Detector
+	fofa           *search.FofaClient
+	merger         *asset.Merger
+	dataDir        string
+	projectID      string
+	config         models.PipelineConfig
+	runID          string
+	onStageChange  StageEventCallback
 }
 
 // NewPipeline creates a new Pipeline instance.
@@ -88,6 +92,11 @@ func (p *Pipeline) WithRunID(runID string) *Pipeline {
 	return p
 }
 
+func (p *Pipeline) WithStageCallback(cb StageEventCallback) *Pipeline {
+	p.onStageChange = cb
+	return p
+}
+
 var requiredTools = []string{"subfinder", "naabu", "nerva", "cdncheck", "httpx", "nuclei"}
 
 func (p *Pipeline) checkTools() []string {
@@ -104,8 +113,76 @@ func (p *Pipeline) setStage(stage StageID) {
 	if p.runID == "" {
 		return
 	}
+	now := time.Now().UTC()
 	if err := p.queries.UpdatePipelineRunStage(p.runID, string(stage)); err != nil {
 		log.Printf("[pipeline] update stage: %v", err)
+	}
+
+	// Upsert stage record: if exists mark running, else create.
+	existing, err := p.queries.GetPipelineRunStage(p.runID, string(stage))
+	if err != nil {
+		log.Printf("[pipeline] get stage record: %v", err)
+	}
+	if existing == nil {
+		s := &models.PipelineRunStage{
+			ID:        util.GenerateID(),
+			RunID:     p.runID,
+			Stage:     string(stage),
+			Status:    models.StageStatusRunning,
+			StartedAt: &now,
+			CreatedAt: now,
+		}
+		if err := p.queries.CreatePipelineRunStage(s); err != nil {
+			log.Printf("[pipeline] create stage record: %v", err)
+		}
+	} else {
+		if err := p.queries.UpdatePipelineRunStageRecord(existing.ID, models.StageStatusRunning, "", nil); err != nil {
+			log.Printf("[pipeline] update stage record: %v", err)
+		}
+	}
+
+	if p.onStageChange != nil {
+		p.onStageChange(p.runID, stage, "running", "")
+	}
+}
+
+func (p *Pipeline) completeStage(stage StageID) {
+	if p.runID == "" {
+		return
+	}
+	now := time.Now().UTC()
+	existing, err := p.queries.GetPipelineRunStage(p.runID, string(stage))
+	if err != nil {
+		log.Printf("[pipeline] get stage record for complete: %v", err)
+		return
+	}
+	if existing != nil {
+		if err := p.queries.UpdatePipelineRunStageRecord(existing.ID, models.StageStatusCompleted, "", &now); err != nil {
+			log.Printf("[pipeline] complete stage record: %v", err)
+		}
+	}
+	if p.onStageChange != nil {
+		p.onStageChange(p.runID, stage, "completed", "")
+	}
+}
+
+func (p *Pipeline) failStage(stage StageID, errMsg string) {
+	if p.runID == "" {
+		return
+	}
+	now := time.Now().UTC()
+	existing, err := p.queries.GetPipelineRunStage(p.runID, string(stage))
+	if err != nil {
+		log.Printf("[pipeline] get stage record for fail: %v", err)
+		return
+	}
+	if existing != nil {
+		if err := p.queries.UpdatePipelineRunStageRecord(existing.ID, models.StageStatusFailed, errMsg, &now); err != nil {
+			log.Printf("[pipeline] fail stage record: %v", err)
+		}
+	}
+	if p.onStageChange != nil {
+		p.onStageChange(p.runID, stage, "failed", errMsg)
 	}
 }
 
@@ -135,11 +212,14 @@ func (p *Pipeline) runHTTPXAndNuclei(ctx context.Context, fpResults []fingerprin
 
 	var webEndpoints []*models.WebEndpoint
 	if len(httpxTargets) > 0 {
+		p.setStage(StageHTTPX)
 		endpoints, err := p.runHttpx(ctx, httpxTargets)
 		if err != nil {
 			log.Printf("httpx: %v", err)
+			p.failStage(StageHTTPX, err.Error())
 		} else {
 			webEndpoints = endpoints
+			p.completeStage(StageHTTPX)
 		}
 	}
 
@@ -148,13 +228,16 @@ func (p *Pipeline) runHTTPXAndNuclei(ctx context.Context, fpResults []fingerprin
 		if len(webEndpoints) > 0 {
 			if err := p.runNucleiWeb(ctx, webEndpoints); err != nil {
 				log.Printf("nuclei web: %v", err)
+				p.failStage(StageVuln, "nuclei web: "+err.Error())
 			}
 		}
 		if len(nonWebResults) > 0 {
 			if err := p.runNucleiNonWeb(ctx, nonWebResults); err != nil {
 				log.Printf("nuclei non-web: %v", err)
+				p.failStage(StageVuln, "nuclei non-web: "+err.Error())
 			}
 		}
+		p.completeStage(StageVuln)
 	}
 
 	return nil
@@ -225,6 +308,17 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 		} else {
 			p.queries.UpdatePipelineRunCompleted(p.runID, now)
 		}
+		// Mark any still-running stages as completed (or failed if overall failed).
+		stages, _ := p.queries.ListPipelineRunStages(p.runID)
+		for _, s := range stages {
+			if s.Status == models.StageStatusRunning {
+				if flowErr != nil {
+					p.queries.UpdatePipelineRunStageRecord(s.ID, models.StageStatusFailed, "pipeline aborted", &now)
+				} else {
+					p.queries.UpdatePipelineRunStageRecord(s.ID, models.StageStatusCompleted, "", &now)
+				}
+			}
+		}
 	}
 
 	return flowErr
@@ -270,6 +364,7 @@ func (p *Pipeline) runCompanyFlow(ctx context.Context, targets []*models.Target)
 
 	if !p.config.EnableFOFA || p.fofa == nil {
 		log.Printf("FOFA disabled or not configured, skipping company targets")
+		p.completeStage(StageSearch)
 		return nil
 	}
 
@@ -278,6 +373,7 @@ func (p *Pipeline) runCompanyFlow(ctx context.Context, targets []*models.Target)
 		results, err := p.fofa.SearchCompany(ctx, t.Value)
 		if err != nil {
 			log.Printf("fofa search for %s: %v", t.Value, err)
+			p.failStage(StageSearch, err.Error())
 			continue
 		}
 
@@ -343,6 +439,9 @@ func (p *Pipeline) runCompanyFlow(ctx context.Context, targets []*models.Target)
 		}
 	}
 
+	if flowErr == nil {
+		p.completeStage(StageSearch)
+	}
 	return flowErr
 }
 
@@ -367,13 +466,18 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 	} else {
 		allDomains = domains
 	}
+	p.completeStage(StageSubdomain)
 
 	// S3: DNS resolution
+	p.setStage(StageResolve)
 	dnsRecords, err := p.resolver.WithParallel(p.config.DNSConcurrency).
 		WithTimeout(time.Duration(p.config.DNSTimeout)*time.Second).
 		Resolve(ctx, allDomains)
 	if err != nil {
 		log.Printf("dns resolution: %v", err)
+		p.failStage(StageResolve, err.Error())
+	} else {
+		p.completeStage(StageResolve)
 	}
 
 	for _, rec := range dnsRecords {
@@ -395,7 +499,10 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 		nonCDNIPs, cdnResults, err = p.cdnDet.FilterCDNIPs(ctx, allIPs)
 		if err != nil {
 			log.Printf("cdn filter: %v", err)
+			p.failStage(StageCDNFilter, err.Error())
 			nonCDNIPs = allIPs
+		} else {
+			p.completeStage(StageCDNFilter)
 		}
 		for _, cdn := range cdnResults {
 			cdn.ProjectID = p.projectID
@@ -408,6 +515,7 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 		cdnDomains = resolve.ExtractCDNDomains(dnsRecords, cdnResults)
 	} else {
 		nonCDNIPs = allIPs
+		p.completeStage(StageCDNFilter)
 	}
 
 	// S5: Port scan
@@ -417,7 +525,12 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 		ports, err = p.runNaabu(ctx, nonCDNIPs)
 		if err != nil {
 			log.Printf("naabu: %v", err)
+			p.failStage(StagePortScan, err.Error())
+		} else {
+			p.completeStage(StagePortScan)
 		}
+	} else {
+		p.completeStage(StagePortScan)
 	}
 
 	// S6: Service fingerprinting
@@ -427,7 +540,12 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 		fpResults, err = p.runNerva(ctx, ports)
 		if err != nil {
 			log.Printf("nerva: %v", err)
+			p.failStage(StageFingerprint, err.Error())
+		} else {
+			p.completeStage(StageFingerprint)
 		}
+	} else {
+		p.completeStage(StageFingerprint)
 	}
 
 	p.saveFingerprints(fpResults)
@@ -440,7 +558,6 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 			extraTargets = append(extraTargets, fmt.Sprintf("%s:%d", port.IP, port.Port))
 		}
 	}
-	p.setStage(StageHTTPX)
 	p.runHTTPXAndNuclei(ctx, fpResults, extraTargets)
 
 	return nil
@@ -456,7 +573,14 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 	var nonCDNIPs []string
 	if p.config.EnableCDNFilter {
 		var cdnResults []models.CDNResult
-		nonCDNIPs, cdnResults, _ = p.cdnDet.FilterCDNIPs(ctx, ips)
+		var err error
+		nonCDNIPs, cdnResults, err = p.cdnDet.FilterCDNIPs(ctx, ips)
+		if err != nil {
+			log.Printf("cdn filter: %v", err)
+			p.failStage(StageCDNFilter, err.Error())
+		} else {
+			p.completeStage(StageCDNFilter)
+		}
 		for _, cdn := range cdnResults {
 			cdn.ProjectID = p.projectID
 			cdn.ID = util.GenerateID()
@@ -467,6 +591,7 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 		}
 	} else {
 		nonCDNIPs = ips
+		p.completeStage(StageCDNFilter)
 	}
 
 	// Port scan
@@ -474,6 +599,9 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 	ports, err := p.runNaabu(ctx, nonCDNIPs)
 	if err != nil {
 		log.Printf("naabu: %v", err)
+		p.failStage(StagePortScan, err.Error())
+	} else {
+		p.completeStage(StagePortScan)
 	}
 
 	// Service fingerprint
@@ -483,7 +611,12 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 		fpResults, err = p.runNerva(ctx, ports)
 		if err != nil {
 			log.Printf("nerva: %v", err)
+			p.failStage(StageFingerprint, err.Error())
+		} else {
+			p.completeStage(StageFingerprint)
 		}
+	} else {
+		p.completeStage(StageFingerprint)
 	}
 
 	p.saveFingerprints(fpResults)
@@ -496,7 +629,6 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 		}
 	}
 
-	p.setStage(StageHTTPX)
 	p.runHTTPXAndNuclei(ctx, fpResults, extraHTTPXTargets)
 
 	return nil
@@ -521,7 +653,12 @@ func (p *Pipeline) runCIDRFlow(ctx context.Context, targets []*models.Target) er
 		fpResults, err = p.runNerva(ctx, ports)
 		if err != nil {
 			log.Printf("nerva: %v", err)
+			p.failStage(StageFingerprint, err.Error())
+		} else {
+			p.completeStage(StageFingerprint)
 		}
+	} else {
+		p.completeStage(StageFingerprint)
 	}
 
 	p.saveFingerprints(fpResults)
@@ -534,7 +671,6 @@ func (p *Pipeline) runCIDRFlow(ctx context.Context, targets []*models.Target) er
 		}
 	}
 
-	p.setStage(StageHTTPX)
 	p.runHTTPXAndNuclei(ctx, fpResults, extraHTTPXTargets)
 
 	return nil
@@ -542,18 +678,23 @@ func (p *Pipeline) runCIDRFlow(ctx context.Context, targets []*models.Target) er
 
 // runURLFlow: httpx → Nuclei.
 func (p *Pipeline) runURLFlow(ctx context.Context, targets []*models.Target) error {
-	p.setStage(StageHTTPX)
-
 	urls := extractTargetValues(targets)
 
 	webEndpoints, err := p.runHttpx(ctx, urls)
 	if err != nil {
 		log.Printf("httpx: %v", err)
+		p.failStage(StageHTTPX, err.Error())
+	} else {
+		p.completeStage(StageHTTPX)
 	}
 
 	if p.config.EnableNuclei && len(webEndpoints) > 0 {
+		p.setStage(StageVuln)
 		if err := p.runNucleiWeb(ctx, webEndpoints); err != nil {
 			log.Printf("nuclei: %v", err)
+			p.failStage(StageVuln, err.Error())
+		} else {
+			p.completeStage(StageVuln)
 		}
 	}
 
@@ -817,6 +958,7 @@ func (p *Pipeline) createAndRunTask(ctx context.Context, tool string, args []str
 	task := &models.ScanTask{
 		ID:              taskID,
 		ProjectID:       p.projectID,
+		RunID:           &p.runID,
 		Tool:            tool,
 		CommandTemplate: strings.Join(args, " "),
 		Status:          models.TaskCreated,
