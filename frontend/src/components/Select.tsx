@@ -35,11 +35,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     ref
   ) {
     const selectBase =
-      "w-full bg-surface-elevated border rounded-apple-sm px-3 py-2 pr-9 text-sm text-text-primary transition-colors duration-200 appearance-none";
+      "w-full bg-black/30 border rounded-apple-sm px-3 py-2 pr-9 text-sm text-text-primary transition-all duration-150 appearance-none shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]";
 
     const selectState = error
       ? "border-brand-danger"
-      : "border-glass-border hover:border-white/[0.18]";
+      : "border-white/[0.08] hover:border-white/[0.15] focus:border-brand-primary focus:shadow-[0_0_0_3px_rgba(47,129,247,0.15),inset_0_2px_4px_rgba(0,0,0,0.5)] focus:outline-none";
 
     const selectDisabled = disabled
       ? "opacity-50 cursor-not-allowed"
