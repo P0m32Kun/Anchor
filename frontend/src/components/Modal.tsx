@@ -55,14 +55,14 @@ export default function Modal({
       }}
       role="presentation"
     >
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-xl" />
       <div
         ref={contentRef}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? "modal-title" : undefined}
-        className={`relative z-10 w-full ${sizeMap[size]} bg-surface-elevated border border-glass-border rounded-apple shadow-apple-lg animate-slide-up outline-none`}
+        className={`relative z-10 w-full ${sizeMap[size]} vision-glass-strong rounded-[20px] animate-scale-in outline-none`}
       >
         {(title || description) && (
           <div className="px-6 pt-5 pb-2">
