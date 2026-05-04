@@ -35,14 +35,14 @@ export function Table<T extends Record<string, unknown>>({
     : undefined;
 
   return (
-    <div className={`overflow-auto ${className}`} style={containerStyle}>
+    <div className={`cyber-glass rounded-xl overflow-auto ${className}`} style={containerStyle}>
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="border-b border-white/[0.06] bg-white/[0.03]">
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider whitespace-nowrap"
+                className="px-4 py-3 text-xs font-semibold text-[#94a3b8] uppercase tracking-wider whitespace-nowrap"
                 style={col.width ? { width: col.width } : undefined}
               >
                 {col.header}
@@ -73,13 +73,13 @@ export function Table<T extends Record<string, unknown>>({
                 className={`
                   border-b border-white/[0.04] relative
                   transition-colors duration-150
-                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_#2F81F7]" : "hover:bg-white/[0.04]"}
+                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_#38bdf8]" : "hover:bg-white/[0.04]"}
                 `}
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className="px-4 py-3 text-sm text-text-primary whitespace-nowrap"
+                    className="px-4 py-3 text-sm text-[#F0F6FC] whitespace-nowrap"
                   >
                     {col.render
                       ? col.render(row)
