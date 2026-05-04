@@ -16,6 +16,7 @@ import {
   DEFAULT_PIPELINE_CONFIG,
   PORT_RANGE_PRESETS,
   type PipelineConfig,
+  type Project,
 } from "../lib/api";
 
 const PRESET_VALUES = new Set(PORT_RANGE_PRESETS.map((p) => p.value).filter((v) => v !== "custom"));
@@ -30,11 +31,17 @@ export default function ScanConfigPage() {
 
   const [config, setConfig] = useState<PipelineConfig>(DEFAULT_PIPELINE_CONFIG);
   const [originalConfig, setOriginalConfig] = useState<PipelineConfig>(DEFAULT_PIPELINE_CONFIG);
+  const [project, setProject] = useState<Project | null>(null);
+  const [fofaEmail, setFofaEmail] = useState("");
+  const [fofaApiKey, setFofaApiKey] = useState("");
+  const [originalFofaEmail, setOriginalFofaEmail] = useState("");
+  const [originalFofaApiKey, setOriginalFofaApiKey] = useState("");
   const [portMode, setPortMode] = useState<string>("top1000");
   const [customPorts, setCustomPorts] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -42,15 +49,25 @@ export default function ScanConfigPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await api.getPipelineConfig(projectId, signal);
-        setConfig(data);
-        setOriginalConfig(data);
-        if (isPresetPort(data.port_range)) {
-          setPortMode(data.port_range);
+        const [configData, projectData] = await Promise.all([
+          api.getPipelineConfig(projectId, signal),
+          api.getProject(projectId, signal),
+        ]);
+        setConfig(configData);
+        setOriginalConfig(configData);
+        setProject(projectData);
+        const email = projectData.fofa_email || "";
+        const apiKey = projectData.fofa_api_key || "";
+        setFofaEmail(email);
+        setFofaApiKey(apiKey);
+        setOriginalFofaEmail(email);
+        setOriginalFofaApiKey(apiKey);
+        if (isPresetPort(configData.port_range)) {
+          setPortMode(configData.port_range);
           setCustomPorts("");
         } else {
           setPortMode("custom");
-          setCustomPorts(data.port_range);
+          setCustomPorts(configData.port_range);
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -145,9 +162,22 @@ export default function ScanConfigPage() {
     }
     setSaving(true);
     try {
-      await api.updatePipelineConfig(projectId, config);
+      const promises: Promise<unknown>[] = [
+        api.updatePipelineConfig(projectId, config),
+      ];
+      if (fofaEmail !== originalFofaEmail || fofaApiKey !== originalFofaApiKey) {
+        promises.push(
+          api.updateProject(projectId, {
+            fofa_email: fofaEmail || undefined,
+            fofa_api_key: fofaApiKey || undefined,
+          })
+        );
+      }
+      await Promise.all(promises);
       toast("扫描配置已保存", "success");
       setOriginalConfig(config);
+      setOriginalFofaEmail(fofaEmail);
+      setOriginalFofaApiKey(fofaApiKey);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "保存失败";
       toast(msg, "error");
@@ -168,7 +198,8 @@ export default function ScanConfigPage() {
     toast("已重置为默认配置（尚未保存）", "warning");
   };
 
-  const isDirty = JSON.stringify(config) !== JSON.stringify(originalConfig);
+  const isDirty = JSON.stringify(config) !== JSON.stringify(originalConfig) ||
+    fofaEmail !== originalFofaEmail || fofaApiKey !== originalFofaApiKey;
 
   if (!projectId) {
     return (
@@ -313,26 +344,54 @@ export default function ScanConfigPage() {
           <CardHeader>
             <div>
               <CardTitle>FOFA 调优</CardTitle>
-              <CardDescription>结果上限与并发</CardDescription>
+              <CardDescription>API 凭证、结果上限与并发</CardDescription>
             </div>
           </CardHeader>
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="结果上限"
-              type="number"
-              value={config.fofa_result_limit}
-              onChange={(e) => updateField("fofa_result_limit", Number(e.target.value))}
-              min={1}
-              max={10000}
-            />
-            <Input
-              label="并发数"
-              type="number"
-              value={config.fofa_concurrency}
-              onChange={(e) => updateField("fofa_concurrency", Number(e.target.value))}
-              min={1}
-              max={100}
-            />
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="FOFA Email"
+                type="email"
+                value={fofaEmail}
+                onChange={(e) => setFofaEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
+              <div className="relative">
+                <Input
+                  label="FOFA API Key"
+                  type={showApiKey ? "text" : "password"}
+                  value={fofaApiKey}
+                  onChange={(e) => setFofaApiKey(e.target.value)}
+                  placeholder="输入 API Key"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey((s) => !s)}
+                  className="absolute right-3 top-[34px] text-xs text-text-tertiary hover:text-text-secondary"
+                  title={showApiKey ? "隐藏" : "显示"}
+                >
+                  {showApiKey ? "🙈" : "👁️"}
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="结果上限"
+                type="number"
+                value={config.fofa_result_limit}
+                onChange={(e) => updateField("fofa_result_limit", Number(e.target.value))}
+                min={1}
+                max={10000}
+              />
+              <Input
+                label="并发数"
+                type="number"
+                value={config.fofa_concurrency}
+                onChange={(e) => updateField("fofa_concurrency", Number(e.target.value))}
+                min={1}
+                max={100}
+              />
+            </div>
           </div>
         </Card>
       )}
@@ -465,7 +524,7 @@ export default function ScanConfigPage() {
       {/* Sticky save bar at bottom for long page */}
       {isDirty && (
         <div className="sticky bottom-4 z-10">
-          <div className="liquid-glass rounded-apple px-4 py-3 flex items-center justify-between border border-brand-primary/30">
+          <div className="vision-glass px-4 py-3 flex items-center justify-between border border-brand-primary/30">
             <span className="text-sm text-text-secondary">配置有未保存的修改</span>
             <div className="flex gap-2">
               <Button variant="secondary" size="sm" onClick={() => load()} disabled={saving}>
@@ -502,13 +561,13 @@ function StageToggle({ label, description, enabled, onChange }: StageToggleProps
         aria-checked={enabled}
         aria-label={`${label} ${enabled ? "已开启" : "已关闭"}`}
         onClick={() => onChange(!enabled)}
-        className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
-          enabled ? "bg-brand-primary" : "bg-white/[0.10]"
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 cursor-pointer ${
+          enabled ? "bg-brand-primary" : "bg-white/10"
         }`}
       >
         <span
-          className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-            enabled ? "translate-x-[22px]" : "translate-x-0.5"
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            enabled ? "translate-x-6" : "translate-x-1"
           }`}
         />
       </button>

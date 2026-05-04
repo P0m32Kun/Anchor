@@ -1,17 +1,9 @@
 import { useNavigate } from "react-router-dom";
-import { useCallback, useEffect, useState, useMemo, useRef } from "react";
-import { API_BASE, api } from "../lib/api";
-import { getApiToken } from "../lib/config";
+import { useEffect, useState, useRef } from "react";
+import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 import { EmptyState, StatusBadge, SeverityBadge } from "../components";
-import type { Project, Run, Finding } from "../lib/api";
-
-interface Worker {
-  id: string;
-  name: string;
-  mode: string;
-  status: string;
-}
+import type { DashboardStats } from "../lib/api";
 
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -32,62 +24,18 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const currentProject = useStore((state) => state.currentProject);
 
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [runs, setRuns] = useState<Run[]>([]);
-  const [pendingFindings, setPendingFindings] = useState<Finding[]>([]);
-  const [onlineWorkers, setOnlineWorkers] = useState(0);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
-  const fetchDashboardData = useCallback(async (signal?: AbortSignal) => {
+  const fetchDashboard = async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
-
     try {
-      const projectsList = await api.listProjects(signal);
-      const validProjects = projectsList ?? [];
-      setProjects(validProjects);
-
-      const token = getApiToken();
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-      fetch(`${API_BASE}/workers`, { signal, headers })
-        .then((res) => (res.ok ? res.json() : []))
-        .then((workers: Worker[]) =>
-          setOnlineWorkers(workers.filter((w) => w.status === "online" || w.status === "busy").length)
-        )
-        .catch(() => setOnlineWorkers(0));
-
-      if (validProjects.length > 0) {
-        const [runsResults, findingsResults] = await Promise.all([
-          Promise.all(validProjects.map((p) => api.listRuns(p.id, signal).catch(() => [] as Run[]))),
-          Promise.all(validProjects.map((p) => api.listFindings(p.id, "pending_review", signal).catch(() => [] as Finding[]))),
-        ]);
-
-        // Filter out null values and flatten
-        const allRuns = runsResults
-          .flat()
-          .filter((r): r is Run => r != null)
-          .sort((a, b) => {
-            const aTime = a.started_at || a.created_at;
-            const bTime = b.started_at || b.created_at;
-            return new Date(bTime).getTime() - new Date(aTime).getTime();
-          });
-
-        const allFindings = findingsResults
-          .flat()
-          .filter((f): f is Finding => f != null)
-          .sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-
-        setRuns(allRuns);
-        setPendingFindings(allFindings);
-      } else {
-        setRuns([]);
-        setPendingFindings([]);
-      }
+      const data = await api.getDashboardStats(signal);
+      setStats(data);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "加载数据失败");
@@ -95,60 +43,25 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     abortRef.current = new AbortController();
-    fetchDashboardData(abortRef.current.signal);
+    fetchDashboard(abortRef.current.signal);
 
     const interval = setInterval(() => {
       abortRef.current?.abort();
       abortRef.current = new AbortController();
-      fetchDashboardData(abortRef.current.signal);
+      fetchDashboard(abortRef.current.signal);
     }, 10000);
 
     return () => {
       abortRef.current?.abort();
       clearInterval(interval);
     };
-  }, [fetchDashboardData]);
+  }, []);
 
-  const stats = useMemo(
-    () => ({
-      totalProjects: projects.length,
-      activeRuns: runs.filter((r) => r.status === "running").length,
-      pendingFindings: pendingFindings.length,
-      onlineWorkers,
-    }),
-    [projects.length, runs, pendingFindings.length, onlineWorkers]
-  );
-
-  const recentRuns = useMemo(() => runs.slice(0, 5), [runs]);
-  const recentFindings = useMemo(
-    () => pendingFindings.slice(0, 5),
-    [pendingFindings]
-  );
-
-  const getProjectName = useCallback(
-    (projectId: string) => {
-      return projects.find((p) => p.id === projectId)?.name || "未知项目";
-    },
-    [projects]
-  );
-
-  const handleImportTargets = () => {
-    if (currentProject) {
-      navigate(`/projects/${currentProject.id}/targets`);
-    } else {
-      navigate("/targets");
-    }
-  };
-
-  const isCompletelyEmpty =
-    !loading &&
-    projects.length === 0 &&
-    runs.length === 0 &&
-    pendingFindings.length === 0;
+  const isEmpty = !loading && stats && stats.total_projects === 0;
 
   return (
     <div className="space-y-6">
@@ -156,26 +69,26 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="总项目数"
-          value={stats.totalProjects}
+          value={stats?.total_projects ?? 0}
           loading={loading}
         />
         <StatCard
           title="活跃扫描"
-          value={stats.activeRuns}
+          value={stats?.active_runs ?? 0}
           loading={loading}
-          active={stats.activeRuns > 0}
+          active={(stats?.active_runs ?? 0) > 0}
         />
         <StatCard
           title="待处理 Findings"
-          value={stats.pendingFindings}
+          value={stats?.pending_findings ?? 0}
           loading={loading}
-          active={stats.pendingFindings > 0}
+          active={(stats?.pending_findings ?? 0) > 0}
         />
         <StatCard
           title="在线 Worker"
-          value={stats.onlineWorkers}
+          value={stats?.online_workers ?? 0}
           loading={loading}
-          active={stats.onlineWorkers > 0}
+          active={(stats?.online_workers ?? 0) > 0}
         />
       </div>
 
@@ -184,7 +97,7 @@ export default function DashboardPage() {
         <div className="rounded-lg bg-brand-danger/10 border border-brand-danger/20 text-brand-danger text-sm p-3 flex items-center justify-between">
           <span>加载数据失败：{error}</span>
           <button
-            onClick={() => fetchDashboardData()}
+            onClick={() => fetchDashboard()}
             className="underline hover:no-underline font-medium"
           >
             重试
@@ -201,16 +114,22 @@ export default function DashboardPage() {
           + 创建项目
         </button>
         <button
-          onClick={handleImportTargets}
-          className="px-4 py-2 rounded-lg liquid-glass text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+          onClick={() => {
+            if (currentProject) {
+              navigate(`/projects/${currentProject.id}/targets`);
+            } else {
+              navigate("/targets");
+            }
+          }}
+          className="px-4 py-2 rounded-lg vision-glass text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
         >
           导入目标
         </button>
       </div>
 
       {/* 主体内容 */}
-      {isCompletelyEmpty ? (
-        <div className="liquid-glass rounded-xl p-8">
+      {isEmpty ? (
+        <div className="vision-glass p-8">
           <EmptyState
             title="欢迎使用 Dashboard"
             description="创建项目并开始扫描，以查看跨项目统计和最近活动"
@@ -221,7 +140,7 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 最近活动 */}
-          <div className="liquid-glass rounded-xl p-4">
+          <div className="vision-glass p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-text-secondary">
                 最近活动
@@ -234,7 +153,7 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {recentRuns.length === 0 ? (
+            {!stats || !stats.recent_runs || stats.recent_runs.length === 0 ? (
               <div className="py-8">
                 <EmptyState
                   title="暂无扫描活动"
@@ -243,7 +162,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {recentRuns.map((run) => (
+                {stats.recent_runs.map((run) => (
                   <div
                     key={run.id}
                     onClick={() => navigate("/runs")}
@@ -254,7 +173,7 @@ export default function DashboardPage() {
                         {run.name}
                       </div>
                       <div className="text-xs text-text-tertiary mt-0.5">
-                        {getProjectName(run.project_id)} ·{" "}
+                        {run.project_name} ·{" "}
                         {run.started_at
                           ? formatRelativeTime(run.started_at)
                           : "未开始"}
@@ -268,7 +187,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 待处理 Findings */}
-          <div className="liquid-glass rounded-xl p-4">
+          <div className="vision-glass p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-text-secondary">
                 待处理 Findings
@@ -281,7 +200,7 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {recentFindings.length === 0 ? (
+            {!stats || !stats.recent_findings || stats.recent_findings.length === 0 ? (
               <div className="py-8">
                 <EmptyState
                   title="暂无待处理 Findings"
@@ -290,7 +209,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {recentFindings.map((finding) => (
+                {stats.recent_findings.map((finding) => (
                   <div
                     key={finding.id}
                     onClick={() => navigate("/findings")}
@@ -301,7 +220,7 @@ export default function DashboardPage() {
                         {finding.title}
                       </div>
                       <div className="text-xs text-text-tertiary mt-0.5">
-                        {getProjectName(finding.project_id)}
+                        {finding.project_name}
                       </div>
                     </div>
                     <SeverityBadge
@@ -331,7 +250,7 @@ function StatCard({
   active?: boolean;
 }) {
   return (
-    <div className="liquid-glass rounded-xl p-4">
+    <div className="vision-glass p-4">
       <div className="text-xs text-text-tertiary mb-1">{title}</div>
       {loading && value === 0 ? (
         <div className="h-8 bg-white/[0.06] rounded-apple-sm animate-pulse w-16" />

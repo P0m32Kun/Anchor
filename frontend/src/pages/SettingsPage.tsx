@@ -48,7 +48,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="liquid-glass rounded-xl p-5 space-y-4">
+      <div className="vision-glass p-5 space-y-4">
         {/* Server URL */}
         <div>
           <div className="text-sm font-medium mb-2">Server 地址</div>
