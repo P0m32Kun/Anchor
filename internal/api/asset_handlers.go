@@ -82,3 +82,33 @@ func (s *Server) handleListAssetsFiltered(w http.ResponseWriter, r *http.Request
 
 	writeJSON(w, http.StatusOK, filtered)
 }
+
+func (s *Server) handleListAssets(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	assets, err := s.queries.ListAssetsByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list assets failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, assets)
+}
+
+func (s *Server) handleListPorts(w http.ResponseWriter, r *http.Request) {
+	assetID := r.PathValue("id")
+	ports, err := s.queries.ListPortsByAsset(assetID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list ports failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, ports)
+}
+
+func (s *Server) handleListServices(w http.ResponseWriter, r *http.Request) {
+	assetID := r.PathValue("id")
+	services, err := s.queries.ListServicesByAsset(assetID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list services failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, services)
+}

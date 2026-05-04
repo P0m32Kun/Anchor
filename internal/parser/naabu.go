@@ -146,3 +146,19 @@ func parseNaabuCSV(r io.Reader) ([]NaabuResult, []ParseError) {
 
 	return results, errs
 }
+
+// ParseNaabuOutput parses naabu -json JSONL output into port info.
+func ParseNaabuOutput(r io.Reader) []PortInfo {
+	results, _ := ParseNaabu(r)
+	var ports []PortInfo
+	for _, res := range results {
+		if res.Port > 0 {
+			ports = append(ports, PortInfo{
+				IP:       res.IP,
+				Port:     res.Port,
+				Protocol: "tcp",
+			})
+		}
+	}
+	return ports
+}

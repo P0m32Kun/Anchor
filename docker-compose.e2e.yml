@@ -1,0 +1,155 @@
+# E2E Test Environment
+# 一键启动完整测试环境：server + worker + rangefield
+#
+# Usage:
+#   docker compose -f docker-compose.e2e.yml up -d
+#   make test-e2e
+
+services:
+  # --- Core Server ---
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: anchor-server
+    ports:
+      - "17421:17421"
+    volumes:
+      - anchor-data:/data
+    environment:
+      - ANCHOR_DATA_DIR=/data
+      - ANCHOR_PORT=17421
+      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
+    restart: unless-stopped
+    networks:
+      - anchor-net
+    healthcheck:
+      test:
+        ["CMD", "sh", "-c", "wget -qO- http://localhost:17421/health >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # --- Remote Worker ---
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: anchor-worker
+    environment:
+      - ANCHOR_DATA_DIR=/data
+      - ANCHOR_CORE_URL=http://server:17421
+      - ANCHOR_WORKER_HOST=worker
+      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
+    volumes:
+      - anchor-worker-data:/data
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+      - NET_RAW
+      - NET_ADMIN
+    command: ["--worker", "--core-url", "http://server:17421"]
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - anchor-net
+
+  # --- Rangefield: Baseline Normal Service ---
+  nginx:
+    image: nginx:alpine
+    container_name: rf-nginx
+    ports:
+      - "18080:80"
+    networks:
+      anchor-net:
+        ipv4_address: 172.30.0.10
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # --- Rangefield: Tomcat Weak Password ---
+  tomcat:
+    build:
+      context: ./docker-rangefield/apps/tomcat-vuln
+      dockerfile: Dockerfile
+    container_name: rf-tomcat
+    ports:
+      - "18081:8080"
+    networks:
+      anchor-net:
+        ipv4_address: 172.30.0.11
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/manager/html"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Rangefield: Grafana Default Credentials ---
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: rf-grafana
+    ports:
+      - "18082:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    networks:
+      anchor-net:
+        ipv4_address: 172.30.0.12
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- Rangefield: Redis Unauthenticated ---
+  redis:
+    image: redis:5-alpine
+    container_name: rf-redis
+    ports:
+      - "16379:6379"
+    command: redis-server --protected-mode no --bind 0.0.0.0
+    networks:
+      anchor-net:
+        ipv4_address: 172.30.0.13
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # --- Rangefield: MySQL Weak Password ---
+  mysql:
+    image: mariadb:10.6
+    container_name: rf-mysql
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: testdb
+    networks:
+      anchor-net:
+        ipv4_address: 172.30.0.14
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  anchor-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  anchor-data:
+  anchor-worker-data:

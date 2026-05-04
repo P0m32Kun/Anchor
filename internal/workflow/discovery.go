@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -331,7 +332,18 @@ func (w *AssetDiscoveryWorkflow) runPostDiscovery(ctx context.Context, projectID
 		return nil
 	}
 
-	httpxHostFile, err := writeHostsFile(w.dataDir, projectID, aliveIPs)
+	// Build host:port targets so httpx can probe non-standard ports.
+	var httpxTargets []string
+	for _, ip := range aliveIPs {
+		for _, nr := range naabuResults {
+			if nr.IP == ip {
+				httpxTargets = append(httpxTargets, fmt.Sprintf("%s:%d", nr.IP, nr.Port))
+			}
+		}
+	}
+	httpxTargets = dedupStrings(httpxTargets)
+
+	httpxHostFile, err := writeHostsFile(w.dataDir, projectID, httpxTargets)
 	if err != nil {
 		return fmt.Errorf("write httpx host file: %w", err)
 	}
@@ -392,8 +404,17 @@ func (w *AssetDiscoveryWorkflow) runPostDiscovery(ctx context.Context, projectID
 // getPortRange returns the project's configured port range or the default "tp100".
 func (w *AssetDiscoveryWorkflow) getPortRange(projectID string) string {
 	project, _ := w.queries.GetProject(projectID)
-	if project != nil && project.PortRange != nil && *project.PortRange != "" {
-		return *project.PortRange
+	if project != nil {
+		if project.PortRange != nil && *project.PortRange != "" {
+			return *project.PortRange
+		}
+		// Fallback to pipeline config port_range
+		if project.PipelineConfig != nil && *project.PipelineConfig != "" {
+			var cfg models.PipelineConfig
+			if err := json.Unmarshal([]byte(*project.PipelineConfig), &cfg); err == nil && cfg.PortRange != "" {
+				return cfg.PortRange
+			}
+		}
 	}
 	return "tp100"
 }
@@ -408,6 +429,8 @@ func buildNaabuArgsWithPortRange(hostFile, portRange string) []string {
 		args = append(args, "-tp", "1000")
 	case "tpfull", "topfull", "full":
 		args = append(args, "-tp", "full")
+	case "high-risk", "highrisk", "hr":
+		args = append(args, "-p", worker.HighRiskPorts)
 	default:
 		args = append(args, "-p", portRange)
 	}

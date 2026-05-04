@@ -1,3 +1,11 @@
+---
+status: review_material
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-04
+scope: v0.3-review-material
+---
+
 # v0.3 Desktop Usability & Reliability — 多模型评审后实施方案
 
 > **版本**：v2.0（基于多模型评审汇总修订）  
@@ -5,6 +13,7 @@
 > **评审日期**：2026-04-29  
 > **参与模型**：kimi-coding、glm-5.1、deepseek-v4-pro（mimo-v2.5-pro 调用失败，未参与）
 > **状态**：✅ 已完成（2026-05-01）
+> **文档角色**：评审汇总材料，不是当前仓库级计划
 
 ---
 

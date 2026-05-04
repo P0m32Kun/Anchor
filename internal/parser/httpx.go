@@ -6,6 +6,9 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
 // ParseHTTPX reads httpx JSONL output and returns discovered web endpoints.
@@ -109,7 +112,7 @@ func ParseHTTPX(r io.Reader) ([]HTTPXResult, []ParseError) {
 						res.Tech = append(res.Tech, c.Product)
 						seen[strings.ToLower(c.Product)] = true
 					}
-			}
+				}
 			}
 		}
 
@@ -121,4 +124,29 @@ func ParseHTTPX(r io.Reader) ([]HTTPXResult, []ParseError) {
 	}
 
 	return results, errs
+}
+
+// ParseHttpxOutput parses httpx -json JSONL output into WebEndpoint models.
+func ParseHttpxOutput(r io.Reader) []*models.WebEndpoint {
+	results, _ := ParseHTTPX(r)
+	var endpoints []*models.WebEndpoint
+	for _, res := range results {
+		if res.URL == "" {
+			continue
+		}
+		endpoint := &models.WebEndpoint{
+			URL:          res.URL,
+			Scheme:       res.Scheme,
+			Host:         res.Host,
+			Title:        res.Title,
+			Technologies: res.Tech,
+			SourceTool:   "httpx",
+			CreatedAt:    time.Now().UTC(),
+		}
+		if res.StatusCode > 0 {
+			endpoint.StatusCode = &res.StatusCode
+		}
+		endpoints = append(endpoints, endpoint)
+	}
+	return endpoints
 }

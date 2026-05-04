@@ -7,13 +7,13 @@ import (
 
 // JSONExport represents the top-level JSON export structure.
 type JSONExport struct {
-	Meta           JSONMeta            `json:"meta"`
-	Project        *JSONProject        `json:"project"`
-	Targets        []*JSONTarget       `json:"targets"`
-	ScopeRules     []*JSONScopeRule    `json:"scope_rules"`
-	Assets         []*JSONAsset        `json:"assets"`
-	WebEndpoints   []*JSONWebEndpoint  `json:"web_endpoints"`
-	Findings       []*JSONReportFinding `json:"findings"`
+	Meta            JSONMeta              `json:"meta"`
+	Project         *JSONProject          `json:"project"`
+	Targets         []*JSONTarget         `json:"targets"`
+	ScopeRules      []*JSONScopeRule      `json:"scope_rules"`
+	Assets          []*JSONAsset          `json:"assets"`
+	WebEndpoints    []*JSONWebEndpoint    `json:"web_endpoints"`
+	Findings        []*JSONReportFinding  `json:"findings"`
 	ToolInvocations []*JSONToolInvocation `json:"tool_invocations"`
 }
 
@@ -65,10 +65,10 @@ type JSONWebEndpoint struct {
 }
 
 type JSONReportFinding struct {
-	Finding       JSONFinding      `json:"finding"`
-	Asset         *JSONAsset       `json:"asset"`
-	WebEndpoint   *JSONWebEndpoint `json:"web_endpoint"`
-	Evidence      []*JSONEvidence  `json:"evidence"`
+	Finding     JSONFinding      `json:"finding"`
+	Asset       *JSONAsset       `json:"asset"`
+	WebEndpoint *JSONWebEndpoint `json:"web_endpoint"`
+	Evidence    []*JSONEvidence  `json:"evidence"`
 }
 
 type JSONFinding struct {
@@ -109,6 +109,12 @@ func GenerateJSON(data *ReportData) ([]byte, error) {
 			Tool:        "anchor",
 			Version:     "0.1.0",
 		},
+		Targets:         make([]*JSONTarget, 0),
+		ScopeRules:      make([]*JSONScopeRule, 0),
+		Assets:          make([]*JSONAsset, 0),
+		WebEndpoints:    make([]*JSONWebEndpoint, 0),
+		Findings:        make([]*JSONReportFinding, 0),
+		ToolInvocations: make([]*JSONToolInvocation, 0),
 	}
 
 	// Project.

@@ -13,8 +13,6 @@ export default function SettingsPage() {
   const placeholderText = isDefaultRelative
     ? "http://localhost:17421 (auto)"
     : rawBase || "http://localhost:17421";
-  const [portRangePreset, setPortRangePreset] = useState<"top100" | "top1000" | "common" | "custom">("top100");
-  const [customPortRange, setCustomPortRange] = useState("");
   const isTauri = !!(window as any).__TAURI__;
 
   useEffect(() => {
@@ -111,55 +109,6 @@ export default function SettingsPage() {
                 {showToken ? "🙈" : "👁️"}
               </button>
             </div>
-          </div>
-        </div>
-
-        <div className="border-t border-white/[0.06] pt-4">
-          <div className="text-sm font-medium mb-2">扫描配置</div>
-          <div className="text-xs text-text-tertiary mb-2">
-            端口范围设置（Project 级别）
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-text-tertiary block mb-1">端口范围</label>
-              <select
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary/50"
-                value={portRangePreset}
-                onChange={(e) => setPortRangePreset(e.target.value as any)}
-              >
-                <option value="top100">Top 100 常用端口</option>
-                <option value="top1000">Top 1000 常用端口</option>
-                <option value="common">全部常见端口</option>
-                <option value="custom">自定义</option>
-              </select>
-            </div>
-            {portRangePreset === "custom" && (
-              <div>
-                <label className="text-xs text-text-tertiary block mb-1">自定义端口</label>
-                <input
-                  type="text"
-                  value={customPortRange}
-                  onChange={(e) => setCustomPortRange(e.target.value)}
-                  placeholder="80,443,8080 或 1-65535"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary/50"
-                />
-                <div className="text-xs text-text-tertiary mt-1">
-                  支持格式：单端口 80，多端口 80,443,8080，范围 1-1000
-                </div>
-              </div>
-            )}
-            {/* TODO: Enable when project context is available.
-              Requires: current project ID + api.updateProject(id, { port_range: ... })
-              Blocked by: No global current-project selector in Zustand store.
-              See: e2e/tests/SettingsPage.e2e.md Test 4
-            */}
-            <button
-              disabled
-              className="bg-brand-primary/40 text-white/60 text-sm px-4 py-2 rounded-lg cursor-not-allowed"
-              title="需在项目内才能保存扫描配置"
-            >
-              保存扫描配置
-            </button>
           </div>
         </div>
 

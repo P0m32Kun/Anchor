@@ -10,17 +10,18 @@ import (
 // --- Project ---
 
 type Project struct {
-	ID             string     `json:"id" db:"id"`
-	Name           string     `json:"name" db:"name"`
-	Organization   string     `json:"organization" db:"organization"`
-	Purpose        string     `json:"purpose" db:"purpose"`
-	StartTime      *time.Time `json:"start_time" db:"start_time"`
-	EndTime        *time.Time `json:"end_time" db:"end_time"`
-	RateLimit      int        `json:"rate_limit" db:"rate_limit"`
-	PortRange      *string    `json:"port_range,omitempty" db:"port_range"`
-	DefaultProfile string     `json:"default_profile" db:"default_profile"`
-	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`
+	ID             string    `json:"id" db:"id"`
+	Name           string    `json:"name" db:"name"`
+	Organization   string    `json:"organization" db:"organization"`
+	Purpose        string    `json:"purpose" db:"purpose"`
+	RateLimit      int       `json:"rate_limit" db:"rate_limit"`
+	PortRange      *string   `json:"port_range,omitempty" db:"port_range"`
+	DefaultProfile string    `json:"default_profile" db:"default_profile"`
+	FofaEmail      *string   `json:"fofa_email,omitempty" db:"fofa_email"`
+	FofaAPIKey     *string   `json:"fofa_api_key,omitempty" db:"fofa_api_key"`
+	PipelineConfig *string   `json:"pipeline_config,omitempty" db:"pipeline_config"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // --- Target ---
@@ -39,10 +40,11 @@ type IPDiscoveryResult struct {
 type TargetType string
 
 const (
-	TargetTypeDomain TargetType = "domain"
-	TargetTypeURL    TargetType = "url"
-	TargetTypeIP     TargetType = "ip"
-	TargetTypeCIDR   TargetType = "cidr"
+	TargetTypeDomain  TargetType = "domain"
+	TargetTypeURL     TargetType = "url"
+	TargetTypeIP      TargetType = "ip"
+	TargetTypeCIDR    TargetType = "cidr"
+	TargetTypeCompany TargetType = "company"
 )
 
 type Target struct {
@@ -317,14 +319,14 @@ const (
 )
 
 type Asset struct {
-	ID              string    `json:"id" db:"id"`
-	ProjectID       string    `json:"project_id" db:"project_id"`
-	Type            AssetType `json:"type" db:"type"`
-	Value           string    `json:"value" db:"value"`
-	NormalizedValue string    `json:"normalized_value" db:"normalized_value"`
-	SourceTools     []string  `json:"source_tools" db:"source_tools"`
-	FirstSeen       time.Time `json:"first_seen" db:"first_seen"`
-	LastSeen        time.Time `json:"last_seen" db:"last_seen"`
+	ID              string            `json:"id" db:"id"`
+	ProjectID       string            `json:"project_id" db:"project_id"`
+	Type            AssetType         `json:"type" db:"type"`
+	Value           string            `json:"value" db:"value"`
+	NormalizedValue string            `json:"normalized_value" db:"normalized_value"`
+	SourceTools     []string          `json:"source_tools" db:"source_tools"`
+	FirstSeen       time.Time         `json:"first_seen" db:"first_seen"`
+	LastSeen        time.Time         `json:"last_seen" db:"last_seen"`
 	Tags            map[string]string `json:"tags" db:"tags"`
 }
 
@@ -358,20 +360,20 @@ type Service struct {
 // --- WebEndpoint ---
 
 type WebEndpoint struct {
-	ID                 string    `json:"id" db:"id"`
-	ProjectID          string    `json:"project_id" db:"project_id"`
-	AssetID            string    `json:"asset_id" db:"asset_id"`
-	URL                string    `json:"url" db:"url"`
-	Scheme             string    `json:"scheme" db:"scheme"`
-	Host               string    `json:"host" db:"host"`
-	Port               *int      `json:"port" db:"port"`
-	Path               string    `json:"path" db:"path"`
-	StatusCode         *int      `json:"status_code" db:"status_code"`
-	Title              string    `json:"title" db:"title"`
-	Technologies       []string  `json:"technologies" db:"technologies"`
-	ScreenshotArtifactID *string `json:"screenshot_artifact_id" db:"screenshot_artifact_id"`
-	SourceTool         string    `json:"source_tool" db:"source_tool"`
-	CreatedAt          time.Time `json:"created_at" db:"created_at"`
+	ID                   string    `json:"id" db:"id"`
+	ProjectID            string    `json:"project_id" db:"project_id"`
+	AssetID              string    `json:"asset_id" db:"asset_id"`
+	URL                  string    `json:"url" db:"url"`
+	Scheme               string    `json:"scheme" db:"scheme"`
+	Host                 string    `json:"host" db:"host"`
+	Port                 *int      `json:"port" db:"port"`
+	Path                 string    `json:"path" db:"path"`
+	StatusCode           *int      `json:"status_code" db:"status_code"`
+	Title                string    `json:"title" db:"title"`
+	Technologies         []string  `json:"technologies" db:"technologies"`
+	ScreenshotArtifactID *string   `json:"screenshot_artifact_id" db:"screenshot_artifact_id"`
+	SourceTool           string    `json:"source_tool" db:"source_tool"`
+	CreatedAt            time.Time `json:"created_at" db:"created_at"`
 }
 
 // --- Finding ---
@@ -399,26 +401,26 @@ const (
 )
 
 type Finding struct {
-	ID             string          `json:"id" db:"id"`
-	ProjectID      string          `json:"project_id" db:"project_id"`
-	AssetID        *string         `json:"asset_id" db:"asset_id"`
-	ServiceID      *string         `json:"service_id" db:"service_id"`
-	WebEndpointID  *string         `json:"web_endpoint_id" db:"web_endpoint_id"`
-	SourceTool     string          `json:"source_tool" db:"source_tool"`
-	SourceRuleID   string          `json:"source_rule_id" db:"source_rule_id"`
-	DedupKey       string          `json:"dedup_key" db:"dedup_key"`
-	Title          string          `json:"title" db:"title"`
-	Severity       FindingSeverity `json:"severity" db:"severity"`
-	Confidence     int             `json:"confidence" db:"confidence"`
-	Priority       int             `json:"priority" db:"priority"`
-	Status         FindingStatus   `json:"status" db:"status"`
-	Summary        string          `json:"summary" db:"summary"`
-	Remediation    string          `json:"remediation" db:"remediation"`
+	ID              string          `json:"id" db:"id"`
+	ProjectID       string          `json:"project_id" db:"project_id"`
+	AssetID         *string         `json:"asset_id" db:"asset_id"`
+	ServiceID       *string         `json:"service_id" db:"service_id"`
+	WebEndpointID   *string         `json:"web_endpoint_id" db:"web_endpoint_id"`
+	SourceTool      string          `json:"source_tool" db:"source_tool"`
+	SourceRuleID    string          `json:"source_rule_id" db:"source_rule_id"`
+	DedupKey        string          `json:"dedup_key" db:"dedup_key"`
+	Title           string          `json:"title" db:"title"`
+	Severity        FindingSeverity `json:"severity" db:"severity"`
+	Confidence      int             `json:"confidence" db:"confidence"`
+	Priority        int             `json:"priority" db:"priority"`
+	Status          FindingStatus   `json:"status" db:"status"`
+	Summary         string          `json:"summary" db:"summary"`
+	Remediation     string          `json:"remediation" db:"remediation"`
 	RawRequest      string          `json:"raw_request" db:"raw_request"`
 	RawResponse     string          `json:"raw_response" db:"raw_response"`
 	MatchedTemplate string          `json:"matched_template" db:"matched_template"`
-	CreatedAt      time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at" db:"updated_at"`
+	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
 }
 
 // --- Evidence ---
@@ -435,13 +437,13 @@ const (
 )
 
 type Evidence struct {
-	ID        string       `json:"id" db:"id"`
-	FindingID string       `json:"finding_id" db:"finding_id"`
-	Type      EvidenceType `json:"type" db:"type"`
-	ArtifactID *string     `json:"artifact_id" db:"artifact_id"`
-	Excerpt   string       `json:"excerpt" db:"excerpt"`
-	CreatedBy string       `json:"created_by" db:"created_by"`
-	CreatedAt time.Time    `json:"created_at" db:"created_at"`
+	ID         string       `json:"id" db:"id"`
+	FindingID  string       `json:"finding_id" db:"finding_id"`
+	Type       EvidenceType `json:"type" db:"type"`
+	ArtifactID *string      `json:"artifact_id" db:"artifact_id"`
+	Excerpt    string       `json:"excerpt" db:"excerpt"`
+	CreatedBy  string       `json:"created_by" db:"created_by"`
+	CreatedAt  time.Time    `json:"created_at" db:"created_at"`
 }
 
 func (f FindingSeverity) Value() (driver.Value, error) { return string(f), nil }
@@ -520,17 +522,17 @@ func ToJSON(v interface{}) json.RawMessage {
 // --- ToolTemplate ---
 
 type ToolTemplate struct {
-	ID                       string    `json:"id" db:"id"`
-	Name                     string    `json:"name" db:"name"`
-	Description              string    `json:"description" db:"description"`
-	ProfileType              string    `json:"profile_type" db:"profile_type"`
-	ToolsJSON                string    `json:"tools_json" db:"tools_json"`
-	DefaultMaxConcurrency    int       `json:"default_max_concurrency" db:"default_max_concurrency"`
-	ScreenshotEnabled        bool      `json:"screenshot_enabled" db:"screenshot_enabled"`
-	DirectoryBruteforceEnabled bool    `json:"directory_bruteforce_enabled" db:"directory_bruteforce_enabled"`
-	NucleiSeverityFilter     string    `json:"nuclei_severity_filter" db:"nuclei_severity_filter"`
-	CreatedAt                time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt                time.Time `json:"updated_at" db:"updated_at"`
+	ID                         string    `json:"id" db:"id"`
+	Name                       string    `json:"name" db:"name"`
+	Description                string    `json:"description" db:"description"`
+	ProfileType                string    `json:"profile_type" db:"profile_type"`
+	ToolsJSON                  string    `json:"tools_json" db:"tools_json"`
+	DefaultMaxConcurrency      int       `json:"default_max_concurrency" db:"default_max_concurrency"`
+	ScreenshotEnabled          bool      `json:"screenshot_enabled" db:"screenshot_enabled"`
+	DirectoryBruteforceEnabled bool      `json:"directory_bruteforce_enabled" db:"directory_bruteforce_enabled"`
+	NucleiSeverityFilter       string    `json:"nuclei_severity_filter" db:"nuclei_severity_filter"`
+	CreatedAt                  time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt                  time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type TemplateTool struct {
@@ -552,14 +554,14 @@ func (t *ToolTemplate) Tools() ([]TemplateTool, error) {
 type StepName string
 
 const (
-	StepScopeCheck      StepName = "scope_check"
-	StepPrepareInput    StepName = "prepare_input"
-	StepRunTool         StepName = "run_tool"
+	StepScopeCheck       StepName = "scope_check"
+	StepPrepareInput     StepName = "prepare_input"
+	StepRunTool          StepName = "run_tool"
 	StepCollectArtifacts StepName = "collect_artifacts"
-	StepParseOutput     StepName = "parse_output"
-	StepNormalizeResult StepName = "normalize_result"
-	StepScoreResult     StepName = "score_result"
-	StepCleanup         StepName = "cleanup"
+	StepParseOutput      StepName = "parse_output"
+	StepNormalizeResult  StepName = "normalize_result"
+	StepScoreResult      StepName = "score_result"
+	StepCleanup          StepName = "cleanup"
 )
 
 type StepStatus string
@@ -657,11 +659,11 @@ type WorkerNode struct {
 type HealthCheckStatus string
 
 const (
-	HealthCheckReady            HealthCheckStatus = "ready"
-	HealthCheckMissing          HealthCheckStatus = "missing"
-	HealthCheckVersionMismatch  HealthCheckStatus = "version_mismatch"
-	HealthCheckConfigError      HealthCheckStatus = "config_error"
-	HealthCheckPermissionError  HealthCheckStatus = "permission_error"
+	HealthCheckReady           HealthCheckStatus = "ready"
+	HealthCheckMissing         HealthCheckStatus = "missing"
+	HealthCheckVersionMismatch HealthCheckStatus = "version_mismatch"
+	HealthCheckConfigError     HealthCheckStatus = "config_error"
+	HealthCheckPermissionError HealthCheckStatus = "permission_error"
 )
 
 type WorkerHealthCheck struct {
@@ -679,11 +681,11 @@ type WorkerHealthCheck struct {
 type RunStatus string
 
 const (
-	RunPending    RunStatus = "pending"
-	RunRunning    RunStatus = "running"
-	RunCompleted  RunStatus = "completed"
-	RunFailed     RunStatus = "failed"
-	RunCancelled  RunStatus = "cancelled"
+	RunPending   RunStatus = "pending"
+	RunRunning   RunStatus = "running"
+	RunCompleted RunStatus = "completed"
+	RunFailed    RunStatus = "failed"
+	RunCancelled RunStatus = "cancelled"
 )
 
 type Run struct {
@@ -717,10 +719,10 @@ type Screenshot struct {
 type RetestResult string
 
 const (
-	RetestStillPresent   RetestResult = "still_present"
-	RetestFixed          RetestResult = "fixed"
-	RetestInconclusive   RetestResult = "inconclusive"
-	RetestFailedToTest   RetestResult = "failed_to_test"
+	RetestStillPresent RetestResult = "still_present"
+	RetestFixed        RetestResult = "fixed"
+	RetestInconclusive RetestResult = "inconclusive"
+	RetestFailedToTest RetestResult = "failed_to_test"
 )
 
 type RetestRun struct {
@@ -730,4 +732,101 @@ type RetestRun struct {
 	Result     RetestResult `json:"result" db:"result"`
 	EvidenceID *string      `json:"evidence_id" db:"evidence_id"`
 	CreatedAt  time.Time    `json:"created_at" db:"created_at"`
+}
+
+// --- Pipeline Config ---
+
+type PipelineConfig struct {
+	EnableFOFA          bool   `json:"enable_fofa"`
+	FofaResultLimit     int    `json:"fofa_result_limit"`
+	FofaConcurrency     int    `json:"fofa_concurrency"`
+	EnableSubfinder     bool   `json:"enable_subfinder"`
+	SubfinderTimeout    int    `json:"subfinder_timeout"`
+	DNSConcurrency      int    `json:"dns_concurrency"`
+	DNSTimeout          int    `json:"dns_timeout"`
+	EnableCDNFilter     bool   `json:"enable_cdn_filter"`
+	PortRange           string `json:"port_range"`
+	PortScanTimeout     int    `json:"port_scan_timeout"`
+	PortScanConcurrency int    `json:"port_scan_concurrency"`
+	EnableNerva         bool   `json:"enable_nerva"`
+	NervaTimeout        int    `json:"nerva_timeout"`
+	NervaConcurrency    int    `json:"nerva_concurrency"`
+	EnableNuclei        bool   `json:"enable_nuclei"`
+	NucleiRateLimit     int    `json:"nuclei_rate_limit"`
+	NucleiConcurrency   int    `json:"nuclei_concurrency"`
+}
+
+func DefaultPipelineConfig() PipelineConfig {
+	return PipelineConfig{
+		EnableFOFA:          true,
+		FofaResultLimit:     500,
+		FofaConcurrency:     5,
+		EnableSubfinder:     true,
+		SubfinderTimeout:    300,
+		DNSConcurrency:      50,
+		DNSTimeout:          5,
+		EnableCDNFilter:     true,
+		PortRange:           "top1000",
+		PortScanTimeout:     600,
+		PortScanConcurrency: 100,
+		EnableNerva:         true,
+		NervaTimeout:        10,
+		NervaConcurrency:    50,
+		EnableNuclei:        true,
+		NucleiRateLimit:     100,
+		NucleiConcurrency:   25,
+	}
+}
+
+// --- DNS ---
+
+type DNSRecord struct {
+	ID        string    `json:"id"`
+	ProjectID string    `json:"project_id"`
+	Domain    string    `json:"domain"`
+	IPs       []string  `json:"ips"`
+	CNAMEs    []string  `json:"cnames,omitempty"`
+	TTL       uint32    `json:"ttl"`
+	Resolver  string    `json:"resolver"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// --- CDN ---
+
+type CDNResult struct {
+	ID        string    `json:"id"`
+	ProjectID string    `json:"project_id"`
+	IP        string    `json:"ip"`
+	IsCDN     bool      `json:"is_cdn"`
+	Provider  string    `json:"provider,omitempty"`
+	Type      string    `json:"type,omitempty"` // cdn | waf | cloud
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// --- Service Fingerprint ---
+
+type ServiceFingerprint struct {
+	ID        string                 `json:"id"`
+	ProjectID string                 `json:"project_id"`
+	IP        string                 `json:"ip"`
+	Port      int                    `json:"port"`
+	Protocol  string                 `json:"protocol"`
+	IsWeb     bool                   `json:"is_web"`
+	Service   string                 `json:"service"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Source    string                 `json:"source"`
+	CreatedAt time.Time              `json:"created_at"`
+}
+
+// --- Pipeline Run ---
+
+type PipelineRun struct {
+	ID          string     `json:"id" db:"id"`
+	ProjectID   string     `json:"project_id" db:"project_id"`
+	Status      string     `json:"status" db:"status"` // running | completed | failed | cancelled
+	Stage       string     `json:"stage,omitempty" db:"stage"`
+	Error       string     `json:"error,omitempty" db:"error"`
+	StartedAt   time.Time  `json:"started_at" db:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 }

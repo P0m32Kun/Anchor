@@ -2,9 +2,15 @@ package api
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/errors"
@@ -12,7 +18,6 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
-// Remote worker task queue
 func (s *Server) initTaskQueue() {
 	s.taskQueue = make(map[string]chan *models.ScanTask)
 	s.taskResults = make(map[string]chan map[string]interface{})
@@ -35,7 +40,6 @@ func generateToken() string {
 	return hex.EncodeToString(b)
 }
 
-// POST /workers/register
 func (s *Server) handleRegisterWorker(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name     string `json:"name"`
@@ -51,9 +55,9 @@ func (s *Server) handleRegisterWorker(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 
 	worker := &models.WorkerNode{
-		ID:       id,
-		Name:     req.Name,
-		Endpoint: req.Endpoint,
+		ID:         id,
+		Name:       req.Name,
+		Endpoint:   req.Endpoint,
 		Mode:       models.WorkerModeRemote,
 		Status:     models.WorkerStatusOnline,
 		TrustLevel: "standard",
@@ -66,7 +70,6 @@ func (s *Server) handleRegisterWorker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Initialize task channel for this worker
 	s.mu.Lock()
 	s.taskQueue[id] = make(chan *models.ScanTask, 10)
 	s.taskResults[id] = make(chan map[string]interface{}, 10)
@@ -78,7 +81,6 @@ func (s *Server) handleRegisterWorker(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /workers/{id}/heartbeat
 func (s *Server) handleWorkerHeartbeat(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -105,11 +107,9 @@ func (s *Server) handleWorkerHeartbeat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// GET /workers/{id}/tasks/poll
 func (s *Server) handlePollTasks(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	// Check if worker exists and is not revoked
 	worker, err := s.queries.GetWorkerNode(id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get worker: %v", err))
@@ -124,7 +124,6 @@ func (s *Server) handlePollTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get or create task channel
 	s.mu.Lock()
 	ch, ok := s.taskQueue[id]
 	if !ok {
@@ -133,7 +132,6 @@ func (s *Server) handlePollTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 
-	// Try to get a task with timeout
 	select {
 	case task := <-ch:
 		writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -150,7 +148,6 @@ func (s *Server) handlePollTasks(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// POST /tasks/{id}/result
 func (s *Server) handleTaskResult(w http.ResponseWriter, r *http.Request) {
 	taskID := r.PathValue("id")
 	var req struct {
@@ -163,7 +160,6 @@ func (s *Server) handleTaskResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update task status in database
 	status := models.TaskStatus(req.Status)
 	now := time.Now().UTC()
 	var exitCode int
@@ -171,21 +167,71 @@ func (s *Server) handleTaskResult(w http.ResponseWriter, r *http.Request) {
 		exitCode = 1
 	}
 
+	// Save worker artifacts BEFORE updating task status to avoid race with
+	// dispatchToWorker polling for completion.
+	task, _ := s.queries.GetScanTask(taskID)
+	for _, art := range req.Artifacts {
+		artType, _ := art["type"].(string)
+		artName, _ := art["name"].(string)
+		var data []byte
+		switch v := art["data"].(type) {
+		case []byte:
+			data = v
+		case string:
+			decoded, err := base64.StdEncoding.DecodeString(v)
+			if err != nil {
+				data = []byte(v)
+			} else {
+				data = decoded
+			}
+		default:
+			continue
+		}
+		var workdir string
+		if task != nil {
+			workdir = filepath.Join(s.dataDir, "workdirs", task.ProjectID, taskID)
+		} else {
+			workdir = filepath.Join(s.dataDir, "workdirs", taskID)
+		}
+		_ = os.MkdirAll(workdir, 0750)
+		filename := artName
+		if filename == "" {
+			filename = fmt.Sprintf("%s_%d.txt", artType, time.Now().UnixNano())
+		}
+		path := filepath.Join(workdir, filename)
+		if err := os.WriteFile(path, data, 0640); err != nil {
+			log.Printf("[server] save artifact %s: %v", path, err)
+			continue
+		}
+		sum := sha256.Sum256(data)
+		a := &models.RawArtifact{
+			ID:              util.GenerateID(),
+			ProjectID:       task.ProjectID,
+			TaskID:          &taskID,
+			Type:            models.ArtifactType(artType),
+			Path:            path,
+			SHA256:          fmt.Sprintf("%x", sum),
+			Size:            int64(len(data)),
+			RedactionStatus: "unchecked",
+			CreatedAt:       now,
+		}
+		if err := s.queries.CreateRawArtifact(a); err != nil {
+			log.Printf("[server] create raw artifact: %v", err)
+		}
+	}
+
 	if err := s.queries.UpdateScanTaskStatus(taskID, status, &exitCode, &now); err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update task: %v", err))
 		return
 	}
 
-	// Check if associated run is complete
-	task, err := s.queries.GetScanTask(taskID)
-	if err == nil && task != nil && task.RunID != nil {
+	if task != nil && task.RunID != nil {
 		go s.checkRunCompletion(*task.RunID)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// POST /workers/{id}/revoke
 func (s *Server) handleRevokeWorker(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	now := time.Now().UTC()
@@ -196,7 +242,6 @@ func (s *Server) handleRevokeWorker(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
 }
 
-// DELETE /workers/{id}
 func (s *Server) handleDeleteWorker(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 

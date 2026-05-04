@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
 func TestExtractValues(t *testing.T) {
@@ -181,6 +182,18 @@ func TestBuildNaabuArgsWithPortRange(t *testing.T) {
 			hostFile:  "hosts.txt",
 			portRange: "TOP100",
 			want:      []string{"naabu", "-json", "-list", "hosts.txt"},
+		},
+		{
+			name:      "high-risk",
+			hostFile:  "hosts.txt",
+			portRange: "high-risk",
+			want:      []string{"naabu", "-json", "-list", "hosts.txt", "-p", worker.HighRiskPorts},
+		},
+		{
+			name:      "high-risk alias hr",
+			hostFile:  "hosts.txt",
+			portRange: "HR",
+			want:      []string{"naabu", "-json", "-list", "hosts.txt", "-p", worker.HighRiskPorts},
 		},
 	}
 

@@ -148,6 +148,10 @@ func parseLine(line string) []ImportTarget {
 				explicitType = models.TargetTypeCIDR
 				hasExplicitType = true
 				content = val
+			case "company":
+				explicitType = models.TargetTypeCompany
+				hasExplicitType = true
+				content = val
 			default:
 				// Unrecognized type, treat whole line as domain.
 				hasExplicitType = false
@@ -212,6 +216,7 @@ func expandCommas(line string) []string {
 //   - http:// or https:// prefix  → url
 //   - Contains "/" and valid CIDR → cidr
 //   - Valid IPv4 or IPv4 range    → ip
+//   - Looks like a company name   → company
 //   - Otherwise                   → domain
 func DetectType(val string) models.TargetType {
 	if strings.HasPrefix(val, "http://") || strings.HasPrefix(val, "https://") {
@@ -225,7 +230,46 @@ func DetectType(val string) models.TargetType {
 	if looksLikeIPv4(val) {
 		return models.TargetTypeIP
 	}
+	if isLikelyCompanyName(val) {
+		return models.TargetTypeCompany
+	}
 	return models.TargetTypeDomain
+}
+
+// isLikelyCompanyName checks if a value looks like a company name rather than a domain.
+// Heuristics: contains spaces, Chinese characters, or common company suffixes.
+func isLikelyCompanyName(val string) bool {
+	val = strings.TrimSpace(val)
+	if val == "" {
+		return false
+	}
+
+	// Contains spaces → likely a company name
+	if strings.Contains(val, " ") {
+		return true
+	}
+
+	// Contains Chinese characters → likely a Chinese company name
+	for _, r := range val {
+		if r >= 0x4e00 && r <= 0x9fff {
+			return true
+		}
+	}
+
+	// Common company suffixes
+	suffixes := []string{
+		" inc", " corp", " ltd", " llc", " limited", " corporation",
+		" company", " group", " holdings", " technologies", " solutions",
+		"科技", "技术", "有限公司", "集团", "股份", "公司",
+	}
+	lower := strings.ToLower(val)
+	for _, s := range suffixes {
+		if strings.HasSuffix(lower, s) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // looksLikeIPv4 reports whether val is a valid IPv4 address or an

@@ -52,68 +52,68 @@ var techToTag = map[string]string{
 	"node.js":          "nodejs",
 
 	// Specific apps
-	"phpmyadmin":      "phpmyadmin",
-	"jenkins":         "jenkins",
-	"gitlab":          "gitlab",
-	"grafana":         "grafana",
-	"prometheus":      "prometheus",
-	"swagger":         "swagger",
-	"graphql":         "graphql",
-	"couchdb":         "couchdb",
-	"rabbitmq":        "rabbitmq",
-	"consul":          "consul",
-	"vault":           "vault",
-	"kibana":          "kibana",
-	"nexus":           "nexus",
-	"artifactory":     "artifactory",
-	"sonarqube":       "sonarqube",
-	"weblogic":        "weblogic",
-	"websphere":       "websphere",
-	"jboss":           "jboss",
-	"wildfly":         "jboss",
-	"thinkphp":        "thinkphp",
-	"struts":          "struts",
-	"apache struts":   "struts",
+	"phpmyadmin":    "phpmyadmin",
+	"jenkins":       "jenkins",
+	"gitlab":        "gitlab",
+	"grafana":       "grafana",
+	"prometheus":    "prometheus",
+	"swagger":       "swagger",
+	"graphql":       "graphql",
+	"couchdb":       "couchdb",
+	"rabbitmq":      "rabbitmq",
+	"consul":        "consul",
+	"vault":         "vault",
+	"kibana":        "kibana",
+	"nexus":         "nexus",
+	"artifactory":   "artifactory",
+	"sonarqube":     "sonarqube",
+	"weblogic":      "weblogic",
+	"websphere":     "websphere",
+	"jboss":         "jboss",
+	"wildfly":       "jboss",
+	"thinkphp":      "thinkphp",
+	"struts":        "struts",
+	"apache struts": "struts",
 
 	// Apache projects (specific > generic)
-	"apache druid":    "apache-druid",
-	"druid":           "apache-druid",
-	"apache solr":     "apache-solr",
-	"solr":            "apache-solr",
-	"apache spark":    "apache-spark",
-	"spark":           "apache-spark",
-	"apache hadoop":   "apache-hadoop",
-	"hadoop":          "apache-hadoop",
-	"apache flink":    "apache-flink",
-	"flink":           "apache-flink",
-	"apache kylin":    "apache-kylin",
-	"kylin":           "apache-kylin",
-	"apache axis2":    "apache-axis2",
-	"axis2":           "apache-axis2",
+	"apache druid":  "apache-druid",
+	"druid":         "apache-druid",
+	"apache solr":   "apache-solr",
+	"solr":          "apache-solr",
+	"apache spark":  "apache-spark",
+	"spark":         "apache-spark",
+	"apache hadoop": "apache-hadoop",
+	"hadoop":        "apache-hadoop",
+	"apache flink":  "apache-flink",
+	"flink":         "apache-flink",
+	"apache kylin":  "apache-kylin",
+	"kylin":         "apache-kylin",
+	"apache axis2":  "apache-axis2",
+	"axis2":         "apache-axis2",
 
 	// Databases / infra
-	"mongodb":         "mongodb",
-	"mongo":           "mongodb",
-	"mysql":           "mysql",
-	"mariadb":         "mariadb",
-	"postgresql":      "postgresql",
-	"postgres":        "postgresql",
-	"redis":           "redis",
-	"elasticsearch":   "elasticsearch",
-	"elastic":         "elasticsearch",
-	"cassandra":       "cassandra",
-	"neo4j":           "neo4j",
-	"influxdb":        "influxdb",
-	"memcached":       "memcached",
+	"mongodb":       "mongodb",
+	"mongo":         "mongodb",
+	"mysql":         "mysql",
+	"mariadb":       "mariadb",
+	"postgresql":    "postgresql",
+	"postgres":      "postgresql",
+	"redis":         "redis",
+	"elasticsearch": "elasticsearch",
+	"elastic":       "elasticsearch",
+	"cassandra":     "cassandra",
+	"neo4j":         "neo4j",
+	"influxdb":      "influxdb",
+	"memcached":     "memcached",
 
 	// DevOps / misc
-	"docker":          "docker",
-	"kubernetes":      "kubernetes",
-	"k8s":             "kubernetes",
-	"git":             "git",
-	"traefik":         "traefik",
-	"istio":           "istio",
-	"envoy":           "envoy",
+	"docker":     "docker",
+	"kubernetes": "kubernetes",
+	"k8s":        "kubernetes",
+	"git":        "git",
+	"traefik":    "traefik",
+	"istio":      "istio",
+	"envoy":      "envoy",
 }
 
 // MapPreciseTags takes httpx fingerprint data and returns the most specific
@@ -135,14 +135,17 @@ func MapPreciseTags(technologies []string, webserver string) []string {
 			}
 			return
 		}
-		// Try base name from "tech/version".
-		if idx := strings.Index(key, "/"); idx > 0 {
-			base := key[:idx]
-			if tag, ok := techToTag[base]; ok {
-				if !seen[tag] {
-					seen[tag] = true
-					tags = append(tags, tag)
+		// Try base name from "tech/version" or "tech:version".
+		for _, sep := range []string{"/", ":"} {
+			if idx := strings.Index(key, sep); idx > 0 {
+				base := key[:idx]
+				if tag, ok := techToTag[base]; ok {
+					if !seen[tag] {
+						seen[tag] = true
+						tags = append(tags, tag)
+					}
 				}
+				break
 			}
 		}
 	}
@@ -158,6 +161,53 @@ func MapPreciseTags(technologies []string, webserver string) []string {
 	// Sort for stable grouping key.
 	sort.Strings(tags)
 	return tags
+}
+
+// serviceToTag maps nerva-detected service names to Nuclei tags.
+var serviceToTag = map[string]string{
+	"mysql":         "mysql",
+	"postgresql":    "postgresql",
+	"redis":         "redis",
+	"mongodb":       "mongodb",
+	"elasticsearch": "elasticsearch",
+	"memcached":     "memcached",
+	"ssh":           "ssh",
+	"ftp":           "ftp",
+	"smtp":          "smtp",
+	"smb":           "smb",
+	"rdp":           "rdp",
+	"vnc":           "vnc",
+	"mssql":         "mssql",
+	"oracle":        "oracle",
+	"cassandra":     "cassandra",
+	"neo4j":         "neo4j",
+	"influxdb":      "influxdb",
+	"kafka":         "kafka",
+	"mqtt":          "mqtt",
+	"dns":           "dns",
+	"ldap":          "ldap",
+	"modbus":        "modbus",
+	"ipmi":          "ipmi",
+	"telnet":        "telnet",
+	"docker":        "docker",
+	"kubernetes":    "kubernetes",
+	"consul":        "consul",
+	"vault":         "vault",
+	"jenkins":       "jenkins",
+	"gitlab":        "gitlab",
+	"grafana":       "grafana",
+	"prometheus":    "prometheus",
+	"couchdb":       "couchdb",
+	"rabbitmq":      "rabbitmq",
+}
+
+// MapServiceToTags maps a service name (from nerva) to Nuclei tags.
+func MapServiceToTags(service string) []string {
+	service = strings.ToLower(strings.TrimSpace(service))
+	if tag, ok := serviceToTag[service]; ok {
+		return []string{tag}
+	}
+	return nil
 }
 
 // MapPortToTag returns the Nuclei tag for a well-known service port, or "" if unknown.
@@ -186,9 +236,9 @@ func GroupEndpointsByTags(endpoints []*models.WebEndpoint) map[string][]string {
 
 // PortTarget represents a network service target (ip:port) with its mapped tag.
 type PortTarget struct {
-	IP     string
-	Port   int
-	Tag    string
+	IP      string
+	Port    int
+	Tag     string
 	AssetID string
 }
 

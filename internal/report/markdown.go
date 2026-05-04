@@ -40,12 +40,6 @@ func GenerateMarkdown(data *ReportData) string {
 		fmt.Fprintf(&sb, "| **Organization** | %s |\n", escapeMDTable(data.Project.Organization))
 	}
 	fmt.Fprintf(&sb, "| **Report Generated** | %s |\n", data.GeneratedAt.Format(time.RFC3339))
-	if data.Project.StartTime != nil {
-		fmt.Fprintf(&sb, "| **Test Period Start** | %s |\n", data.Project.StartTime.Format("2006-01-02"))
-	}
-	if data.Project.EndTime != nil {
-		fmt.Fprintf(&sb, "| **Test Period End** | %s |\n", data.Project.EndTime.Format("2006-01-02"))
-	}
 	sb.WriteString("\n")
 
 	// Severity counts.

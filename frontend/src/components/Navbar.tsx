@@ -29,6 +29,7 @@ export function Navbar() {
         { path: `/projects/${currentProjectId}/runs`, label: "Runs" },
         { path: `/projects/${currentProjectId}/findings`, label: "Findings" },
         { path: `/projects/${currentProjectId}/reports`, label: "Reports" },
+        { path: `/projects/${currentProjectId}/scan-config`, label: "Scan Config" },
       ]
     : [];
 

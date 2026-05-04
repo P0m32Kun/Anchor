@@ -1,74 +1,63 @@
-# 📚 Anchor 文档中心
+# Anchor 文档中心
 
-> 最后更新：2026-05-01
-> 当前状态：v0.3 已完成，准备开启新开发计划
+> 最后更新：2026-05-04
+> 默认原则：任何 agent 在阅读历史材料前，先读本页和 `docs/current/`
 
----
+## 先读这些
 
-## 🗂️ 文档索引
+按默认顺序阅读：
 
-### 归档文档（v0.1 + v0.2）
+1. [`../README.md`](../README.md)
+2. [`current/agent-guide.md`](current/agent-guide.md)
+3. [`current/plan.md`](current/plan.md)
+4. [`current/architecture.md`](current/architecture.md)
+5. [`current/design/README.md`](current/design/README.md)
+6. [`current/decisions/README.md`](current/decisions/README.md)
 
-所有 v0.1 和 v0.2 阶段的计划、设计、决策文档已归档至 [`archived/`](archived/)。
+## 当前有效文档
 
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [v0.1 执行计划](archived/v0.1/plan.md) | v0.1 | M0-M4 开发计划，全部完成 |
-| [v0.1 PRD](archived/v0.1/设计.md) | v0.1 | MVP 产品需求文档 |
-| [v0.1 ADR](archived/v0.1/decisions/) | v0.1 | 8 个架构决策记录（ADR-001 ~ ADR-008） |
-| [v0.2 PRD](archived/v0.2/v0.2-prd.md) | v0.2 | 实战可用化与体验提升 |
-| [v0.2 执行计划](archived/v0.2/执行计划-v0.2.md) | v0.2 | M0-M5 开发计划，全部完成 |
-| [v0.2 ADR](archived/v0.2/ADR-v0.2.md) | v0.2 | Worker 架构、通信协议、DB Schema |
-| [系统架构](archived/v0.2/ARCHITECTURE.md) | v0.2 | 系统架构说明（含 ASCII 架构图） |
-| [API 参考](archived/v0.2/API.md) | v0.2 | API 端点参考文档 |
-| [部署指南](archived/v0.2/部署指南.md) | v0.2 | Docker Compose 部署指南 |
-| [内网扫描设计](archived/v0.2/design/内网扫描与容器化架构设计.md) | v0.2 | 内网扫描与容器化详细设计 |
-| [前端重构计划](archived/v0.2/design/DESIGN_REFACTOR_PLAN.md) | v0.2 | Apple 设计语言 UI 重构 |
-| [v0.2 进度](archived/v0.2/progress.md) | v0.2 | 开发进度跟踪 |
-| [v0.2 ADR](archived/v0.2/decisions/) | v0.2 | 2 个架构决策记录（ADR-009 ~ ADR-010） |
+| 文档 | 角色 | 是否为当前真相 |
+| --- | --- | --- |
+| [`current/agent-guide.md`](current/agent-guide.md) | Coding agent 迭代协议 | Yes |
+| [`current/plan.md`](current/plan.md) | 当前唯一仓库级计划 | Yes |
+| [`current/architecture.md`](current/architecture.md) | 当前唯一架构基线 | Yes |
+| [`current/design/README.md`](current/design/README.md) | 当前候选设计索引 | Yes |
+| [`current/decisions/README.md`](current/decisions/README.md) | 当前决策索引 | Yes |
+| [`acceptance-criteria.md`](acceptance-criteria.md) | 验收标准参考 | Supporting |
+| [`api-error-contract.md`](api-error-contract.md) | API 错误约定 | Supporting |
+| [`coverage-baseline.md`](coverage-baseline.md) | 测试覆盖率基线 | Supporting |
+| [`engineering-health.md`](engineering-health.md) | 工程健康基线 | Supporting |
 
-> 📖 详细归档说明见 [archived/README.md](archived/README.md)
+## 候选方案与评审材料
 
----
+这些文档可以参考，但默认不应当作当前真相：
 
-### 活跃文档
+| 文档/目录 | 状态 | 说明 |
+| --- | --- | --- |
+| [`design/`](design/) | In review | 新设计提案区 |
+| [`refactoring-plan.md`](refactoring-plan.md) | Backlog | 重构想法和拆分路线 |
+| [`active/plan/`](active/plan/) | Review material | 历史实施稿和评审汇总 |
+| [`active/review/`](active/review/) | Review material | 多模型评审记录 |
 
-> 🔨 新开发计划的文档将放置在此区域
+## 归档
 
-| 文档 | 说明 | 状态 |
-|------|------|------|
-| `v0.3-plan.md` | v0.3 执行计划（桌面可用性与可靠性） | ✅ 已完成 |
-| _(待创建)_ | 新阶段 PRD | ⏳ 待启动 |
-| _(待创建)_ | 新阶段执行计划 | ⏳ 待启动 |
-| _(待创建)_ | 新阶段架构决策 | ⏳ 待启动 |
+- 历史版本文档统一放在 [`archived/`](archived/)
+- 根目录 [`../plan.md`](../plan.md) 和若干旧文档只保留跳转作用
+- 详细归档说明见 [`archived/README.md`](archived/README.md)
 
----
-
-### 通用文档（持续维护）
+## 通用参考
 
 | 位置 | 说明 |
-|------|------|
-| [`../wiki/conventions/`](../wiki/conventions/) | 编码规范（API、后端、前端） |
-| [`../wiki/pitfalls/`](../wiki/pitfalls/) | 踩坑记录（7 篇） |
-| [`../wiki/SCHEMA.md`](../wiki/SCHEMA.md) | 数据库 Schema 文档 |
+| --- | --- |
+| [`../wiki/conventions/`](../wiki/conventions/) | 编码规范 |
+| [`../wiki/pitfalls/`](../wiki/pitfalls/) | 踩坑记录 |
+| [`../wiki/SCHEMA.md`](../wiki/SCHEMA.md) | 数据库 Schema |
 | [`../wiki/log.md`](../wiki/log.md) | 开发日志 |
-| [`../README.md`](../README.md) | 项目 README |
-| [`../CHANGELOG.md`](../CHANGELOG.md) | 变更日志 |
 
----
+## 维护规则
 
-## 📋 文档规范
-
-### 新文档命名约定
-
-- PRD: `prd-v{版本}.md`
-- 执行计划: `plan-v{版本}.md`
-- 架构决策: `adr-{编号}-{主题}.md`
-- 设计文档: `design/{主题}.md`
-- API 文档: `api-v{版本}.md`
-
-### 归档规则
-
-- 阶段结束后，所有计划/设计/决策文档移入 `archived/v{版本}/`
-- 归档文档添加 YAML frontmatter（archived、version、status、reason）
-- 原位置保留重定向文件，指向归档位置
+1. 任意时刻只保留一份仓库级 plan 和一份仓库级 architecture。
+2. 新设计先进入 `docs/design/`，只有被提升后才能改写 `docs/current/`。
+3. 阶段结束后，把计划、设计和评审材料移入 `docs/archived/` 或明确标成 `archived` / `superseded`。
+4. 新增文档时优先补状态头，而不是再新增一个平行入口。
+5. 面向 agent 的流程、验证门槛和本地 artifact 规则统一维护在 [`current/agent-guide.md`](current/agent-guide.md)。

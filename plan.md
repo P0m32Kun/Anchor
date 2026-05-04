@@ -1,3 +1,11 @@
+---
+status: archived
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-04
+scope: root-plan-redirect
+---
+
 > ⚠️ **此文档已归档**
 >
 > - 归档位置：[`docs/archived/v0.1/plan.md`](docs/archived/v0.1/plan.md)

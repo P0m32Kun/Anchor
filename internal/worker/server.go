@@ -3,6 +3,7 @@ package worker
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -45,15 +46,37 @@ func (ws *WorkerServer) Register(mux *http.ServeMux) {
 
 func (ws *WorkerServer) handleTask(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		TaskID      string   `json:"task_id"`
-		Tool        string   `json:"tool"`
-		Command     []string `json:"command"`
-		Workdir     string   `json:"workdir"`
-		RateLimit   int      `json:"rate_limit"`
+		TaskID     string            `json:"task_id"`
+		Tool       string            `json:"tool"`
+		Command    []string          `json:"command"`
+		Workdir    string            `json:"workdir"`
+		RateLimit  int               `json:"rate_limit"`
+		InputFiles map[string]string `json:"input_files"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	// Materialise input files (sent by the dispatcher) onto the worker's
+	// filesystem at the absolute paths referenced in the command. This lets
+	// tools like `naabu -list /data/.../hosts.txt` work even though the file
+	// was created in the server container.
+	for path, b64 := range req.InputFiles {
+		data, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil {
+			log.Printf("[worker] task %s decode input file %s: %v", req.TaskID, path, err)
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+			log.Printf("[worker] task %s mkdir input dir %s: %v", req.TaskID, filepath.Dir(path), err)
+			continue
+		}
+		if err := os.WriteFile(path, data, 0640); err != nil {
+			log.Printf("[worker] task %s write input file %s: %v", req.TaskID, path, err)
+			continue
+		}
+		log.Printf("[worker] task %s materialised input file: %s (%dB)", req.TaskID, path, len(data))
 	}
 
 	// Execute task asynchronously

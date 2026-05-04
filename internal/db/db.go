@@ -65,6 +65,40 @@ func migrate(db *sql.DB) error {
 		version = 3
 	}
 
+	if version < 4 {
+		if err := migrateV04(db); err != nil {
+			return fmt.Errorf("migrate v4 (v0.4 pipeline): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 4"); err != nil {
+			return fmt.Errorf("set user_version 4: %w", err)
+		}
+		version = 4
+	}
+
+	if version < 5 {
+		if err := migrateV05(db); err != nil {
+			return fmt.Errorf("migrate v5 (drop start_time/end_time): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 5"); err != nil {
+			return fmt.Errorf("set user_version 5: %w", err)
+		}
+		version = 5
+	}
+
+	if version < 6 {
+		if err := migrateV06(db); err != nil {
+			return fmt.Errorf("migrate v6 (pipeline_runs): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 6"); err != nil {
+			return fmt.Errorf("set user_version 6: %w", err)
+		}
+		version = 6
+	}
+
+	if err := ensureProjectsColumns(db); err != nil {
+		return fmt.Errorf("ensure projects columns: %w", err)
+	}
+
 	return nil
 }
 
@@ -77,10 +111,11 @@ CREATE TABLE IF NOT EXISTS projects (
 	name TEXT NOT NULL,
 	organization TEXT,
 	purpose TEXT,
-	start_time DATETIME,
-	end_time DATETIME,
 	default_profile TEXT DEFAULT 'standard',
 	port_range TEXT,
+	fofa_email TEXT,
+	fofa_api_key TEXT,
+	pipeline_config TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -518,6 +553,231 @@ func migrateV02RunID(db *sql.DB) error {
 	if count == 0 {
 		_, err = db.Exec(`ALTER TABLE scan_tasks ADD COLUMN run_id TEXT REFERENCES runs(id) ON DELETE CASCADE`)
 		return err
+	}
+	return nil
+}
+
+func migrateV04(db *sql.DB) error {
+	// 1. Update targets table CHECK constraint to support 'company' type
+	// SQLite doesn't support ALTER TABLE DROP CONSTRAINT, so we need to recreate
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS targets_new (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			type TEXT NOT NULL CHECK(type IN ('domain','url','ip','cidr','company')),
+			value TEXT NOT NULL,
+			source TEXT DEFAULT 'manual',
+			status TEXT DEFAULT 'active',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+	`)
+	if err != nil {
+		return fmt.Errorf("create targets_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO targets_new (id, project_id, type, value, source, status, created_at)
+		SELECT id, project_id, type, value, source, status, created_at FROM targets;
+	`)
+	if err != nil {
+		return fmt.Errorf("copy targets: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE targets;`)
+	if err != nil {
+		return fmt.Errorf("drop old targets: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE targets_new RENAME TO targets;`)
+	if err != nil {
+		return fmt.Errorf("rename targets_new: %w", err)
+	}
+
+	// Recreate index
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_targets_project ON targets(project_id);`)
+	if err != nil {
+		return fmt.Errorf("create index: %w", err)
+	}
+
+	// 2. Add FOFA config to projects
+	var colCount int
+	err = db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name = 'fofa_email'`).Scan(&colCount)
+	if err != nil {
+		return fmt.Errorf("check fofa_email column: %w", err)
+	}
+	if colCount == 0 {
+		_, err = db.Exec(`ALTER TABLE projects ADD COLUMN fofa_email TEXT;`)
+		if err != nil {
+			return fmt.Errorf("add fofa_email: %w", err)
+		}
+		_, err = db.Exec(`ALTER TABLE projects ADD COLUMN fofa_api_key TEXT;`)
+		if err != nil {
+			return fmt.Errorf("add fofa_api_key: %w", err)
+		}
+		_, err = db.Exec(`ALTER TABLE projects ADD COLUMN pipeline_config TEXT;`)
+		if err != nil {
+			return fmt.Errorf("add pipeline_config: %w", err)
+		}
+	}
+
+	// 3. Create DNS records table
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS dns_records (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			domain TEXT NOT NULL,
+			ips TEXT NOT NULL,
+			cnames TEXT,
+			ttl INTEGER,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(project_id, domain)
+		);
+	`)
+	if err != nil {
+		return fmt.Errorf("create dns_records: %w", err)
+	}
+
+	// 4. Create CDN results table
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS cdn_results (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			ip TEXT NOT NULL,
+			is_cdn BOOLEAN DEFAULT FALSE,
+			cdn_provider TEXT,
+			cdn_type TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(project_id, ip)
+		);
+	`)
+	if err != nil {
+		return fmt.Errorf("create cdn_results: %w", err)
+	}
+
+	// 5. Create service fingerprints table
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS service_fingerprints (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			ip TEXT NOT NULL,
+			port INTEGER NOT NULL,
+			protocol TEXT DEFAULT 'tcp',
+			is_web BOOLEAN DEFAULT FALSE,
+			service TEXT NOT NULL,
+			metadata TEXT,
+			source TEXT DEFAULT 'nerva',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(project_id, ip, port)
+		);
+	`)
+	if err != nil {
+		return fmt.Errorf("create service_fingerprints: %w", err)
+	}
+
+	return nil
+}
+
+func migrateV05(db *sql.DB) error {
+	// Check if start_time column exists in projects
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name = 'start_time'`).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		// Column already removed, nothing to do
+		return nil
+	}
+
+	// SQLite doesn't support DROP COLUMN, so we need to recreate the table
+	_, err = db.Exec(`
+		CREATE TABLE projects_new (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			organization TEXT,
+			purpose TEXT,
+			default_profile TEXT DEFAULT 'standard',
+			port_range TEXT,
+			fofa_email TEXT,
+			fofa_api_key TEXT,
+			pipeline_config TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+	`)
+	if err != nil {
+		return fmt.Errorf("create projects_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO projects_new (id, name, organization, purpose, default_profile, port_range, fofa_email, fofa_api_key, pipeline_config, created_at, updated_at)
+		SELECT id, name, organization, purpose, default_profile, port_range, fofa_email, fofa_api_key, pipeline_config, created_at, updated_at
+		FROM projects;
+	`)
+	if err != nil {
+		return fmt.Errorf("copy projects: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE projects;`)
+	if err != nil {
+		return fmt.Errorf("drop old projects: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE projects_new RENAME TO projects;`)
+	if err != nil {
+		return fmt.Errorf("rename projects_new: %w", err)
+	}
+
+	return nil
+}
+
+func migrateV06(db *sql.DB) error {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS pipeline_runs (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			status TEXT NOT NULL DEFAULT 'running',
+			stage TEXT,
+			error TEXT,
+			started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE INDEX IF NOT EXISTS idx_pipeline_runs_project ON pipeline_runs(project_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("create pipeline_runs: %w", err)
+	}
+	return nil
+}
+
+// ensureProjectsColumns verifies that all expected columns exist on the
+// projects table and adds any that are missing. This acts as a final
+// safety net for databases that may have skipped an intermediate
+// migration or had their schema altered outside the normal flow.
+func ensureProjectsColumns(db *sql.DB) error {
+	columns := []struct {
+		name string
+		def  string
+	}{
+		{"rate_limit", "INTEGER DEFAULT 0"},
+	}
+
+	for _, col := range columns {
+		var count int
+		err := db.QueryRow(
+			"SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name = ?",
+			col.name,
+		).Scan(&count)
+		if err != nil {
+			return fmt.Errorf("check column %s: %w", col.name, err)
+		}
+		if count == 0 {
+			_, err := db.Exec(fmt.Sprintf("ALTER TABLE projects ADD COLUMN %s %s", col.name, col.def))
+			if err != nil {
+				return fmt.Errorf("add column %s: %w", col.name, err)
+			}
+		}
 	}
 	return nil
 }

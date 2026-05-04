@@ -19,7 +19,8 @@
  * | /projects/:projectId/assets  | AssetPage    | Nested: assets                   | No          |
  * | /projects/:projectId/runs    | RunsPage     | Nested: runs                     | No          |
  * | /projects/:projectId/findings| FindingsPage | Nested: findings                 | No          |
- * | /projects/:projectId/reports | ReportsPage  | Nested: reports                  | No          |
+ * | /projects/:projectId/scan-config| ScanConfigPage | Nested: scan config            | No          |
+| /projects/:projectId/reports | ReportsPage  | Nested: reports                  | No          |
  * | /projects/:id            | ProjectPage    | Legacy project detail            | No          |
  * | /projects/:id/assets     | AssetPage      | Legacy (same as nested)          | No          |
  * | /projects/:id/targets    | TargetPage     | Legacy (same as nested)          | No          |
@@ -49,6 +50,7 @@ import FindingsPage from "./pages/FindingsPage";
 import ReportsPage from "./pages/ReportsPage";
 import WorkersPage from "./pages/WorkersPage";
 import SettingsPage from "./pages/SettingsPage";
+import ScanConfigPage from "./pages/ScanConfigPage";
 
 function LegacyRouteGuard() {
   const location = useLocation();
@@ -199,6 +201,7 @@ function AppContent() {
               <Route path="runs" element={<RunsPage />} />
               <Route path="findings" element={<FindingsPage />} />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="scan-config" element={<ScanConfigPage />} />
             </Route>
             {/* Legacy routes for backward compat — Sprint 1.11 will remove */}
             <Route path="/projects/:id" element={<ProjectPage />} />

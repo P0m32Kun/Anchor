@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",
-    "pre-merge": "bash ../scripts/pre-merge-check.sh"
+    "pre-merge": "bash ../scripts/pre-merge-check.sh",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
@@ -24,7 +27,9 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tauri-apps/cli": "^2.10.1",
+    "@types/node": "^25.6.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",

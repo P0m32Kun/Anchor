@@ -37,3 +37,17 @@ func (e *AppError) WithDetail(detail string) *AppError {
 	e.Detail = detail
 	return e
 }
+
+// StatusCode returns the HTTP status code for the error.
+func (e *AppError) StatusCode() int {
+	switch e.Code {
+	case ErrBadRequest, ErrParse:
+		return 400
+	case ErrNotFound:
+		return 404
+	case ErrScopeDenied:
+		return 403
+	default:
+		return 500
+	}
+}

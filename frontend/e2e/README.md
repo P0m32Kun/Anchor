@@ -1,54 +1,116 @@
 # Anchor Frontend E2E Tests
 
-End-to-end tests using `agent-browser` CLI.
+基于 **Playwright** 的自动化端到端测试，覆盖全部页面和核心用户流程。
+
+> 旧的 `.e2e.md` 手工测试计划文档仍保留在 `tests/` 目录中作为参考，但不再维护。
+> 所有新的测试用例应编写为 `.spec.ts` 文件。
 
 ## Prerequisites
 
 ```bash
-npm i -g agent-browser
-agent-browser install
+# 1. 安装 Playwright（已包含在 package.json devDependencies 中）
+npm install
+
+# 2. 安装 Chromium 浏览器（首次需要，约 100MB）
+npx playwright install chromium
+
+# 3. 确保 Docker 正在运行（后端通过 docker-compose 启动）
+docker info
 ```
 
 ## Running Tests
 
-### 1. Start the dev server
+### 快速运行所有测试
 
 ```bash
 cd frontend
-npm run dev
-# Server runs on http://localhost:1420
+npm run test:e2e
 ```
 
-### 2. Run E2E verification
+Playwright 会自动：
+
+1. 通过 `globalSetup` 启动 Docker 后端（如果未运行）
+2. 生成本地 `storage-state.json`，注入 API Base 和测试 token
+3. 通过 `webServer` 启动前端 dev server
+4. 并行执行所有 `.spec.ts` 测试
+5. 通过 `globalTeardown` 停止 Docker 后端并删除 `storage-state.json`
+
+### 交互式调试（UI 模式）
 
 ```bash
-# Navigate to app
-agent-browser navigate http://localhost:1420
+npm run test:e2e:ui
+```
 
-# Load the specific test plan from e2e/tests/*.e2e.md
-# Follow the steps documented in each test file
+### 调试单个测试
+
+```bash
+npx playwright test tests/DashboardPage.spec.ts --debug
+```
+
+### 生成 HTML 报告
+
+```bash
+npm run test:e2e
+npx playwright show-report
 ```
 
 ## Test Coverage
 
-| Page | Test File | Status |
-|------|-----------|--------|
-| App (routing + navbar) | `App.e2e.md` | ⬜ |
-| Dashboard | `DashboardPage.e2e.md` | ⬜ |
-| Projects | `ProjectPage.e2e.md` | ⬜ |
-| Targets | `TargetPage.e2e.md` | ⬜ |
-| Assets | `AssetPage.e2e.md` | ⬜ |
-| Runs | `RunsPage.e2e.md` | ⬜ |
-| Findings | `FindingsPage.e2e.md` | ⬜ |
-| Reports | `ReportsPage.e2e.md` | ⬜ |
-| Workers | `WorkersPage.e2e.md` | ⬜ |
-| Settings | `SettingsPage.e2e.md` | ⬜ |
+| 模块           | 测试文件                      | 覆盖内容                                                        |
+| -------------- | ----------------------------- | --------------------------------------------------------------- |
+| **Dashboard**  | `tests/DashboardPage.spec.ts` | 空状态、统计卡片、最近活动、待处理 Findings、快速操作、错误重试 |
+| **Smoke Test** | `tests/smoke.spec.ts`         | 完整主流程：Dashboard → 创建项目 → 导入目标 → 查看 Runs         |
 
-## Adding New Tests
+## 测试基础设施
 
-When adding a new page or feature:
+```
+e2e/
+├── global-setup.ts          # 测试前：启动 Docker 后端，等待 healthcheck
+├── global-teardown.ts       # 测试后：停止 Docker 后端，清理 storage-state
+├── fixtures/
+│   ├── api-helpers.ts       # 直接调用后端 API 的工具函数
+│   ├── db-utils.ts          # 数据库清理/重置工具
+│   └── test-data.ts         # 测试数据工厂
+├── tests/
+│   ├── DashboardPage.spec.ts
+│   ├── smoke.spec.ts
+│   └── *.e2e.md             # 旧的手工测试计划（保留参考）
+└── README.md
+```
 
-1. Create `e2e/tests/<PageName>.e2e.md` following the template in `_template.e2e.md`
-2. Include: navigation, interaction, form submissions, error states
-3. Mark disabled buttons and explain why
-4. Verify all `<Link>` targets resolve to real routes
+`storage-state.json` 是运行时生成文件，包含本地测试 token，不应提交到 Git。
+
+## Fixtures 使用示例
+
+```typescript
+import { test, expect } from "@playwright/test";
+import { createProject, addTarget } from "../fixtures/api-helpers";
+import { cleanupTestData } from "../fixtures/db-utils";
+
+test.beforeEach(async () => {
+  await cleanupTestData(); // 每个测试前清理数据
+});
+
+test("my test", async ({ page }) => {
+  await createProject({ name: "Test Project" });
+  await page.goto("/");
+  await expect(page.getByText("Test Project")).toBeVisible();
+});
+```
+
+## 添加新测试
+
+1. 在 `e2e/tests/` 下创建 `<FeatureName>.spec.ts`
+2. 使用 `test.beforeEach` 调用 `cleanupTestData()` 确保数据隔离
+3. 使用 `page.goto()` + `expect()` 进行断言
+4. 使用 fixtures 中的 API helpers 准备测试数据
+5. 运行 `npx playwright test <file> --list` 确认测试被发现
+
+## Troubleshooting
+
+| 问题                                       | 解决方案                                               |
+| ------------------------------------------ | ------------------------------------------------------ |
+| `Executable doesn't exist at ... chromium` | 运行 `npx playwright install chromium`                 |
+| `Docker daemon is not running`             | 启动 Docker Desktop 或 Docker daemon                   |
+| `Backend did not become healthy`           | 检查 `docker-compose logs server`                      |
+| 测试间数据污染                             | 确保每个 `test` 或 `describe` 都有 `cleanupTestData()` |

@@ -1,7 +1,26 @@
+# Frontend
+frontend/
+
+# Build artifacts
 frontend/node_modules/
 frontend/dist/
 src-tauri/target/
+bin/
+
+# Git
 .git/
 .gitignore
-*.md
+
+# Documentation
 docs/
+*.md
+
+# Scripts and config
+scripts/
+docker-rangefield/
+
+# Test and dev artifacts
+e2e-test-result.md
+progress.md
+plan.md
+tmp-e2e-data/

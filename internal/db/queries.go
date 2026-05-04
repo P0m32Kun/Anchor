@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/models"
@@ -23,16 +24,16 @@ func New(db DBTX) *Queries { return &Queries{db: db} }
 
 func (q *Queries) CreateProject(p *models.Project) error {
 	_, err := q.db.Exec(`
-		INSERT INTO projects (id, name, organization, purpose, start_time, end_time, rate_limit, port_range, default_profile, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Name, p.Organization, p.Purpose, p.StartTime, p.EndTime, p.RateLimit, p.PortRange, p.DefaultProfile, p.CreatedAt, p.UpdatedAt)
+		INSERT INTO projects (id, name, organization, purpose, rate_limit, port_range, default_profile, fofa_email, fofa_api_key, pipeline_config, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Name, p.Organization, p.Purpose, p.RateLimit, p.PortRange, p.DefaultProfile, p.FofaEmail, p.FofaAPIKey, p.PipelineConfig, p.CreatedAt, p.UpdatedAt)
 	return err
 }
 
 func (q *Queries) GetProject(id string) (*models.Project, error) {
-	row := q.db.QueryRow(`SELECT id, name, organization, purpose, start_time, end_time, rate_limit, port_range, default_profile, created_at, updated_at FROM projects WHERE id = ?`, id)
+	row := q.db.QueryRow(`SELECT id, name, organization, purpose, rate_limit, port_range, default_profile, fofa_email, fofa_api_key, pipeline_config, created_at, updated_at FROM projects WHERE id = ?`, id)
 	p := &models.Project{}
-	err := row.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt)
+	err := row.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.FofaEmail, &p.FofaAPIKey, &p.PipelineConfig, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -40,7 +41,7 @@ func (q *Queries) GetProject(id string) (*models.Project, error) {
 }
 
 func (q *Queries) ListProjects() ([]*models.Project, error) {
-	rows, err := q.db.Query(`SELECT id, name, organization, purpose, start_time, end_time, rate_limit, port_range, default_profile, created_at, updated_at FROM projects ORDER BY created_at DESC`)
+	rows, err := q.db.Query(`SELECT id, name, organization, purpose, rate_limit, port_range, default_profile, fofa_email, fofa_api_key, pipeline_config, created_at, updated_at FROM projects ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func (q *Queries) ListProjects() ([]*models.Project, error) {
 	list := make([]*models.Project, 0)
 	for rows.Next() {
 		p := &models.Project{}
-		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.StartTime, &p.EndTime, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.FofaEmail, &p.FofaAPIKey, &p.PipelineConfig, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, p)
@@ -485,9 +486,15 @@ func WithTx(rawDB *sql.DB, fn func(*Queries) error) error {
 // --- Assets ---
 
 func (q *Queries) CreateAsset(a *models.Asset) error {
-	sourceToolsJSON, _ := json.Marshal(a.SourceTools)
-	tagsJSON, _ := json.Marshal(a.Tags)
-	_, err := q.db.Exec(`
+	sourceToolsJSON, err := json.Marshal(a.SourceTools)
+	if err != nil {
+		return fmt.Errorf("marshal source_tools: %w", err)
+	}
+	tagsJSON, err := json.Marshal(a.Tags)
+	if err != nil {
+		return fmt.Errorf("marshal tags: %w", err)
+	}
+	_, err = q.db.Exec(`
 		INSERT INTO assets (id, project_id, type, value, normalized_value, source_tools, first_seen, last_seen, tags)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.ID, a.ProjectID, a.Type, a.Value, a.NormalizedValue, string(sourceToolsJSON), a.FirstSeen, a.LastSeen, string(tagsJSON))
@@ -502,8 +509,11 @@ func (q *Queries) GetAssetByNormalizedValue(projectID, normalizedValue string) (
 }
 
 func (q *Queries) UpdateAssetLastSeen(id string, lastSeen time.Time, sourceTools []string) error {
-	sourceToolsJSON, _ := json.Marshal(sourceTools)
-	_, err := q.db.Exec(`UPDATE assets SET last_seen = ?, source_tools = ? WHERE id = ?`, lastSeen, string(sourceToolsJSON), id)
+	sourceToolsJSON, err := json.Marshal(sourceTools)
+	if err != nil {
+		return fmt.Errorf("marshal source_tools: %w", err)
+	}
+	_, err = q.db.Exec(`UPDATE assets SET last_seen = ?, source_tools = ? WHERE id = ?`, lastSeen, string(sourceToolsJSON), id)
 	return err
 }
 
@@ -539,10 +549,14 @@ func scanAsset(row interface {
 		return nil, err
 	}
 	if sourceToolsJSON != "" && sourceToolsJSON != "null" {
-		_ = json.Unmarshal([]byte(sourceToolsJSON), &a.SourceTools)
+		if err := json.Unmarshal([]byte(sourceToolsJSON), &a.SourceTools); err != nil {
+			// silently ignore unmarshal errors for backward compatibility
+		}
 	}
 	if tagsJSON != "" && tagsJSON != "null" {
-		_ = json.Unmarshal([]byte(tagsJSON), &a.Tags)
+		if err := json.Unmarshal([]byte(tagsJSON), &a.Tags); err != nil {
+			// silently ignore unmarshal errors for backward compatibility
+		}
 	}
 	return a, nil
 }
@@ -611,8 +625,11 @@ func (q *Queries) ListServicesByAsset(assetID string) ([]*models.Service, error)
 // --- Web Endpoints ---
 
 func (q *Queries) CreateWebEndpoint(we *models.WebEndpoint) error {
-	techJSON, _ := json.Marshal(we.Technologies)
-	_, err := q.db.Exec(`
+	techJSON, err := json.Marshal(we.Technologies)
+	if err != nil {
+		return fmt.Errorf("marshal technologies: %w", err)
+	}
+	_, err = q.db.Exec(`
 		INSERT INTO web_endpoints (id, project_id, asset_id, url, scheme, host, port, path, status_code, title, technologies, screenshot_artifact_id, source_tool, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		we.ID, we.ProjectID, we.AssetID, we.URL, we.Scheme, we.Host, we.Port, we.Path, we.StatusCode, we.Title, string(techJSON), we.ScreenshotArtifactID, we.SourceTool, we.CreatedAt)
@@ -672,7 +689,9 @@ func scanWebEndpoints(rows *sql.Rows) ([]*models.WebEndpoint, error) {
 		}
 		we.ScreenshotArtifactID = nullableString(screenshotID)
 		if techJSON != "" && techJSON != "null" {
-			_ = json.Unmarshal([]byte(techJSON), &we.Technologies)
+			if err := json.Unmarshal([]byte(techJSON), &we.Technologies); err != nil {
+				// silently ignore unmarshal errors for backward compatibility
+			}
 		}
 		list = append(list, we)
 	}
@@ -1159,14 +1178,31 @@ func (q *Queries) ListScanTasksByRun(runID string) ([]*models.ScanTask, error) {
 			&t.ID, &t.ProjectID, &pid, &rid, &dep, &tid, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &sa, &fa, &ec, &wid, &t.CreatedAt); err != nil {
 			return nil, err
 		}
-		if pid.Valid { t.PlanID = pid.String }
-		if rid.Valid { t.RunID = &rid.String }
-		if dep.Valid { t.DependsOnTaskID = &dep.String }
-		if tid.Valid { t.TargetID = &tid.String }
-		if sa.Valid { t.StartedAt = &sa.Time }
-		if fa.Valid { t.FinishedAt = &fa.Time }
-		if ec.Valid { v := int(ec.Int64); t.ExitCode = &v }
-		if wid.Valid { t.WorkerID = &wid.String }
+		if pid.Valid {
+			t.PlanID = pid.String
+		}
+		if rid.Valid {
+			t.RunID = &rid.String
+		}
+		if dep.Valid {
+			t.DependsOnTaskID = &dep.String
+		}
+		if tid.Valid {
+			t.TargetID = &tid.String
+		}
+		if sa.Valid {
+			t.StartedAt = &sa.Time
+		}
+		if fa.Valid {
+			t.FinishedAt = &fa.Time
+		}
+		if ec.Valid {
+			v := int(ec.Int64)
+			t.ExitCode = &v
+		}
+		if wid.Valid {
+			t.WorkerID = &wid.String
+		}
 		list = append(list, t)
 	}
 	return list, rows.Err()
@@ -1175,4 +1211,176 @@ func (q *Queries) ListScanTasksByRun(runID string) ([]*models.ScanTask, error) {
 func (q *Queries) UpdateRunStatus(id string, status models.RunStatus, startedAt, finishedAt *time.Time) error {
 	_, err := q.db.Exec(`UPDATE runs SET status = ?, started_at = ?, finished_at = ? WHERE id = ?`, status, startedAt, finishedAt, id)
 	return err
+}
+
+// --- v0.4 Pipeline tables ---
+
+func (q *Queries) SaveDNSRecord(r *models.DNSRecord) error {
+	_, err := q.db.Exec(`
+		INSERT INTO dns_records (id, project_id, domain, ips, cnames, ttl, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(project_id, domain) DO UPDATE SET
+			ips = excluded.ips,
+			cnames = excluded.cnames,
+			ttl = excluded.ttl,
+			created_at = excluded.created_at
+	`, r.ID, r.ProjectID, r.Domain, strings.Join(r.IPs, ","), strings.Join(r.CNAMEs, ","), r.TTL, r.CreatedAt)
+	return err
+}
+
+func (q *Queries) ListDNSRecordsByProject(projectID string) ([]*models.DNSRecord, error) {
+	rows, err := q.db.Query(`SELECT id, project_id, domain, ips, cnames, ttl, created_at FROM dns_records WHERE project_id = ?`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.DNSRecord
+	for rows.Next() {
+		r := &models.DNSRecord{}
+		var ips, cnames string
+		var ttl sql.NullInt64
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Domain, &ips, &cnames, &ttl, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		r.IPs = strings.Split(ips, ",")
+		r.CNAMEs = strings.Split(cnames, ",")
+		if ttl.Valid {
+			r.TTL = uint32(ttl.Int64)
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) SaveCDNResult(r *models.CDNResult) error {
+	_, err := q.db.Exec(`
+		INSERT INTO cdn_results (id, project_id, ip, is_cdn, cdn_provider, cdn_type, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(project_id, ip) DO UPDATE SET
+			is_cdn = excluded.is_cdn,
+			cdn_provider = excluded.cdn_provider,
+			cdn_type = excluded.cdn_type,
+			created_at = excluded.created_at
+	`, r.ID, r.ProjectID, r.IP, r.IsCDN, r.Provider, r.Type, r.CreatedAt)
+	return err
+}
+
+func (q *Queries) ListCDNResultsByProject(projectID string) ([]*models.CDNResult, error) {
+	rows, err := q.db.Query(`SELECT id, project_id, ip, is_cdn, cdn_provider, cdn_type, created_at FROM cdn_results WHERE project_id = ?`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.CDNResult
+	for rows.Next() {
+		r := &models.CDNResult{}
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.IP, &r.IsCDN, &r.Provider, &r.Type, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) SaveServiceFingerprint(r *models.ServiceFingerprint) error {
+	metaJSON, _ := json.Marshal(r.Metadata)
+	_, err := q.db.Exec(`
+		INSERT INTO service_fingerprints (id, project_id, ip, port, protocol, is_web, service, metadata, source, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(project_id, ip, port) DO UPDATE SET
+			protocol = excluded.protocol,
+			is_web = excluded.is_web,
+			service = excluded.service,
+			metadata = excluded.metadata,
+			source = excluded.source,
+			created_at = excluded.created_at
+	`, r.ID, r.ProjectID, r.IP, r.Port, r.Protocol, r.IsWeb, r.Service, string(metaJSON), r.Source, r.CreatedAt)
+	return err
+}
+
+func (q *Queries) ListServiceFingerprintsByProject(projectID string) ([]*models.ServiceFingerprint, error) {
+	rows, err := q.db.Query(`SELECT id, project_id, ip, port, protocol, is_web, service, metadata, source, created_at FROM service_fingerprints WHERE project_id = ?`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.ServiceFingerprint
+	for rows.Next() {
+		r := &models.ServiceFingerprint{}
+		var metaJSON string
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.IP, &r.Port, &r.Protocol, &r.IsWeb, &r.Service, &metaJSON, &r.Source, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(metaJSON), &r.Metadata); err != nil {
+			// silently ignore unmarshal errors for backward compatibility
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) UpdateProjectPipelineConfig(projectID string, cfgJSON string) error {
+	_, err := q.db.Exec(`UPDATE projects SET pipeline_config = ? WHERE id = ?`, cfgJSON, projectID)
+	return err
+}
+
+func (q *Queries) CreatePipelineRun(r *models.PipelineRun) error {
+	_, err := q.db.Exec(`INSERT INTO pipeline_runs (id, project_id, status, stage, error, started_at, completed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ProjectID, r.Status, r.Stage, r.Error, r.StartedAt, r.CompletedAt, r.CreatedAt)
+	return err
+}
+
+func (q *Queries) UpdatePipelineRunStatus(id, status string) error {
+	_, err := q.db.Exec(`UPDATE pipeline_runs SET status = ? WHERE id = ?`, status, id)
+	return err
+}
+
+func (q *Queries) UpdatePipelineRunStage(id, stage string) error {
+	_, err := q.db.Exec(`UPDATE pipeline_runs SET stage = ? WHERE id = ?`, stage, id)
+	return err
+}
+
+func (q *Queries) UpdatePipelineRunError(id, errMsg string) error {
+	_, err := q.db.Exec(`UPDATE pipeline_runs SET error = ? WHERE id = ?`, errMsg, id)
+	return err
+}
+
+func (q *Queries) UpdatePipelineRunCompleted(id string, completedAt time.Time) error {
+	_, err := q.db.Exec(`UPDATE pipeline_runs SET status = 'completed', completed_at = ? WHERE id = ?`, completedAt, id)
+	return err
+}
+
+func (q *Queries) GetPipelineRun(id string) (*models.PipelineRun, error) {
+	row := q.db.QueryRow(`SELECT id, project_id, status, stage, error, started_at, completed_at, created_at FROM pipeline_runs WHERE id = ?`, id)
+	r := &models.PipelineRun{}
+	var completedAt sql.NullTime
+	err := row.Scan(&r.ID, &r.ProjectID, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if completedAt.Valid {
+		r.CompletedAt = &completedAt.Time
+	}
+	return r, err
+}
+
+func (q *Queries) ListPipelineRunsByProject(projectID string) ([]*models.PipelineRun, error) {
+	rows, err := q.db.Query(`SELECT id, project_id, status, stage, error, started_at, completed_at, created_at FROM pipeline_runs WHERE project_id = ? ORDER BY created_at DESC`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.PipelineRun
+	for rows.Next() {
+		r := &models.PipelineRun{}
+		var completedAt sql.NullTime
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		if completedAt.Valid {
+			r.CompletedAt = &completedAt.Time
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
 }

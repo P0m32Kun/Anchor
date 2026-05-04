@@ -1,0 +1,41 @@
+# Anchor Worker Base Image
+# 预装所有安全扫描工具，作为 worker runtime 的基础镜像
+#
+# 构建并推送（工具更新时才需要执行）：
+#   docker build -f Dockerfile.worker-base -t anchor-worker-base:latest .
+#   docker tag anchor-worker-base:latest p0m32kun/anchor-worker-base:latest
+#   docker push p0m32kun/anchor-worker-base:latest
+#
+# 本地开发使用：
+#   make build-worker-base
+
+# --- Stage 1: 构建工具 ---
+FROM golang:1.26-alpine AS tools-builder
+
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
+RUN apk add --no-cache git gcc musl-dev sqlite-dev libpcap-dev
+
+ENV GOPROXY=https://goproxy.cn,direct
+
+# 安装安全工具（这些变化极慢，单独成层）
+RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+    go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
+    go install github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
+    go install github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest && \
+    go install github.com/praetorian-inc/nerva/cmd/nerva@latest && \
+    nuclei -update-templates
+
+# --- Stage 2: 精简运行时基础镜像 ---
+FROM alpine:latest
+
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
+    apk add --no-cache ca-certificates libpcap-dev chromium
+
+COPY --from=tools-builder /go/bin/subfinder /usr/local/bin/
+COPY --from=tools-builder /go/bin/naabu    /usr/local/bin/
+COPY --from=tools-builder /go/bin/httpx    /usr/local/bin/
+COPY --from=tools-builder /go/bin/nuclei   /usr/local/bin/
+COPY --from=tools-builder /go/bin/cdncheck /usr/local/bin/
+COPY --from=tools-builder /go/bin/nerva    /usr/local/bin/
+COPY --from=tools-builder /root/nuclei-templates /root/nuclei-templates

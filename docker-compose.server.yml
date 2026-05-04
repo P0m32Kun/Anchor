@@ -15,7 +15,13 @@ services:
       - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:17421/health >/dev/null 2>&1"]
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "wget -qO- http://localhost:17421/health >/dev/null 2>&1",
+        ]
       interval: 5s
       timeout: 3s
       retries: 5

@@ -8,26 +8,36 @@
 目标输入 → Scope Check → 资产发现 → Web 初筛 → 人工验证 → 报告导出
 ```
 
-| 阶段 | 工具 | 输出 |
-|------|------|------|
-| **Scope Check** | 自研引擎 | ScopeDecision (allow/deny) |
-| **资产发现** | Subfinder → httpx → Naabu | Asset / WebEndpoint / Port |
-| **Web 初筛** | Nuclei（指纹驱动模板筛选） | Finding / Evidence |
-| **人工验证** | 前端队列 | confirmed / false_positive / accepted_risk |
-| **报告导出** | 自研生成器 | Markdown / JSON |
+| 阶段            | 工具                       | 输出                                       |
+| --------------- | -------------------------- | ------------------------------------------ |
+| **Scope Check** | 自研引擎                   | ScopeDecision (allow/deny)                 |
+| **资产发现**    | Subfinder → DNS → CDNcheck → Naabu → nerva → httpx | Asset / WebEndpoint / Port / Service |
+| **Web 初筛**    | Nuclei（指纹驱动模板筛选） | Finding / Evidence                         |
+| **人工验证**    | 前端队列                   | confirmed / false_positive / accepted_risk |
+| **报告导出**    | 自研生成器                 | Markdown / JSON                            |
 
 **核心设计**：指纹驱动 Nuclei 模板筛选 — httpx 识别的技术栈（WordPress/nginx/Apache Druid 等）精确映射到 Nuclei `-tags`，无指纹目标自动跳过，避免全量扫描。
 
 ## 技术栈
 
-| 层级 | 技术 |
-|------|------|
-| 桌面客户端 | Tauri 2.x + React 18 + TypeScript + Tailwind CSS |
-| 状态管理 | Zustand |
-| 本地/远程服务 | Go 1.26 |
-| 数据库 | SQLite (WAL 模式) |
-| 实时推送 | SSE (Server-Sent Events) |
-| 语法高亮 | Prism.js |
+| 层级          | 技术                                             |
+| ------------- | ------------------------------------------------ |
+| 桌面客户端    | Tauri 2.x + React 18 + TypeScript + Tailwind CSS |
+| 状态管理      | Zustand                                          |
+| 本地/远程服务 | Go 1.26                                          |
+| 数据库        | SQLite (WAL 模式)                                |
+| 实时推送      | SSE (Server-Sent Events)                         |
+| 语法高亮      | Prism.js                                         |
+
+## 文档入口
+
+当前文档入口统一收敛在 [`docs/README.md`](docs/README.md)。
+
+- Agent 迭代指南：[`docs/current/agent-guide.md`](docs/current/agent-guide.md)
+- 当前计划：[`docs/current/plan.md`](docs/current/plan.md)
+- 当前架构：[`docs/current/architecture.md`](docs/current/architecture.md)
+- 候选设计索引：[`docs/current/design/README.md`](docs/current/design/README.md)
+- 历史归档：[`docs/archived/`](docs/archived/)
 
 ## 快速开始
 
@@ -45,6 +55,8 @@
 
 ### Docker 一键部署（推荐）
 
+> ⚠️ **部署与本地开发二选一**：Docker 部署和本地 `go run` 都使用端口 **17421**，同时运行会导致端口冲突。如需切换模式，请先停止另一方。
+
 ```bash
 # 启动 Server + Worker + 靶场（可选）
 make up-all
@@ -58,15 +70,26 @@ docker compose ps
 
 Server 监听 `:17421`，Worker 自动注册并拉取任务。
 
+**国内镜像源：**
+Dockerfile 默认已配置阿里云 Alpine 源和 `GOPROXY=https://goproxy.cn`，可直接在国内网络环境下构建。
+
 ### 本地开发
 
+> 本地开发直接运行 Go 二进制，不经过 Docker。
+
 **运行后端：**
+
 ```bash
-go run main.go
+# 启动 server
+go run .
 # 服务监听 :17421，数据目录 ~/.anchor
+
+# 或本地 worker 连接本地 server
+make run-worker
 ```
 
 **运行前端：**
+
 ```bash
 cd frontend
 npm install
@@ -75,6 +98,7 @@ npm run dev
 ```
 
 **构建：**
+
 ```bash
 make build    # 构建 Go 后端
 make test     # 运行测试
@@ -95,6 +119,7 @@ Worker 完全容器化，通过 Docker Compose 编排：
 Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 
 **典型场景：**
+
 - 公网 VPS 部署 Server，家庭 WiFi 笔记本运行 Worker
 - 多云 Worker 统一接入中心 Server
 - 单机开发：`make up-all` 一键启动完整环境
@@ -109,13 +134,13 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 ├── docker-compose.yml          # Server + Worker + 网络编排
 ├── Dockerfile.server           # Server 镜像（纯管理面）
 ├── Dockerfile.worker           # Worker 镜像（含安全工具）
-├── 设计.md                      # PRD（产品需求文档）
-├── plan.md                     # 开发执行计划与进度
+├── plan.md                     # 旧计划跳转页（非当前真相）
 ├── README.md                   # 本文件
-├── docs/                       # 技术文档
-│   ├── API.md                 # API 参考
-│   ├── ARCHITECTURE.md        # 架构说明
-│   ├── ADR-v0.2.md            # v0.2 架构决策
+├── docs/                       # 文档中心
+│   ├── README.md              # 文档导航入口
+│   ├── current/               # 当前唯一有效的计划/架构入口
+│   ├── design/                # 候选设计稿
+│   ├── archived/              # 历史归档
 │   └── 部署指南.md             # 部署指南
 ├── internal/                   # Go 内部包
 │   ├── api/                   # HTTP API handlers
@@ -219,34 +244,40 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 
 - [x] 扫描入口统一（TargetPage Subfinder 按钮 → Runs 导航）
 - [x] 路由统一（`/projects/:projectId/*` 嵌套路由）
+- [x] 项目内扫描配置页（端口范围预设、阶段开关、并发/超时调优）
+- [x] 高危端口预设（115 个攻击面端口，覆盖 Redis/ES/MongoDB/K8s/Ollama 等）
+- [x] nerva 服务指纹识别 + cdncheck CDN 过滤集成
 - [x] 网络服务扫描（非 Web 端口：Redis/MySQL/PostgreSQL/Elasticsearch/MongoDB/Memcached/MSSQL/Oracle）
 - [x] CPE 指纹补充（404/302 页面 tech fallback）
 - [x] httpx `-follow-redirects`
 - [x] 靶场环境修复（Tomcat 弱口令/Manager 访问）
-- [x] Go 单元测试覆盖（tagmapper、httpx parser、parser 包）
+- [x] Go 单元测试覆盖（tagmapper、httpx parser、parser 包、naabu args）
+- [x] E2E 测试：ScanConfigPage + high-risk pipeline 端到端验证
 
 ## 外部工具依赖
 
-| 工具 | 用途 | 最低版本 |
-|------|------|----------|
-| [Subfinder](https://github.com/projectdiscovery/subfinder) | 子域名枚举 | v2.6+ |
-| [httpx](https://github.com/projectdiscovery/httpx) | Web 存活与指纹 | v1.3+ |
-| [Naabu](https://github.com/projectdiscovery/naabu) | 端口发现 | v2.1+ |
-| [Nuclei](https://github.com/projectdiscovery/nuclei) | 漏洞初筛 | v3.0+ |
-| [Nmap](https://nmap.org/) | 深度服务识别（可选） | v7.92+ |
+| 工具                                                       | 用途                 | 最低版本 |
+| ---------------------------------------------------------- | -------------------- | -------- |
+| [Subfinder](https://github.com/projectdiscovery/subfinder) | 子域名枚举           | v2.6+    |
+| [httpx](https://github.com/projectdiscovery/httpx)         | Web 存活与指纹       | v1.3+    |
+| [Naabu](https://github.com/projectdiscovery/naabu)         | 端口发现             | v2.1+    |
+| [nerva](https://github.com/praetorian-inc/nerva)           | 服务指纹识别         | latest   |
+| [cdncheck](https://github.com/projectdiscovery/cdncheck)   | CDN/WAF 过滤         | latest   |
+| [Nuclei](https://github.com/projectdiscovery/nuclei)       | 漏洞初筛             | v3.0+    |
+| [Nmap](https://nmap.org/)                                  | 深度服务识别（可选） | v7.92+   |
 
 ## 版本
 
-| Tag | 说明 |
-|-----|------|
-| `v0.1.0-m0` | 工程骨架 |
-| `v0.1.0-m1` | 目标与 Scope 增强 |
-| `v0.1.0-m2` | 资产发现 |
-| `v0.1.0-m3` | Nuclei 初筛 |
-| `v0.1.0-m4` | 报告导出 |
+| Tag         | 说明                             |
+| ----------- | -------------------------------- |
+| `v0.1.0-m0` | 工程骨架                         |
+| `v0.1.0-m1` | 目标与 Scope 增强                |
+| `v0.1.0-m2` | 资产发现                         |
+| `v0.1.0-m3` | Nuclei 初筛                      |
+| `v0.1.0-m4` | 报告导出                         |
 | `v0.2.0-p1` | Docker 容器化 + 远程 Worker 架构 |
-| `v0.2.0-p2` | 项目管理与体验修复 |
-| `v0.3.0` | 桌面可用性与可靠性 |
+| `v0.2.0-p2` | 项目管理与体验修复               |
+| `v0.3.0`    | 桌面可用性与可靠性               |
 
 ## 许可
 

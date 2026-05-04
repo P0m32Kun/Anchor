@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,7 +30,7 @@ type Runner struct {
 	queries    *db.Queries
 	scopeEng   *scope.Engine
 	dataDir    string
-	httpClient *http.Client
+	dispatcher *Dispatcher
 	procs      map[string]*exec.Cmd
 	doneChs    map[string]chan struct{} // closed when process exits
 	mu         sync.RWMutex
@@ -43,7 +41,7 @@ func NewRunner(q *db.Queries, scopeEng *scope.Engine, dataDir string) *Runner {
 		queries:    q,
 		scopeEng:   scopeEng,
 		dataDir:    dataDir,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		dispatcher: NewDispatcher(q),
 		procs:      make(map[string]*exec.Cmd),
 		doneChs:    make(map[string]chan struct{}),
 	}
@@ -114,14 +112,31 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 		return fmt.Errorf("project not found: %s", task.ProjectID)
 	}
 
-	// Try to dispatch to a remote worker first.
-	if worker := r.pickOnlineWorker(); worker != nil {
-		log.Printf("[runner] dispatching task %s to worker %s (%s)", task.ID, worker.ID, worker.Endpoint)
-		if err := r.dispatchToWorker(ctx, task, worker, workdir, project); err != nil {
-			log.Printf("[runner] remote dispatch failed: %v, falling back to local", err)
-		} else {
-			return nil
+	// Try to dispatch to a remote worker first. On dispatch failure (worker
+	// unreachable), mark the worker offline and try the next online worker.
+	var triedWorkerIDs []string
+	for {
+		worker := r.dispatcher.PickOnlineWorkerExcluding(triedWorkerIDs)
+		if worker == nil {
+			break
 		}
+		log.Printf("[runner] dispatching task %s to worker %s (%s)", task.ID, worker.ID, worker.Endpoint)
+		if err := r.dispatcher.DispatchToWorker(ctx, task, worker, workdir, project); err != nil {
+			log.Printf("[runner] remote dispatch to %s failed: %v", worker.ID, err)
+			if isUnreachableError(err) {
+				if markErr := r.dispatcher.MarkWorkerOffline(worker.ID); markErr != nil {
+					log.Printf("[runner] mark worker %s offline failed: %v", worker.ID, markErr)
+				} else {
+					log.Printf("[runner] worker %s marked offline (unreachable)", worker.ID)
+				}
+				triedWorkerIDs = append(triedWorkerIDs, worker.ID)
+				continue
+			}
+			// Task-level failure (worker reachable but task failed/cancelled/timed out).
+			// Do not silently fall back to local — propagate the failure.
+			return err
+		}
+		return nil
 	}
 
 	binary := args[0]
@@ -298,129 +313,26 @@ func (lb *limitedBuffer) Write(p []byte) (n int, err error) {
 func (lb *limitedBuffer) Len() int      { return lb.buf.Len() }
 func (lb *limitedBuffer) Bytes() []byte { return lb.buf.Bytes() }
 
-// BuildSubfinderCommand builds a Subfinder command for the given domain.
-// Output goes to stdout as JSONL so the worker can capture it as an artifact.
-func BuildSubfinderCommand(domain string) []string {
-	return []string{"subfinder", "-d", domain, "-oJ"}
-}
-
-// BuildHttpxCommand builds an httpx command that reads hosts from a file.
-// hostFile should contain one host per line.
-// Output goes to stdout as JSONL so the worker can capture it as an artifact.
-func BuildHttpxCommand(hostFile string) []string {
-	return []string{"httpx", "-json", "-l", hostFile, "-follow-redirects"}
-}
-
-// BuildNaabuCommand builds a Naabu command that reads hosts from a file.
-// hostFile should contain one host per line.
-// Output goes to stdout as JSONL so the worker can capture it as an artifact.
-func BuildNaabuCommand(hostFile string) []string {
-	return []string{"naabu", "-json", "-list", hostFile}
-}
-
-// BuildNucleiCommand builds a Nuclei command.
-// If tags is non-empty, adds -tags flag. Otherwise runs without tag filter.
-func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string) []string {
-	args := []string{"nuclei", "-jsonl", "-l", targetFile}
-
-	switch profile {
-	case "light":
-		args = append(args, "-severity", "critical,high", "-timeout", "3")
-	case "standard", "":
-		args = append(args, "-severity", "critical,high,medium", "-timeout", "5")
-	case "deep":
-		args = append(args, "-severity", "critical,high,medium,low,info", "-timeout", "10")
+// isUnreachableError reports whether the dispatch error indicates the worker
+// is unreachable (connection refused, DNS failure, timeout) rather than a
+// task-level failure.
+func isUnreachableError(err error) bool {
+	if err == nil {
+		return false
 	}
-
-	if len(tags) > 0 {
-		args = append(args, "-tags", strings.Join(tags, ","))
-	}
-
-	if rateLimit > 0 {
-		args = append(args, "-rl", fmt.Sprintf("%d", rateLimit))
-	}
-
-	return args
-}
-
-// appendRateLimitArgs appends tool-specific rate limit flags to the argument list.
-// Only adds flags when rate > 0 and the tool supports it.
-func appendRateLimitArgs(args []string, tool string, rate int) []string {
-	if rate <= 0 {
-		return args
-	}
-	switch strings.ToLower(tool) {
-	case "naabu":
-		return append(args, "-rate", fmt.Sprintf("%d", rate))
-	case "nuclei":
-		return append(args, "-rl", fmt.Sprintf("%d", rate))
-	case "httpx":
-		return append(args, "-rate-limit", fmt.Sprintf("%d", rate))
-	default:
-		// Subfinder and others don't support rate limiting; skip.
-		return args
-	}
-}
-
-// pickOnlineWorker returns the most recently seen online remote worker, or nil if none.
-func (r *Runner) pickOnlineWorker() *models.WorkerNode {
-	workers, err := r.queries.ListWorkerNodes()
-	if err != nil {
-		return nil
-	}
-	var latest *models.WorkerNode
-	for _, w := range workers {
-		if w.Status == models.WorkerStatusOnline && w.Endpoint != "" && w.RevokedAt == nil {
-			if latest == nil || (w.LastSeen != nil && latest.LastSeen != nil && w.LastSeen.After(*latest.LastSeen)) {
-				latest = w
-			}
+	msg := err.Error()
+	for _, signature := range []string{
+		"post task to worker",
+		"connection refused",
+		"no such host",
+		"timeout",
+		"i/o timeout",
+		"network is unreachable",
+		"dial tcp",
+	} {
+		if strings.Contains(msg, signature) {
+			return true
 		}
 	}
-	return latest
-}
-
-// dispatchToWorker sends a task to a remote worker and polls until completion.
-func (r *Runner) dispatchToWorker(ctx context.Context, task *models.ScanTask, worker *models.WorkerNode, workdir string, project *models.Project) error {
-	args := strings.Fields(task.CommandTemplate)
-	reqBody, _ := json.Marshal(map[string]interface{}{
-		"task_id":    task.ID,
-		"tool":       task.Tool,
-		"command":    args,
-		"workdir":    workdir,
-		"rate_limit": project.RateLimit,
-	})
-
-	resp, err := r.httpClient.Post(worker.Endpoint+"/tasks", "application/json", bytes.NewReader(reqBody))
-	if err != nil {
-		return fmt.Errorf("post task to worker: %w", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("worker rejected task: %s", resp.Status)
-	}
-
-	// Poll for task completion (up to 10 minutes).
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-	timeout := time.After(10 * time.Minute)
-
-	for {
-		select {
-		case <-ticker.C:
-			t, err := r.queries.GetScanTask(task.ID)
-			if err != nil || t == nil {
-				continue
-			}
-			if t.Status == models.TaskCompleted {
-				return nil
-			}
-			if t.Status == models.TaskFailed || t.Status == models.TaskScopeDenied || t.Status == models.TaskCancelled {
-				return fmt.Errorf("task %s finished with status: %s", task.ID, t.Status)
-			}
-		case <-timeout:
-			return fmt.Errorf("task %s timeout waiting for worker", task.ID)
-		case <-ctx.Done():
-			return fmt.Errorf("task %s cancelled", task.ID)
-		}
-	}
+	return false
 }

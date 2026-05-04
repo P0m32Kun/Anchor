@@ -1,37 +1,33 @@
 # Anchor Remote Worker Dockerfile
-# Usage: docker build -f Dockerfile.worker -t anchor-worker .
-#        docker run -e ANCHOR_CORE_URL=http://server:17421 anchor-worker
+# 基于 anchor-worker-base（预装安全工具）快速构建
+#
+# 首次使用请先构建基础镜像：
+#   make build-worker-base
+#
+# 然后正常构建 worker：
+#   docker build -f Dockerfile.worker -t anchor-worker .
+#   docker run -e ANCHOR_CORE_URL=http://server:17421 anchor-worker
 
+# --- 编译阶段：只编译业务代码，不需要重新安装工具 ---
 FROM golang:1.26-alpine AS builder
 
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
 RUN apk add --no-cache git gcc musl-dev sqlite-dev libpcap-dev
 
 WORKDIR /build
 COPY go.mod go.sum ./
+
+ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
 COPY . .
 RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor .
 
-# --- Install security tools ---
-RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-RUN go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
-RUN go install github.com/projectdiscovery/httpx/cmd/httpx@latest
-RUN go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-RUN nuclei -update-templates
-
-# --- Runtime ---
-FROM alpine:latest
-
-RUN apk add --no-cache ca-certificates libpcap-dev chromium
+# --- 运行阶段：使用预装工具的精简基础镜像 ---
+FROM anchor-worker-base:latest
 
 WORKDIR /app
 COPY --from=builder /build/anchor .
-COPY --from=builder /go/bin/subfinder /usr/local/bin/
-COPY --from=builder /go/bin/naabu /usr/local/bin/
-COPY --from=builder /go/bin/httpx /usr/local/bin/
-COPY --from=builder /go/bin/nuclei /usr/local/bin/
-COPY --from=builder /root/nuclei-templates /root/nuclei-templates
 
 ENV ANCHOR_DATA_DIR=/data
 ENV ANCHOR_CORE_URL=""

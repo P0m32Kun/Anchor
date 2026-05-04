@@ -4,10 +4,16 @@
 
 FROM golang:1.26-alpine AS builder
 
+# 使用国内镜像源加速构建
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
+
 RUN apk add --no-cache git gcc musl-dev sqlite-dev
 
 WORKDIR /build
 COPY go.mod go.sum ./
+
+# 使用国内 Go 模块代理
+ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
 COPY . .

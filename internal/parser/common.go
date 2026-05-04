@@ -42,3 +42,10 @@ type NaabuResult struct {
 	Port int    `json:"port"`
 	IP   string `json:"ip"`
 }
+
+// PortInfo represents a single open port from naabu output.
+type PortInfo struct {
+	IP       string `json:"ip"`
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol"`
+}

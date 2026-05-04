@@ -1,64 +1,74 @@
-.PHONY: build run dev test clean
-.PHONY: up up-server up-worker down down-server down-worker restart-worker status logs logs-server logs-worker logs-server-solo logs-worker-solo
-.PHONY: dev-desktop dev-web tauri-dev tauri-build
+.PHONY: build clean
+.PHONY: up down up-server down-server up-worker down-worker restart-worker
+.PHONY: logs logs-server logs-worker status shell-server shell-worker
+.PHONY: build-worker-base push-worker-base pull-worker-base setup-worker-base
+.PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-full
 .PHONY: range-up range-down range-status range-logs
-.PHONY: up-all down-all
-.PHONY: shell-server shell-worker test-naabu
+.PHONY: dev-web tauri-build
 
 GO_FILES := $(shell find . -name '*.go' -not -path './frontend/*')
 
-# --- Build & Run ---
+# ============================================================
+#  Base Image (预装安全工具，极少更新)
+# ============================================================
 
-build:
-	go build -o bin/anchor .
+build-worker-base:
+	docker build -f Dockerfile.worker-base -t anchor-worker-base:latest .
 
-run: build
-	./bin/anchor
+push-worker-base:
+	docker tag anchor-worker-base:latest p0m32kun/anchor-worker-base:latest
+	docker push p0m32kun/anchor-worker-base:latest
 
-dev:
-	@lsof -ti:17421 | xargs kill -9 2>/dev/null || true
-	go run .
+pull-worker-base:
+	docker pull p0m32kun/anchor-worker-base:latest
+	docker tag p0m32kun/anchor-worker-base:latest anchor-worker-base:latest
 
-test:
-	go test ./...
+# 首次设置：构建并标记本地基础镜像
+setup-worker-base: build-worker-base
 
-clean:
-	rm -rf bin/
-	docker compose -f docker-compose.yml down --volumes --remove-orphans 2>/dev/null || true
-	docker compose -f docker-compose.server.yml down --volumes --remove-orphans 2>/dev/null || true
-	docker compose -f docker-compose.worker.yml down --volumes --remove-orphans 2>/dev/null || true
-	docker compose -f docker-rangefield/docker-compose.yml down --volumes --remove-orphans 2>/dev/null || true
-	docker network rm anchor-net 2>/dev/null || true
+# ============================================================
+#  Development Environment (Docker only)
+# ============================================================
 
-# --- Docker Compose Lifecycle ---
-
-# 单机全栈（server + worker）
+# 启动完整环境（server + worker）
 up:
 	docker compose -f docker-compose.yml up -d --build
 
-# 快速启动（开发用，复用已有镜像不强制 build）
+# 快速启动（不重建镜像，使用缓存）
 up-fast:
 	docker compose -f docker-compose.yml up -d
 
+# 强制重建并启动
+up-force:
+	docker compose -f docker-compose.yml down --remove-orphans
+	docker compose -f docker-compose.yml build --no-cache
+	docker compose -f docker-compose.yml up -d
+
+# 停止完整环境
 down:
 	docker compose -f docker-compose.yml down --remove-orphans
 
-# 单独 Server
+# 仅启动 server
 up-server:
 	docker compose -f docker-compose.server.yml up -d --build
 
 down-server:
 	docker compose -f docker-compose.server.yml down --remove-orphans
 
-# 单独 Worker（需设置 ANCHOR_CORE_URL 指向远端 server）
+# 仅启动 worker（连接已有 server）
 up-worker:
 	docker compose -f docker-compose.worker.yml up -d --build
 
 down-worker:
 	docker compose -f docker-compose.worker.yml down --remove-orphans
 
+# 重启 worker
 restart-worker: down-worker up-worker
 	@echo "Worker restarted"
+
+# ============================================================
+#  Logs & Debug
+# ============================================================
 
 status:
 	docker compose ps
@@ -78,31 +88,53 @@ logs-server-solo:
 logs-worker-solo:
 	docker compose -f docker-compose.worker.yml logs -f worker
 
-# --- Development Modes ---
+shell-server:
+	docker exec -it anchor-server /bin/sh
 
-dev-desktop:
-	@echo "Starting Tauri dev..."
-	@pkill -f "vite" 2>/dev/null || true
-	@pkill -f "target/debug/anchor" 2>/dev/null || true
-	cd frontend && npm install
-	./frontend/node_modules/.bin/tauri dev
+shell-worker:
+	docker exec -it anchor-worker /bin/sh
 
-dev-web:
-	@echo "Starting Vite dev server..."
-	cd frontend && npm install
-	./frontend/node_modules/.bin/vite --host
+# ============================================================
+#  Testing
+# ============================================================
 
-tauri-dev:
-	@pkill -f "vite" 2>/dev/null || true
-	@pkill -f "target/debug/anchor" 2>/dev/null || true
-	cd frontend && npm install
-	./frontend/node_modules/.bin/tauri dev
+# Go 单元测试（本地运行，不需要 Docker）
+test:
+	go test ./...
 
-tauri-build:
-	cd frontend && npm install
-	./frontend/node_modules/.bin/tauri build
+test-unit: test
 
-# --- Rangefield ---
+# E2E 测试：启动完整 Docker 环境后运行 Playwright
+test-e2e:
+	@echo "[test-e2e] Starting E2E Docker environment..."
+	@docker compose -f docker-compose.e2e.yml up -d --build
+	@echo "[test-e2e] Waiting for services..."
+	@sleep 5
+	@cd frontend && npx playwright test --project=chromium
+
+# E2E smoke 测试
+test-e2e-smoke:
+	@docker compose -f docker-compose.e2e.yml up -d --build
+	@sleep 5
+	@cd frontend && npx playwright test e2e/tests/smoke.spec.ts --project=chromium
+
+# E2E 完整流程测试（无预置 auth）
+test-e2e-full:
+	@docker compose -f docker-compose.e2e.yml up -d --build
+	@sleep 5
+	@cd frontend && npx playwright test e2e/tests/full-flow.spec.ts --project=chromium-auth
+
+# E2E 环境启动（不运行测试，手动调试用）
+test-e2e-up:
+	docker compose -f docker-compose.e2e.yml up -d --build
+
+# E2E 环境停止
+test-e2e-down:
+	docker compose -f docker-compose.e2e.yml down --remove-orphans
+
+# ============================================================
+#  Rangefield (靶场，独立管理)
+# ============================================================
 
 range-up:
 	docker compose -f docker-rangefield/docker-compose.yml up -d
@@ -116,21 +148,34 @@ range-status:
 range-logs:
 	docker compose -f docker-rangefield/docker-compose.yml logs -f
 
-# --- Combined ---
-
-up-all: up range-up
-	@echo "Anchor server, worker, and rangefield services are up"
-
-down-all: down range-down
-	@echo "All services stopped"
-
-# --- Utilities ---
-
-shell-server:
-	docker exec -it anchor-server /bin/sh
-
-shell-worker:
-	docker exec -it anchor-worker /bin/sh
-
 test-naabu:
 	docker exec -it anchor-worker naabu -host 172.30.0.10 -p 80
+
+# ============================================================
+#  Local Build (仅编译二进制，不启动服务)
+# ============================================================
+
+build:
+	go build -o bin/anchor .
+
+clean:
+	rm -rf bin/
+	docker compose -f docker-compose.yml down --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.server.yml down --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.worker.yml down --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.e2e.yml down --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f docker-rangefield/docker-compose.yml down --volumes --remove-orphans 2>/dev/null || true
+	docker network rm anchor-net 2>/dev/null || true
+
+# ============================================================
+#  Frontend Dev (本地开发，不依赖 Docker)
+# ============================================================
+
+dev-web:
+	@echo "Starting Vite dev server..."
+	cd frontend && npm install
+	./frontend/node_modules/.bin/vite --host
+
+tauri-build:
+	cd frontend && npm install
+	./frontend/node_modules/.bin/tauri build

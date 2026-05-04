@@ -1,0 +1,119 @@
+package worker
+
+import (
+	"fmt"
+	"strings"
+)
+
+// HighRiskPorts is a curated list of ports that commonly host vulnerable
+// or sensitive services. Naabu's built-in top-100/top-1000 sets are biased
+// toward Nmap's general-purpose service prevalence and miss several high-value
+// targets (e.g. 6379 Redis, 9200 Elasticsearch, 27017 MongoDB, 11434 Ollama).
+// This list intentionally favours attack-surface coverage over generality.
+const HighRiskPorts = "21,22,23,25,53,80,81,88,110,135,139,143,389,443,445,465,587,636,873,993,995," +
+	"1080,1099,1433,1521,1723,2049,2082,2375,2376,2480,3000,3128,3306,3389," +
+	"4040,4194,4369,4444,4848,5000,5432,5601,5672,5900,5901,5984,6379,6443," +
+	"7000,7001,7002,7077,7474,8000,8001,8008,8009,8020,8060,8080,8081,8086,8088,8090,8161,8200,8443,8500,8531,8888,8983," +
+	"9000,9001,9042,9043,9060,9080,9090,9091,9092,9100,9200,9300,9418,9443,9981," +
+	"10000,10250,10255,11211,11434,15672,15692,16379,18091," +
+	"27017,27018,27019,28017,50000,50070,50075,61613,61616"
+
+// BuildSubfinderCommand builds a Subfinder command for the given domain.
+// Output goes to stdout as JSONL so the worker can capture it as an artifact.
+func BuildSubfinderCommand(domain string) []string {
+	return []string{"subfinder", "-d", domain, "-oJ"}
+}
+
+// BuildHttpxCommand builds an httpx command that reads hosts from a file.
+// hostFile should contain one host per line.
+// Output goes to stdout as JSONL so the worker can capture it as an artifact.
+func BuildHttpxCommand(hostFile string) []string {
+	return []string{"httpx", "-json", "-l", hostFile, "-follow-redirects"}
+}
+
+// BuildNaabuCommand builds a Naabu command that reads hosts from a file.
+// hostFile should contain one host per line.
+// portRange can be a custom port list (e.g. "80,443,8080"), or one of:
+//
+//	"top100" / "tp100"  → naabu default (no extra flag)
+//	"top1000" / "tp1000" → -tp 1000
+//	"full" / "tpfull" / "topfull" → -tp full
+//	"high-risk" / "highrisk" / "hr" → curated high-risk ports (Redis,
+//	    Elasticsearch, MongoDB, etc.) that the top-N presets miss
+//
+// Output goes to stdout as JSONL so the worker can capture it as an artifact.
+func BuildNaabuCommand(hostFile, portRange string) []string {
+	args := []string{"naabu", "-json", "-list", hostFile}
+
+	switch strings.ToLower(portRange) {
+	case "", "tp100", "top100":
+		// Naabu default is top 100, no extra flag needed
+	case "tp1000", "top1000":
+		args = append(args, "-tp", "1000")
+	case "tpfull", "topfull", "full":
+		args = append(args, "-tp", "full")
+	case "high-risk", "highrisk", "hr":
+		args = append(args, "-p", HighRiskPorts)
+	default:
+		// User-defined port list
+		args = append(args, "-p", portRange)
+	}
+
+	return args
+}
+
+// BuildNucleiCommand builds a Nuclei command.
+// If tags is non-empty, adds -tags flag. Otherwise runs without tag filter.
+func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string) []string {
+	args := []string{"nuclei", "-jsonl", "-l", targetFile}
+
+	switch profile {
+	case "light":
+		args = append(args, "-severity", "critical,high", "-timeout", "3")
+	case "standard", "":
+		args = append(args, "-severity", "critical,high,medium", "-timeout", "5")
+	case "deep":
+		args = append(args, "-severity", "critical,high,medium,low,info", "-timeout", "10")
+	}
+
+	if len(tags) > 0 {
+		args = append(args, "-tags", strings.Join(tags, ","))
+	}
+
+	if rateLimit > 0 {
+		args = append(args, "-rl", fmt.Sprintf("%d", rateLimit))
+	}
+
+	return args
+}
+
+// BuildNervaCommand builds a nerva command for service fingerprinting.
+// targets should be in "host:port" format, comma-separated.
+func BuildNervaCommand(targets string) []string {
+	return []string{"nerva", "--json", "-t", targets}
+}
+
+// BuildCDNCheckCommand builds a cdncheck command for CDN detection.
+// ips should be comma-separated.
+func BuildCDNCheckCommand(ips string) []string {
+	return []string{"cdncheck", "-i", ips, "-jsonl"}
+}
+
+// appendRateLimitArgs appends tool-specific rate limit flags to the argument list.
+// Only adds flags when rate > 0 and the tool supports it.
+func appendRateLimitArgs(args []string, tool string, rate int) []string {
+	if rate <= 0 {
+		return args
+	}
+	switch strings.ToLower(tool) {
+	case "naabu":
+		return append(args, "-rate", fmt.Sprintf("%d", rate))
+	case "nuclei":
+		return append(args, "-rl", fmt.Sprintf("%d", rate))
+	case "httpx":
+		return append(args, "-rate-limit", fmt.Sprintf("%d", rate))
+	default:
+		// Subfinder and others don't support rate limiting; skip.
+		return args
+	}
+}

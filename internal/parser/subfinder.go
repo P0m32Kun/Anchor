@@ -64,3 +64,17 @@ func ParseSubfinder(r io.Reader) ([]SubfinderResult, []ParseError) {
 
 	return results, errs
 }
+
+// ParseSubfinderOutput parses subfinder -oJ JSONL output into a list of subdomains.
+func ParseSubfinderOutput(r io.Reader) []string {
+	results, _ := ParseSubfinder(r)
+	seen := make(map[string]bool)
+	var subs []string
+	for _, res := range results {
+		if res.Host != "" && !seen[res.Host] {
+			seen[res.Host] = true
+			subs = append(subs, res.Host)
+		}
+	}
+	return subs
+}

@@ -389,6 +389,16 @@ export const api = {
   cancelRun: (id: string, signal?: AbortSignal) =>
     fetchAPI<{ status: string }>(`/runs/${id}/cancel`, { method: "POST", signal }),
 
+  // --- Pipeline Config (project-scoped) ---
+  getPipelineConfig: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<PipelineConfig>(`/projects/${projectId}/pipeline/config`, { signal }),
+  updatePipelineConfig: (projectId: string, data: PipelineConfig, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/projects/${projectId}/pipeline/config`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      signal,
+    }),
+
   // --- Tool Templates ---
   listToolTemplates: (signal?: AbortSignal) =>
     fetchAPI<ToolTemplate[]>("/tool-templates", { signal }),
@@ -422,3 +432,77 @@ export interface ToolTemplate {
   is_preset: boolean;
   created_at: string;
 }
+
+export interface PipelineConfig {
+  enable_fofa: boolean;
+  fofa_result_limit: number;
+  fofa_concurrency: number;
+  enable_subfinder: boolean;
+  subfinder_timeout: number;
+  dns_concurrency: number;
+  dns_timeout: number;
+  enable_cdn_filter: boolean;
+  port_range: string;
+  port_scan_timeout: number;
+  port_scan_concurrency: number;
+  enable_nerva: boolean;
+  nerva_timeout: number;
+  nerva_concurrency: number;
+  enable_nuclei: boolean;
+  nuclei_rate_limit: number;
+  nuclei_concurrency: number;
+}
+
+export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
+  enable_fofa: true,
+  fofa_result_limit: 500,
+  fofa_concurrency: 5,
+  enable_subfinder: true,
+  subfinder_timeout: 300,
+  dns_concurrency: 50,
+  dns_timeout: 5,
+  enable_cdn_filter: true,
+  port_range: "top1000",
+  port_scan_timeout: 600,
+  port_scan_concurrency: 100,
+  enable_nerva: true,
+  nerva_timeout: 10,
+  nerva_concurrency: 50,
+  enable_nuclei: true,
+  nuclei_rate_limit: 100,
+  nuclei_concurrency: 25,
+};
+
+export interface PortRangePreset {
+  value: string;
+  label: string;
+  description: string;
+}
+
+export const PORT_RANGE_PRESETS: PortRangePreset[] = [
+  {
+    value: "top100",
+    label: "Top 100 常用端口",
+    description: "Naabu 默认快扫，覆盖 Web/SSH/SMB 等高频服务",
+  },
+  {
+    value: "top1000",
+    label: "Top 1000 常用端口",
+    description: "更广覆盖，但漏掉 Redis 6379、ES 9200、Kubelet 10250 等",
+  },
+  {
+    value: "high-risk",
+    label: "高危端口（推荐）",
+    description: "115 个攻击面端口，覆盖 Redis/ES/MongoDB/Docker/K8s/Ollama 等高价值目标",
+  },
+  {
+    value: "full",
+    label: "全端口（1-65535）",
+    description: "最完整但最慢，建议仅在内网或小范围使用",
+  },
+  {
+    value: "custom",
+    label: "自定义",
+    description: "手动指定端口，例如 80,443,8080 或 1-1000",
+  },
+];

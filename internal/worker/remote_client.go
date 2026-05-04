@@ -63,6 +63,8 @@ func (c *RemoteClient) Register(name string) error {
 
 	c.workerID = result.WorkerID
 	log.Printf("[worker] registered as %s", c.workerID)
+	// Immediately heartbeat so server marks us online without waiting for ticker.
+	c.heartbeat()
 	return nil
 }
 
@@ -126,6 +128,15 @@ func (c *RemoteClient) StartPolling() {
 				log.Printf("[worker] poll unauthorized (revoked?), stopping")
 				resp.Body.Close()
 				return
+			}
+			if resp.StatusCode == http.StatusNotFound {
+				log.Printf("[worker] poll 404, re-registering...")
+				resp.Body.Close()
+				if err := c.Register("remote-worker"); err != nil {
+					log.Printf("[worker] re-register failed: %v", err)
+					// If re-register succeeds, heartbeat is sent inside Register.
+				}
+				continue
 			}
 
 			if resp.StatusCode == http.StatusOK {
