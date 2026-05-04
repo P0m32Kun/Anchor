@@ -44,10 +44,10 @@ const variantStyles: Record<
     glow: "shadow-[0_0_15px_rgba(248,113,113,0.25)]",
   },
   info: {
-    bg: "bg-[#38bdf8]/10",
-    text: "text-[#38bdf8]",
-    border: "border-[#38bdf8]/20",
-    glow: "shadow-[0_0_15px_rgba(56,189,248,0.25)]",
+    bg: "bg-[#06b6d4]/10",
+    text: "text-[#06b6d4]",
+    border: "border-[#06b6d4]/20",
+    glow: "shadow-[0_0_15px_rgba(6,182,212,0.25)]",
   },
   critical: {
     bg: "bg-[#f87171]/20",

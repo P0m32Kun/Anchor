@@ -41,11 +41,11 @@ export default {
         },
         // Vibrant primary colors (Electric variants)
         brand: {
-          primary: "#2F81F7",   // More vibrant electric blue
+          primary: "#38bdf8",   // CyberOS 主色-蓝 (sky-400)
           secondary: "#7D8590",
-          success: "#3FB950",   // Vibrant green
-          warning: "#D29922",   // Vibrant gold/orange
-          danger: "#F85149",    // Vibrant red
+          success: "#4ade80",   // CyberOS 成功-绿 (green-400)
+          warning: "#facc15",   // CyberOS 警告-黄 (yellow-400)
+          danger: "#f87171",    // CyberOS 警告-红 (red-400)
           purple: "#A371F7",    // Electric purple
         },
         // Text colors for dark mode
