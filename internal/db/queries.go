@@ -57,6 +57,32 @@ func (q *Queries) ListProjects() ([]*models.Project, error) {
 	return list, rows.Err()
 }
 
+func (q *Queries) CountProjects() (int, error) {
+	var count int
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM projects`)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) ListProjectsPaginated(limit, offset int) ([]*models.Project, error) {
+	rows, err := q.db.Query(`SELECT id, name, organization, purpose, rate_limit, port_range, default_profile, fofa_email, fofa_api_key, pipeline_config, created_at, updated_at FROM projects ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.Project, 0)
+	for rows.Next() {
+		p := &models.Project{}
+		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.FofaEmail, &p.FofaAPIKey, &p.PipelineConfig, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, p)
+	}
+	return list, rows.Err()
+}
+
 func (q *Queries) DeleteProject(id string) error {
 	_, err := q.db.Exec(`DELETE FROM projects WHERE id = ?`, id)
 	return err
@@ -105,6 +131,32 @@ func (q *Queries) GetTarget(id string) (*models.Target, error) {
 
 func (q *Queries) ListTargetsByProject(projectID string) ([]*models.Target, error) {
 	rows, err := q.db.Query(`SELECT id, project_id, type, value, source, status, created_at FROM targets WHERE project_id = ? ORDER BY created_at DESC`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.Target, 0)
+	for rows.Next() {
+		t := &models.Target{}
+		if err := rows.Scan(&t.ID, &t.ProjectID, &t.Type, &t.Value, &t.Source, &t.Status, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, t)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) CountTargetsByProject(projectID string) (int, error) {
+	var count int
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM targets WHERE project_id = ?`, projectID)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) ListTargetsByProjectPaginated(projectID string, limit, offset int) ([]*models.Target, error) {
+	rows, err := q.db.Query(`SELECT id, project_id, type, value, source, status, created_at FROM targets WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`, projectID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -182,6 +234,32 @@ func (q *Queries) CreateScopeRule(r *models.ScopeRule) error {
 
 func (q *Queries) ListScopeRulesByProject(projectID string) ([]*models.ScopeRule, error) {
 	rows, err := q.db.Query(`SELECT id, project_id, action, type, value, reason, created_at, updated_at FROM scope_rules WHERE project_id = ? ORDER BY created_at`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.ScopeRule, 0)
+	for rows.Next() {
+		r := &models.ScopeRule{}
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Action, &r.Type, &r.Value, &r.Reason, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) CountScopeRulesByProject(projectID string) (int, error) {
+	var count int
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM scope_rules WHERE project_id = ?`, projectID)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) ListScopeRulesByProjectPaginated(projectID string, limit, offset int) ([]*models.ScopeRule, error) {
+	rows, err := q.db.Query(`SELECT id, project_id, action, type, value, reason, created_at, updated_at FROM scope_rules WHERE project_id = ? ORDER BY created_at LIMIT ? OFFSET ?`, projectID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -536,6 +614,34 @@ func (q *Queries) ListAssetsByProject(projectID string) ([]*models.Asset, error)
 	return list, rows.Err()
 }
 
+func (q *Queries) CountAssetsByProject(projectID string) (int, error) {
+	var count int
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM assets WHERE project_id = ?`, projectID)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) ListAssetsByProjectPaginated(projectID string, limit, offset int) ([]*models.Asset, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, type, value, normalized_value, source_tools, first_seen, last_seen, tags
+		FROM assets WHERE project_id = ? ORDER BY last_seen DESC LIMIT ? OFFSET ?`, projectID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.Asset, 0)
+	for rows.Next() {
+		a, err := scanAsset(rows)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, a)
+	}
+	return list, rows.Err()
+}
+
 func scanAsset(row interface {
 	Scan(dest ...any) error
 }) (*models.Asset, error) {
@@ -658,6 +764,26 @@ func (q *Queries) ListWebEndpointsByProject(projectID string) ([]*models.WebEndp
 	return scanWebEndpoints(rows)
 }
 
+func (q *Queries) CountWebEndpointsByProject(projectID string) (int, error) {
+	var count int
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM web_endpoints WHERE project_id = ?`, projectID)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) ListWebEndpointsByProjectPaginated(projectID string, limit, offset int) ([]*models.WebEndpoint, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, asset_id, url, scheme, host, port, path, status_code, title, technologies, screenshot_artifact_id, source_tool, created_at
+		FROM web_endpoints WHERE project_id = ? ORDER BY url LIMIT ? OFFSET ?`, projectID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanWebEndpoints(rows)
+}
+
 func (q *Queries) WebEndpointExists(projectID, url string) (bool, error) {
 	row := q.db.QueryRow(`SELECT COUNT(1) FROM web_endpoints WHERE project_id = ? AND url = ?`, projectID, url)
 	var count int
@@ -756,6 +882,58 @@ func (q *Queries) ListFindingsByStatus(projectID string, status models.FindingSt
 	rows, err := q.db.Query(`
 		SELECT id, project_id, asset_id, service_id, web_endpoint_id, source_tool, source_rule_id, dedup_key, title, severity, confidence, priority, status, summary, remediation, created_at, updated_at
 		FROM findings WHERE project_id = ? AND status = ? ORDER BY priority DESC, created_at DESC`, projectID, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.Finding, 0)
+	for rows.Next() {
+		f, err := scanFinding(rows)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, f)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) CountFindingsByProject(projectID string, status models.FindingStatus) (int, error) {
+	var count int
+	var err error
+	if status != "" {
+		err = q.db.QueryRow(`SELECT COUNT(*) FROM findings WHERE project_id = ? AND status = ?`, projectID, status).Scan(&count)
+	} else {
+		err = q.db.QueryRow(`SELECT COUNT(*) FROM findings WHERE project_id = ?`, projectID).Scan(&count)
+	}
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) ListFindingsByProjectPaginated(projectID string, limit, offset int) ([]*models.Finding, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, asset_id, service_id, web_endpoint_id, source_tool, source_rule_id, dedup_key, title, severity, confidence, priority, status, summary, remediation, created_at, updated_at
+		FROM findings WHERE project_id = ? ORDER BY priority DESC, created_at DESC LIMIT ? OFFSET ?`, projectID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.Finding, 0)
+	for rows.Next() {
+		f, err := scanFinding(rows)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, f)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) ListFindingsByStatusPaginated(projectID string, status models.FindingStatus, limit, offset int) ([]*models.Finding, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, asset_id, service_id, web_endpoint_id, source_tool, source_rule_id, dedup_key, title, severity, confidence, priority, status, summary, remediation, created_at, updated_at
+		FROM findings WHERE project_id = ? AND status = ? ORDER BY priority DESC, created_at DESC LIMIT ? OFFSET ?`, projectID, status, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -1089,6 +1267,45 @@ func (q *Queries) ListRunsByProject(projectID string) ([]*models.Run, error) {
 	return list, rows.Err()
 }
 
+func (q *Queries) CountRunsByProject(projectID string) (int, error) {
+	var count int
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM runs WHERE project_id = ?`, projectID)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) ListRunsByProjectPaginated(projectID string, limit, offset int) ([]*models.Run, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, tool_template_id, name, status, started_at, finished_at, created_at
+		FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`, projectID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.Run, 0)
+	for rows.Next() {
+		r := &models.Run{}
+		var templateID sql.NullString
+		var startedAt, finishedAt sql.NullTime
+		if err := rows.Scan(&r.ID, &r.ProjectID, &templateID, &r.Name, &r.Status, &startedAt, &finishedAt, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		if templateID.Valid {
+			r.ToolTemplateID = &templateID.String
+		}
+		if startedAt.Valid {
+			r.StartedAt = &startedAt.Time
+		}
+		if finishedAt.Valid {
+			r.FinishedAt = &finishedAt.Time
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
 // --- Screenshot ---
 
 func (q *Queries) CreateScreenshot(s *models.Screenshot) error {
@@ -1325,8 +1542,8 @@ func (q *Queries) UpdateProjectPipelineConfig(projectID string, cfgJSON string) 
 }
 
 func (q *Queries) CreatePipelineRun(r *models.PipelineRun) error {
-	_, err := q.db.Exec(`INSERT INTO pipeline_runs (id, project_id, status, stage, error, started_at, completed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.ProjectID, r.Status, r.Stage, r.Error, r.StartedAt, r.CompletedAt, r.CreatedAt)
+	_, err := q.db.Exec(`INSERT INTO pipeline_runs (id, project_id, mode, status, stage, error, started_at, completed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ProjectID, r.Mode, r.Status, r.Stage, r.Error, r.StartedAt, r.CompletedAt, r.CreatedAt)
 	return err
 }
 
@@ -1351,10 +1568,10 @@ func (q *Queries) UpdatePipelineRunCompleted(id string, completedAt time.Time) e
 }
 
 func (q *Queries) GetPipelineRun(id string) (*models.PipelineRun, error) {
-	row := q.db.QueryRow(`SELECT id, project_id, status, stage, error, started_at, completed_at, created_at FROM pipeline_runs WHERE id = ?`, id)
+	row := q.db.QueryRow(`SELECT id, project_id, mode, status, stage, error, started_at, completed_at, created_at FROM pipeline_runs WHERE id = ?`, id)
 	r := &models.PipelineRun{}
 	var completedAt sql.NullTime
-	err := row.Scan(&r.ID, &r.ProjectID, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt)
+	err := row.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -1365,7 +1582,7 @@ func (q *Queries) GetPipelineRun(id string) (*models.PipelineRun, error) {
 }
 
 func (q *Queries) ListPipelineRunsByProject(projectID string) ([]*models.PipelineRun, error) {
-	rows, err := q.db.Query(`SELECT id, project_id, status, stage, error, started_at, completed_at, created_at FROM pipeline_runs WHERE project_id = ? ORDER BY created_at DESC`, projectID)
+	rows, err := q.db.Query(`SELECT id, project_id, mode, status, stage, error, started_at, completed_at, created_at FROM pipeline_runs WHERE project_id = ? ORDER BY created_at DESC`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -1374,13 +1591,182 @@ func (q *Queries) ListPipelineRunsByProject(projectID string) ([]*models.Pipelin
 	for rows.Next() {
 		r := &models.PipelineRun{}
 		var completedAt sql.NullTime
-		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		if completedAt.Valid {
 			r.CompletedAt = &completedAt.Time
 		}
 		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) CountPipelineRunsByProject(projectID string) (int, error) {
+	var count int
+	err := q.db.QueryRow(`SELECT COUNT(*) FROM pipeline_runs WHERE project_id = ?`, projectID).Scan(&count)
+	return count, err
+}
+
+func (q *Queries) ListPipelineRunsByProjectPaginated(projectID string, limit, offset int) ([]*models.PipelineRun, error) {
+	rows, err := q.db.Query(
+		`SELECT id, project_id, mode, status, stage, error, started_at, completed_at, created_at
+		 FROM pipeline_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		projectID, limit, offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.PipelineRun
+	for rows.Next() {
+		r := &models.PipelineRun{}
+		var completedAt sql.NullTime
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		if completedAt.Valid {
+			r.CompletedAt = &completedAt.Time
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+// --- Pipeline Run Stages ---
+
+func (q *Queries) CreatePipelineRunStage(s *models.PipelineRunStage) error {
+	_, err := q.db.Exec(`
+		INSERT INTO pipeline_run_stages (id, run_id, stage, status, error, started_at, completed_at, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.ID, s.RunID, s.Stage, s.Status, s.Error, s.StartedAt, s.CompletedAt, s.CreatedAt)
+	return err
+}
+
+func (q *Queries) UpdatePipelineRunStageRecord(id string, status models.PipelineRunStageStatus, errMsg string, completedAt *time.Time) error {
+	_, err := q.db.Exec(`
+		UPDATE pipeline_run_stages SET status = ?, error = ?, completed_at = ? WHERE id = ?`,
+		status, errMsg, completedAt, id)
+	return err
+}
+
+func (q *Queries) GetPipelineRunStage(runID, stage string) (*models.PipelineRunStage, error) {
+	row := q.db.QueryRow(`
+		SELECT id, run_id, stage, status, error, started_at, completed_at, created_at
+		FROM pipeline_run_stages WHERE run_id = ? AND stage = ?`, runID, stage)
+	s := &models.PipelineRunStage{}
+	var startedAt, completedAt sql.NullTime
+	err := row.Scan(&s.ID, &s.RunID, &s.Stage, &s.Status, &s.Error, &startedAt, &completedAt, &s.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if startedAt.Valid {
+		s.StartedAt = &startedAt.Time
+	}
+	if completedAt.Valid {
+		s.CompletedAt = &completedAt.Time
+	}
+	return s, err
+}
+
+func (q *Queries) ListPipelineRunStages(runID string) ([]*models.PipelineRunStage, error) {
+	rows, err := q.db.Query(`
+		SELECT id, run_id, stage, status, error, started_at, completed_at, created_at
+		FROM pipeline_run_stages WHERE run_id = ? ORDER BY created_at ASC`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.PipelineRunStage
+	for rows.Next() {
+		s := &models.PipelineRunStage{}
+		var startedAt, completedAt sql.NullTime
+		if err := rows.Scan(&s.ID, &s.RunID, &s.Stage, &s.Status, &s.Error, &startedAt, &completedAt, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		if startedAt.Valid {
+			s.StartedAt = &startedAt.Time
+		}
+		if completedAt.Valid {
+			s.CompletedAt = &completedAt.Time
+		}
+		list = append(list, s)
+	}
+	return list, rows.Err()
+}
+
+// --- Dashboard ---
+
+func (q *Queries) CountActiveRuns() (int, error) {
+	var count int
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM runs WHERE status = 'running'`)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) CountPendingFindings() (int, error) {
+	var count int
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM findings WHERE status = 'pending_review'`)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) CountOnlineWorkers() (int, error) {
+	var count int
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM worker_nodes WHERE status IN ('online', 'busy') AND (revoked_at IS NULL OR revoked_at = '')`)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (q *Queries) ListRecentRuns(limit int) ([]*models.DashboardRunItem, error) {
+	rows, err := q.db.Query(`
+		SELECT r.id, r.project_id, p.name, r.name, r.status, r.started_at, r.created_at
+		FROM runs r
+		JOIN projects p ON r.project_id = p.id
+		ORDER BY r.created_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.DashboardRunItem, 0)
+	for rows.Next() {
+		item := &models.DashboardRunItem{}
+		var startedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.ProjectID, &item.ProjectName, &item.Name, &item.Status, &startedAt, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		if startedAt.Valid {
+			item.StartedAt = &startedAt.Time
+		}
+		list = append(list, item)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) ListRecentFindingsByStatus(status models.FindingStatus, limit int) ([]*models.DashboardFindingItem, error) {
+	rows, err := q.db.Query(`
+		SELECT f.id, f.project_id, p.name, f.title, f.severity, f.created_at
+		FROM findings f
+		JOIN projects p ON f.project_id = p.id
+		WHERE f.status = ?
+		ORDER BY f.priority DESC, f.created_at DESC LIMIT ?`, status, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.DashboardFindingItem, 0)
+	for rows.Next() {
+		item := &models.DashboardFindingItem{}
+		if err := rows.Scan(&item.ID, &item.ProjectID, &item.ProjectName, &item.Title, &item.Severity, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, item)
 	}
 	return list, rows.Err()
 }

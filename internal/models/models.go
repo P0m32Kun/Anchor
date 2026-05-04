@@ -823,10 +823,81 @@ type ServiceFingerprint struct {
 type PipelineRun struct {
 	ID          string     `json:"id" db:"id"`
 	ProjectID   string     `json:"project_id" db:"project_id"`
+	Mode        string     `json:"mode" db:"mode"` // quick | standard | deep | custom
 	Status      string     `json:"status" db:"status"` // running | completed | failed | cancelled
 	Stage       string     `json:"stage,omitempty" db:"stage"`
 	Error       string     `json:"error,omitempty" db:"error"`
 	StartedAt   time.Time  `json:"started_at" db:"started_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+}
+
+// --- Pipeline Run Stage ---
+
+type PipelineRunStageStatus string
+
+const (
+	StageStatusPending   PipelineRunStageStatus = "pending"
+	StageStatusRunning   PipelineRunStageStatus = "running"
+	StageStatusCompleted PipelineRunStageStatus = "completed"
+	StageStatusFailed    PipelineRunStageStatus = "failed"
+	StageStatusSkipped   PipelineRunStageStatus = "skipped"
+)
+
+type PipelineRunStage struct {
+	ID          string                 `json:"id" db:"id"`
+	RunID       string                 `json:"run_id" db:"run_id"`
+	Stage       string                 `json:"stage" db:"stage"`
+	Status      PipelineRunStageStatus `json:"status" db:"status"`
+	Error       string                 `json:"error,omitempty" db:"error"`
+	StartedAt   *time.Time             `json:"started_at,omitempty" db:"started_at"`
+	CompletedAt *time.Time             `json:"completed_at,omitempty" db:"completed_at"`
+	CreatedAt   time.Time              `json:"created_at" db:"created_at"`
+}
+
+// --- Dashboard ---
+
+type DashboardStats struct {
+	TotalProjects   int                    `json:"total_projects"`
+	ActiveRuns      int                    `json:"active_runs"`
+	PendingFindings int                    `json:"pending_findings"`
+	OnlineWorkers   int                    `json:"online_workers"`
+	RecentRuns      []*DashboardRunItem     `json:"recent_runs"`
+	RecentFindings  []*DashboardFindingItem `json:"recent_findings"`
+}
+
+type DashboardRunItem struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	ProjectName string    `json:"project_name"`
+	Name        string    `json:"name"`
+	Status      string    `json:"status"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type DashboardFindingItem struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	ProjectName string    `json:"project_name"`
+	Title       string    `json:"title"`
+	Severity    string    `json:"severity"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func (s PipelineRunStageStatus) Value() (driver.Value, error) { return string(s), nil }
+func (s *PipelineRunStageStatus) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	switch v := value.(type) {
+	case string:
+		*s = PipelineRunStageStatus(v)
+		return nil
+	case []byte:
+		*s = PipelineRunStageStatus(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot scan %T into PipelineRunStageStatus", value)
+	}
 }

@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -93,6 +94,26 @@ func migrate(db *sql.DB) error {
 			return fmt.Errorf("set user_version 6: %w", err)
 		}
 		version = 6
+	}
+
+	if version < 7 {
+		if err := migrateV07(db); err != nil {
+			return fmt.Errorf("migrate v7 (pipeline_run_stages): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 7"); err != nil {
+			return fmt.Errorf("set user_version 7: %w", err)
+		}
+		version = 7
+	}
+
+	if version < 8 {
+		if err := migrateV08(db); err != nil {
+			return fmt.Errorf("migrate v8 (pipeline_runs mode): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 8"); err != nil {
+			return fmt.Errorf("set user_version 8: %w", err)
+		}
+		version = 8
 	}
 
 	if err := ensureProjectsColumns(db); err != nil {
@@ -778,6 +799,37 @@ func ensureProjectsColumns(db *sql.DB) error {
 				return fmt.Errorf("add column %s: %w", col.name, err)
 			}
 		}
+	}
+	return nil
+}
+
+func migrateV08(db *sql.DB) error {
+	// Add mode column to pipeline_runs
+	_, err := db.Exec(`ALTER TABLE pipeline_runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'standard'`)
+	if err != nil {
+		// Column may already exist
+		log.Printf("migration v8 (mode column): %v", err)
+	}
+	return nil
+}
+
+func migrateV07(db *sql.DB) error {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS pipeline_run_stages (
+			id TEXT PRIMARY KEY,
+			run_id TEXT NOT NULL REFERENCES pipeline_runs(id) ON DELETE CASCADE,
+			stage TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','completed','failed','skipped')),
+			error TEXT,
+			started_at DATETIME,
+			completed_at DATETIME,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE INDEX IF NOT EXISTS idx_pipeline_run_stages_run ON pipeline_run_stages(run_id);
+		CREATE INDEX IF NOT EXISTS idx_pipeline_run_stages_stage ON pipeline_run_stages(run_id, stage);
+	`)
+	if err != nil {
+		return fmt.Errorf("create pipeline_run_stages: %w", err)
 	}
 	return nil
 }
