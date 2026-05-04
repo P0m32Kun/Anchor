@@ -340,7 +340,7 @@
 
   /* ===== CyberOS Buttons ===== */
   .btn-cyber-primary {
-    @apply inline-flex items-center justify-center gap-1.5 font-medium rounded-md px-4 py-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 font-medium px-4 py-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
     background: linear-gradient(180deg, #38bdf8 0%, #2563eb 100%);
     border: 1px solid rgba(56, 189, 248, 0.5);
     color: #ffffff;
@@ -360,7 +360,7 @@
   }
 
   .btn-cyber-secondary {
-    @apply inline-flex items-center justify-center gap-1.5 font-medium rounded-md px-4 py-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 font-medium px-4 py-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
     background: rgba(11, 17, 32, 0.6);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(56, 189, 248, 0.25);
@@ -378,7 +378,7 @@
   }
 
   .btn-cyber-danger {
-    @apply inline-flex items-center justify-center gap-1.5 font-medium rounded-md px-4 py-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 font-medium px-4 py-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
     background: linear-gradient(180deg, #f87171 0%, #ef4444 100%);
     border: 1px solid rgba(248, 113, 113, 0.5);
     color: #ffffff;
@@ -398,7 +398,7 @@
   }
 
   .btn-cyber-ghost {
-    @apply inline-flex items-center justify-center gap-1.5 font-medium rounded-md px-4 py-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 font-medium px-4 py-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
     background: transparent;
     border: 1px solid transparent;
     color: #8b949e;
