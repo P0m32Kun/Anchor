@@ -44,16 +44,16 @@ export function Navbar() {
   };
 
   return (
-    <nav className="nav-glass-dark sticky top-0 z-50">
+    <nav className="nav-cyber sticky top-0 z-50">
       <div className="flex items-center h-14 px-5 gap-1 max-w-6xl mx-auto">
         {/* Logo */}
         <Link
           to="/"
-          className="flex items-center gap-2.5 mr-4 text-text-primary font-semibold text-[15px] tracking-tight group"
+          className="flex items-center gap-2.5 mr-4 text-F0F6FC font-semibold text-[15px] tracking-tight group"
         >
-          <div className="p-1.5 rounded-lg bg-brand-primary/10 border border-brand-primary/20 transition-all duration-300 group-hover:bg-brand-primary/20 group-hover:shadow-[0_0_15px_rgba(47,129,247,0.25)]">
+          <div className="p-1.5 rounded-lg bg-38bdf8/10 border border-38bdf8/20 transition-all duration-300 group-hover:bg-38bdf8/20 group-hover:shadow-[0_0_15px_rgba(56,189,248,0.25)]">
             <svg
-              className="w-4.5 h-4.5 text-brand-primary"
+              className="w-4.5 h-4.5 text-38bdf8"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -78,10 +78,10 @@ export function Navbar() {
                 key={item.path}
                 to={item.path}
                 aria-current={isActive ? "page" : undefined}
-                className={`relative px-3 py-1.5 text-[13px] font-medium rounded-full transition-all duration-200 whitespace-nowrap ${
+                className={`relative px-3 py-1.5 text-[13px] font-medium rounded-md transition-all duration-200 whitespace-nowrap ${
                   isActive
-                    ? "text-text-primary bg-white/[0.08]"
-                    : "text-text-tertiary hover:text-text-secondary hover:bg-white/[0.04]"
+                    ? "text-38bdf8 bg-38bdf8/10 border-b-2 border-38bdf8"
+                    : "text-94a3b8 hover:text-F0F6FC hover:bg-white/[0.04]"
                 }`}
               >
                 {item.label}
@@ -92,7 +92,7 @@ export function Navbar() {
 
         {/* Divider */}
         {hasProjectSection && (
-          <div className="w-px h-6 bg-white/10 mx-2 shrink-0" />
+          <div className="w-px h-6 bg-38bdf8/20 mx-2 shrink-0" />
         )}
 
         {/* Project section */}
@@ -102,7 +102,7 @@ export function Navbar() {
             <select
               value={currentProjectId}
               onChange={handleProjectSwitch}
-              className="mr-2 h-8 px-2 text-[13px] font-medium rounded-lg bg-white/[0.06] text-text-primary border border-white/10 hover:bg-white/[0.08] focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer"
+              className="mr-2 h-8 px-2 text-[13px] font-medium rounded-lg bg-white/[0.06] text-F0F6FC border border-38bdf8/20 hover:bg-white/[0.08] focus:outline-none focus:ring-1 focus:ring-38bdf8 cursor-pointer"
               aria-label="Switch project"
             >
               {projects.map((project) => (
@@ -120,10 +120,10 @@ export function Navbar() {
                   key={item.path}
                   to={item.path}
                   aria-current={isActive ? "page" : undefined}
-                  className={`relative px-3 py-1.5 text-[13px] font-medium rounded-full transition-all duration-200 whitespace-nowrap ${
+                  className={`relative px-3 py-1.5 text-[13px] font-medium rounded-md transition-all duration-200 whitespace-nowrap ${
                     isActive
-                      ? "text-text-primary bg-white/[0.08]"
-                      : "text-text-tertiary hover:text-text-secondary hover:bg-white/[0.04]"
+                      ? "text-38bdf8 bg-38bdf8/10 border-b-2 border-38bdf8"
+                      : "text-94a3b8 hover:text-F0F6FC hover:bg-white/[0.04]"
                   }`}
                 >
                   {item.label}
