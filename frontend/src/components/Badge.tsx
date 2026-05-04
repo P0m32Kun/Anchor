@@ -9,50 +9,51 @@ type BadgeVariant =
   | "info"
   | "critical";
 
-// Dark mode translucent badge styles
+// CyberOS badge styles with enhanced glow effects
 const variantStyles: Record<
   BadgeVariant,
   { bg: string; text: string; border: string; glow?: string }
 > = {
   default: {
-    bg: "bg-white/[0.04]",
-    text: "text-text-secondary",
-    border: "border-white/[0.08]",
+    bg: "bg-[#64748b]/10",
+    text: "text-[#64748b]",
+    border: "border-[#64748b]/20",
   },
   primary: {
-    bg: "bg-brand-primary/10",
-    text: "text-brand-primary",
-    border: "border-brand-primary/20",
-    glow: "shadow-[0_0_12px_rgba(47,129,247,0.15)]",
+    bg: "bg-[#38bdf8]/10",
+    text: "text-[#38bdf8]",
+    border: "border-[#38bdf8]/20",
+    glow: "shadow-[0_0_15px_rgba(56,189,248,0.25)]",
   },
   success: {
-    bg: "bg-brand-success/10",
-    text: "text-brand-success",
-    border: "border-brand-success/20",
-    glow: "shadow-[0_0_12px_rgba(63,185,80,0.15)]",
+    bg: "bg-[#4ade80]/10",
+    text: "text-[#4ade80]",
+    border: "border-[#4ade80]/20",
+    glow: "shadow-[0_0_15px_rgba(74,222,128,0.25)]",
   },
   warning: {
-    bg: "bg-brand-warning/10",
-    text: "text-brand-warning",
-    border: "border-brand-warning/20",
-    glow: "shadow-[0_0_12px_rgba(210,153,34,0.1)]",
+    bg: "bg-[#facc15]/10",
+    text: "text-[#facc15]",
+    border: "border-[#facc15]/20",
+    glow: "shadow-[0_0_15px_rgba(250,204,21,0.2)]",
   },
   danger: {
-    bg: "bg-brand-danger/10",
-    text: "text-brand-danger",
-    border: "border-brand-danger/20",
-    glow: "shadow-[0_0_12px_rgba(248,81,73,0.15)]",
+    bg: "bg-[#f87171]/10",
+    text: "text-[#f87171]",
+    border: "border-[#f87171]/20",
+    glow: "shadow-[0_0_15px_rgba(248,113,113,0.25)]",
   },
   info: {
-    bg: "bg-accent-teal/10",
-    text: "text-accent-teal",
-    border: "border-accent-teal/20",
+    bg: "bg-[#38bdf8]/10",
+    text: "text-[#38bdf8]",
+    border: "border-[#38bdf8]/20",
+    glow: "shadow-[0_0_15px_rgba(56,189,248,0.25)]",
   },
   critical: {
-    bg: "bg-brand-danger/20",
-    text: "text-brand-danger",
-    border: "border-brand-danger/30",
-    glow: "shadow-[0_0_15px_rgba(248,81,73,0.2)]",
+    bg: "bg-[#f87171]/20",
+    text: "text-[#f87171]",
+    border: "border-[#f87171]/30",
+    glow: "shadow-[0_0_18px_rgba(248,113,113,0.3)]",
   },
 };
 
