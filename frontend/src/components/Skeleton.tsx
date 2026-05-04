@@ -12,7 +12,7 @@ export function Skeleton({ className = "" }: SkeletonProps) {
 
 export function SkeletonCard({ lines = 3 }: { lines?: number }) {
   return (
-    <div className="vision-glass p-5 space-y-3">
+    <div className="cyber-glass p-5 space-y-3">
       <Skeleton className="h-4 w-1/3" />
       {Array.from({ length: lines }).map((_, i) => (
         <Skeleton key={i} className="h-3 w-full" />

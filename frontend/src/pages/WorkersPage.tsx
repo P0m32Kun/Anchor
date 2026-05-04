@@ -148,7 +148,7 @@ export default function WorkersPage() {
         </div>
       </div>
 
-      <div className="vision-glass p-5">
+      <div className="cyber-glass p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-sm font-medium">已注册 Worker</div>

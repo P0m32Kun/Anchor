@@ -244,7 +244,7 @@ export default function ScanConfigPage() {
         <div>
           <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">扫描配置</h1>
           <p className="text-sm text-text-tertiary mt-1">
-            调整流水线各阶段的开关、端口范围、并发与超时
+            此配置仅影响「自定义」扫描模式。快速/标准/深度模式使用内置预设参数。
           </p>
         </div>
         <div className="flex gap-2">
@@ -301,7 +301,7 @@ export default function ScanConfigPage() {
         <CardHeader>
           <div>
             <CardTitle>流水线阶段</CardTitle>
-            <CardDescription>开启/关闭各扫描阶段</CardDescription>
+            <CardDescription>开启/关闭各扫描阶段（仅自定义模式生效）</CardDescription>
           </div>
         </CardHeader>
         <div className="space-y-3">
@@ -524,7 +524,7 @@ export default function ScanConfigPage() {
       {/* Sticky save bar at bottom for long page */}
       {isDirty && (
         <div className="sticky bottom-4 z-10">
-          <div className="vision-glass px-4 py-3 flex items-center justify-between border border-brand-primary/30">
+          <div className="cyber-glass px-4 py-3 flex items-center justify-between border border-brand-primary/30">
             <span className="text-sm text-text-secondary">配置有未保存的修改</span>
             <div className="flex gap-2">
               <Button variant="secondary" size="sm" onClick={() => load()} disabled={saving}>

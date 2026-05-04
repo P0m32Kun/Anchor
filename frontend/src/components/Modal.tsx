@@ -62,7 +62,7 @@ export default function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? "modal-title" : undefined}
-        className={`relative z-10 w-full ${sizeMap[size]} vision-glass-strong rounded-[20px] animate-scale-in outline-none`}
+        className={`relative z-10 w-full ${sizeMap[size]} cyber-glass rounded-[20px] animate-scale-in outline-none`}
       >
         {(title || description) && (
           <div className="px-6 pt-5 pb-2">

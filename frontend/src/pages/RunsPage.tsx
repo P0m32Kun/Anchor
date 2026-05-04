@@ -2,11 +2,12 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState, useProjectId, ConfirmDialog, Button } from "../components";
+import { EmptyState, useProjectId, ConfirmDialog, Button, ScanModal } from "../components";
 import { useToast } from "../components/Toast";
 import { useSSE, usePolling } from "../hooks";
 import { getApiBase } from "../lib/config";
-import type { ScanTask, ToolTemplate, Run } from "../lib/api";
+import type { ScanTask, PipelineRun, PipelineRunStage } from "../lib/api";
+import type { ScanMode } from "../components/ScanModal";
 
 const statusColors: Record<string, string> = {
   pending: "bg-accent-yellow/15 text-accent-yellow",
@@ -22,6 +23,20 @@ const statusLabels: Record<string, string> = {
   completed: "已完成",
   failed: "失败",
   cancelled: "已取消",
+};
+
+const modeLabels: Record<string, string> = {
+  quick: "快速",
+  standard: "标准",
+  deep: "深度",
+  custom: "自定义",
+};
+
+const modeColors: Record<string, string> = {
+  quick: "bg-accent-yellow/10 text-accent-yellow",
+  standard: "bg-brand-primary/10 text-brand-primary",
+  deep: "bg-accent-purple/10 text-accent-purple",
+  custom: "bg-white/[0.06] text-text-secondary",
 };
 
 const taskStatusColors: Record<string, string> = {
@@ -45,17 +60,17 @@ export default function RunsPage() {
   const setRuns = useStore((state) => state.setRuns);
   const setRunsLoading = useStore((state) => state.setRunsLoading);
   const setRunsError = useStore((state) => state.setRunsError);
-  const [templates, setTemplates] = useState<ToolTemplate[]>([]);
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
   const [tasks, setTasks] = useState<ScanTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
+  const [stages, setStages] = useState<PipelineRunStage[]>([]);
+  const [stagesLoading, setStagesLoading] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelTargetRun, setCancelTargetRun] = useState<Run | null>(null);
+  const [cancelTargetRun, setCancelTargetRun] = useState<PipelineRun | null>(null);
 
-  // Prevent duplicate toasts from SSE/polling rapid failures
   const lastToastErrorRef = useRef<string | null>(null);
 
   const maybeToastError = useCallback(
@@ -78,8 +93,8 @@ export default function RunsPage() {
       setRunsLoading(true);
       setRunsError(null);
       try {
-        const data = await api.listRuns(projectId, signal);
-        setRuns(data ?? []);
+        const data = await api.listScanRuns(projectId, undefined, signal);
+        setRuns(data.data ?? []);
         clearToastError();
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -94,24 +109,19 @@ export default function RunsPage() {
     [projectId, setRuns, setRunsLoading, setRunsError, maybeToastError, clearToastError]
   );
 
-  const loadTemplates = async (signal?: AbortSignal) => {
-    try {
-      const data = await api.listToolTemplates(signal);
-      setTemplates(data ?? []);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      const msg = err instanceof Error ? err.message : "加载工具模板失败";
-      toast(msg, "error");
-      console.error(err);
-    }
-  };
-
-  const loadTasks = async (runId: string, signal?: AbortSignal) => {
+  const loadRunDetails = async (runId: string, signal?: AbortSignal) => {
     setSelectedRun(runId);
     setTasksLoading(true);
+    setStagesLoading(true);
     try {
-      const data = await api.getRunTasks(runId, signal);
-      setTasks(data ?? []);
+      const [taskData, stageData] = await Promise.all([
+        api.getRunTasks(runId, signal).catch(() => [] as ScanTask[]),
+        projectId
+          ? api.listPipelineRunStages(projectId, runId, signal).catch(() => ({ stages: [] as PipelineRunStage[] }))
+          : Promise.resolve({ stages: [] as PipelineRunStage[] }),
+      ]);
+      setTasks(taskData ?? []);
+      setStages(stageData.stages ?? []);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "加载任务详情失败";
@@ -119,6 +129,7 @@ export default function RunsPage() {
       console.error(err);
     } finally {
       setTasksLoading(false);
+      setStagesLoading(false);
     }
   };
 
@@ -126,27 +137,38 @@ export default function RunsPage() {
     if (!projectId) return;
     const ctrl = new AbortController();
     loadRuns(ctrl.signal);
-    loadTemplates(ctrl.signal);
     return () => ctrl.abort();
   }, [projectId, loadRuns]);
 
   // SSE for real-time updates
-  const { status: sseStatus } = useSSE(`${getApiBase()}/events`, {
-    projectId: projectId ?? undefined,
+  const sseUrl = projectId ? `${getApiBase()}/projects/${projectId}/events` : `${getApiBase()}/events`;
+  const { status: sseStatus } = useSSE(sseUrl, {
     onMessage: (raw) => {
       const msg = raw as {
         event?: string;
         run_id?: string;
-        project_id?: string;
+        stage?: string;
+        status?: string;
+        error?: string;
       };
-      if (
-        msg.event === "task_update" ||
-        msg.event === "asset_discovery_complete" ||
-        msg.event === "web_screening_complete"
-      ) {
+      if (msg.event === "pipeline_stage_change" && msg.run_id === selectedRun) {
+        setStages((prev) => {
+          const idx = prev.findIndex((s) => s.stage === msg.stage);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], status: msg.status ?? "running", error: msg.error };
+            return next;
+          }
+          return prev;
+        });
+        if (msg.status === "failed" && msg.error) {
+          toast(`阶段 ${msg.stage} 失败: ${msg.error}`, "error");
+        }
+      }
+      if (msg.event === "pipeline_complete") {
         loadRuns();
         if (selectedRun && msg.run_id === selectedRun) {
-          loadTasks(selectedRun);
+          loadRunDetails(selectedRun);
         }
       }
     },
@@ -159,11 +181,11 @@ export default function RunsPage() {
   usePolling(
     async () => {
       try {
-        const data = await api.listRuns(projectId!);
-        setRuns(data ?? []);
+        const data = await api.listScanRuns(projectId!, undefined);
+        setRuns(data.data ?? []);
         setRunsError(null);
         clearToastError();
-        return data ?? [];
+        return data.data ?? [];
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return [];
         const msg = err instanceof Error ? err.message : "轮询运行状态失败";
@@ -179,16 +201,13 @@ export default function RunsPage() {
     }
   );
 
-  const handleCreate = async (templateId: string, name: string) => {
+  const handleStartScan = async (mode: ScanMode) => {
     if (!projectId || creating) return;
     setCreating(true);
     try {
-      await api.createRun(projectId, {
-        tool_template_id: templateId,
-        name: name || "未命名扫描",
-      });
+      await api.createScan(projectId, { mode });
       toast("扫描任务已启动", "success");
-      setShowCreate(false);
+      setShowScanModal(false);
       await loadRuns();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "启动扫描失败";
@@ -199,7 +218,7 @@ export default function RunsPage() {
     }
   };
 
-  const openCancelDialog = (run: Run) => {
+  const openCancelDialog = (run: PipelineRun) => {
     setCancelTargetRun(run);
     setCancelDialogOpen(true);
   };
@@ -217,7 +236,7 @@ export default function RunsPage() {
       toast("扫描任务已取消", "success");
       await loadRuns();
       if (selectedRun === cancelTargetRun.id) {
-        await loadTasks(cancelTargetRun.id);
+        await loadRunDetails(cancelTargetRun.id);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "取消扫描失败";
@@ -233,20 +252,18 @@ export default function RunsPage() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      {/* Title area */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">
           扫描执行
         </h1>
         {projectId && (
-          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+          <Button variant="primary" size="sm" onClick={() => setShowScanModal(true)}>
             新建扫描
           </Button>
         )}
       </div>
 
-      {/* Content area */}
-      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-6">
+      <section className="cyber-glass p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-base font-medium text-zinc-200">执行历史</h2>
           {projectId && (
@@ -277,38 +294,45 @@ export default function RunsPage() {
         {runsLoading && runs.length === 0 && (
           <div className="space-y-2 py-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-10 bg-zinc-800/40 animate-pulse rounded-lg"
-              />
+              <div key={i} className="h-10 bg-white/[0.02] animate-pulse rounded-lg" />
             ))}
           </div>
         )}
 
-        <div className="divide-y divide-zinc-800/60">
+        <div className="divide-y divide-glass-border-light">
           {runs.map((run) => (
             <div
               key={run.id}
               className={`py-3 px-2 flex items-center justify-between text-sm rounded-lg transition-all ${
                 selectedRun === run.id
-                  ? "bg-zinc-800/60"
-                  : "hover:bg-zinc-800/40"
+                  ? "bg-white/[0.04]"
+                  : "hover:bg-white/[0.02]"
               }`}
             >
               <button
-                onClick={() => loadTasks(run.id)}
-                className="flex items-center gap-4 flex-1 text-left cursor-pointer"
+                onClick={() => loadRunDetails(run.id)}
+                className="flex items-center gap-3 flex-1 text-left cursor-pointer"
               >
-                <span className="font-medium text-zinc-200">{run.name}</span>
+                <span
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                    modeColors[run.mode] || modeColors.standard
+                  }`}
+                >
+                  {modeLabels[run.mode] || run.mode}
+                </span>
                 <span className="text-zinc-500 text-xs font-mono">
                   {run.id.slice(-8)}
                 </span>
+                {run.stage && (
+                  <span className="text-xs text-zinc-500 bg-white/[0.04] px-2 py-0.5 rounded">
+                    {run.stage}
+                  </span>
+                )}
               </button>
               <div className="flex items-center gap-3">
                 <span
                   className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    statusColors[run.status] ||
-                    "bg-zinc-800/60 text-zinc-400"
+                    statusColors[run.status] || "bg-white/[0.04] text-zinc-400"
                   }`}
                 >
                   {statusLabels[run.status] || run.status}
@@ -380,7 +404,7 @@ export default function RunsPage() {
                 </button>
                 <span className="text-zinc-600">→</span>
                 <button
-                  onClick={() => setShowCreate(true)}
+                  onClick={() => setShowScanModal(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-brand-primary hover:bg-brand-primary/20 transition-colors"
                 >
                   <span className="w-5 h-5 rounded-full bg-brand-primary/20 text-brand-primary text-xs flex items-center justify-center font-medium">
@@ -401,14 +425,22 @@ export default function RunsPage() {
       </section>
 
       {selectedRun && (
-        <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-6">
+        <section className="cyber-glass p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-base font-medium text-zinc-200">任务详情</h2>
-            {tasksLoading && (
+            {(tasksLoading || stagesLoading) && (
               <span className="text-zinc-500 text-sm">加载中...</span>
             )}
           </div>
-          <div className="divide-y divide-zinc-800/60">
+
+          {stages.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-xs font-medium text-zinc-400 mb-2">阶段进度</h3>
+              <StageProgress stages={stages} />
+            </div>
+          )}
+
+          <div className="divide-y divide-glass-border-light">
             {tasks.map((task) => (
               <div
                 key={task.id}
@@ -424,8 +456,7 @@ export default function RunsPage() {
                 </div>
                 <span
                   className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    taskStatusColors[task.status] ||
-                    "bg-zinc-800/60 text-zinc-400"
+                    taskStatusColors[task.status] || "bg-white/[0.04] text-zinc-400"
                   }`}
                 >
                   {task.status}
@@ -439,17 +470,13 @@ export default function RunsPage() {
         </section>
       )}
 
-      {/* Create Run Modal */}
-      {showCreate && (
-        <CreateRunModal
-          templates={templates}
-          onCreate={handleCreate}
-          onClose={() => setShowCreate(false)}
-          creating={creating}
-        />
-      )}
+      <ScanModal
+        open={showScanModal}
+        onClose={() => setShowScanModal(false)}
+        onStart={handleStartScan}
+        loading={creating}
+      />
 
-      {/* Cancel Confirm Dialog */}
       <ConfirmDialog
         open={cancelDialogOpen}
         onClose={closeCancelDialog}
@@ -457,7 +484,7 @@ export default function RunsPage() {
         title="确认取消扫描？"
         description={
           cancelTargetRun
-            ? `即将取消扫描「${cancelTargetRun.name}」，此操作不可撤销。`
+            ? `即将取消扫描「${cancelTargetRun.id.slice(-8)}」，此操作不可撤销。`
             : ""
         }
         confirmText="确认取消"
@@ -469,89 +496,63 @@ export default function RunsPage() {
   );
 }
 
-function CreateRunModal({
-  templates,
-  onCreate,
-  onClose,
-  creating,
-}: {
-  templates: ToolTemplate[];
-  onCreate: (templateId: string, name: string) => void;
-  onClose: () => void;
-  creating: boolean;
-}) {
-  const [selectedTemplate, setSelectedTemplate] = useState("");
-  const [name, setName] = useState("");
+const STAGE_LABELS: Record<string, string> = {
+  classify: "目标分类",
+  search: "FOFA 搜索",
+  subdomain: "子域名发现",
+  resolve: "DNS 解析",
+  cdn_filter: "CDN 过滤",
+  portscan: "端口扫描",
+  fingerprint: "服务指纹",
+  httpx: "Web 探活",
+  vuln: "漏洞探测",
+};
 
+const STAGE_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-zinc-700",
+  running: "bg-brand-primary animate-pulse",
+  completed: "bg-brand-success",
+  failed: "bg-brand-danger",
+  skipped: "bg-zinc-600",
+};
+
+function StageProgress({ stages }: { stages: PipelineRunStage[] }) {
   return (
-    <div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
-      onClick={onClose}
-    >
-      <div
-        className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-full max-w-md space-y-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-semibold text-zinc-100">新建扫描</h2>
-        <div className="space-y-3">
-          <div>
-            <label className="text-sm text-zinc-400 block mb-1">扫描名称</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例如：外网初筛"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-primary/50"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-zinc-400 block mb-1">
-              工具模板
-            </label>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {templates.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => setSelectedTemplate(t.id)}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                    selectedTemplate === t.id
-                      ? "border-brand-primary bg-brand-primary/10"
-                      : "border-zinc-700 hover:border-zinc-600"
-                  }`}
-                >
-                  <div className="text-sm font-medium text-zinc-200">
-                    {t.name}
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-0.5">
-                    {t.description}
-                  </div>
-                </div>
-              ))}
-              {templates.length === 0 && (
-                <div className="text-sm text-zinc-500 py-2">
-                  暂无可用模板
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={onClose}
-            disabled={creating}
-            className="flex-1 bg-zinc-800 text-zinc-300 text-sm py-2 rounded-lg hover:bg-zinc-700 transition-colors disabled:opacity-50"
+    <div className="space-y-1.5">
+      {stages.map((s) => (
+        <div key={s.id} className="flex items-center gap-3 text-sm">
+          <div
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              STAGE_STATUS_COLORS[s.status] || "bg-zinc-600"
+            }`}
+          />
+          <span className="text-zinc-300 w-24 shrink-0">
+            {STAGE_LABELS[s.stage] || s.stage}
+          </span>
+          <span
+            className={`text-xs ${
+              s.status === "failed"
+                ? "text-brand-danger"
+                : s.status === "running"
+                ? "text-brand-primary"
+                : s.status === "completed"
+                ? "text-brand-success"
+                : "text-zinc-500"
+            }`}
           >
-            取消
-          </button>
-          <button
-            onClick={() => onCreate(selectedTemplate, name || "未命名扫描")}
-            disabled={!selectedTemplate || creating}
-            className="flex-1 bg-brand-primary text-white text-sm py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {creating ? "创建中..." : "开始扫描"}
-          </button>
+            {s.status === "pending" && "待执行"}
+            {s.status === "running" && "执行中"}
+            {s.status === "completed" && "已完成"}
+            {s.status === "failed" && `失败${s.error ? ": " + s.error : ""}`}
+            {s.status === "skipped" && "已跳过"}
+          </span>
+          {s.started_at && (
+            <span className="text-zinc-600 text-xs ml-auto">
+              {new Date(s.started_at).toLocaleTimeString("zh-CN")}
+            </span>
+          )}
         </div>
-      </div>
+      ))}
     </div>
   );
 }
