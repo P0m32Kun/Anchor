@@ -15,32 +15,32 @@ const variantStyles: Record<
   { bg: string; text: string; border: string; glow?: string }
 > = {
   default: {
-    bg: "bg-[#64748b]/10",
-    text: "text-[#64748b]",
-    border: "border-[#64748b]/20",
+    bg: "bg-text-quaternary/10",
+    text: "text-text-quaternary",
+    border: "border-text-quaternary/20",
   },
   primary: {
-    bg: "bg-[#38bdf8]/10",
-    text: "text-[#38bdf8]",
-    border: "border-[#38bdf8]/20",
+    bg: "bg-brand-primary/10",
+    text: "text-brand-primary",
+    border: "border-brand-primary/20",
     glow: "shadow-[0_0_15px_rgba(56,189,248,0.25)]",
   },
   success: {
-    bg: "bg-[#4ade80]/10",
-    text: "text-[#4ade80]",
-    border: "border-[#4ade80]/20",
+    bg: "bg-brand-success/10",
+    text: "text-brand-success",
+    border: "border-brand-success/20",
     glow: "shadow-[0_0_15px_rgba(74,222,128,0.25)]",
   },
   warning: {
-    bg: "bg-[#facc15]/10",
-    text: "text-[#facc15]",
-    border: "border-[#facc15]/20",
+    bg: "bg-brand-warning/10",
+    text: "text-brand-warning",
+    border: "border-brand-warning/20",
     glow: "shadow-[0_0_15px_rgba(250,204,21,0.2)]",
   },
   danger: {
-    bg: "bg-[#f87171]/10",
-    text: "text-[#f87171]",
-    border: "border-[#f87171]/20",
+    bg: "bg-brand-danger/10",
+    text: "text-brand-danger",
+    border: "border-brand-danger/20",
     glow: "shadow-[0_0_15px_rgba(248,113,113,0.25)]",
   },
   info: {

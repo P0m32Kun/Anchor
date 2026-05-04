@@ -42,7 +42,7 @@ export function Table<T extends Record<string, unknown>>({
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="px-4 py-3 text-xs font-semibold text-[#94a3b8] uppercase tracking-wider whitespace-nowrap"
+                className="px-4 py-3 text-xs font-semibold text-text-tertiary uppercase tracking-wider whitespace-nowrap"
                 style={col.width ? { width: col.width } : undefined}
               >
                 {col.header}
@@ -73,13 +73,13 @@ export function Table<T extends Record<string, unknown>>({
                 className={`
                   border-b border-white/[0.04] relative
                   transition-colors duration-150
-                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_#38bdf8]" : "hover:bg-white/[0.04]"}
+                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_var(--color-brand-primary,#38bdf8)]" : "hover:bg-white/[0.04]"}
                 `}
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className="px-4 py-3 text-sm text-[#F0F6FC] whitespace-nowrap"
+                    className="px-4 py-3 text-sm text-text-primary whitespace-nowrap"
                   >
                     {col.render
                       ? col.render(row)
@@ -94,7 +94,7 @@ export function Table<T extends Record<string, unknown>>({
               <td colSpan={columns.length}>
                 <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
                   <svg
-                    className="w-12 h-12 text-[#64748b] mb-4"
+                    className="w-12 h-12 text-text-quaternary mb-4"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -106,7 +106,7 @@ export function Table<T extends Record<string, unknown>>({
                     <path d="M3 9h18" />
                     <path d="M9 21V9" />
                   </svg>
-                  <p className="text-sm text-[#94a3b8]">{emptyText}</p>
+                  <p className="text-sm text-text-tertiary">{emptyText}</p>
                 </div>
               </td>
             </tr>

@@ -45,7 +45,7 @@ export const CardHeader = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 export const CardTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
   function CardTitle({ children, className = "", ...props }, ref) {
     return (
-      <h3 ref={ref} className={`text-base font-semibold text-[#F0F6FC] ${className}`} {...props}>
+      <h3 ref={ref} className={`text-base font-semibold text-text-primary ${className}`} {...props}>
         {children}
       </h3>
     );
@@ -55,7 +55,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTM
 export const CardDescription = forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
   function CardDescription({ children, className = "", ...props }, ref) {
     return (
-      <p ref={ref} className={`text-sm text-[#94a3b8] mt-0.5 ${className}`} {...props}>
+      <p ref={ref} className={`text-sm text-text-tertiary mt-0.5 ${className}`} {...props}>
         {children}
       </p>
     );

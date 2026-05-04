@@ -48,11 +48,11 @@ export default {
           danger: "#f87171",    // CyberOS 警告-红 (red-400)
           purple: "#A371F7",    // Electric purple
         },
-        // Text colors for dark mode
+        // Text colors (CyberOS)
         "text-primary": "#F0F6FC",
-        "text-secondary": "#8B949E",
-        "text-tertiary": "#6E7681",
-        "text-quaternary": "#484F58",
+        "text-secondary": "#e2e8f0",
+        "text-tertiary": "#94a3b8",
+        "text-quaternary": "#64748b",
         // Apple accent colors (preserved but vibrant)
         accent: {
           blue: "#0A84FF",

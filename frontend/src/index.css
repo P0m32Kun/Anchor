@@ -279,19 +279,6 @@
     outline: none;
   }
 
-  /* ===== Nav Glass Dark (vision) ===== */
-  .nav-glass-dark {
-    background: rgba(10, 12, 16, 0.7);
-    backdrop-filter: saturate(200%) blur(30px);
-    -webkit-backdrop-filter: saturate(200%) blur(30px);
-    border-bottom: 1px solid transparent;
-    background-image: linear-gradient(rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.06));
-    background-size: 100% 1px;
-    background-repeat: no-repeat;
-    background-position: bottom;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-  }
-
   /* ===== Glow effects ===== */
   .glow-blue {
     box-shadow: 0 0 20px rgba(56, 189, 248, 0.6), 0 0 40px rgba(56, 189, 248, 0.3);
