@@ -15,6 +15,7 @@ export interface TableProps<T> {
   emptyText?: string;
   onRowClick?: (row: T) => void;
   className?: string;
+  maxHeight?: number | string;
 }
 
 export function Table<T extends Record<string, unknown>>({
@@ -24,15 +25,20 @@ export function Table<T extends Record<string, unknown>>({
   emptyText = "暂无数据",
   onRowClick,
   className = "",
+  maxHeight,
 }: TableProps<T>) {
   const hasData = data.length > 0;
   const isClickable = !!onRowClick;
 
+  const containerStyle = maxHeight
+    ? { maxHeight: typeof maxHeight === "number" ? `${maxHeight}px` : maxHeight }
+    : undefined;
+
   return (
-    <div className={`overflow-x-auto ${className}`}>
+    <div className={`overflow-auto ${className}`} style={containerStyle}>
       <table className="w-full text-left border-collapse">
         <thead>
-          <tr className="border-b border-white/[0.06]">
+          <tr className="border-b border-white/[0.06] bg-white/[0.03]">
             {columns.map((col) => (
               <th
                 key={col.key}
@@ -65,9 +71,9 @@ export function Table<T extends Record<string, unknown>>({
                 key={rowIdx}
                 onClick={isClickable ? () => onRowClick!(row) : undefined}
                 className={`
-                  border-b border-white/[0.04]
+                  border-b border-white/[0.04] relative
                   transition-colors duration-150
-                  ${isClickable ? "cursor-pointer hover:bg-white/[0.05]" : "hover:bg-white/[0.03]"}
+                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_#2F81F7]" : "hover:bg-white/[0.04]"}
                 `}
               >
                 {columns.map((col) => (
