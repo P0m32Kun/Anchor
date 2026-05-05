@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "pre-user-input": [
+      "bash -c 'if [ -n \"$(git status --porcelain 2>/dev/null)\" ]; then git add -A && git commit -m \"autocommit: $(date +%Y-%m-%d_%H:%M:%S)\" || true; fi'"
+    ]
+  }
+}
