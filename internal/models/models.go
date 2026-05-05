@@ -734,6 +734,18 @@ type RetestRun struct {
 	CreatedAt  time.Time    `json:"created_at" db:"created_at"`
 }
 
+// --- Engine Credential ---
+
+type EngineCredential struct {
+	ID        string    `json:"id" db:"id"`
+	Engine    string    `json:"engine" db:"engine"`
+	APIKey    string    `json:"api_key" db:"api_key"`
+	Email     *string   `json:"email,omitempty" db:"email"`
+	Extra     *string   `json:"extra,omitempty" db:"extra"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
 // --- Pipeline Config ---
 
 type PipelineConfig struct {
@@ -741,16 +753,25 @@ type PipelineConfig struct {
 	FofaResultLimit     int    `json:"fofa_result_limit"`
 	FofaConcurrency     int    `json:"fofa_concurrency"`
 	EnableSubfinder     bool   `json:"enable_subfinder"`
+	SubfinderRateLimit  int    `json:"subfinder_rate_limit"`
+	SubfinderThreads    int    `json:"subfinder_threads"`
 	SubfinderTimeout    int    `json:"subfinder_timeout"`
-	DNSConcurrency      int    `json:"dns_concurrency"`
-	DNSTimeout          int    `json:"dns_timeout"`
+	EnableDNSx          bool   `json:"enable_dnsx"`
+	DNSxRateLimit       int    `json:"dnsx_rate_limit"`
+	DNSxThreads         int    `json:"dnsx_threads"`
+	DNSxTimeout         int    `json:"dnsx_timeout"`
 	EnableCDNFilter     bool   `json:"enable_cdn_filter"`
 	PortRange           string `json:"port_range"`
-	PortScanTimeout     int    `json:"port_scan_timeout"`
-	PortScanConcurrency int    `json:"port_scan_concurrency"`
+	NaabuRate           int    `json:"naabu_rate"`
+	NaabuThreads        int    `json:"naabu_threads"`
+	NaabuTimeout        int    `json:"naabu_timeout"`
 	EnableNerva         bool   `json:"enable_nerva"`
+	NervaRateLimit      int    `json:"nerva_rate_limit"`
+	NervaWorkers        int    `json:"nerva_workers"`
 	NervaTimeout        int    `json:"nerva_timeout"`
-	NervaConcurrency    int    `json:"nerva_concurrency"`
+	EnableHttpx         bool   `json:"enable_httpx"`
+	HttpxRateLimit      int    `json:"httpx_rate_limit"`
+	HttpxThreads        int    `json:"httpx_threads"`
 	EnableNuclei        bool   `json:"enable_nuclei"`
 	NucleiRateLimit     int    `json:"nuclei_rate_limit"`
 	NucleiConcurrency   int    `json:"nuclei_concurrency"`
@@ -758,23 +779,32 @@ type PipelineConfig struct {
 
 func DefaultPipelineConfig() PipelineConfig {
 	return PipelineConfig{
-		EnableFOFA:          true,
-		FofaResultLimit:     500,
-		FofaConcurrency:     5,
-		EnableSubfinder:     true,
-		SubfinderTimeout:    300,
-		DNSConcurrency:      50,
-		DNSTimeout:          5,
-		EnableCDNFilter:     true,
-		PortRange:           "top1000",
-		PortScanTimeout:     600,
-		PortScanConcurrency: 100,
-		EnableNerva:         true,
-		NervaTimeout:        10,
-		NervaConcurrency:    50,
-		EnableNuclei:        true,
-		NucleiRateLimit:     100,
-		NucleiConcurrency:   25,
+		EnableFOFA:         true,
+		FofaResultLimit:    500,
+		FofaConcurrency:    5,
+		EnableSubfinder:    true,
+		SubfinderRateLimit: 50,
+		SubfinderThreads:   10,
+		SubfinderTimeout:   300,
+		EnableDNSx:         true,
+		DNSxRateLimit:      100,
+		DNSxThreads:        50,
+		DNSxTimeout:        5,
+		EnableCDNFilter:    true,
+		PortRange:          "top1000",
+		NaabuRate:          1000,
+		NaabuThreads:       100,
+		NaabuTimeout:       600,
+		EnableNerva:        true,
+		NervaRateLimit:     100,
+		NervaWorkers:       50,
+		NervaTimeout:       10,
+		EnableHttpx:        true,
+		HttpxRateLimit:     150,
+		HttpxThreads:       50,
+		EnableNuclei:       true,
+		NucleiRateLimit:    100,
+		NucleiConcurrency:  25,
 	}
 }
 

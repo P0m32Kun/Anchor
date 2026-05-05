@@ -13,6 +13,8 @@ type ProjectRepository interface {
 	Create(project *models.Project) error
 	Get(id string) (*models.Project, error)
 	List() ([]*models.Project, error)
+	Count() (int, error)
+	ListPaginated(limit, offset int) ([]*models.Project, error)
 	Delete(id string) error
 }
 
@@ -20,6 +22,8 @@ type ProjectRepository interface {
 type TargetRepository interface {
 	Create(target *models.Target) error
 	ListByProject(projectID string) ([]*models.Target, error)
+	CountByProject(projectID string) (int, error)
+	ListByProjectPaginated(projectID string, limit, offset int) ([]*models.Target, error)
 	ExistsByValue(projectID, value string) (bool, error)
 	BulkCreate(targets []*models.Target) error
 }
@@ -29,6 +33,9 @@ type FindingRepository interface {
 	Get(id string) (*models.Finding, error)
 	ListByProject(projectID string) ([]*models.Finding, error)
 	ListByStatus(projectID string, status models.FindingStatus) ([]*models.Finding, error)
+	CountByProject(projectID string, status models.FindingStatus) (int, error)
+	ListByProjectPaginated(projectID string, limit, offset int) ([]*models.Finding, error)
+	ListByStatusPaginated(projectID string, status models.FindingStatus, limit, offset int) ([]*models.Finding, error)
 	UpdateStatus(id string, status models.FindingStatus) error
 	CreateEvidence(evidence *models.Evidence) error
 	ListEvidenceByFinding(findingID string) ([]*models.Evidence, error)

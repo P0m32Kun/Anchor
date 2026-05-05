@@ -19,8 +19,7 @@
  * | /projects/:projectId/assets  | AssetPage    | Nested: assets                   | No          |
  * | /projects/:projectId/runs    | RunsPage     | Nested: runs                     | No          |
  * | /projects/:projectId/findings| FindingsPage | Nested: findings                 | No          |
- * | /projects/:projectId/scan-config| ScanConfigPage | Nested: scan config            | No          |
-| /projects/:projectId/reports | ReportsPage  | Nested: reports                  | No          |
+ * | /projects/:projectId/reports | ReportsPage  | Nested: reports                  | No          |
  * | /projects/:id            | ProjectPage    | Legacy project detail            | No          |
  * | /projects/:id/assets     | AssetPage      | Legacy (same as nested)          | No          |
  * | /projects/:id/targets    | TargetPage     | Legacy (same as nested)          | No          |
@@ -50,7 +49,8 @@ import FindingsPage from "./pages/FindingsPage";
 import ReportsPage from "./pages/ReportsPage";
 import WorkersPage from "./pages/WorkersPage";
 import SettingsPage from "./pages/SettingsPage";
-import ScanConfigPage from "./pages/ScanConfigPage";
+import EnginesPage from "./pages/EnginesPage";
+import EngineKeysPage from "./pages/EngineKeysPage";
 
 function LegacyRouteGuard() {
   const location = useLocation();
@@ -180,9 +180,9 @@ function AppContent() {
   }, [toast]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface text-text-primary">
+    <div className="app-shell">
       <Navbar />
-      <main className="flex-1 px-6 py-6 max-w-7xl mx-auto w-full">
+      <main className="app-main lg:pl-[312px]">
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
@@ -191,6 +191,8 @@ function AppContent() {
             <Route path="/runs" element={<LegacyRouteGuard />} />
             <Route path="/findings" element={<LegacyRouteGuard />} />
             <Route path="/reports" element={<LegacyRouteGuard />} />
+            <Route path="/engines" element={<EnginesPage />} />
+            <Route path="/engines/keys" element={<EngineKeysPage />} />
             <Route path="/workers" element={<WorkersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/projects" element={<ProjectPage />} />
@@ -201,7 +203,6 @@ function AppContent() {
               <Route path="runs" element={<RunsPage />} />
               <Route path="findings" element={<FindingsPage />} />
               <Route path="reports" element={<ReportsPage />} />
-              <Route path="scan-config" element={<ScanConfigPage />} />
             </Route>
             {/* Legacy routes for backward compat — Sprint 1.11 will remove */}
             <Route path="/projects/:id" element={<ProjectPage />} />

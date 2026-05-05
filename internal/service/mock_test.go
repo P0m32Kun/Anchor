@@ -69,6 +69,31 @@ func (m *MockProjectRepository) Delete(id string) error {
 	return nil
 }
 
+func (m *MockProjectRepository) Count() (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.projects), nil
+}
+
+func paginateSlice[T any](all []T, limit, offset int) []T {
+	if offset > len(all) {
+		return []T{}
+	}
+	end := offset + limit
+	if end > len(all) {
+		end = len(all)
+	}
+	return all[offset:end]
+}
+
+func (m *MockProjectRepository) ListPaginated(limit, offset int) ([]*models.Project, error) {
+	all, err := m.List()
+	if err != nil {
+		return nil, err
+	}
+	return paginateSlice(all, limit, offset), nil
+}
+
 // MockTargetRepository is a mock implementation of TargetRepository.
 type MockTargetRepository struct {
 	mu       sync.RWMutex
@@ -122,6 +147,26 @@ func (m *MockTargetRepository) BulkCreate(targets []*models.Target) error {
 		m.targets[t.ID] = t
 	}
 	return nil
+}
+
+func (m *MockTargetRepository) CountByProject(projectID string) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var count int
+	for _, t := range m.targets {
+		if t.ProjectID == projectID {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (m *MockTargetRepository) ListByProjectPaginated(projectID string, limit, offset int) ([]*models.Target, error) {
+	all, err := m.ListByProject(projectID)
+	if err != nil {
+		return nil, err
+	}
+	return paginateSlice(all, limit, offset), nil
 }
 
 // MockFindingRepository is a mock implementation of FindingRepository.
@@ -194,6 +239,34 @@ func (m *MockFindingRepository) ListEvidenceByFinding(findingID string) ([]*mode
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.evidence[findingID], nil
+}
+
+func (m *MockFindingRepository) CountByProject(projectID string, status models.FindingStatus) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var count int
+	for _, f := range m.findings {
+		if f.ProjectID == projectID && (status == "" || f.Status == status) {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (m *MockFindingRepository) ListByProjectPaginated(projectID string, limit, offset int) ([]*models.Finding, error) {
+	all, err := m.ListByProject(projectID)
+	if err != nil {
+		return nil, err
+	}
+	return paginateSlice(all, limit, offset), nil
+}
+
+func (m *MockFindingRepository) ListByStatusPaginated(projectID string, status models.FindingStatus, limit, offset int) ([]*models.Finding, error) {
+	all, err := m.ListByStatus(projectID, status)
+	if err != nil {
+		return nil, err
+	}
+	return paginateSlice(all, limit, offset), nil
 }
 
 // MockScopeChecker is a mock implementation of ScopeChecker.

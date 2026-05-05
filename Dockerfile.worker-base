@@ -24,6 +24,7 @@ RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && 
     go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
     go install github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest && \
     go install github.com/praetorian-inc/nerva/cmd/nerva@latest && \
+    go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
     nuclei -update-templates
 
 # --- Stage 2: 精简运行时基础镜像 ---
@@ -38,4 +39,5 @@ COPY --from=tools-builder /go/bin/httpx    /usr/local/bin/
 COPY --from=tools-builder /go/bin/nuclei   /usr/local/bin/
 COPY --from=tools-builder /go/bin/cdncheck /usr/local/bin/
 COPY --from=tools-builder /go/bin/nerva    /usr/local/bin/
+COPY --from=tools-builder /go/bin/dnsx     /usr/local/bin/
 COPY --from=tools-builder /root/nuclei-templates /root/nuclei-templates

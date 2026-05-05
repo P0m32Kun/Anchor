@@ -35,9 +35,9 @@ export function Table<T extends Record<string, unknown>>({
     : undefined;
 
   return (
-    <div className={`cyber-glass rounded-xl overflow-auto ${className}`} style={containerStyle}>
+    <div className={`panel overflow-auto ${className}`} style={containerStyle}>
       <table className="w-full text-left border-collapse">
-        <thead>
+        <thead className="sticky top-0 z-10">
           <tr className="border-b border-white/[0.06] bg-white/[0.03]">
             {columns.map((col) => (
               <th
@@ -73,7 +73,7 @@ export function Table<T extends Record<string, unknown>>({
                 className={`
                   border-b border-white/[0.04] relative
                   transition-colors duration-150
-                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_var(--color-brand-primary,#38bdf8)]" : "hover:bg-white/[0.04]"}
+                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_#38bdf8]" : "hover:bg-white/[0.04]"}
                 `}
               >
                 {columns.map((col) => (

@@ -1770,3 +1770,64 @@ func (q *Queries) ListRecentFindingsByStatus(status models.FindingStatus, limit 
 	}
 	return list, rows.Err()
 }
+
+// --- Engine Credentials ---
+
+func (q *Queries) GetEngineCredential(engine string) (*models.EngineCredential, error) {
+	row := q.db.QueryRow(`SELECT id, engine, api_key, email, extra, created_at, updated_at FROM engine_credentials WHERE engine = ?`, engine)
+	c := &models.EngineCredential{}
+	var email, extra sql.NullString
+	err := row.Scan(&c.ID, &c.Engine, &c.APIKey, &email, &extra, &c.CreatedAt, &c.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if email.Valid {
+		c.Email = &email.String
+	}
+	if extra.Valid {
+		c.Extra = &extra.String
+	}
+	return c, err
+}
+
+func (q *Queries) ListEngineCredentials() ([]*models.EngineCredential, error) {
+	rows, err := q.db.Query(`SELECT id, engine, api_key, email, extra, created_at, updated_at FROM engine_credentials ORDER BY engine`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.EngineCredential, 0)
+	for rows.Next() {
+		c := &models.EngineCredential{}
+		var email, extra sql.NullString
+		if err := rows.Scan(&c.ID, &c.Engine, &c.APIKey, &email, &extra, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if email.Valid {
+			c.Email = &email.String
+		}
+		if extra.Valid {
+			c.Extra = &extra.String
+		}
+		list = append(list, c)
+	}
+	return list, rows.Err()
+}
+
+func (q *Queries) SaveEngineCredential(c *models.EngineCredential) error {
+	_, err := q.db.Exec(`
+		INSERT INTO engine_credentials (id, engine, api_key, email, extra, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(engine) DO UPDATE SET
+			api_key = excluded.api_key,
+			email = excluded.email,
+			extra = excluded.extra,
+			updated_at = excluded.updated_at;
+	`, c.ID, c.Engine, c.APIKey, c.Email, c.Extra, c.CreatedAt, c.UpdatedAt)
+	return err
+}
+
+func (q *Queries) DeleteEngineCredential(engine string) error {
+	_, err := q.db.Exec(`DELETE FROM engine_credentials WHERE engine = ?`, engine)
+	return err
+}

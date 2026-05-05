@@ -4,6 +4,51 @@
 
 ---
 
+## 2026-05-05
+
+### 搜索引擎集成 + 扫描流程重构完成
+
+- **互联网搜索引擎页面**：新增全局 `/engines` 页面，集成 FOFA、Hunter、Quake 三大平台
+- **API Key 全局配置**：`/engines/keys` 统一管理 FOFA Email+Key、Hunter Key、Quake Key，存储于 `engine_credentials` 表
+- **FOFA 凭证迁移**：从项目级 `fofa_email`/`fofa_api_key` 迁移到全局表，Pipeline 自动读取
+- **扫描模式重构**：从 4 种模式（quick/standard/deep/custom）简化为 2 种：`external`（外网）和 `internal`（内网）
+- **ScanModal 两步式**：Step 1 选择模式 → Step 2 配置端口范围 + 各工具速度参数（rate/threads/timeout）
+- **删除 ScanConfigPage**：所有扫描配置并入 ScanModal，不再保留独立配置页面
+- **dnsx 集成**：dnsx CLI 替代 Go `resolver` 模块作为默认 DNS 解析方式
+- **PipelineConfig 字段重构**：
+  - `dns_concurrency`/`dns_timeout` → `dnsx_threads`/`dnsx_timeout`
+  - `port_scan_timeout`/`port_scan_concurrency` → `naabu_timeout`/`naabu_threads`
+  - `nerva_concurrency` → `nerva_workers`
+  - 新增各工具 `rate_limit` 字段（subfinder/naabu/nerva/httpx）
+- **Worker 命令构建器参数化**：所有 `BuildXxxCommand` 函数支持传入速度参数
+
+**后端变更：**
+- `internal/db/db.go` — Migration v9: `engine_credentials` 表 + FOFA 凭证迁移
+- `internal/models/models.go` — `EngineCredential` 模型，`PipelineConfig` 扩展速度参数字段
+- `internal/db/queries.go` — `GetEngineCredential` / `ListEngineCredentials` / `SaveEngineCredential` / `DeleteEngineCredential`
+- `internal/search/hunter.go` / `quake.go` / `engine.go` — Hunter/Quake 客户端 + 统一接口
+- `internal/api/engine_handlers.go` — `GET/POST/DELETE /engines/credentials`, `GET /engines/search`
+- `internal/api/pipeline_handlers.go` — `buildConfigForMode` 重构为 external/internal，`handleCreateScan` 接收 `config`
+- `internal/worker/commands.go` — 所有命令构建器支持速度参数
+- `internal/workflow/pipeline.go` — dnsx 集成（`runDNSx`），调用命令构建器时传入 config 速度参数
+- `internal/parser/dnsx.go` — dnsx JSONL 解析器
+- `Dockerfile.worker-base` — 安装 dnsx
+
+**前端变更：**
+- `frontend/src/pages/EnginesPage.tsx` — 搜索引擎搜索页面
+- `frontend/src/pages/EngineKeysPage.tsx` — API Key 配置页面
+- `frontend/src/components/ScanModal.tsx` — 两步式扫描弹窗（模式选择 + 速度配置）
+- `frontend/src/lib/api.ts` — `listEngineCredentials` / `saveEngineCredential` / `deleteEngineCredential` / `searchEngine`
+- `frontend/src/components/Navbar.tsx` — 新增 "搜索引擎" 全局导航
+- `frontend/src/App.tsx` — 注册 `/engines` 和 `/engines/keys` 路由
+- `frontend/src/pages/ScanConfigPage.tsx` — 已删除
+
+**验证：**
+- `go build ./...` ✅ / `go test ./...` ✅
+- `npx tsc --noEmit` ✅
+
+---
+
 ## 2026-04-29
 
 ### v0.2 Phase 2: 项目管理功能修复与体验优化完成 ✅

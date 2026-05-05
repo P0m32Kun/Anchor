@@ -11,8 +11,9 @@ import (
 func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
 	status := r.URL.Query().Get("status")
+	page := parsePagination(r)
 
-	findings, err := s.findingSvc.List(r.Context(), projectID, status)
+	result, err := s.findingSvc.ListPaginated(r.Context(), projectID, status, service.PaginationParams{Page: page.Page, PageSize: page.PageSize})
 	if err != nil {
 		if appErr, ok := err.(*errors.AppError); ok {
 			writeError(w, appErr.StatusCode(), appErr)
@@ -21,7 +22,7 @@ func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list findings failed: %v", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, findings)
+	writePaginatedJSON(w, result.Data, result.Total, page)
 }
 
 func (s *Server) handleGetFinding(w http.ResponseWriter, r *http.Request) {

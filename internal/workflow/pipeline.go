@@ -97,7 +97,7 @@ func (p *Pipeline) WithStageCallback(cb StageEventCallback) *Pipeline {
 	return p
 }
 
-var requiredTools = []string{"subfinder", "naabu", "nerva", "cdncheck", "httpx", "nuclei"}
+var requiredTools = []string{"subfinder", "naabu", "nerva", "cdncheck", "httpx", "nuclei", "dnsx"}
 
 func (p *Pipeline) checkTools() []string {
 	var missing []string
@@ -265,11 +265,9 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 
 	// Initialize FOFA if enabled and not already set
 	if p.config.EnableFOFA && p.fofa == nil {
-		project, err := p.queries.GetProject(projectID)
-		if err == nil && project != nil {
-			if project.FofaEmail != nil && project.FofaAPIKey != nil && *project.FofaEmail != "" && *project.FofaAPIKey != "" {
-				p.fofa = search.NewFofaClient(*project.FofaEmail, *project.FofaAPIKey)
-			}
+		cred, err := p.queries.GetEngineCredential("fofa")
+		if err == nil && cred != nil && cred.Email != nil && *cred.Email != "" && cred.APIKey != "" {
+			p.fofa = search.NewFofaClient(*cred.Email, cred.APIKey)
 		}
 	}
 
@@ -468,16 +466,28 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 	}
 	p.completeStage(StageSubdomain)
 
-	// S3: DNS resolution
+	// S3: DNS resolution via dnsx
 	p.setStage(StageResolve)
-	dnsRecords, err := p.resolver.WithParallel(p.config.DNSConcurrency).
-		WithTimeout(time.Duration(p.config.DNSTimeout)*time.Second).
-		Resolve(ctx, allDomains)
-	if err != nil {
-		log.Printf("dns resolution: %v", err)
-		p.failStage(StageResolve, err.Error())
+	var dnsRecords []models.DNSRecord
+	var err error
+	if p.config.EnableDNSx {
+		dnsRecords, err = p.runDNSx(ctx, allDomains)
+		if err != nil {
+			log.Printf("dnsx resolution: %v", err)
+			p.failStage(StageResolve, err.Error())
+		} else {
+			p.completeStage(StageResolve)
+		}
 	} else {
-		p.completeStage(StageResolve)
+		dnsRecords, err = p.resolver.WithParallel(p.config.DNSxThreads).
+			WithTimeout(time.Duration(p.config.DNSxTimeout) * time.Second).
+			Resolve(ctx, allDomains)
+		if err != nil {
+			log.Printf("dns resolution: %v", err)
+			p.failStage(StageResolve, err.Error())
+		} else {
+			p.completeStage(StageResolve)
+		}
 	}
 
 	for _, rec := range dnsRecords {
@@ -710,7 +720,7 @@ func (p *Pipeline) runSubfinder(ctx context.Context, domain string) ([]string, e
 		return nil, fmt.Errorf("scope denied")
 	}
 
-	task, stdout, err := p.createAndRunTask(ctx, "subfinder", worker.BuildSubfinderCommand(domain))
+	task, stdout, err := p.createAndRunTask(ctx, "subfinder", worker.BuildSubfinderCommand(domain, p.config.SubfinderRateLimit, p.config.SubfinderThreads, p.config.SubfinderTimeout))
 	if err != nil {
 		return nil, err
 	}
@@ -737,7 +747,7 @@ func (p *Pipeline) runNaabu(ctx context.Context, hosts []string) ([]parser.PortI
 		hostFile = abs
 	}
 
-	task, stdout, err := p.createAndRunTask(ctx, "naabu", worker.BuildNaabuCommand(hostFile, p.config.PortRange))
+	task, stdout, err := p.createAndRunTask(ctx, "naabu", worker.BuildNaabuCommand(hostFile, p.config.PortRange, p.config.NaabuRate, p.config.NaabuThreads, p.config.NaabuTimeout))
 	if err != nil {
 		return nil, err
 	}
@@ -769,7 +779,7 @@ func (p *Pipeline) runNerva(ctx context.Context, ports []parser.PortInfo) ([]fin
 		targets = append(targets, fmt.Sprintf("%s:%d", port.IP, port.Port))
 	}
 
-	cmd := worker.BuildNervaCommand(strings.Join(targets, ","))
+	cmd := worker.BuildNervaCommand(strings.Join(targets, ","), p.config.NervaRateLimit, p.config.NervaWorkers, p.config.NervaTimeout)
 	task, stdout, err := p.createAndRunTask(ctx, "nerva", cmd)
 	if err != nil {
 		return nil, err
@@ -778,6 +788,42 @@ func (p *Pipeline) runNerva(ctx context.Context, ports []parser.PortInfo) ([]fin
 
 	results := fingerprint.ParseNervaOutput(string(stdout))
 	return results, nil
+}
+
+func (p *Pipeline) runDNSx(ctx context.Context, domains []string) ([]models.DNSRecord, error) {
+	if len(domains) == 0 {
+		return nil, nil
+	}
+
+	hostFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("dnsx-%s.txt", util.GenerateID()))
+	if err := os.MkdirAll(filepath.Dir(hostFile), 0750); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(hostFile, []byte(strings.Join(domains, "\n")), 0640); err != nil {
+		return nil, err
+	}
+	if abs, err := filepath.Abs(hostFile); err == nil {
+		hostFile = abs
+	}
+
+	cmd := worker.BuildDNSxCommand(hostFile, nil, p.config.DNSxRateLimit, p.config.DNSxThreads)
+	task, stdout, err := p.createAndRunTask(ctx, "dnsx", cmd)
+	if err != nil {
+		return nil, err
+	}
+	_ = task
+
+	results := parser.ParseDNSxOutput(bytes.NewReader(stdout))
+	var records []models.DNSRecord
+	for domain, rec := range results {
+		records = append(records, models.DNSRecord{
+			Domain: domain,
+			IPs:    parser.ExtractDNSxIPs(rec),
+			CNAMEs: parser.ExtractDNSxCNAMEs(rec),
+			TTL:    uint32(rec.TTL),
+		})
+	}
+	return records, nil
 }
 
 func (p *Pipeline) runHttpx(ctx context.Context, hosts []string) ([]*models.WebEndpoint, error) {
@@ -796,7 +842,7 @@ func (p *Pipeline) runHttpx(ctx context.Context, hosts []string) ([]*models.WebE
 		hostFile = abs
 	}
 
-	task, stdout, err := p.createAndRunTask(ctx, "httpx", worker.BuildHttpxCommand(hostFile))
+	task, stdout, err := p.createAndRunTask(ctx, "httpx", worker.BuildHttpxCommand(hostFile, p.config.HttpxRateLimit, p.config.HttpxThreads))
 	if err != nil {
 		return nil, err
 	}
@@ -826,15 +872,6 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 		urlToEndpoint[ep.URL] = ep
 	}
 
-	project, err := p.queries.GetProject(p.projectID)
-	if err != nil {
-		return err
-	}
-	rateLimit := 0
-	if project != nil {
-		rateLimit = project.RateLimit
-	}
-
 	for tagKey, urls := range groups {
 		tags := strings.Split(tagKey, ",")
 		targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
@@ -845,7 +882,7 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 			targetFile = abs
 		}
 
-		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", rateLimit, tags))
+		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, tags))
 		if err != nil {
 			log.Printf("nuclei task for tags %s: %v", tagKey, err)
 			continue
@@ -872,15 +909,6 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Ne
 		return nil
 	}
 
-	project, err := p.queries.GetProject(p.projectID)
-	if err != nil {
-		return err
-	}
-	rateLimit := 0
-	if project != nil {
-		rateLimit = project.RateLimit
-	}
-
 	for tag, targets := range groups {
 		targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
 		if err := os.WriteFile(targetFile, []byte(strings.Join(targets, "\n")), 0640); err != nil {
@@ -890,7 +918,7 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Ne
 			targetFile = abs
 		}
 
-		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", rateLimit, []string{tag}))
+		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, []string{tag}))
 		if err != nil {
 			log.Printf("nuclei task for tag %s: %v", tag, err)
 			continue
@@ -906,7 +934,10 @@ func (p *Pipeline) saveNucleiFindings(stdout []byte, urlToEndpoint map[string]*m
 	if len(stdout) == 0 {
 		return
 	}
-	results, _ := parser.ParseNuclei(bytes.NewReader(stdout))
+	results, parseErrs := parser.ParseNuclei(bytes.NewReader(stdout))
+	for _, pe := range parseErrs {
+		log.Printf("[saveNucleiFindings] parse error line=%d msg=%s", pe.Line, pe.Message)
+	}
 	for _, nr := range results {
 		dedupKey := fmt.Sprintf("%s|%s|%s", nr.TemplateID, nr.Host, nr.MatcherName)
 		existing, err := p.queries.GetFindingByDedupKey(p.projectID, dedupKey)

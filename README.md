@@ -11,7 +11,7 @@
 | 阶段            | 工具                       | 输出                                       |
 | --------------- | -------------------------- | ------------------------------------------ |
 | **Scope Check** | 自研引擎                   | ScopeDecision (allow/deny)                 |
-| **资产发现**    | Subfinder → DNS → CDNcheck → Naabu → nerva → httpx | Asset / WebEndpoint / Port / Service |
+| **资产发现**    | Subfinder → DNSx → CDNcheck → Naabu → nerva → httpx | Asset / WebEndpoint / Port / Service |
 | **Web 初筛**    | Nuclei（指纹驱动模板筛选） | Finding / Evidence                         |
 | **人工验证**    | 前端队列                   | confirmed / false_positive / accepted_risk |
 | **报告导出**    | 自研生成器                 | Markdown / JSON                            |
@@ -48,6 +48,7 @@
 - 外部安全工具
   ```bash
   go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+  go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
   go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
   go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
   go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
@@ -152,9 +153,15 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 │   ├── nuclei/                # Nuclei 指纹-Tag 映射
 │   ├── parser/                # 工具输出解析器
 │   │   ├── subfinder.go       # Subfinder JSONL 解析
+│   │   ├── dnsx.go            # dnsx JSONL 解析
 │   │   ├── httpx.go           # httpx JSONL 解析
 │   │   ├── naabu.go           # Naabu 输出解析
 │   │   └── nuclei.go          # Nuclei JSONL 解析
+│   ├── search/                # 互联网搜索引擎客户端
+│   │   ├── fofa.go            # FOFA API 客户端
+│   │   ├── hunter.go          # Hunter API 客户端
+│   │   ├── quake.go           # Quake API 客户端
+│   │   └── engine.go          # 统一搜索引擎接口
 │   ├── report/                # Markdown / JSON 报告生成
 │   ├── scope/                 # Scope Check 引擎
 │   ├── scoring/               # Finding confidence/priority 评分
@@ -244,8 +251,11 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 
 - [x] 扫描入口统一（TargetPage Subfinder 按钮 → Runs 导航）
 - [x] 路由统一（`/projects/:projectId/*` 嵌套路由）
-- [x] 项目内扫描配置页（端口范围预设、阶段开关、并发/超时调优）
+- [x] 扫描模式选择（外网/内网）+ 速度参数配置面板
 - [x] 高危端口预设（115 个攻击面端口，覆盖 Redis/ES/MongoDB/K8s/Ollama 等）
+- [x] dnsx DNS 解析替代 Go resolver
+- [x] 互联网搜索引擎页面（FOFA/Hunter/Quake 统一搜索 + API Key 配置）
+- [x] FOFA 凭证全局化（engine_credentials 表）
 - [x] nerva 服务指纹识别 + cdncheck CDN 过滤集成
 - [x] 网络服务扫描（非 Web 端口：Redis/MySQL/PostgreSQL/Elasticsearch/MongoDB/Memcached/MSSQL/Oracle）
 - [x] CPE 指纹补充（404/302 页面 tech fallback）
@@ -259,6 +269,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 | 工具                                                       | 用途                 | 最低版本 |
 | ---------------------------------------------------------- | -------------------- | -------- |
 | [Subfinder](https://github.com/projectdiscovery/subfinder) | 子域名枚举           | v2.6+    |
+| [dnsx](https://github.com/projectdiscovery/dnsx)           | DNS 解析             | latest   |
 | [httpx](https://github.com/projectdiscovery/httpx)         | Web 存活与指纹       | v1.3+    |
 | [Naabu](https://github.com/projectdiscovery/naabu)         | 端口发现             | v2.1+    |
 | [nerva](https://github.com/praetorian-inc/nerva)           | 服务指纹识别         | latest   |

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { api, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse } from "../lib/api";
+import { api, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
 import { useProjectId, ConfirmDialog, useToast, EmptyState, Table, Badge, SkeletonList } from "../components";
 
@@ -13,7 +13,7 @@ function ProjectInfo({ project }: { project: Project }) {
   const isActive = (!start || start <= now) && (!end || end >= now);
 
   return (
-    <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+    <section className="panel p-4">
       <h2 className="font-semibold mb-2">项目信息</h2>
       <div className="text-sm space-y-1">
         <div className="text-zinc-400">
@@ -113,12 +113,12 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         onClick={() => fileRef.current?.click()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition ${
+        className={`border border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
           importing
-            ? "border-gray-300 bg-gray-50 pointer-events-none"
+            ? "border-white/[0.08] bg-white/[0.03] pointer-events-none"
             : dragOver
-            ? "border-blue-400 bg-blue-50"
-            : "border-gray-300 hover:border-gray-400"
+            ? "border-sky-400 bg-sky-500/10"
+            : "border-white/[0.12] bg-white/[0.025] hover:border-white/[0.24]"
         }`}
       >
         <input
@@ -147,7 +147,7 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
       </div>
 
       {result && (
-        <div className="bg-gray-50 p-3 rounded text-sm space-y-2">
+        <div className="panel p-3 text-sm space-y-2">
           <div className="font-semibold">导入结果</div>
           <div className="flex gap-4 flex-wrap">
             <StatBadge label="成功导入" value={result.imported} color="green" />
@@ -166,7 +166,7 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
               <ul className="text-xs space-y-0.5 max-h-32 overflow-auto">
                 {result.denied_targets.map((d, i) => (
                   <li key={i} className="text-zinc-400">
-                    <code className="bg-yellow-50 px-1 rounded">{d.value}</code>
+                    <code className="bg-yellow-500/10 px-1 rounded text-accent-yellow">{d.value}</code>
                     <span className="text-yellow-700 ml-2">— {d.reason}</span>
                   </li>
                 ))}
@@ -233,8 +233,8 @@ export default function TargetPage() {
     setTargetsLoading(true);
     setTargetsError(null);
     try {
-      const data = await api.listTargets(projectId, signal);
-      setTargets(data ?? []);
+      const data = await api.listTargets(projectId, PAGE_ALL, signal);
+      setTargets(data.data ?? []);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : String(err);
@@ -374,12 +374,12 @@ export default function TargetPage() {
 
   if (!currentProject) {
     return (
-      <div className="max-w-5xl space-y-6">
+      <div className="page-shell space-y-6">
         <div>
           <h1 className="text-2xl font-bold">目标管理</h1>
           <p className="text-zinc-400 text-sm mt-1">管理项目目标、Scope 规则和批量导入</p>
         </div>
-        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8 text-center">
+        <div className="panel p-8 text-center">
           <p className="text-zinc-400 mb-4">请先从 Dashboard 选择一个项目</p>
           <Link to="/" className="text-blue-600 hover:underline">前往 Dashboard</Link>
         </div>
@@ -388,21 +388,23 @@ export default function TargetPage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
-      {/* 标题区 */}
-      <div>
-        <h1 className="text-2xl font-bold">目标管理</h1>
-        <p className="text-zinc-400 text-sm mt-1">管理项目目标、Scope 规则和批量导入</p>
+    <div className="page-shell space-y-6">
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">Step 1</div>
+          <h1 className="page-title">目标与 Scope</h1>
+          <p className="page-subtitle">先确认授权边界，再导入域名、URL、IP 或 CIDR；所有后续扫描都从这里开始。</p>
+        </div>
       </div>
 
       <ProjectInfo project={currentProject} />
 
       {/* 操作区 */}
-      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 space-y-4">
+      <section className="panel p-4 space-y-4">
         <h2 className="font-semibold">添加目标</h2>
         <form onSubmit={addTarget} className="flex gap-2">
           <select
-            className="border rounded px-2 bg-zinc-800 border-zinc-700 text-zinc-200"
+            className="rounded-lg border border-white/[0.10] bg-slate-950/40 px-2 text-zinc-200"
             value={targetType}
             onChange={(e) => setTargetType(e.target.value)}
           >
@@ -413,7 +415,7 @@ export default function TargetPage() {
             <option value="cidr">CIDR</option>
           </select>
           <input
-            className="flex-1 border rounded px-3 py-2 bg-zinc-800 border-zinc-700 text-zinc-200 placeholder-zinc-500"
+            className="flex-1 rounded-lg border border-white/[0.10] bg-slate-950/40 px-3 py-2 text-zinc-200 placeholder-zinc-500"
             placeholder="example.com 或 192.168.1.1 或 10.0.0.0/24 或 192.168.0.1-10"
             value={targetValue}
             onChange={(e) => setTargetValue(e.target.value)}
@@ -421,7 +423,7 @@ export default function TargetPage() {
           <button
             type="submit"
             disabled={addingTarget}
-            className="bg-slate-700 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-cyber-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {addingTarget ? "添加中..." : "添加"}
           </button>
@@ -432,7 +434,7 @@ export default function TargetPage() {
       </section>
 
       {/* 内容区 */}
-      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4">
+      <section className="panel p-4">
         <h2 className="font-semibold mb-3">目标列表</h2>
         {loading ? (
           <SkeletonList count={3} />
@@ -456,16 +458,17 @@ export default function TargetPage() {
             columns={targetColumns}
             data={targets as unknown as Record<string, unknown>[]}
             emptyText="暂无目标"
+            maxHeight={480}
           />
         )}
       </section>
 
       {/* Scope 规则 */}
-      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+      <section className="panel p-4">
         <h2 className="font-semibold mb-3">Scope 规则</h2>
         <form onSubmit={addScopeRule} className="flex gap-2 mb-3">
           <select
-            className="border rounded px-2 bg-zinc-800 border-zinc-700 text-zinc-200"
+            className="rounded-lg border border-white/[0.10] bg-slate-950/40 px-2 text-zinc-200"
             value={scopeAction}
             onChange={(e) => setScopeAction(e.target.value as any)}
           >
@@ -473,44 +476,44 @@ export default function TargetPage() {
             <option value="exclude">排除</option>
           </select>
           <input
-            className="flex-1 border rounded px-3 py-2 bg-zinc-800 border-zinc-700 text-zinc-200 placeholder-zinc-500"
+            className="flex-1 rounded-lg border border-white/[0.10] bg-slate-950/40 px-3 py-2 text-zinc-200 placeholder-zinc-500"
             placeholder="域名规则，如 example.com"
             value={scopeValue}
             onChange={(e) => setScopeValue(e.target.value)}
           />
-          <button type="submit" disabled={addingScope} className="bg-slate-700 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed">
+          <button type="submit" disabled={addingScope} className="btn-cyber-secondary disabled:opacity-50 disabled:cursor-not-allowed">
             {addingScope ? "添加中..." : "添加"}
           </button>
         </form>
       </section>
 
       {/* 操作 */}
-      <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+      <section className="panel p-4">
         <h2 className="font-semibold mb-3">操作</h2>
         <div className="flex gap-3 flex-wrap">
           <button
             onClick={() => setDryRunConfirmOpen(true)}
             disabled={dryRunLoading}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-cyber-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {dryRunLoading ? "检测中..." : "授权检测 (Scope Check)"}
           </button>
-          <Link to={`/projects/${currentProject.id}/runs`} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500">
+          <Link to={`/projects/${currentProject.id}/runs`} className="btn-cyber-secondary">
             前往扫描
           </Link>
-          <Link to={`/projects/${currentProject.id}/assets`} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-500">
+          <Link to={`/projects/${currentProject.id}/assets`} className="btn-cyber-secondary">
             查看资产
           </Link>
-          <Link to={`/projects/${currentProject.id}/findings`} className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-500">
+          <Link to={`/projects/${currentProject.id}/findings`} className="btn-cyber-secondary">
             漏洞发现
           </Link>
-          <Link to={`/projects/${currentProject.id}/reports`} className="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-500">
-            📄 报告
+          <Link to={`/projects/${currentProject.id}/reports`} className="btn-cyber-secondary">
+            报告
           </Link>
         </div>
 
         {dryRunResult && (
-          <div className="mt-4 bg-gray-50 p-3 rounded text-sm space-y-2">
+          <div className="mt-4 panel p-3 text-sm space-y-2">
             <div className="font-semibold">授权检测结果 ({dryRunResult.mode})</div>
             <div className="flex gap-4 text-xs">
               <div>

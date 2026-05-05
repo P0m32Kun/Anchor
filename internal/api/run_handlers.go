@@ -182,12 +182,18 @@ func (s *Server) checkRunCompletion(runID string) {
 // GET /projects/{id}/runs
 func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
-	runs, err := s.queries.ListRunsByProject(projectID)
+	page := parsePagination(r)
+	total, err := s.queries.CountRunsByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "count runs: %v", err))
+		return
+	}
+	runs, err := s.queries.ListRunsByProjectPaginated(projectID, page.PageSize, page.Offset())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list runs: %v", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, runs)
+	writePaginatedJSON(w, runs, total, page)
 }
 
 // GET /runs/{id}

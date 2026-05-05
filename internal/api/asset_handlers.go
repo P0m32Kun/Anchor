@@ -80,7 +80,17 @@ func (s *Server) handleListAssetsFiltered(w http.ResponseWriter, r *http.Request
 		filtered = append(filtered, a)
 	}
 
-	writeJSON(w, http.StatusOK, filtered)
+	page := parsePagination(r)
+	total := len(filtered)
+	start := page.Offset()
+	end := start + page.PageSize
+	if start > total {
+		start = total
+	}
+	if end > total {
+		end = total
+	}
+	writePaginatedJSON(w, filtered[start:end], total, page)
 }
 
 func (s *Server) handleListAssets(w http.ResponseWriter, r *http.Request) {

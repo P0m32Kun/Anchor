@@ -12,11 +12,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     ref
   ) {
     const inputBase =
-      "w-full bg-black/30 border rounded-apple-sm px-3 py-2 text-sm text-text-primary placeholder:text-text-quaternary transition-all duration-150 appearance-none shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]";
+      "w-full bg-slate-950/40 border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-quaternary transition-colors duration-150 appearance-none";
 
     const inputState = error
       ? "border-brand-danger"
-      : "border-white/[0.08] hover:border-white/[0.15] focus:border-brand-primary focus:shadow-[0_0_0_3px_rgba(47,129,247,0.15),inset_0_2px_4px_rgba(0,0,0,0.5)] focus:outline-none";
+      : "border-white/[0.10] hover:border-white/[0.18] focus:border-brand-primary focus:shadow-[0_0_0_3px_rgba(14,165,233,0.18)] focus:outline-none";
 
     const inputDisabled = disabled
       ? "opacity-50 cursor-not-allowed"

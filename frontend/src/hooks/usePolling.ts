@@ -56,7 +56,12 @@ export function usePolling<T>(
     setIsLoading(true);
     try {
       const result = await pollFnRef.current();
-      setData(result);
+      setData((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(result)) {
+          return prev;
+        }
+        return result;
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));

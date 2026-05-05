@@ -74,10 +74,16 @@ func (s *Server) handleStartWebScreening(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleListWebEndpointsByProject(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
-	endpoints, err := s.queries.ListWebEndpointsByProject(projectID)
+	page := parsePagination(r)
+	total, err := s.queries.CountWebEndpointsByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "count web endpoints failed: %v", err))
+		return
+	}
+	endpoints, err := s.queries.ListWebEndpointsByProjectPaginated(projectID, page.PageSize, page.Offset())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list web endpoints failed: %v", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, endpoints)
+	writePaginatedJSON(w, endpoints, total, page)
 }

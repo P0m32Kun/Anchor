@@ -20,15 +20,32 @@ const HighRiskPorts = "21,22,23,25,53,80,81,88,110,135,139,143,389,443,445,465,5
 
 // BuildSubfinderCommand builds a Subfinder command for the given domain.
 // Output goes to stdout as JSONL so the worker can capture it as an artifact.
-func BuildSubfinderCommand(domain string) []string {
-	return []string{"subfinder", "-d", domain, "-oJ"}
+func BuildSubfinderCommand(domain string, rateLimit, threads, timeout int) []string {
+	args := []string{"subfinder", "-d", domain, "-oJ"}
+	if rateLimit > 0 {
+		args = append(args, "-rate-limit", fmt.Sprintf("%d", rateLimit))
+	}
+	if threads > 0 {
+		args = append(args, "-t", fmt.Sprintf("%d", threads))
+	}
+	if timeout > 0 {
+		args = append(args, "-timeout", fmt.Sprintf("%d", timeout))
+	}
+	return args
 }
 
 // BuildHttpxCommand builds an httpx command that reads hosts from a file.
 // hostFile should contain one host per line.
 // Output goes to stdout as JSONL so the worker can capture it as an artifact.
-func BuildHttpxCommand(hostFile string) []string {
-	return []string{"httpx", "-json", "-l", hostFile, "-follow-redirects"}
+func BuildHttpxCommand(hostFile string, rateLimit, threads int) []string {
+	args := []string{"httpx", "-json", "-l", hostFile, "-follow-redirects"}
+	if rateLimit > 0 {
+		args = append(args, "-rate-limit", fmt.Sprintf("%d", rateLimit))
+	}
+	if threads > 0 {
+		args = append(args, "-threads", fmt.Sprintf("%d", threads))
+	}
+	return args
 }
 
 // BuildNaabuCommand builds a Naabu command that reads hosts from a file.
@@ -42,21 +59,31 @@ func BuildHttpxCommand(hostFile string) []string {
 //	    Elasticsearch, MongoDB, etc.) that the top-N presets miss
 //
 // Output goes to stdout as JSONL so the worker can capture it as an artifact.
-func BuildNaabuCommand(hostFile, portRange string) []string {
+func BuildNaabuCommand(hostFile, portRange string, rate, threads, timeout int) []string {
 	args := []string{"naabu", "-json", "-list", hostFile}
 
 	switch strings.ToLower(portRange) {
-	case "", "tp100", "top100":
+	case "", "tp100", "top100", "top-100":
 		// Naabu default is top 100, no extra flag needed
-	case "tp1000", "top1000":
+	case "tp1000", "top1000", "top-1000":
 		args = append(args, "-tp", "1000")
-	case "tpfull", "topfull", "full":
+	case "tpfull", "topfull", "full", "top-full":
 		args = append(args, "-tp", "full")
 	case "high-risk", "highrisk", "hr":
 		args = append(args, "-p", HighRiskPorts)
 	default:
 		// User-defined port list
 		args = append(args, "-p", portRange)
+	}
+
+	if rate > 0 {
+		args = append(args, "-rate", fmt.Sprintf("%d", rate))
+	}
+	if threads > 0 {
+		args = append(args, "-c", fmt.Sprintf("%d", threads))
+	}
+	if timeout > 0 {
+		args = append(args, "-timeout", fmt.Sprintf("%d", timeout))
 	}
 
 	return args
@@ -89,8 +116,42 @@ func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string
 
 // BuildNervaCommand builds a nerva command for service fingerprinting.
 // targets should be in "host:port" format, comma-separated.
-func BuildNervaCommand(targets string) []string {
-	return []string{"nerva", "--json", "-t", targets}
+func BuildNervaCommand(targets string, rateLimit, workers, timeout int) []string {
+	args := []string{"nerva", "--json", "-t", targets}
+	if rateLimit > 0 {
+		args = append(args, "-R", fmt.Sprintf("%d", rateLimit))
+	}
+	if workers > 0 {
+		args = append(args, "-w", fmt.Sprintf("%d", workers))
+	}
+	if timeout > 0 {
+		args = append(args, "-T", fmt.Sprintf("%d", timeout))
+	}
+	return args
+}
+
+// BuildDNSxCommand builds a dnsx command for DNS resolution.
+// hostFile should contain one host per line.
+// recordTypes can be a list of record types (e.g. ["a", "aaaa", "cname"]).
+func BuildDNSxCommand(hostFile string, recordTypes []string, rateLimit, threads int) []string {
+	args := []string{"dnsx", "-l", hostFile, "-json"}
+
+	if len(recordTypes) > 0 {
+		for _, rt := range recordTypes {
+			args = append(args, "-"+strings.ToLower(rt))
+		}
+	} else {
+		args = append(args, "-a", "-aaaa", "-cname")
+	}
+
+	if rateLimit > 0 {
+		args = append(args, "-rl", fmt.Sprintf("%d", rateLimit))
+	}
+	if threads > 0 {
+		args = append(args, "-t", fmt.Sprintf("%d", threads))
+	}
+
+	return args
 }
 
 // BuildCDNCheckCommand builds a cdncheck command for CDN detection.
@@ -112,8 +173,13 @@ func appendRateLimitArgs(args []string, tool string, rate int) []string {
 		return append(args, "-rl", fmt.Sprintf("%d", rate))
 	case "httpx":
 		return append(args, "-rate-limit", fmt.Sprintf("%d", rate))
+	case "subfinder":
+		return append(args, "-rate-limit", fmt.Sprintf("%d", rate))
+	case "dnsx":
+		return append(args, "-rl", fmt.Sprintf("%d", rate))
+	case "nerva":
+		return append(args, "-R", fmt.Sprintf("%d", rate))
 	default:
-		// Subfinder and others don't support rate limiting; skip.
 		return args
 	}
 }

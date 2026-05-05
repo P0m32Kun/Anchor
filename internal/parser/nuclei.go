@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 )
@@ -34,18 +35,25 @@ func ParseNuclei(r io.Reader) ([]NucleiResult, []ParseError) {
 	var results []NucleiResult
 	var errs []ParseError
 
-	scanner := bufio.NewScanner(r)
+	reader := bufio.NewReader(r)
 	lineNo := 0
-	for scanner.Scan() {
+	for {
 		lineNo++
-		line := scanner.Text()
+		lineBytes, readErr := reader.ReadBytes('\n')
+		line := string(bytes.TrimSpace(lineBytes))
 		if line == "" {
+			if readErr == io.EOF {
+				break
+			}
 			continue
 		}
 
 		var raw map[string]json.RawMessage
 		if err := json.Unmarshal([]byte(line), &raw); err != nil {
 			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "invalid JSON: " + err.Error()})
+			if readErr == io.EOF {
+				break
+			}
 			continue
 		}
 
@@ -89,10 +97,10 @@ func ParseNuclei(r io.Reader) ([]NucleiResult, []ParseError) {
 		}
 
 		results = append(results, res)
-	}
 
-	if err := scanner.Err(); err != nil {
-		errs = append(errs, ParseError{Line: lineNo, Raw: "", Message: "scanner error: " + err.Error()})
+		if readErr == io.EOF {
+			break
+		}
 	}
 
 	return results, errs

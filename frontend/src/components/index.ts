@@ -11,4 +11,7 @@ export { Table } from "./Table";
 export { default as ProjectLayout, useProjectId } from "./ProjectLayout";
 export { default as Modal } from "./Modal";
 export { default as ConfirmDialog } from "./ConfirmDialog";
+export { default as ScanModal } from "./ScanModal";
+export type { ScanMode } from "./ScanModal";
 export { ErrorBoundary } from "./ErrorBoundary";
+export { VirtualList } from "./VirtualList";

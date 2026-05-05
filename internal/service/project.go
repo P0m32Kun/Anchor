@@ -71,6 +71,23 @@ func (s *projectService) List(ctx context.Context) ([]*models.Project, error) {
 	return projects, nil
 }
 
+func (s *projectService) ListPaginated(ctx context.Context, p PaginationParams) (*PaginatedList[*models.Project], error) {
+	total, err := s.repo.Count()
+	if err != nil {
+		return nil, errors.Newf(errors.ErrInternal, "count projects failed: %v", err)
+	}
+	projects, err := s.repo.ListPaginated(p.PageSize, p.Offset())
+	if err != nil {
+		return nil, errors.Newf(errors.ErrInternal, "list projects failed: %v", err)
+	}
+	return &PaginatedList[*models.Project]{
+		Data:     projects,
+		Total:    total,
+		Page:     p.Page,
+		PageSize: p.PageSize,
+	}, nil
+}
+
 func (s *projectService) Get(ctx context.Context, id string) (*models.Project, error) {
 	p, err := s.repo.Get(id)
 	if err != nil {

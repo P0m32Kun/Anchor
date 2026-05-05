@@ -112,7 +112,7 @@ func (w *AssetDiscoveryWorkflow) runDomainChain(ctx context.Context, projectID s
 			continue
 		}
 
-		subfinderTask, err := w.createAndRunTask(ctx, projectID, dt.ID, "subfinder", worker.BuildSubfinderCommand(dt.Value))
+		subfinderTask, err := w.createAndRunTask(ctx, projectID, dt.ID, "subfinder", worker.BuildSubfinderCommand(dt.Value, 0, 0, 0))
 		if err != nil {
 			continue
 		}
@@ -145,7 +145,7 @@ func (w *AssetDiscoveryWorkflow) runDomainChain(ctx context.Context, projectID s
 			log.Printf("write httpx host file: %v", err)
 			continue
 		}
-		httpxTask, err := w.createAndRunTask(ctx, projectID, dt.ID, "httpx", worker.BuildHttpxCommand(httpxHostFile))
+		httpxTask, err := w.createAndRunTask(ctx, projectID, dt.ID, "httpx", worker.BuildHttpxCommand(httpxHostFile, 0, 0))
 		if err != nil {
 			continue
 		}
@@ -348,7 +348,7 @@ func (w *AssetDiscoveryWorkflow) runPostDiscovery(ctx context.Context, projectID
 		return fmt.Errorf("write httpx host file: %w", err)
 	}
 
-	httpxTask, err := w.createAndRunTask(ctx, projectID, targetID, "httpx", worker.BuildHttpxCommand(httpxHostFile))
+	httpxTask, err := w.createAndRunTask(ctx, projectID, targetID, "httpx", worker.BuildHttpxCommand(httpxHostFile, 0, 0))
 	if err != nil {
 		return fmt.Errorf("run httpx: %w", err)
 	}

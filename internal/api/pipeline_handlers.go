@@ -65,9 +65,6 @@ func (s *Server) handleRunPipeline(w http.ResponseWriter, r *http.Request) {
 					"time":    time.Now().UTC().Format(time.RFC3339),
 				})
 			})
-		if project.FofaEmail != nil && project.FofaAPIKey != nil && *project.FofaEmail != "" && *project.FofaAPIKey != "" {
-			pipeline.WithFOFA(*project.FofaEmail, *project.FofaAPIKey)
-		}
 		if err := pipeline.Run(ctx, projectID); err != nil {
 			log.Printf("pipeline run for project %s: %v", projectID, err)
 		}
@@ -214,73 +211,88 @@ func (s *Server) handleGetPipelineRunStages(w http.ResponseWriter, r *http.Reque
 
 // --- Unified Scan ---
 
-// ScanMode represents a predefined scan configuration
-type ScanMode string
-
-const (
-	ScanModeQuick    ScanMode = "quick"
-	ScanModeStandard ScanMode = "standard"
-	ScanModeDeep     ScanMode = "deep"
-	ScanModeCustom   ScanMode = "custom"
-)
-
-// buildConfigForMode returns a PipelineConfig preset for the given scan mode
-func buildConfigForMode(mode ScanMode, base models.PipelineConfig) models.PipelineConfig {
-	switch mode {
-	case ScanModeQuick:
-		return models.PipelineConfig{
-			EnableFOFA:          false,
-			EnableSubfinder:     false,
-			EnableCDNFilter:     false,
-			PortRange:           "top-1000",
-			PortScanTimeout:     10,
-			PortScanConcurrency: 25,
-			EnableNerva:         false,
-			EnableNuclei:        false,
-		}
-	case ScanModeStandard:
-		return models.PipelineConfig{
-			EnableFOFA:          false,
-			EnableSubfinder:     true,
-			SubfinderTimeout:    30,
-			DNSConcurrency:      50,
-			DNSTimeout:          5,
-			EnableCDNFilter:     false,
-			PortRange:           "top-1000",
-			PortScanTimeout:     10,
-			PortScanConcurrency: 25,
-			EnableNerva:         true,
-			NervaTimeout:        10,
-			NervaConcurrency:    10,
-			EnableNuclei:        true,
-			NucleiRateLimit:     150,
-			NucleiConcurrency:   25,
-		}
-	case ScanModeDeep:
-		return models.PipelineConfig{
-			EnableFOFA:          base.EnableFOFA,
-			FofaResultLimit:     base.FofaResultLimit,
-			FofaConcurrency:     base.FofaConcurrency,
-			EnableSubfinder:     true,
-			SubfinderTimeout:    60,
-			DNSConcurrency:      100,
-			DNSTimeout:          10,
-			EnableCDNFilter:     true,
-			PortRange:           base.PortRange,
-			PortScanTimeout:     15,
-			PortScanConcurrency: 50,
-			EnableNerva:         true,
-			NervaTimeout:        15,
-			NervaConcurrency:    20,
-			EnableNuclei:        true,
-			NucleiRateLimit:     300,
-			NucleiConcurrency:   50,
-		}
-	case ScanModeCustom:
-		return base
-	default:
-		return models.DefaultPipelineConfig()
+// buildConfigForMode returns a PipelineConfig for external/internal scan modes.
+// Speed parameters are loaded from the request body; defaults are applied for zero values.
+func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineConfig {
+	// Apply defaults for any zero speed values.
+	defaults := models.DefaultPipelineConfig()
+	if cfg.PortRange == "" {
+		cfg.PortRange = defaults.PortRange
 	}
+	if cfg.SubfinderRateLimit == 0 {
+		cfg.SubfinderRateLimit = defaults.SubfinderRateLimit
+	}
+	if cfg.SubfinderThreads == 0 {
+		cfg.SubfinderThreads = defaults.SubfinderThreads
+	}
+	if cfg.SubfinderTimeout == 0 {
+		cfg.SubfinderTimeout = defaults.SubfinderTimeout
+	}
+	if cfg.DNSxRateLimit == 0 {
+		cfg.DNSxRateLimit = defaults.DNSxRateLimit
+	}
+	if cfg.DNSxThreads == 0 {
+		cfg.DNSxThreads = defaults.DNSxThreads
+	}
+	if cfg.DNSxTimeout == 0 {
+		cfg.DNSxTimeout = defaults.DNSxTimeout
+	}
+	if cfg.NaabuRate == 0 {
+		cfg.NaabuRate = defaults.NaabuRate
+	}
+	if cfg.NaabuThreads == 0 {
+		cfg.NaabuThreads = defaults.NaabuThreads
+	}
+	if cfg.NaabuTimeout == 0 {
+		cfg.NaabuTimeout = defaults.NaabuTimeout
+	}
+	if cfg.NervaRateLimit == 0 {
+		cfg.NervaRateLimit = defaults.NervaRateLimit
+	}
+	if cfg.NervaWorkers == 0 {
+		cfg.NervaWorkers = defaults.NervaWorkers
+	}
+	if cfg.NervaTimeout == 0 {
+		cfg.NervaTimeout = defaults.NervaTimeout
+	}
+	if cfg.HttpxRateLimit == 0 {
+		cfg.HttpxRateLimit = defaults.HttpxRateLimit
+	}
+	if cfg.HttpxThreads == 0 {
+		cfg.HttpxThreads = defaults.HttpxThreads
+	}
+	if cfg.NucleiRateLimit == 0 {
+		cfg.NucleiRateLimit = defaults.NucleiRateLimit
+	}
+	if cfg.NucleiConcurrency == 0 {
+		cfg.NucleiConcurrency = defaults.NucleiConcurrency
+	}
+	if cfg.FofaResultLimit == 0 {
+		cfg.FofaResultLimit = defaults.FofaResultLimit
+	}
+	if cfg.FofaConcurrency == 0 {
+		cfg.FofaConcurrency = defaults.FofaConcurrency
+	}
+
+	switch mode {
+	case "external":
+		cfg.EnableFOFA = true
+		cfg.EnableSubfinder = true
+		cfg.EnableDNSx = true
+		cfg.EnableCDNFilter = true
+		cfg.EnableNerva = true
+		cfg.EnableHttpx = true
+		cfg.EnableNuclei = true
+	case "internal":
+		cfg.EnableFOFA = false
+		cfg.EnableSubfinder = false
+		cfg.EnableDNSx = false
+		cfg.EnableCDNFilter = false
+		cfg.EnableNerva = true
+		cfg.EnableHttpx = true
+		cfg.EnableNuclei = true
+	}
+	return cfg
 }
 
 func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
@@ -291,8 +303,8 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Mode ScanMode `json:"mode"`
-		Name string   `json:"name"`
+		Mode   string                `json:"mode"`
+		Config models.PipelineConfig `json:"config"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New("INVALID_BODY", "Invalid request body"))
@@ -300,7 +312,7 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Mode == "" {
-		req.Mode = ScanModeStandard
+		req.Mode = "external"
 	}
 
 	project, err := s.queries.GetProject(projectID)
@@ -313,12 +325,7 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build config based on mode
-	baseConfig := models.DefaultPipelineConfig()
-	if project.PipelineConfig != nil && *project.PipelineConfig != "" {
-		json.Unmarshal([]byte(*project.PipelineConfig), &baseConfig)
-	}
-	cfg := buildConfigForMode(req.Mode, baseConfig)
+	cfg := buildConfigForMode(req.Mode, req.Config)
 
 	// Create pipeline run with mode
 	runID := util.GenerateID()
@@ -326,7 +333,7 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 	if err := s.queries.CreatePipelineRun(&models.PipelineRun{
 		ID:        runID,
 		ProjectID: projectID,
-		Mode:      string(req.Mode),
+		Mode:      req.Mode,
 		Status:    "running",
 		StartedAt: now,
 		CreatedAt: now,
@@ -352,12 +359,6 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 				})
 			})
 
-		// Set FOFA credentials if deep mode and configured
-		if req.Mode == ScanModeDeep && project.FofaEmail != nil && project.FofaAPIKey != nil &&
-			*project.FofaEmail != "" && *project.FofaAPIKey != "" {
-			pipeline.WithFOFA(*project.FofaEmail, *project.FofaAPIKey)
-		}
-
 		if err := pipeline.Run(ctx, projectID); err != nil {
 			log.Printf("scan run %s for project %s: %v", runID, projectID, err)
 			s.queries.UpdatePipelineRunError(runID, err.Error())
@@ -375,7 +376,7 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, map[string]string{
 		"run_id": runID,
 		"status": "accepted",
-		"mode":   string(req.Mode),
+		"mode":   req.Mode,
 	})
 }
 

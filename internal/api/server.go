@@ -218,4 +218,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /tasks/{id}/result", auth(http.HandlerFunc(s.handleTaskResult)))
 	mux.Handle("POST /workers/{id}/revoke", auth(http.HandlerFunc(s.handleRevokeWorker)))
 	mux.Handle("DELETE /workers/{id}", auth(http.HandlerFunc(s.handleDeleteWorker)))
+	// Engine search
+	mux.Handle("GET /engines/credentials", auth(http.HandlerFunc(s.handleListEngineCredentials)))
+	mux.Handle("POST /engines/credentials", auth(http.HandlerFunc(s.handleSaveEngineCredential)))
+	mux.Handle("DELETE /engines/credentials/{engine}", auth(http.HandlerFunc(s.handleDeleteEngineCredential)))
+	mux.Handle("GET /engines/search", auth(http.HandlerFunc(s.handleSearchEngine)))
 }

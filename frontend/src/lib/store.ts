@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Project, Target, ScanTask, Asset, WebEndpoint, Port, Service, Finding, Evidence, Run } from "./api";
+import type { Project, Target, ScanTask, Asset, WebEndpoint, Port, Service, Finding, Evidence, PipelineRun } from "./api";
 
 interface FindingStatusRecord {
   status: string;
@@ -28,7 +28,7 @@ interface AppState {
   findingsError: string | null;
   currentFinding: { finding: Finding; evidence: Evidence[] } | null;
   findingStatusHistory: Record<string, FindingStatusRecord>;
-  runs: Run[];
+  runs: PipelineRun[];
   runsLoading: boolean;
   runsError: string | null;
   workersLoading: boolean;
@@ -56,7 +56,7 @@ interface AppState {
   setFindingsError: (error: string | null) => void;
   setCurrentFinding: (f: { finding: Finding; evidence: Evidence[] } | null) => void;
   recordStatusChange: (id: string, status: string) => void;
-  setRuns: (runs: Run[]) => void;
+  setRuns: (runs: PipelineRun[]) => void;
   setRunsLoading: (loading: boolean) => void;
   setRunsError: (error: string | null) => void;
   setWorkersLoading: (loading: boolean) => void;

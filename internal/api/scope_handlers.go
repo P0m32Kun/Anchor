@@ -47,12 +47,18 @@ func (s *Server) handleListScopeRules(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "missing project_id"))
 		return
 	}
-	rules, err := s.queries.ListScopeRulesByProject(projectID)
+	page := parsePagination(r)
+	total, err := s.queries.CountScopeRulesByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "count scope rules failed: %v", err))
+		return
+	}
+	rules, err := s.queries.ListScopeRulesByProjectPaginated(projectID, page.PageSize, page.Offset())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list scope rules failed: %v", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, rules)
+	writePaginatedJSON(w, rules, total, page)
 }
 
 func (s *Server) handleBatchCreateScopeRules(w http.ResponseWriter, r *http.Request) {

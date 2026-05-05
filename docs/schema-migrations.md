@@ -45,3 +45,9 @@ if version < 4 {
 | 1 | Initial schema: projects, targets, scope_rules, scan_plans, scan_tasks, tool_invocations, scope_decisions, raw_artifacts, audit_logs, tool_health, assets, ports, services, web_endpoints, findings, evidence, tool_templates, scan_steps, worker_nodes, worker_health_checks, runs, ip_discovery_results, screenshots | 2026-04 |
 | 2 | Add `rate_limit` column to `projects` table | 2026-04 |
 | 3 | v0.2 schema updates: add `steps_json`, `tool_template_id` to `scan_tasks`; add `raw_request`, `raw_response`, `matched_template` to `findings`; add `run_id` to `scan_tasks`; insert default `tool_templates` | 2026-04 |
+| 4 | Recreate `targets` table to add `company` type to CHECK constraint | 2026-04 |
+| 5 | Recreate `projects` table to remove `start_time`/`end_time` columns | 2026-04 |
+| 6 | Create `pipeline_runs` table for unified scan pipeline | 2026-04 |
+| 7 | Create `pipeline_run_stages` table for per-stage tracking | 2026-04 |
+| 8 | Add `mode` column to `pipeline_runs` | 2026-05 |
+| 9 | Create `engine_credentials` table; migrate FOFA credentials from `projects` | 2026-05 |

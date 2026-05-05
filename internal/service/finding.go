@@ -32,6 +32,31 @@ func (s *findingService) List(ctx context.Context, projectID string, status stri
 	return findings, nil
 }
 
+func (s *findingService) ListPaginated(ctx context.Context, projectID string, status string, p PaginationParams) (*PaginatedList[*models.Finding], error) {
+	var total int
+	var findings []*models.Finding
+	var err error
+	st := models.FindingStatus(status)
+	total, err = s.repo.CountByProject(projectID, st)
+	if err != nil {
+		return nil, errors.Newf(errors.ErrInternal, "count findings failed: %v", err)
+	}
+	if status != "" {
+		findings, err = s.repo.ListByStatusPaginated(projectID, st, p.PageSize, p.Offset())
+	} else {
+		findings, err = s.repo.ListByProjectPaginated(projectID, p.PageSize, p.Offset())
+	}
+	if err != nil {
+		return nil, errors.Newf(errors.ErrInternal, "list findings failed: %v", err)
+	}
+	return &PaginatedList[*models.Finding]{
+		Data:     findings,
+		Total:    total,
+		Page:     p.Page,
+		PageSize: p.PageSize,
+	}, nil
+}
+
 func (s *findingService) Get(ctx context.Context, id string) (*models.Finding, error) {
 	finding, err := s.repo.Get(id)
 	if err != nil {

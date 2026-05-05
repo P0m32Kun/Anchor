@@ -8,10 +8,29 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
+// PaginationParams is used across service methods.
+type PaginationParams struct {
+	Page     int
+	PageSize int
+}
+
+func (p PaginationParams) Offset() int {
+	return (p.Page - 1) * p.PageSize
+}
+
+// PaginatedList is the generic response for paginated queries.
+type PaginatedList[T any] struct {
+	Data     []T `json:"data"`
+	Total    int `json:"total"`
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
+}
+
 // ProjectService handles project-related business logic.
 type ProjectService interface {
 	Create(ctx context.Context, req CreateProjectRequest) (*models.Project, error)
 	List(ctx context.Context) ([]*models.Project, error)
+	ListPaginated(ctx context.Context, p PaginationParams) (*PaginatedList[*models.Project], error)
 	Get(ctx context.Context, id string) (*models.Project, error)
 	Delete(ctx context.Context, id string) error
 }
@@ -20,12 +39,14 @@ type ProjectService interface {
 type TargetService interface {
 	Create(ctx context.Context, projectID string, req CreateTargetRequest) (*TargetResponse, error)
 	List(ctx context.Context, projectID string) ([]*models.Target, error)
+	ListPaginated(ctx context.Context, projectID string, p PaginationParams) (*PaginatedList[*models.Target], error)
 	Import(ctx context.Context, projectID string, targets []ImportTarget) (*ImportResult, error)
 }
 
 // FindingService handles finding-related business logic.
 type FindingService interface {
 	List(ctx context.Context, projectID string, status string) ([]*models.Finding, error)
+	ListPaginated(ctx context.Context, projectID string, status string, p PaginationParams) (*PaginatedList[*models.Finding], error)
 	Get(ctx context.Context, id string) (*models.Finding, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	AddEvidence(ctx context.Context, findingID string, req AddEvidenceRequest) (*models.Evidence, error)

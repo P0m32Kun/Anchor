@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // FofaClient is a client for the FOFA API.
@@ -38,7 +37,7 @@ func NewFofaClient(email, apiKey string) *FofaClient {
 		email:   email,
 		apiKey:  apiKey,
 		baseURL: "https://fofa.info",
-		client:  &http.Client{Timeout: 30 * time.Second},
+		client:  defaultHTTPClient,
 	}
 }
 

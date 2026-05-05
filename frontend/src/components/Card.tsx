@@ -23,7 +23,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={`cyber-glass rounded-xl ${paddings[padding]} ${glowCls} ${hoverCls} ${className}`}
+        className={`cyber-glass rounded-lg ${paddings[padding]} ${glowCls} ${hoverCls} ${className}`}
         {...props}
       >
         {children}

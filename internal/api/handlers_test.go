@@ -112,12 +112,15 @@ func TestListProjects(t *testing.T) {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 
-	var projects []*models.Project
-	if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
+	var result PaginatedResponse[*models.Project]
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if len(projects) != 3 {
-		t.Errorf("len(projects) = %d, want 3", len(projects))
+	if len(result.Data) != 3 {
+		t.Errorf("len(projects) = %d, want 3", len(result.Data))
+	}
+	if result.Total != 3 {
+		t.Errorf("total = %d, want 3", result.Total)
 	}
 }
 

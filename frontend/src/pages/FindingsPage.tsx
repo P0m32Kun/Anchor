@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
 import { EmptyState, Input, Select, SkeletonList, useProjectId, useToast } from "../components";
 import type { Finding, Evidence } from "../lib/api";
@@ -54,8 +54,8 @@ export default function FindingsPage() {
     setFindingsLoading(true);
     setFindingsError(null);
     api
-      .listFindings(projectId, undefined, ctrl.signal)
-      .then((data) => setFindings(data ?? []))
+      .listFindings(projectId, undefined, PAGE_ALL, ctrl.signal)
+      .then((res) => setFindings(res.data ?? []))
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setFindingsError(err instanceof Error ? err.message : String(err));
@@ -129,8 +129,8 @@ export default function FindingsPage() {
       setSelectedIds(new Set());
       setBatchStatus("");
       if (projectId) {
-        const updated = await api.listFindings(projectId, undefined);
-        setFindings(updated ?? []);
+        const updated = await api.listFindings(projectId, undefined, PAGE_ALL);
+        setFindings(updated.data ?? []);
       }
     } catch (err) {
       toast("批量更新失败: " + (err instanceof Error ? err.message : String(err)), "error");
@@ -175,9 +175,14 @@ export default function FindingsPage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
-      {/* Title area */}
-      <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Findings</h1>
+    <div className="page-shell space-y-6">
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">Step 4</div>
+          <h1 className="page-title">发现审核</h1>
+          <p className="page-subtitle">按严重级别、状态和关键词筛选，确认真实风险、标记误报或接受风险。</p>
+        </div>
+      </div>
 
       {/* Severity filter */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -263,7 +268,7 @@ export default function FindingsPage() {
       {loading && <SkeletonList count={5} />}
 
       {!loading && filteredFindings.length === 0 && (
-        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8">
+        <div className="panel p-8">
           <EmptyState
             title="暂无 Finding"
             description="当前项目还没有任何安全发现，请先运行扫描任务"
@@ -272,7 +277,7 @@ export default function FindingsPage() {
       )}
 
       {!loading && filteredFindings.length > 0 && (
-        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl overflow-x-auto">
+        <div className="panel overflow-auto max-h-[560px]">
         <table className="min-w-full text-sm">
           <thead className="bg-zinc-800/40 text-zinc-400">
             <tr>
@@ -397,7 +402,7 @@ function FindingDetail({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl rounded w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+      <div className="panel w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold">Finding 详情</h2>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200">✕</button>
@@ -460,7 +465,7 @@ function FindingDetail({
             {evidence.length === 0 && <p className="text-zinc-500 text-sm">暂无 Evidence</p>}
             <div className="space-y-2">
               {evidence.map((e) => (
-                <div key={e.id} className="border rounded p-3 text-sm">
+                <div key={e.id} className="border border-white/[0.10] rounded-lg p-3 text-sm">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="px-2 py-0.5 rounded bg-zinc-800/60 text-xs">{e.type}</span>
                     <span className="text-zinc-500 text-xs">{e.created_at}</span>
@@ -474,7 +479,7 @@ function FindingDetail({
           <div>
             <h3 className="font-semibold text-sm mb-2">添加备注</h3>
             <textarea
-              className="w-full border rounded p-2 text-sm"
+              className="w-full rounded-lg border border-white/[0.10] bg-slate-950/40 p-2 text-sm text-text-primary placeholder:text-text-quaternary"
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}

@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
 import { EmptyState, useProjectId, ConfirmDialog, Button, ScanModal } from "../components";
 import { useToast } from "../components/Toast";
 import { useSSE, usePolling } from "../hooks";
 import { getApiBase } from "../lib/config";
-import type { ScanTask, PipelineRun, PipelineRunStage } from "../lib/api";
+import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
 
 const statusColors: Record<string, string> = {
@@ -93,7 +93,7 @@ export default function RunsPage() {
       setRunsLoading(true);
       setRunsError(null);
       try {
-        const data = await api.listScanRuns(projectId, undefined, signal);
+        const data = await api.listScanRuns(projectId, PAGE_ALL, signal);
         setRuns(data.data ?? []);
         clearToastError();
       } catch (err) {
@@ -181,7 +181,7 @@ export default function RunsPage() {
   usePolling(
     async () => {
       try {
-        const data = await api.listScanRuns(projectId!, undefined);
+        const data = await api.listScanRuns(projectId!, PAGE_ALL);
         setRuns(data.data ?? []);
         setRunsError(null);
         clearToastError();
@@ -201,11 +201,11 @@ export default function RunsPage() {
     }
   );
 
-  const handleStartScan = async (mode: ScanMode) => {
+  const handleStartScan = async (mode: ScanMode, config: PipelineConfig) => {
     if (!projectId || creating) return;
     setCreating(true);
     try {
-      await api.createScan(projectId, { mode });
+      await api.createScan(projectId, { mode, config });
       toast("扫描任务已启动", "success");
       setShowScanModal(false);
       await loadRuns();
@@ -251,11 +251,13 @@ export default function RunsPage() {
   const runsError = useStore((state) => state.runsError);
 
   return (
-    <div className="max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">
-          扫描执行
-        </h1>
+    <div className="page-shell space-y-6">
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">Step 3</div>
+          <h1 className="page-title">扫描执行</h1>
+          <p className="page-subtitle">查看运行历史、实时连接状态、阶段进度和任务明细。</p>
+        </div>
         {projectId && (
           <Button variant="primary" size="sm" onClick={() => setShowScanModal(true)}>
             新建扫描
@@ -263,7 +265,7 @@ export default function RunsPage() {
         )}
       </div>
 
-      <section className="cyber-glass p-6">
+      <section className="panel p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-base font-medium text-zinc-200">执行历史</h2>
           {projectId && (
@@ -425,7 +427,7 @@ export default function RunsPage() {
       </section>
 
       {selectedRun && (
-        <section className="cyber-glass p-6">
+        <section className="panel p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-base font-medium text-zinc-200">任务详情</h2>
             {(tasksLoading || stagesLoading) && (

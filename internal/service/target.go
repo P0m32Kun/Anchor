@@ -75,6 +75,23 @@ func (s *targetService) List(ctx context.Context, projectID string) ([]*models.T
 	return targets, nil
 }
 
+func (s *targetService) ListPaginated(ctx context.Context, projectID string, p PaginationParams) (*PaginatedList[*models.Target], error) {
+	total, err := s.queries.CountTargetsByProject(projectID)
+	if err != nil {
+		return nil, errors.Newf(errors.ErrInternal, "count targets failed: %v", err)
+	}
+	targets, err := s.queries.ListTargetsByProjectPaginated(projectID, p.PageSize, p.Offset())
+	if err != nil {
+		return nil, errors.Newf(errors.ErrInternal, "list targets failed: %v", err)
+	}
+	return &PaginatedList[*models.Target]{
+		Data:     targets,
+		Total:    total,
+		Page:     p.Page,
+		PageSize: p.PageSize,
+	}, nil
+}
+
 func (s *targetService) Import(ctx context.Context, projectID string, targets []ImportTarget) (*ImportResult, error) {
 	rules, err := s.queries.ListScopeRulesByProject(projectID)
 	if err != nil {

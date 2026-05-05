@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
+import type React from "react";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 import { EmptyState, StatusBadge, SeverityBadge } from "../components";
@@ -62,181 +63,180 @@ export default function DashboardPage() {
   }, []);
 
   const isEmpty = !loading && stats && stats.total_projects === 0;
+  const projectPath = (suffix: string) => currentProject ? `/projects/${currentProject.id}/${suffix}` : "/projects";
 
   return (
-    <div className="space-y-6">
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="总项目数"
-          value={stats?.total_projects ?? 0}
-          loading={loading}
-        />
-        <StatCard
-          title="活跃扫描"
-          value={stats?.active_runs ?? 0}
-          loading={loading}
-          active={(stats?.active_runs ?? 0) > 0}
-          glow="blue"
-        />
-        <StatCard
-          title="待处理 Findings"
-          value={stats?.pending_findings ?? 0}
-          loading={loading}
-          active={(stats?.pending_findings ?? 0) > 0}
-          glow="blue"
-        />
-        <StatCard
-          title="在线 Worker"
-          value={stats?.online_workers ?? 0}
-          loading={loading}
-          active={(stats?.online_workers ?? 0) > 0}
-        />
+    <div className="page-shell space-y-6">
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">Command Center</div>
+          <h1 className="page-title">安全测试工作台</h1>
+          <p className="page-subtitle">
+            统一查看跨项目风险、扫描状态和待审核发现，并按目标到报告的路径推进交付。
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => navigate("/projects")} className="btn-cyber-primary">
+            新建项目
+          </button>
+          <button onClick={() => navigate(projectPath("targets"))} className="btn-cyber-secondary">
+            导入目标
+          </button>
+        </div>
       </div>
 
-      {/* 错误提示 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="项目" value={stats?.total_projects ?? 0} loading={loading} />
+        <StatCard title="运行中扫描" value={stats?.active_runs ?? 0} loading={loading} active={(stats?.active_runs ?? 0) > 0} />
+        <StatCard title="待审核发现" value={stats?.pending_findings ?? 0} loading={loading} active={(stats?.pending_findings ?? 0) > 0} />
+        <StatCard title="在线 Worker" value={stats?.online_workers ?? 0} loading={loading} active={(stats?.online_workers ?? 0) > 0} />
+      </div>
+
       {error && (
         <div className="rounded-lg bg-brand-danger/10 border border-brand-danger/20 text-brand-danger text-sm p-3 flex items-center justify-between">
           <span>加载数据失败：{error}</span>
-          <button
-            onClick={() => fetchDashboard()}
-            className="underline hover:no-underline font-medium"
-          >
+          <button onClick={() => fetchDashboard()} className="underline hover:no-underline font-medium">
             重试
           </button>
         </div>
       )}
 
-      {/* 快速操作 */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => navigate("/projects")}
-          className="btn-cyber-primary"
-        >
-          + 创建项目
-        </button>
-        <button
-          onClick={() => {
-            if (currentProject) {
-              navigate(`/projects/${currentProject.id}/targets`);
-            } else {
-              navigate("/targets");
-            }
-          }}
-          className="btn-cyber-secondary"
-        >
-          导入目标
-        </button>
-      </div>
-
-      {/* 主体内容 */}
       {isEmpty ? (
-        <div className="cyber-glass p-8">
+        <div className="panel p-8">
           <EmptyState
-            title="欢迎使用 Dashboard"
-            description="创建项目并开始扫描，以查看跨项目统计和最近活动"
+            title="还没有项目"
+            description="先创建项目，再导入目标、运行扫描、审核发现并导出报告。"
             actionLabel="创建项目"
             onAction={() => navigate("/projects")}
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 最近活动 */}
-          <div className="cyber-glass p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-text-secondary">
-                最近活动
-              </h3>
-              <button
-                onClick={() => navigate("/runs")}
-                className="text-xs text-brand-primary hover:text-brand-secondary transition-colors"
-              >
-                查看全部 →
-              </button>
-            </div>
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
+          <div className="space-y-6">
+            <ActivityPanel
+              title="最近扫描活动"
+              description="快速定位运行中、失败和刚完成的扫描"
+              actionLabel="查看扫描"
+              onAction={() => navigate(projectPath("runs"))}
+            >
+              {!stats || !stats.recent_runs || stats.recent_runs.length === 0 ? (
+                <div className="py-8">
+                  <EmptyState title="暂无扫描活动" description="启动扫描后，这里会显示阶段状态和最近运行记录" />
+                </div>
+              ) : (
+                <div className="divide-y divide-white/[0.06]">
+                  {stats.recent_runs.map((run) => (
+                    <button
+                      key={run.id}
+                      onClick={() => navigate(projectPath("runs"))}
+                      className="flex w-full items-center justify-between gap-4 py-3 text-left hover:bg-white/[0.03]"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-text-primary truncate">{run.name}</div>
+                        <div className="text-xs text-text-tertiary mt-1">
+                          {run.project_name} · {run.started_at ? formatRelativeTime(run.started_at) : "未开始"}
+                        </div>
+                      </div>
+                      <StatusBadge status={run.status} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ActivityPanel>
 
-            {!stats || !stats.recent_runs || stats.recent_runs.length === 0 ? (
-              <div className="py-8">
-                <EmptyState
-                  title="暂无扫描活动"
-                  description="开始扫描后，这里将显示最近的活动"
-                />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {stats.recent_runs.map((run) => (
-                  <div
-                    key={run.id}
-                    onClick={() => navigate("/runs")}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-text-secondary truncate">
-                        {run.name}
+            <ActivityPanel
+              title="待审核发现"
+              description="先确认真实风险，再进入报告交付"
+              actionLabel="进入队列"
+              onAction={() => navigate(projectPath("findings"))}
+            >
+              {!stats || !stats.recent_findings || stats.recent_findings.length === 0 ? (
+                <div className="py-8">
+                  <EmptyState title="暂无待处理发现" description="扫描产生的 Finding 会进入审核队列" />
+                </div>
+              ) : (
+                <div className="divide-y divide-white/[0.06]">
+                  {stats.recent_findings.map((finding) => (
+                    <button
+                      key={finding.id}
+                      onClick={() => navigate(projectPath("findings"))}
+                      className="flex w-full items-center justify-between gap-4 py-3 text-left hover:bg-white/[0.03]"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-text-primary truncate">{finding.title}</div>
+                        <div className="text-xs text-text-tertiary mt-1">{finding.project_name}</div>
                       </div>
-                      <div className="text-xs text-text-tertiary mt-0.5">
-                        {run.project_name} ·{" "}
-                        {run.started_at
-                          ? formatRelativeTime(run.started_at)
-                          : "未开始"}
-                      </div>
-                    </div>
-                    <StatusBadge status={run.status} />
-                  </div>
-                ))}
-              </div>
-            )}
+                      <SeverityBadge severity={finding.severity} className="shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ActivityPanel>
           </div>
 
-          {/* 待处理 Findings */}
-          <div className="cyber-glass p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-text-secondary">
-                待处理 Findings
-              </h3>
-              <button
-                onClick={() => navigate("/findings")}
-                className="text-xs text-brand-primary hover:text-brand-secondary transition-colors"
-              >
-                查看全部 →
-              </button>
+          <aside className="panel h-fit">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">推荐操作路径</h2>
+                <p className="text-xs text-text-tertiary mt-1">按安全测试交付流程组织，而不是按数据表组织</p>
+              </div>
             </div>
-
-            {!stats || !stats.recent_findings || stats.recent_findings.length === 0 ? (
-              <div className="py-8">
-                <EmptyState
-                  title="暂无待处理 Findings"
-                  description="扫描发现的安全问题将在这里显示"
-                />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {stats.recent_findings.map((finding) => (
-                  <div
-                    key={finding.id}
-                    onClick={() => navigate("/findings")}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-colors"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-text-secondary truncate">
-                        {finding.title}
-                      </div>
-                      <div className="text-xs text-text-tertiary mt-0.5">
-                        {finding.project_name}
-                      </div>
-                    </div>
-                    <SeverityBadge
-                      severity={finding.severity}
-                      className="ml-2 shrink-0"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+            <div className="panel-body space-y-3">
+              {[
+                ["1", "确认项目授权", "配置 Scope、时间窗口和速率限制", projectPath("targets")],
+                ["2", "导入并归一化目标", "批量导入域名、URL、IP 或 CIDR", projectPath("targets")],
+                ["3", "发现资产与服务", "沉淀 Web 端点、端口与技术栈", projectPath("assets")],
+                ["4", "运行扫描并观察阶段", "关注失败阶段和 Worker 状态", projectPath("runs")],
+                ["5", "审核 Finding 并交付报告", "确认、标误报、接受风险并导出", projectPath("findings")],
+              ].map(([step, title, desc, path]) => (
+                <button
+                  key={step}
+                  onClick={() => navigate(path)}
+                  className="flex w-full gap-3 rounded-lg border border-white/[0.08] bg-white/[0.025] p-3 text-left transition-colors hover:border-sky-400/30 hover:bg-sky-500/5"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sky-500/12 text-xs font-semibold text-sky-200">
+                    {step}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium text-text-primary">{title}</span>
+                    <span className="mt-1 block text-xs text-text-tertiary">{desc}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </aside>
         </div>
       )}
     </div>
+  );
+}
+
+function ActivityPanel({
+  title,
+  description,
+  actionLabel,
+  onAction,
+  children,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <h2 className="panel-title">{title}</h2>
+          <p className="text-xs text-text-tertiary mt-1">{description}</p>
+        </div>
+        <button onClick={onAction} className="text-xs text-brand-primary hover:text-sky-200 transition-colors">
+          {actionLabel}
+        </button>
+      </div>
+      <div className="panel-body">{children}</div>
+    </section>
   );
 }
 
@@ -245,26 +245,19 @@ function StatCard({
   value,
   loading,
   active,
-  glow,
 }: {
   title: string;
   value: number;
   loading: boolean;
   active?: boolean;
-  glow?: "blue" | "red";
 }) {
-  const glowClass = glow === "blue" && active ? " glow-blue" : "";
   return (
-    <div className={`cyber-glass p-4${glowClass}`}>
-      <div className="text-xs text-text-tertiary mb-1">{title}</div>
+    <div className={`metric-card ${active ? "border-sky-400/35 bg-sky-500/5" : ""}`}>
+      <div className="metric-label">{title}</div>
       {loading && value === 0 ? (
-        <div className="h-8 bg-white/[0.06] rounded-apple-sm animate-pulse w-16" />
+        <div className="h-8 bg-white/[0.06] rounded-lg animate-pulse w-16 mt-3" />
       ) : (
-        <div
-          className={`text-2xl font-bold ${
-            active ? "text-brand-primary" : "text-text-primary"
-          }`}
-        >
+        <div className={`metric-value ${active ? "text-brand-primary" : "text-text-primary"}`}>
           {value}
         </div>
       )}

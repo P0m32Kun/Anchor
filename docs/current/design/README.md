@@ -16,6 +16,7 @@ This index separates active proposal material from baseline architecture.
 | --- | --- | --- | --- |
 | [`../../design/v0.4-scan-pipeline.md`](../../design/v0.4-scan-pipeline.md) | In review | No | The task is specifically about the v0.4 pipeline direction |
 | [`../../design/v0.4-migrations.md`](../../design/v0.4-migrations.md) | In review | No | The task is specifically about schema changes tied to the v0.4 pipeline |
+| [`../../design/custom-nuclei-template-management.md`](../../design/custom-nuclei-template-management.md) | In review | No | The task is specifically about managing custom Nuclei templates |
 | [`../../refactoring-plan.md`](../../refactoring-plan.md) | Backlog | No | The task is specifically about structural refactoring options |
 
 ## Archived Design Material

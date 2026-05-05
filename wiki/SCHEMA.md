@@ -1,7 +1,7 @@
 # Anchor Project Schema
 
 > 这是 Anchor 项目的 AI 指令文件。所有 Agent 在处理此项目代码前，必须先读取此文件。
-> 最后更新：2026-05-04
+> 最后更新：2026-05-05
 
 ---
 
@@ -9,7 +9,7 @@
 
 **Anchor** — 目标中心自动化安全测试工作台。
 
-通过编排成熟开源工具（Subfinder、httpx、Naabu、Nuclei、Nmap），强制 Scope 校验，统一结果模型，减少安全人员在工具切换、数据整理、证据归档和报告交付上的重复劳动。
+通过编排成熟开源工具（Subfinder、dnsx、httpx、Naabu、Nuclei、nerva、cdncheck），强制 Scope 校验，统一结果模型，减少安全人员在工具切换、数据整理、证据归档和报告交付上的重复劳动。
 
 ---
 
@@ -26,7 +26,7 @@
 | 实时推送      | SSE (Server-Sent Events)    | —         |
 | 语法高亮      | Prism.js                    | —         |
 
-**外部工具依赖**：Subfinder、httpx、Naabu、Nuclei、nerva、cdncheck
+**外部工具依赖**：Subfinder、dnsx、httpx、Naabu、Nuclei、nerva、cdncheck
 
 ---
 
@@ -60,7 +60,7 @@
 │   ├── fingerprint/            # 服务指纹识别（nerva 集成）
 │   ├── parser/                 # 工具输出解析器
 │   ├── resolve/                # DNS 解析器
-│   ├── search/                 # FOFA 客户端
+│   ├── search/                 # 搜索引擎客户端（FOFA / Hunter / Quake）
 │   ├── report/                 # Markdown / JSON 报告生成
 │   ├── scoring/                # Finding confidence/priority 评分引擎
 │   ├── scope/                  # Scope Check 引擎
@@ -158,7 +158,7 @@
 | v0.2 Phase 1 容器化与远程 Worker | ✅ 已完成 | `v0.2.0-p1` | Docker + 远程 Worker + 心跳清理 + WorkersPage                                             |
 | v0.2 Phase 2 项目管理与体验修复  | ✅ 已完成 | `v0.2.0-p2` | 项目创建/删除/级联清理 + 导航修复 + Dashboard 快捷入口                                    |
 | v0.3 桌面可用性与可靠性          | ✅ 已完成 | `v0.3.0`    | 网络服务扫描 + CPE 指纹补充 + 路由统一 + 扫描入口统一 + httpx follow-redirects + 靶场修复 |
-| v0.4 智能扫描管线                | ✅ 已完成 | `v0.4.0`    | 多目标类型（company）+ FOFA 集成 + CDN 过滤 + nerva 服务指纹 + Pipeline 编排 + 工具解析器 |
+| v0.4 智能扫描管线                | ✅ 已完成 | `v0.4.0`    | 多目标类型（company）+ FOFA 集成 + CDN 过滤 + nerva 服务指纹 + dnsx DNS 解析 + Pipeline 编排 + Hunter/Quake 搜索引擎 + 工具解析器 |
 
 ---
 

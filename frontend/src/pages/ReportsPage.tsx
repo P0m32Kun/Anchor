@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { api, Finding, API_BASE } from "../lib/api";
+import { useNavigate } from "react-router-dom";
+import { api, Finding, API_BASE, PAGE_ALL } from "../lib/api";
 import { getApiToken } from "../lib/config";
 import { renderMarkdown } from "../lib/markdown";
 import { Button } from "../components/Button";
@@ -96,8 +96,8 @@ export default function ReportsPage() {
       setReportsLoading(true);
       setReportsError(null);
 
-      const allFindings = await api.listFindings(projectId, undefined, signal);
-      const reportFindings = (allFindings ?? []).filter(
+      const allFindings = await api.listFindings(projectId, undefined, PAGE_ALL, signal);
+      const reportFindings = (allFindings.data ?? []).filter(
         (f) => f.status === "confirmed" || f.status === "accepted_risk"
       );
 
@@ -204,7 +204,7 @@ export default function ReportsPage() {
 
   if (!projectId) {
     return (
-      <div className="max-w-5xl mx-auto">
+      <div className="page-shell">
         <EmptyState
           title="请先选择一个项目"
           description="选择一个项目后生成和导出报告"
@@ -216,17 +216,16 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* Title area */}
-      <div>
-        <Link to={`/projects/${projectId}`} className="text-sm text-brand-primary hover:text-brand-primary/80 mb-1 block transition-colors">
-          ← 返回项目
-        </Link>
-        <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">安全评估报告</h1>
-        <p className="text-zinc-500 text-sm mt-1">
-          <span className="font-mono text-zinc-300">{confirmedCount}</span> 个确认漏洞，
-          <span className="font-mono text-zinc-300">{acceptedCount}</span> 个接受风险
-        </p>
+    <div className="page-shell space-y-6">
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">Step 5</div>
+          <h1 className="page-title">安全评估报告</h1>
+          <p className="page-subtitle">
+            <span className="font-mono text-zinc-300">{confirmedCount}</span> 个确认漏洞，
+            <span className="font-mono text-zinc-300">{acceptedCount}</span> 个接受风险可进入交付报告。
+          </p>
+        </div>
       </div>
 
       {/* Findings Summary */}
@@ -306,18 +305,18 @@ export default function ReportsPage() {
 
           {/* Section overview */}
           <div className="flex flex-wrap gap-3 mb-4 text-sm text-zinc-500">
-            <span className="flex items-center gap-1">📋 概览</span>
-            <span className="flex items-center gap-1">📐 范围</span>
-            <span className="flex items-center gap-1">🔬 方法</span>
-            <span className="flex items-center gap-1">📊 风险统计</span>
-            <span className="flex items-center gap-1">🐛 漏洞详情</span>
-            <span className="flex items-center gap-1">✅ 接受风险</span>
-            <span className="flex items-center gap-1">📎 附录</span>
+            <span className="chip">概览</span>
+            <span className="chip">范围</span>
+            <span className="chip">方法</span>
+            <span className="chip">风险统计</span>
+            <span className="chip">漏洞详情</span>
+            <span className="chip">接受风险</span>
+            <span className="chip">附录</span>
           </div>
 
           {/* Findings outline — clickable */}
           {findings.length > 0 && (
-            <div className="bg-zinc-900/30 border border-zinc-800/60 rounded-lg p-3">
+            <div className="panel p-3">
               <h3 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">
                 Findings 列表
               </h3>
@@ -348,7 +347,7 @@ export default function ReportsPage() {
               <div
                 key={fd.finding.id}
                 id={`finding-${fd.finding.id}`}
-                className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 hover:border-zinc-700/80 transition-all scroll-mt-6"
+                className="panel p-4 hover:border-zinc-700/80 transition-all scroll-mt-6"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

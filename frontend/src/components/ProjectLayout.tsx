@@ -16,7 +16,6 @@ export default function ProjectLayout() {
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const currentProject = useStore((s) => s.currentProject);
   const currentProjectId = useStore((s) => s.currentProjectId);
   const setCurrentProjectId = useStore((s) => s.setCurrentProjectId);
   const setCurrentProject = useStore((s) => s.setCurrentProject);
@@ -76,11 +75,6 @@ export default function ProjectLayout() {
   return (
     <ProjectContext.Provider value={projectId || null}>
       <div className="space-y-4">
-        {currentProject?.end_time && new Date(currentProject.end_time) < new Date() && (
-          <div className="bg-accent-yellow/10 border border-accent-yellow/20 text-accent-yellow px-4 py-2 rounded-apple text-sm">
-            ⚠️ 该项目测试窗口已过期
-          </div>
-        )}
         <Outlet />
       </div>
     </ProjectContext.Provider>

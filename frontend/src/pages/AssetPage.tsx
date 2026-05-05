@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
 import { useProjectId, useToast, EmptyState, Table, SkeletonList } from "../components";
 
@@ -59,8 +59,8 @@ export default function AssetPage() {
     setAssetsLoading(true);
     setAssetsError(null);
     try {
-      const data = await api.listAssets(projectId, signal);
-      setAssets(data ?? []);
+      const data = await api.listAssets(projectId, PAGE_ALL, signal);
+      setAssets(data.data ?? []);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : String(err);
@@ -73,8 +73,8 @@ export default function AssetPage() {
 
   const loadWebEndpoints = useCallback((signal?: AbortSignal) => {
     if (!projectId) return;
-    api.listWebEndpoints(projectId, signal)
-      .then((data) => setWebEndpoints(data ?? []))
+    api.listWebEndpoints(projectId, PAGE_ALL, signal)
+      .then((res) => setWebEndpoints(res.data ?? []))
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         console.error(err);
@@ -182,12 +182,12 @@ export default function AssetPage() {
 
   if (!currentProject) {
     return (
-      <div className="max-w-5xl space-y-6">
+      <div className="page-shell space-y-6">
         <div>
           <h1 className="text-2xl font-bold">资产清单</h1>
           <p className="text-zinc-400 text-sm mt-1">查看和管理项目发现的资产、Web 端点和端口信息</p>
         </div>
-        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-8 text-center">
+        <div className="panel p-8 text-center">
           <p className="text-zinc-400 mb-4">请先从 Dashboard 选择一个项目</p>
           <Link to="/" className="text-blue-600 hover:underline">前往 Dashboard</Link>
         </div>
@@ -196,28 +196,23 @@ export default function AssetPage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
-      {/* 标题区 */}
-      <div>
-        <h1 className="text-2xl font-bold">资产清单</h1>
-        <p className="text-zinc-400 text-sm mt-1">查看和管理项目发现的资产、Web 端点和端口信息</p>
-      </div>
-
-      {/* 操作区 */}
-      <div className="flex items-center justify-between">
-        <Link to={`/projects/${currentProject.id}`} className="text-sm text-blue-600 hover:underline">
-          ← 返回目标管理
-        </Link>
+    <div className="page-shell space-y-6">
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">Step 2</div>
+          <h1 className="page-title">资产清单</h1>
+          <p className="page-subtitle">按资产、Web 端点和开放端口查看发现结果，为后续指纹驱动扫描做准备。</p>
+        </div>
         <button
           onClick={startDiscovery}
           disabled={loading}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500 disabled:opacity-50"
+          className="btn-cyber-primary disabled:opacity-50"
         >
           {loading ? "启动中..." : "资产发现"}
         </button>
       </div>
 
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 border-b border-white/[0.08]">
         {[
           { key: "assets", label: `资产 (${assets.length})` },
           { key: "web", label: `Web 端点 (${webEndpoints.length})` },
@@ -228,7 +223,7 @@ export default function AssetPage() {
             onClick={() => setActiveTab(t.key as any)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
               activeTab === t.key
-                ? "border-green-600 text-green-700"
+                ? "border-sky-400 text-sky-200"
                 : "border-transparent text-zinc-400 hover:text-zinc-300"
             }`}
           >
@@ -238,7 +233,7 @@ export default function AssetPage() {
       </div>
 
       {activeTab === "assets" && (
-        <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4">
+        <section className="panel p-4">
           <div className="flex flex-col gap-3 mb-4">
             <div className="flex flex-wrap gap-2">
               {ASSET_TYPES.map((t) => (
@@ -247,7 +242,7 @@ export default function AssetPage() {
                   onClick={() => setFilterType(t)}
                   className={`px-3 py-1 rounded text-xs font-medium border transition ${
                     filterType === t
-                      ? "bg-green-600/20 border-green-600/50 text-green-400"
+                      ? "bg-sky-500/15 border-sky-400/50 text-sky-200"
                       : "bg-zinc-800/60 border-zinc-700/60 text-zinc-400 hover:text-zinc-200"
                   }`}
                 >
@@ -261,7 +256,7 @@ export default function AssetPage() {
                 placeholder="筛选资产值..."
                 value={filterAsset}
                 onChange={(e) => setFilterAsset(e.target.value)}
-                className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
+                className="bg-slate-950/40 border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-sky-400/50 w-48"
               />
               <button
                 onClick={() => { setFilterType("all"); setFilterAsset(""); }}
@@ -291,27 +286,28 @@ export default function AssetPage() {
               columns={assetColumns}
               data={filteredAssets as unknown as Record<string, unknown>[]}
               emptyText="暂无匹配的资产"
+              maxHeight={480}
             />
           )}
         </section>
       )}
 
       {activeTab === "web" && (
-        <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+        <section className="panel p-4">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <input
               type="text"
               placeholder="筛选标题..."
               value={filterTitle}
               onChange={(e) => setFilterTitle(e.target.value)}
-              className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
+              className="bg-slate-950/40 border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-sky-400/50 w-48"
             />
             <input
               type="text"
               placeholder="搜索技术栈..."
               value={filterTech}
               onChange={(e) => setFilterTech(e.target.value)}
-              className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-48"
+              className="bg-slate-950/40 border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-sky-400/50 w-48"
             />
             <button
               onClick={() => { setFilterTitle(""); setFilterTech(""); }}
@@ -322,6 +318,7 @@ export default function AssetPage() {
             <span className="text-zinc-500 text-xs ml-auto">共 {filteredWeb.length} 个端点</span>
           </div>
           {filteredWeb.length > 0 ? (
+            <div className="max-h-[480px] overflow-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-zinc-400 border-b">
@@ -357,6 +354,7 @@ export default function AssetPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           ) : (
             <EmptyState title="暂无 Web 端点" description="当前项目还没有发现任何 Web 端点" />
           )}
@@ -365,7 +363,7 @@ export default function AssetPage() {
 
       {activeTab === "ports" && (
         <div className="space-y-4">
-          <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+          <section className="panel p-4">
             <h3 className="font-semibold mb-2 text-sm text-zinc-400">选择 IP 资产查看端口</h3>
             <div className="flex flex-wrap gap-2">
               {assets.filter((a) => a.type === "ip").map((a) => (
@@ -377,8 +375,8 @@ export default function AssetPage() {
                   }}
                   className={`px-3 py-1 rounded text-sm border ${
                     selectedAsset === a.id
-                      ? "bg-purple-100 border-purple-300 text-purple-700"
-                      : "bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl border-zinc-800 text-zinc-400 hover:bg-zinc-800/40"
+                      ? "bg-sky-500/15 border-sky-400/50 text-sky-200"
+                      : "bg-white/[0.03] border-white/[0.10] text-zinc-400 hover:bg-zinc-800/40"
                   }`}
                 >
                   {a.value}
@@ -388,7 +386,7 @@ export default function AssetPage() {
           </section>
 
           {selectedAsset && ports[selectedAsset] && (
-            <section className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl p-4 ">
+            <section className="panel p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold">端口</h3>
                 <div className="flex items-center gap-2">
@@ -397,7 +395,7 @@ export default function AssetPage() {
                     placeholder="筛选端口..."
                     value={filterPort}
                     onChange={(e) => setFilterPort(e.target.value)}
-                    className="bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-green-600/50 w-32"
+                    className="bg-slate-950/40 border border-white/[0.10] rounded-lg px-3 py-1 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-sky-400/50 w-32"
                   />
                   <button
                     onClick={() => setFilterPort("")}
