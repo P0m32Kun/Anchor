@@ -344,6 +344,10 @@ Add scan config fields:
 }
 ```
 
+Refs execution strategy (TBD in Phase 4):
+
+The `custom_nuclei_refs` array supports three execution shapes — one nuclei task per ref, one task per `source_id`, or one task for all refs. The trade-off is failure-isolation granularity vs. dispatch overhead. This decision is deferred to Phase 4 when scan integration is implemented; Phase 1–3 do not depend on it. Default lean: one nuclei task per ref, for clean per-ref attribution of findings, errors, and bundle versions.
+
 Command examples:
 
 ```bash
