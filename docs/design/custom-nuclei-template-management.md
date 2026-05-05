@@ -426,8 +426,10 @@ Editing should create draft changes. Published bundles should be immutable.
 2. Add custom Nuclei command builder for `-t` and `-w`.
 3. Create additional custom nuclei tasks after existing official nuclei stage.
 4. Require matching worker bundle version for custom tasks.
-5. Record bundle version used by custom tasks.
+5. Record bundle version used by custom tasks. Depends on the dedicated `nuclei_custom_bundle_version` column added in Phase 1 (see §7). Phase 4 must not introduce that schema change itself.
 6. Add command builder and workflow pipeline tests.
+
+Phase 4 also resolves the refs execution strategy noted in §11 (per-ref task vs. merged task). The default lean is one task per ref.
 
 ### Phase 5: Frontend
 
