@@ -187,7 +187,7 @@ Reuse `worker_nodes.template_versions` to store worker-reported custom bundle ve
 }
 ```
 
-Optional but recommended: add nullable fields to scan task metadata if the current model has a suitable JSON field. If not, store the bundle version in `arguments_redacted` or add a dedicated field in a later migration.
+Decision: this milestone adds a dedicated nullable column `nuclei_custom_bundle_version TEXT` to `scan_tasks` (or to the equivalent custom-nuclei task table introduced in Phase 4). This is a Phase 1 schema deliverable so that Phase 4 can record reproducibility metadata without a follow-up migration. The column stores the exact bundle version (e.g. `sha256:abc...`) that was synchronized to the worker when the task ran. NULL means the task did not use custom templates.
 
 ## 8. Backend API Plan
 
