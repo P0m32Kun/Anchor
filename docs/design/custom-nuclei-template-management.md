@@ -84,6 +84,8 @@ anchor-nuclei-templates/
 
 Anchor imports that repository as one custom source. Users may also upload ad-hoc templates or archives for quick testing. Uploaded files should still be represented as custom sources.
 
+Private Git repository support is out of scope for this milestone. Recommended sources are public HTTPS repositories. If a user requires a private repository, they should mirror it as a public read-only repository, or wait for the credential-storage milestone. The Git import API may accept a `branch` field but should not accept a token/secret field in this milestone.
+
 Custom workflow paths should be relative to the source root:
 
 ```yaml
