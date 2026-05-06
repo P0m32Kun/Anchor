@@ -48,8 +48,12 @@ func (e *AppError) StatusCode() int {
 		return 400
 	case ErrNotFound:
 		return 404
-	case ErrScopeDenied:
+	case ErrScopeDenied, ErrForbidden:
 		return 403
+	case ErrConflict:
+		return 409
+	case ErrValidation:
+		return 422
 	default:
 		return 500
 	}
