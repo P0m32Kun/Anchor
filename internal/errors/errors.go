@@ -14,6 +14,9 @@ const (
 	ErrWorkdir       ErrorCode = "WORKDIR_ERROR"
 	ErrNotFound      ErrorCode = "NOT_FOUND"
 	ErrBadRequest    ErrorCode = "BAD_REQUEST"
+	ErrConflict      ErrorCode = "CONFLICT"
+	ErrValidation    ErrorCode = "VALIDATION_ERROR"
+	ErrForbidden     ErrorCode = "FORBIDDEN"
 	ErrInternal      ErrorCode = "INTERNAL_ERROR"
 )
 
