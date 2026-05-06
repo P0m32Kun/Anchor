@@ -14,6 +14,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/health"
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/nuclei/custom"
 	"github.com/P0m32Kun/Anchor/internal/scope"
 	"github.com/P0m32Kun/Anchor/internal/service"
 	"github.com/P0m32Kun/Anchor/internal/worker"
