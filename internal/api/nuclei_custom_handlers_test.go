@@ -200,7 +200,7 @@ func TestNucleiCustom_FullRoundTrip(t *testing.T) {
 	}
 }
 
-func TestNucleiCustom_TraversalRejected(t *testing.T) {
+func TestNucleiCustom_DisallowedExtensionRejected(t *testing.T) {
 	env := newNucleiCustomTestEnv(t, map[string]string{
 		"templates/seed.yaml": "id: seed\n",
 	})
@@ -218,12 +218,13 @@ func TestNucleiCustom_TraversalRejected(t *testing.T) {
 	json.NewDecoder(resp.Body).Decode(&created)
 	resp.Body.Close()
 
-	// PUT with a "../" segment in the path. The mux's wildcard receives the
-	// URL-decoded path; we encode just enough to keep it routable.
-	body := bytes.NewReader([]byte("id: x\n"))
-	resp = env.do(t, http.MethodPut, "/nuclei/custom/sources/"+created.ID+"/files/templates/..%2Fescape.yaml", body, "application/octet-stream")
-	if resp.StatusCode != http.StatusUnprocessableEntity && resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("traversal write status: want 400 or 422, got %d", resp.StatusCode)
+	// Writing a .sh file is rejected by the extension policy at the Manager
+	// layer; surfaces as 422.
+	body := bytes.NewReader([]byte("#!/bin/sh\nrm -rf /\n"))
+	resp = env.do(t, http.MethodPut, "/nuclei/custom/sources/"+created.ID+"/files/templates/evil.sh", body, "application/octet-stream")
+	if resp.StatusCode != http.StatusUnprocessableEntity {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("disallowed extension status: want 422, got %d body=%s", resp.StatusCode, string(b))
 	}
 	resp.Body.Close()
 }
