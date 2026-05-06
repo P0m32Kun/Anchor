@@ -51,3 +51,4 @@ if version < 4 {
 | 7 | Create `pipeline_run_stages` table for per-stage tracking | 2026-04 |
 | 8 | Add `mode` column to `pipeline_runs` | 2026-05 |
 | 9 | Create `engine_credentials` table; migrate FOFA credentials from `projects` | 2026-05 |
+| 10 | Create `nuclei_custom_sources` and `nuclei_custom_bundles` tables; add `nuclei_custom_bundle_version` column to `scan_tasks` | 2026-05 |
