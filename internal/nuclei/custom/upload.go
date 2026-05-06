@@ -97,11 +97,14 @@ func extractZipUpload(layout Layout, sourceID string, body io.Reader) error {
 	var totalUncompressed int64
 
 	for _, f := range zr.File {
-		if f.Mode()&0o20000000 != 0 {
-			// archive/zip exposes symlinks via mode bits (fs.ModeSymlink).
+		mode := f.Mode()
+		if mode&os.ModeSymlink != 0 {
 			return fmt.Errorf("custom: zip entry %q is a symlink", f.Name)
 		}
-		if f.Mode()&(1<<27) != 0 || f.Mode().IsDir() || strings.HasSuffix(f.Name, "/") {
+		if mode&os.ModeDevice != 0 || mode&os.ModeNamedPipe != 0 || mode&os.ModeSocket != 0 {
+			return fmt.Errorf("custom: zip entry %q has disallowed file mode", f.Name)
+		}
+		if mode.IsDir() || strings.HasSuffix(f.Name, "/") {
 			continue
 		}
 
