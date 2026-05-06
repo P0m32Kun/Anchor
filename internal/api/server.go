@@ -229,4 +229,15 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /engines/credentials", auth(http.HandlerFunc(s.handleSaveEngineCredential)))
 	mux.Handle("DELETE /engines/credentials/{engine}", auth(http.HandlerFunc(s.handleDeleteEngineCredential)))
 	mux.Handle("GET /engines/search", auth(http.HandlerFunc(s.handleSearchEngine)))
+	// Nuclei custom template sources
+	mux.Handle("GET /nuclei/custom/sources", auth(http.HandlerFunc(s.handleListNucleiCustomSources)))
+	mux.Handle("POST /nuclei/custom/sources/git", auth(http.HandlerFunc(s.handleCreateNucleiCustomGitSource)))
+	mux.Handle("POST /nuclei/custom/sources/upload", auth(http.HandlerFunc(s.handleCreateNucleiCustomUploadSource)))
+	mux.Handle("POST /nuclei/custom/sources/{id}/refresh", auth(http.HandlerFunc(s.handleRefreshNucleiCustomSource)))
+	mux.Handle("PATCH /nuclei/custom/sources/{id}", auth(http.HandlerFunc(s.handlePatchNucleiCustomSource)))
+	mux.Handle("DELETE /nuclei/custom/sources/{id}", auth(http.HandlerFunc(s.handleDeleteNucleiCustomSource)))
+	mux.Handle("GET /nuclei/custom/sources/{id}/files", auth(http.HandlerFunc(s.handleListNucleiCustomFiles)))
+	mux.Handle("GET /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleReadNucleiCustomFile)))
+	mux.Handle("PUT /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleWriteNucleiCustomFile)))
+	mux.Handle("DELETE /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleDeleteNucleiCustomFile)))
 }
