@@ -1,0 +1,264 @@
+package api
+
+import (
+	"encoding/json"
+	stdErrors "errors"
+	"io"
+	"net/http"
+	"strings"
+
+	apperrors "github.com/P0m32Kun/Anchor/internal/errors"
+	"github.com/P0m32Kun/Anchor/internal/nuclei/custom"
+)
+
+// --- Nuclei Custom Sources ---
+
+type createNucleiCustomGitRequest struct {
+	Name          string `json:"name"`
+	URI           string `json:"uri"`
+	Branch        string `json:"branch,omitempty"`
+	RoutingPolicy string `json:"routing_policy"`
+}
+
+type patchNucleiCustomSourceRequest struct {
+	Name          *string `json:"name,omitempty"`
+	Enabled       *bool   `json:"enabled,omitempty"`
+	RoutingPolicy *string `json:"routing_policy,omitempty"`
+}
+
+func (s *Server) handleListNucleiCustomSources(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	list, err := s.nucleiCustomMgr.List()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, apperrors.Newf(apperrors.ErrInternal, "list sources: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (s *Server) handleCreateNucleiCustomGitSource(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+
+	var req createNucleiCustomGitRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	src, err := s.nucleiCustomMgr.CreateFromGit(r.Context(), req.Name, req.URI, req.Branch, req.RoutingPolicy)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, src)
+}
+
+func (s *Server) handleCreateNucleiCustomUploadSource(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "failed to parse multipart form").WithDetail(err.Error()))
+		return
+	}
+
+	name := r.FormValue("name")
+	routingPolicy := r.FormValue("routing_policy")
+	if routingPolicy == "" {
+		routingPolicy = "manual"
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "missing file field").WithDetail(err.Error()))
+		return
+	}
+	defer file.Close()
+
+	src, err := s.nucleiCustomMgr.CreateFromUpload(r.Context(), name, routingPolicy, header.Filename, file)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, src)
+}
+
+func (s *Server) handleRefreshNucleiCustomSource(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id is required"))
+		return
+	}
+	src, err := s.nucleiCustomMgr.Refresh(r.Context(), id)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, src)
+}
+
+func (s *Server) handlePatchNucleiCustomSource(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id is required"))
+		return
+	}
+
+	var req patchNucleiCustomSourceRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	src, err := s.nucleiCustomMgr.Patch(id, custom.SourcePatch{
+		Name:          req.Name,
+		Enabled:       req.Enabled,
+		RoutingPolicy: req.RoutingPolicy,
+	})
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, src)
+}
+
+func (s *Server) handleDeleteNucleiCustomSource(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id is required"))
+		return
+	}
+	if err := s.nucleiCustomMgr.Delete(r.Context(), id); err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleListNucleiCustomFiles(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id is required"))
+		return
+	}
+	files, err := s.nucleiCustomMgr.ListFiles(id)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, files)
+}
+
+func (s *Server) handleReadNucleiCustomFile(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id, rel, ok := splitNucleiCustomFilePath(r)
+	if !ok {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id and path are required"))
+		return
+	}
+	data, err := s.nucleiCustomMgr.ReadFile(id, rel)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+func (s *Server) handleWriteNucleiCustomFile(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id, rel, ok := splitNucleiCustomFilePath(r)
+	if !ok {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id and path are required"))
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, custom.MaxWriteFileBytes)
+	defer r.Body.Close()
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusRequestEntityTooLarge, apperrors.New(apperrors.ErrValidation, "request body too large").WithDetail(err.Error()))
+		return
+	}
+
+	if err := s.nucleiCustomMgr.WriteFile(id, rel, data); err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleDeleteNucleiCustomFile(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id, rel, ok := splitNucleiCustomFilePath(r)
+	if !ok {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id and path are required"))
+		return
+	}
+	if err := s.nucleiCustomMgr.DeleteFile(id, rel); err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// splitNucleiCustomFilePath extracts the source id and the {path...} wildcard
+// segment from the request. Returns ok=false when either is empty.
+func splitNucleiCustomFilePath(r *http.Request) (id, rel string, ok bool) {
+	id = r.PathValue("id")
+	rel = r.PathValue("path")
+	rel = strings.TrimPrefix(rel, "/")
+	if id == "" || rel == "" {
+		return "", "", false
+	}
+	return id, rel, true
+}
+
+// writeNucleiCustomError maps a Manager-layer error onto an HTTP response.
+// AppError keeps its own status code; everything else becomes 500.
+func writeNucleiCustomError(w http.ResponseWriter, err error) {
+	var appErr *apperrors.AppError
+	if stdErrors.As(err, &appErr) {
+		writeError(w, appErr.StatusCode(), appErr)
+		return
+	}
+	writeError(w, http.StatusInternalServerError, apperrors.Newf(apperrors.ErrInternal, "%v", err))
+}
