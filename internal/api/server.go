@@ -22,20 +22,21 @@ import (
 
 // Server holds API dependencies.
 type Server struct {
-	queries     *db.Queries
-	rawDB       *sql.DB
-	scopeEng    *scope.Engine
-	worker      *worker.Runner
-	health      *health.Checker
-	dataDir     string
-	sseClients  map[string]map[string]chan []byte
-	taskQueue   map[string]chan *models.ScanTask
-	taskResults map[string]chan map[string]interface{}
-	mu          sync.Mutex
-	apiToken    string
-	projectSvc  service.ProjectService
-	targetSvc   service.TargetService
-	findingSvc  service.FindingService
+	queries         *db.Queries
+	rawDB           *sql.DB
+	scopeEng        *scope.Engine
+	worker          *worker.Runner
+	health          *health.Checker
+	dataDir         string
+	sseClients      map[string]map[string]chan []byte
+	taskQueue       map[string]chan *models.ScanTask
+	taskResults     map[string]chan map[string]interface{}
+	mu              sync.Mutex
+	apiToken        string
+	projectSvc      service.ProjectService
+	targetSvc       service.TargetService
+	findingSvc      service.FindingService
+	nucleiCustomMgr *custom.Manager
 }
 
 func generateAPIToken() string {
