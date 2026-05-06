@@ -166,7 +166,7 @@ func (m *Manager) CreateFromGit(ctx context.Context, name, uri, branch, routingP
 
 // CreateFromUpload accepts a single yaml/yml file or a zip archive, extracts
 // it under the source's templates/ subtree, and marks the source ready.
-func (m *Manager) CreateFromUpload(ctx context.Context, name, routingPolicy, filename string, body interface{ Read(p []byte) (int, error) }) (*models.NucleiCustomSource, error) {
+func (m *Manager) CreateFromUpload(ctx context.Context, name, routingPolicy, filename string, body io.Reader) (*models.NucleiCustomSource, error) {
 	if err := validateName(name); err != nil {
 		return nil, err
 	}
