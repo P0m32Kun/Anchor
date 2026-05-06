@@ -71,6 +71,10 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 		targetSvc:   service.NewTargetService(queries, rawDB, scopeEng),
 		findingSvc:  service.NewFindingService(queries),
 	}
+	s.nucleiCustomMgr = custom.NewManager(queries, rawDB, dataDir, custom.ExecCloner{})
+	if err := s.nucleiCustomMgr.EnsureLayout(); err != nil {
+		log.Printf("[server] nuclei custom layout init: %v (continuing)", err)
+	}
 	s.markAllWorkersOffline()
 	go s.cleanupStaleWorkers()
 	return s
