@@ -922,7 +922,7 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Ne
 			targetFile = abs
 		}
 
-		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, []string{tag}, p.config.NucleiScanDepth, DefaultWorkflowDir))
+		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, []string{tag}, p.config.NucleiScanDepth, DefaultWorkflowDir))
 		if err != nil {
 			log.Printf("nuclei task for tag %s: %v", tag, err)
 			continue
