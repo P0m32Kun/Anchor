@@ -92,7 +92,6 @@ export default function EngineKeysPage() {
       await api.saveEngineCredential({
         engine,
         api_key: form.apiKey.trim(),
-        email: form.email.trim() || undefined,
       });
       updateForm(engine, {
         exists: true,
