@@ -658,6 +658,9 @@ func (p *Pipeline) runCIDRFlow(ctx context.Context, targets []*models.Target) er
 	ports, err := p.runNaabu(ctx, cidrs)
 	if err != nil {
 		log.Printf("naabu: %v", err)
+		p.failStage(StagePortScan, err.Error())
+	} else {
+		p.completeStage(StagePortScan)
 	}
 
 	// Service fingerprint
