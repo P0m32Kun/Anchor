@@ -181,12 +181,12 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 ├── docker-rangefield/          # 靶场环境（用于测试）
 │   ├── docker-compose.yml
 │   └── README.md
-└── wiki/                       # 项目知识库
-    ├── SCHEMA.md              # AI 指令文件（必读）
-    ├── decisions/             # 架构决策记录 (ADR)
+└── docs/                       # 项目文档
+    ├── current/               # 当前有效文档（agent-guide / architecture / plan）
+    ├── archived/              # 历史版本归档
     ├── conventions/           # 编码约定
     ├── pitfalls/              # 踩坑记录
-    └── log.md                 # 变更日志
+    └── CHANGELOG.md           # 变更日志
 ```
 
 ## 功能清单
