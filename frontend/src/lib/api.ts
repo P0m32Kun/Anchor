@@ -537,6 +537,7 @@ export interface PipelineConfig {
   enable_nuclei: boolean;
   nuclei_rate_limit: number;
   nuclei_concurrency: number;
+  nuclei_scan_depth: string; // "workflow" | "tags" | "both"
 }
 
 export interface DashboardRunItem {
