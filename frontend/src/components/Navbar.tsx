@@ -148,7 +148,7 @@ export function Navbar() {
 
   return (
     <>
-    <div className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#0d1118]/95 px-4 py-3 backdrop-blur lg:hidden">
+    <div className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#0d1e36]/95 px-4 py-3 backdrop-blur lg:hidden">
       <div className="flex items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-2 text-sm font-semibold text-slate-100">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/12 text-sky-300 ring-1 ring-sky-400/25">
