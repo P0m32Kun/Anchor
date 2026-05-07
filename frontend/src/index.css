@@ -71,8 +71,8 @@
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus {
-    -webkit-text-fill-color: #F0F6FC;
-    -webkit-box-shadow: 0 0 0px 1000px #161B22 inset;
+    -webkit-text-fill-color: #ffffff;
+    -webkit-box-shadow: 0 0 0px 1000px #0d1e36 inset;
     transition: background-color 5000s ease-in-out 0s;
   }
 }
