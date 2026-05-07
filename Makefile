@@ -178,8 +178,7 @@ dev-web:
 
 tauri-dev:
 	@echo "Starting Tauri dev mode..."
-	cd frontend && npm install
-	cd src-tauri && npx tauri dev
+	cd frontend && npm install && npx tauri dev
 
 tauri-build:
 	cd frontend && npm install
