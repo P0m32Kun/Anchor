@@ -239,6 +239,27 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
             </div>
           </div>
 
+          {/* Nuclei Scan Depth */}
+          <div className="cyber-glass p-4 rounded-lg">
+            <div className="text-sm font-medium text-text-primary mb-2">Nuclei 扫描策略</div>
+            <div className="grid grid-cols-3 gap-2">
+              {SCAN_DEPTH_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setConfig((prev) => ({ ...prev, nuclei_scan_depth: opt.value }))}
+                  className={`text-left p-2.5 rounded-lg border text-xs transition-colors ${
+                    config.nuclei_scan_depth === opt.value
+                      ? "border-brand-primary/40 bg-brand-primary/[0.06] ring-1 ring-brand-primary/20"
+                      : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <div className="font-medium text-text-primary">{opt.label}</div>
+                  <div className="text-text-tertiary mt-0.5">{opt.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Tool Speed Panels */}
           {toolFields.map((group) => (
             <div key={group.group} className="cyber-glass p-4 rounded-lg">
