@@ -93,17 +93,3 @@ Workflow 模板来自 [RBKD-SEC/templates](https://github.com/RBKD-SEC/templates
 ## Documentation Contract
 
 If architecture changes materially, update this file first or in the same change set. Proposal documents should explain the delta from this baseline instead of redefining the entire system from scratch.
-
-- `docs/design/v0.4-scan-pipeline.md` describes a newer pipeline direction, but it is still an in-review design document.
-- `docs/design/v0.4-migrations.md` is migration support material for that same proposal.
-- `docs/refactoring-plan.md` is a backlog/refactor inventory, not the current product architecture.
-
-## How To Use This File
-
-- Use this file for repo-level orientation.
-- Use the implementation and tests to answer behavior questions.
-- Use `docs/current/design/README.md` only when a task explicitly targets a proposal or review stream.
-
-## Documentation Contract
-
-If architecture changes materially, update this file first or in the same change set. Proposal documents should explain the delta from this baseline instead of redefining the entire system from scratch.
