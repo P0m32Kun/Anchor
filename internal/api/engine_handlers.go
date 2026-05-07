@@ -58,7 +58,6 @@ func (s *Server) handleSaveEngineCredential(w http.ResponseWriter, r *http.Reque
 		ID:        util.GenerateID(),
 		Engine:    req.Engine,
 		APIKey:    req.APIKey,
-		Email:     req.Email,
 		Extra:     req.Extra,
 		CreatedAt: now,
 		UpdatedAt: now,
