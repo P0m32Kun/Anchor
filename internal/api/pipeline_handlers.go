@@ -267,6 +267,9 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 	if cfg.NucleiConcurrency == 0 {
 		cfg.NucleiConcurrency = defaults.NucleiConcurrency
 	}
+	if cfg.NucleiScanDepth == "" {
+		cfg.NucleiScanDepth = defaults.NucleiScanDepth
+	}
 	if cfg.FofaResultLimit == 0 {
 		cfg.FofaResultLimit = defaults.FofaResultLimit
 	}
