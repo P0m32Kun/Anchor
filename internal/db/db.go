@@ -1106,7 +1106,7 @@ func migrateV12(db *sql.DB) error {
 			id TEXT PRIMARY KEY,
 			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 			plan_id TEXT REFERENCES scan_plans(id) ON DELETE CASCADE,
-			depends_on_task_id TEXT REFERENCES scan_tasks_new(id) ON DELETE SET NULL,
+			depends_on_task_id TEXT REFERENCES scan_tasks(id) ON DELETE SET NULL,
 			target_id TEXT REFERENCES targets(id) ON DELETE SET NULL,
 			tool TEXT NOT NULL,
 			command_template TEXT,
