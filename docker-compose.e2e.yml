@@ -144,6 +144,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- FOFA Mock (E2E only): canned company-search responses ---
+  fofa-mock:
+    image: nginx:alpine
+    container_name: anchor-fofa-mock
+    volumes:
+      - ./frontend/e2e/fixtures/fofa-mock.nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      anchor-net:
+        ipv4_address: 172.30.0.20
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8888/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
 networks:
   anchor-net:
     driver: bridge
