@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -32,11 +33,17 @@ type FofaResult struct {
 }
 
 // NewFofaClient creates a new FOFA client.
+// The base URL defaults to https://fofa.info but can be overridden via the
+// FOFA_BASE_URL environment variable (used by E2E tests to point at a mock).
 func NewFofaClient(email, apiKey string) *FofaClient {
+	baseURL := "https://fofa.info"
+	if override := os.Getenv("FOFA_BASE_URL"); override != "" {
+		baseURL = strings.TrimRight(override, "/")
+	}
 	return &FofaClient{
 		email:   email,
 		apiKey:  apiKey,
-		baseURL: "https://fofa.info",
+		baseURL: baseURL,
 		client:  defaultHTTPClient,
 	}
 }
