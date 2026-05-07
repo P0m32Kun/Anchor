@@ -312,7 +312,7 @@ func (ws *WorkerServer) handleResult(w http.ResponseWriter, r *http.Request) {
 
 func (ws *WorkerServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	tools := []map[string]string{}
-	for _, name := range []string{"subfinder", "httpx", "naabu", "nuclei"} {
+	for _, name := range []string{"subfinder", "httpx", "naabu", "nuclei", "nmap"} {
 		status := "missing"
 		if _, err := exec.LookPath(name); err == nil {
 			status = "ready"
