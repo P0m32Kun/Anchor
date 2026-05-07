@@ -101,7 +101,7 @@ func (w *WebScreeningWorkflow) Run(ctx context.Context, projectID string) (*Scre
 			continue
 		}
 
-		task, err := w.createAndRunTask(ctx, projectID, "nuclei", worker.BuildNucleiCommand(targetFile, "standard", rateLimit, tags))
+		task, err := w.createAndRunTask(ctx, projectID, "nuclei", worker.BuildNucleiCommand(targetFile, "standard", rateLimit, tags, "tags", ""))
 		if err != nil {
 			log.Printf("nuclei task for tags %s failed: %v", tagKey, err)
 			continue
