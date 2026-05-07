@@ -67,7 +67,7 @@ func (q *Queries) CountProjects() (int, error) {
 }
 
 func (q *Queries) ListProjectsPaginated(limit, offset int) ([]*models.Project, error) {
-	rows, err := q.db.Query(`SELECT id, name, organization, purpose, rate_limit, port_range, default_profile, fofa_email, fofa_api_key, pipeline_config, created_at, updated_at FROM projects ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset)
+	rows, err := q.db.Query(`SELECT id, name, organization, purpose, rate_limit, port_range, default_profile, pipeline_config, created_at, updated_at FROM projects ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (q *Queries) ListProjectsPaginated(limit, offset int) ([]*models.Project, e
 	list := make([]*models.Project, 0)
 	for rows.Next() {
 		p := &models.Project{}
-		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.FofaEmail, &p.FofaAPIKey, &p.PipelineConfig, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Organization, &p.Purpose, &p.RateLimit, &p.PortRange, &p.DefaultProfile, &p.PipelineConfig, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, p)
