@@ -227,14 +227,14 @@ func (m *Manager) ActivateBundle(version string) error {
 	now := time.Now().UTC()
 	for _, b := range bundles {
 		if b.Status == "active" {
-			if err := m.q.Setmodels.NucleiCustomBundleStatus(b.Version, "archived", &now); err != nil {
+			if err := m.q.SetNucleiCustomBundleStatus(b.Version, "archived", &now); err != nil {
 				return fmt.Errorf("deactivate bundle %s: %w", b.Version, err)
 			}
 		}
 	}
 
 	// Activate new bundle
-	if err := m.q.Setmodels.NucleiCustomBundleStatus(version, "active", &now); err != nil {
+	if err := m.q.SetNucleiCustomBundleStatus(version, "active", &now); err != nil {
 		return fmt.Errorf("activate bundle: %w", err)
 	}
 
