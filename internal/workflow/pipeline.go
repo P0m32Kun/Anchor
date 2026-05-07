@@ -533,11 +533,26 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 		p.completeStage(StageCDNFilter)
 	}
 
+	// S4.5: Alive check via nmap (filters dead IPs so naabu only scans live hosts)
+	p.setStage(StageAlive)
+	aliveIPs, aliveErr := p.runNmapAlive(ctx, nonCDNIPs)
+	if aliveErr != nil {
+		log.Printf("nmap alive: %v", aliveErr)
+		p.failStage(StageAlive, aliveErr.Error())
+		aliveIPs = nonCDNIPs
+	} else {
+		if len(aliveIPs) == 0 && len(nonCDNIPs) > 0 {
+			log.Printf("[pipeline] nmap reported 0 alive, falling back to %d input hosts", len(nonCDNIPs))
+			aliveIPs = nonCDNIPs
+		}
+		p.completeStage(StageAlive)
+	}
+
 	// S5: Port scan
 	p.setStage(StagePortScan)
 	var ports []parser.PortInfo
-	if len(nonCDNIPs) > 0 {
-		ports, err = p.runNaabu(ctx, nonCDNIPs)
+	if len(aliveIPs) > 0 {
+		ports, err = p.runNaabu(ctx, aliveIPs)
 		if err != nil {
 			log.Printf("naabu: %v", err)
 			p.failStage(StagePortScan, err.Error())
