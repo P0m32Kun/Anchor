@@ -28,10 +28,12 @@ RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && 
     nuclei -update-templates
 
 # --- Stage 2: 精简运行时基础镜像 ---
-FROM alpine:latest
+FROM debian:bookworm-slim
 
-RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
-    apk add --no-cache ca-certificates libpcap-dev git nmap nss freetype harfbuzz ttf-freefont gcompat libc6-compat
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libpcap-dev git nmap wget unzip \
+    libnss3 libfreetype6 libharfbuzz0b fonts-freefont-ttf \
+    && rm -rf /var/lib/apt/lists/*
 
 # Chrome for Testing headless-shell — 无头截图专用，比完整 chromium 轻量 60%+
 RUN wget -q -O /tmp/chrome.zip \
