@@ -536,7 +536,8 @@ export interface PipelineConfig {
   httpx_threads: number;
   enable_nuclei: boolean;
   nuclei_rate_limit: number;
-  nuclei_concurrency: number;
+  nuclei_rate_limit_per_min: number; // -rlm: requests per minute (sensitive targets)
+  nuclei_concurrency: number; // -c: parallel templates/hosts
   nuclei_scan_depth: string; // "workflow" | "tags" | "both"
 }
 
