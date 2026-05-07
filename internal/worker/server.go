@@ -107,6 +107,11 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 		return
 	}
 
+	// Inject custom nuclei templates if available
+	if tool == "nuclei" {
+		command = ws.injectCustomNucleiTemplates(command, taskID)
+	}
+
 	binary := command[0]
 	if _, err := exec.LookPath(binary); err != nil {
 		log.Printf("[worker] task %s tool not found: %s", taskID, binary)
