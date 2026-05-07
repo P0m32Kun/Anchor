@@ -176,6 +176,11 @@ dev-web:
 	cd frontend && npm install
 	./frontend/node_modules/.bin/vite --host
 
+tauri-dev:
+	@echo "Starting Tauri dev mode..."
+	cd frontend && npm install
+	cd ../src-tauri && cargo tauri dev
+
 tauri-build:
 	cd frontend && npm install
 	./frontend/node_modules/.bin/tauri build
