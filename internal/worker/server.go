@@ -370,6 +370,8 @@ func defaultToolTimeout(tool string) time.Duration {
 		return 30 * time.Minute
 	case "nuclei":
 		return 60 * time.Minute
+	case "nmap":
+		return 10 * time.Minute
 	default:
 		return 10 * time.Minute
 	}
