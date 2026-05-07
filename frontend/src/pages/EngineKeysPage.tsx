@@ -53,7 +53,6 @@ export default function EngineKeysPage() {
             next[c.engine] = {
               ...next[c.engine],
               apiKey: maskKey(c.api_key),
-              email: c.email ?? "",
               exists: true,
             };
           }
