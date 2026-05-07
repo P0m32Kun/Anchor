@@ -39,7 +39,7 @@ test("v0.4 Goal 1+2: company 目标 + FOFA 自动展开", async ({ page }) => {
 	log("Step 0: 保存 FOFA 假凭证（fofa-mock 接受任意 key）");
 	const credRes = await page.request.post(`${API_BASE}/engines/credentials`, {
 		headers,
-		data: { engine: "fofa", api_key: "test_fofa_key", email: "test@example.com" },
+		data: { engine: "fofa", api_key: "test_fofa_key" },
 	});
 	expect(credRes.status(), `保存 FOFA 凭证失败: ${await credRes.text()}`).toBe(200);
 
