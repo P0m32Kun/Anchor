@@ -1,8 +1,18 @@
+---
+status: archived
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-07
+scope: coverage-baseline
+archive_reason: Sprint 0 基线数据，已过时
+---
+
 # Go 测试覆盖率基线报告
 
 > 生成日期：2026-04-29  
 > Sprint：0.8  
-> 总语句覆盖率：**18.5%**
+> 总语句覆盖率：**18.5%**  
+> ⚠️ 此文档已归档，数据基于 Sprint 0 代码库，仅供参考
 
 ---
 
