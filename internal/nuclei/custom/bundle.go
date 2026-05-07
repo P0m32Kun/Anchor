@@ -7,12 +7,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
+
+	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
 // BundleManifest is the JSON manifest embedded in every published bundle.
