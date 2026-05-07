@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-04
+last_updated: 2026-05-07
 scope: design-index
 ---
 
@@ -10,12 +10,17 @@ scope: design-index
 
 This index separates active proposal material from baseline architecture.
 
+## Accepted Design Documents
+
+| Document | Status | Notes |
+| --- | --- | --- |
+| [`../../design/v0.4-scan-pipeline.md`](../../design/v0.4-scan-pipeline.md) | Accepted (v0.4.0) | Implemented and verified; baseline since 2026-05-07 |
+| [`../../design/v0.4-migrations.md`](../../design/v0.4-migrations.md) | Accepted (v0.4.0) | Schema changes for v0.4 |
+
 ## In-Review Design Documents
 
 | Document | Status | Source of truth? | Use it when |
 | --- | --- | --- | --- |
-| [`../../design/v0.4-scan-pipeline.md`](../../design/v0.4-scan-pipeline.md) | In review | No | The task is specifically about the v0.4 pipeline direction |
-| [`../../design/v0.4-migrations.md`](../../design/v0.4-migrations.md) | In review | No | The task is specifically about schema changes tied to the v0.4 pipeline |
 | [`../../design/custom-nuclei-template-management.md`](../../design/custom-nuclei-template-management.md) | In review | No | The task is specifically about managing custom Nuclei templates |
 | [`../../refactoring-plan.md`](../../refactoring-plan.md) | Backlog | No | The task is specifically about structural refactoring options |
 
