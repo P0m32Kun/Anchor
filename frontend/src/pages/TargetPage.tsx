@@ -413,6 +413,7 @@ export default function TargetPage() {
             <option value="url">URL</option>
             <option value="ip">IP</option>
             <option value="cidr">CIDR</option>
+            <option value="company">公司</option>
           </select>
           <input
             className="flex-1 rounded-lg border border-white/[0.10] bg-slate-950/40 px-3 py-2 text-zinc-200 placeholder-zinc-500"
