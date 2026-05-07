@@ -73,7 +73,8 @@ const BASE_TOOL_FIELDS: { group: string; fields: ToolField[] }[] = [
     group: "Nuclei",
     fields: [
       { key: "nuclei_rate_limit", label: "速率限制", unit: "rps", min: 50, max: 1000, recommended: 100 },
-      { key: "nuclei_concurrency", label: "并发数", unit: "", min: 10, max: 100, recommended: 25 },
+      { key: "nuclei_rate_limit_per_min", label: "分钟限速", unit: "rpm", min: 0, max: 600, recommended: 0 },
+      { key: "nuclei_concurrency", label: "并发数", unit: "", min: 1, max: 100, recommended: 25 },
     ],
   },
 ];
