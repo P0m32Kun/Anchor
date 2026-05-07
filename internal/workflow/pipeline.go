@@ -44,6 +44,10 @@ const (
 // StageEventCallback is invoked when a pipeline stage changes state.
 type StageEventCallback func(runID string, stage StageID, status string, errMsg string)
 
+// DefaultWorkflowDir is the path where RBKD-SEC/templates workflows are installed
+// in the worker Docker image. Used when NucleiScanDepth is "workflow" or "both".
+const DefaultWorkflowDir = "/opt/rbkd-templates/workflows"
+
 // Pipeline orchestrates the complete scan workflow.
 type Pipeline struct {
 	queries        *db.Queries
