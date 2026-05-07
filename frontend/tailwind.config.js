@@ -102,9 +102,9 @@ export default {
           "0 0 0 1px rgba(255,255,255,0.12), 0 4px 8px rgba(0,0,0,0.35), 0 16px 32px rgba(0,0,0,0.45), 0 32px 72px rgba(0,0,0,0.55)",
         "island-glow":
           "inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 20px rgba(255,255,255,0.02)",
-        "glow-blue": "0 0 20px rgba(47,129,247,0.3), 0 0 40px rgba(47,129,247,0.1)",
-        "glow-green": "0 0 20px rgba(63,185,80,0.3), 0 0 40px rgba(63,185,80,0.1)",
-        "glow-red": "0 0 20px rgba(248,81,73,0.3), 0 0 40px rgba(248,81,73,0.1)",
+        "glow-blue": "0 0 20px rgba(0,212,255,0.3), 0 0 40px rgba(0,212,255,0.1)",
+        "glow-green": "0 0 20px rgba(0,230,118,0.3), 0 0 40px rgba(0,230,118,0.1)",
+        "glow-red": "0 0 20px rgba(255,71,87,0.3), 0 0 40px rgba(255,71,87,0.1)",
         "glow-purple": "0 0 20px rgba(163,113,247,0.3), 0 0 40px rgba(163,113,247,0.1)",
       },
       backdropBlur: {
