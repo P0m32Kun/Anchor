@@ -125,11 +125,7 @@ func (s *Server) handleSearchEngine(w http.ResponseWriter, r *http.Request) {
 	var results []search.SearchResult
 	switch engine {
 	case "fofa":
-		var email string
-		if cred.Email != nil {
-			email = *cred.Email
-		}
-		client := search.NewFofaClient(email, cred.APIKey)
+		client := search.NewFofaClient(cred.APIKey)
 		fofaResults, err := client.SearchDomain(r.Context(), query)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "fofa search: %v", err))
