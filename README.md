@@ -264,6 +264,14 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 - [x] Go 单元测试覆盖（tagmapper、httpx parser、parser 包、naabu args）
 - [x] E2E 测试：ScanConfigPage + high-risk pipeline 端到端验证
 
+### v0.4 in-progress: Nuclei 分层扫描 ✅（已实现，待发布）
+
+- [x] **Nuclei 分层扫描策略**：`tags`（广度，按指纹）/ `workflow`（精确，RBKD-SEC workflows）/ `both`（综合）
+- [x] **RBKD-SEC/templates 集成**：Worker 镜像构建阶段克隆到 `/opt/rbkd-templates`
+- [x] **Nuclei 速率防爆破**：新增 `-rlm`（每分钟限速）和 `-c`（并发）参数，前端可在 ScanModal 配置
+- [x] **ScanModal Nuclei 策略选择面板**：精确/广度/综合三选一卡片
+- [x] **Playwright E2E 测试**：覆盖 UI 交互、请求体、Worker 命令链路（`frontend/e2e/scan-modal*.spec.ts`）
+
 ## 外部工具依赖
 
 | 工具                                                       | 用途                 | 最低版本 |
