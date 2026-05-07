@@ -83,9 +83,11 @@ func (s *BundleSyncer) Sync() (string, error) {
 	}
 
 	cur := s.CurrentVersion()
+	hasContent := s.hasBundleContent(manifest.Version)
+	log.Printf("[worker] sync check: cur=%s manifest=%s hasContent=%v", cur, manifest.Version, hasContent)
 	// Check if we need to sync: version differs OR directory is empty
 	// (shared-volume scenario where server creates empty dir + symlink)
-	needsSync := cur != manifest.Version || !s.hasBundleContent(manifest.Version)
+	needsSync := cur != manifest.Version || !hasContent
 
 	if !needsSync {
 		return cur, nil
