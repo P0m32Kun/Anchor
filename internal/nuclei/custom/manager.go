@@ -587,3 +587,42 @@ func isYAMLFile(p string) bool {
 	lower := strings.ToLower(p)
 	return strings.HasSuffix(lower, ".yaml") || strings.HasSuffix(lower, ".yml")
 }
+
+// isNucleiTemplatePath returns true if the path is in a directory that should
+// contain nuclei templates (templates/, workflows/, fingerprints/, http/,
+// network/, javascript/). Excludes metadata/, payloads/, scripts/, tests/, docs/.
+func isNucleiTemplatePath(p string) bool {
+	// Normalize path separators
+	p = strings.ReplaceAll(p, "\\", "/")
+
+	// Exclude non-template directories
+	excludePrefixes := []string{
+		"metadata/",
+		"payloads/",
+		"scripts/",
+		"tests/",
+		"docs/",
+	}
+	for _, prefix := range excludePrefixes {
+		if strings.HasPrefix(p, prefix) {
+			return false
+		}
+	}
+
+	// Include nuclei template directories
+	includePrefixes := []string{
+		"templates/",
+		"workflows/",
+		"fingerprints/",
+		"http/",
+		"network/",
+		"javascript/",
+	}
+	for _, prefix := range includePrefixes {
+		if strings.HasPrefix(p, prefix) {
+			return true
+		}
+	}
+
+	return false
+}
