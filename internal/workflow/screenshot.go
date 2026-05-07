@@ -245,7 +245,7 @@ func (w *WebScreeningWorkflow) runNetworkServiceScan(ctx context.Context, projec
 			continue
 		}
 
-		task, err := w.createAndRunTask(ctx, projectID, "nuclei", worker.BuildNucleiCommand(targetFile, "standard", rateLimit, []string{tag}, "tags", ""))
+		task, err := w.createAndRunTask(ctx, projectID, "nuclei", worker.BuildNucleiCommand(targetFile, "standard", rateLimit, 0, 0, []string{tag}, "tags", ""))
 		if err != nil {
 			log.Printf("nuclei network task for tag %s failed: %v", tag, err)
 			continue
