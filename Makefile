@@ -13,7 +13,8 @@ GO_FILES := $(shell find . -name '*.go' -not -path './frontend/*')
 # ============================================================
 
 build-worker-base:
-	docker build -f Dockerfile.worker-base -t anchor-worker-base:latest .
+	# 强制 linux/amd64 — 部署目标为 x64 服务器，本地 ARM Mac 通过 QEMU 自动模拟
+	docker build --platform linux/amd64 -f Dockerfile.worker-base -t anchor-worker-base:latest .
 
 push-worker-base:
 	docker tag anchor-worker-base:latest p0m32kun/anchor-worker-base:latest
