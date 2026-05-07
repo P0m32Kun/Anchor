@@ -1,10 +1,12 @@
 # Frontend
 frontend/
-
-# Build artifacts
 frontend/node_modules/
 frontend/dist/
-src-tauri/target/
+
+# Tauri (desktop app, not used by server/worker)
+src-tauri/
+
+# Build artifacts
 bin/
 
 # Git
@@ -19,8 +21,23 @@ docs/
 scripts/
 docker-rangefield/
 
+# Code intelligence index (local dev only, ~47MB)
+.gitnexus/
+
+# Claude Code config and skills
+.claude/
+
+# Local task management
+tasks/
+
+# Build/orchestration files (not needed inside the image)
+Dockerfile.*
+docker-compose*.yml
+Makefile
+
 # Test and dev artifacts
 e2e-test-result.md
 progress.md
 plan.md
 tmp-e2e-data/
+tmp-tag-test/
