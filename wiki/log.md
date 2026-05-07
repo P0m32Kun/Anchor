@@ -4,6 +4,52 @@
 
 ---
 
+## 2026-05-07
+
+### Nuclei 分层扫描策略 + 速率防爆破
+
+- **Nuclei 分层扫描**：新增 `PipelineConfig.NucleiScanDepth` 字段（`workflow`/`tags`/`both`）
+  - `tags`（默认）：按 httpx 指纹精确匹配 Nuclei 模板（原行为）
+  - `workflow`：使用 RBKD-SEC/templates workflow 串联指纹检测和漏洞利用
+  - `both`：workflow + tags 双重检测，覆盖最全
+- **RBKD-SEC/templates 集成**：`Dockerfile.worker-base` 在镜像构建阶段克隆到 `/opt/rbkd-templates`
+- **Nuclei 速率防爆破**：
+  - 新增 `nuclei_rate_limit_per_min`（`-rlm`）：每分钟请求数限制，扫描内网敏感目标时使用
+  - 新增 `nuclei_concurrency`（`-c`）：并行模板/主机数（之前字段存在但未传入命令）
+- **ScanModal UI**：Step 2 新增「Nuclei 扫描策略」三选一卡片 + 「分钟限速」「并发数」输入框
+- **E2E 测试**：新增 `frontend/e2e/scan-modal.spec.ts` 和 `scan-modal-real.spec.ts`，覆盖 UI 交互、请求体、Worker 命令完整链路
+
+**后端变更：**
+- `internal/models/models.go` — `PipelineConfig` 新增 `NucleiScanDepth`、`NucleiRateLimitPerMinute`，`DefaultPipelineConfig` 默认 scan depth = "tags"
+- `internal/worker/commands.go` — `BuildNucleiCommand` 函数签名重构：`(targetFile, profile string, rateLimit, rateLimitPerMin, concurrency int, tags []string, scanDepth string, workflowDir string)`，按 scanDepth 分支决定 `-w` / `-tags` / 二者并用
+- `internal/workflow/pipeline.go` — 新增 `DefaultWorkflowDir = "/opt/rbkd-templates/workflows"` 常量，`runNucleiWeb` / `runNucleiNonWeb` 从 config 读取参数
+- `internal/workflow/screenshot.go` — `BuildNucleiCommand` 调用更新（向后兼容，默认 "tags"）
+- `internal/api/pipeline_handlers.go` — `buildConfigForMode` 处理 `NucleiScanDepth` 默认值
+
+**前端变更：**
+- `frontend/src/lib/api.ts` — `PipelineConfig` 接口新增 `nuclei_scan_depth` 和 `nuclei_rate_limit_per_min`，默认值同步
+- `frontend/src/components/ScanModal.tsx` — 新增 `SCAN_DEPTH_OPTIONS` + 「Nuclei 扫描策略」面板；BASE_TOOL_FIELDS Nuclei 区域新增「分钟限速」字段，「并发数」最小值改为 1
+
+**Docker 变更：**
+- `Dockerfile.worker-base` — apk 添加 `git`，新增 `RUN git clone --depth 1 https://github.com/RBKD-SEC/templates.git /opt/rbkd-templates`
+
+**E2E 测试基础设施：**
+- `frontend/e2e/scan-modal.spec.ts` — 3 个 TC：UI 显示验证、参数修改验证、请求体验证
+- `frontend/e2e/scan-modal-real.spec.ts` — 真实目标项目，验证 Worker 实际接收到 `-w /opt/rbkd-templates/workflows -c 3 -rlm 30 -rl 100`
+- `frontend/playwright.e2e-minimal.config.ts` — 不依赖 global-setup 的最小配置（用于已运行的 Docker 环境）
+
+**验证结果：**
+Worker 实际执行的 Nuclei 命令（来自 anchor-worker 容器日志）：
+```
+nuclei -jsonl -l <targets-file>
+       -severity critical,high,medium,low,info -timeout 10
+       -w /opt/rbkd-templates/workflows
+       -c 3 -rlm 30 -rl 100
+       -t /data/nuclei/custom/bundles/current/templates
+```
+
+---
+
 ## 2026-05-05
 
 ### 搜索引擎集成 + 扫描流程重构完成
