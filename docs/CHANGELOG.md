@@ -85,7 +85,7 @@ FOFA V1 API 不再需要 email,清掉:
   - `docs/current/plan.md` v0.4 升为 baseline
   - `docs/current/architecture.md` 增补 Company 目标流和 FOFA 自动展开说明
   - `README.md` 版本表新增 `v0.4.0`，功能清单合并 v0.4 章节
-  - `wiki/SCHEMA.md` 里程碑 v0.4 改为 ✅ 已完成 + `v0.4.0` tag
+  - `README.md` 里程碑 v0.4 改为 ✅ 已完成 + `v0.4.0` tag
 
 ---
 
