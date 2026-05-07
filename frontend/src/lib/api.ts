@@ -595,6 +595,7 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   enable_nuclei: true,
   nuclei_rate_limit: 100,
   nuclei_concurrency: 25,
+  nuclei_scan_depth: "tags",
 };
 
 export interface PortRangePreset {
