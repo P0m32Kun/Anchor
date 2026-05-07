@@ -109,7 +109,7 @@ export default function EngineKeysPage() {
   async function handleDelete(engine: string) {
     const form = forms[engine];
     if (!form.exists) {
-      updateForm(engine, { apiKey: "", email: "" });
+      updateForm(engine, { apiKey: "" });
       return;
     }
     if (!window.confirm(`确认删除 ${ENGINE_DEFS.find((d) => d.key === engine)?.label} 的 API Key？`)) {
@@ -120,7 +120,6 @@ export default function EngineKeysPage() {
       await api.deleteEngineCredential(engine);
       updateForm(engine, {
         apiKey: "",
-        email: "",
         exists: false,
         showKey: false,
       });
