@@ -457,3 +457,129 @@ func nullableStr(s string) *string {
 	}
 	return &s
 }
+
+// --- Phase 2: Validation & Publishing ---
+
+// ValidateSource validates all templates in a single source. Returns validation
+// results including any workflow reference errors.
+func (m *Manager) ValidateSource(id string) (*models.NucleiCustomValidationResult, error) {
+	if _, err := m.GetByID(id); err != nil {
+		return nil, err
+	}
+
+	mu := m.lockFor(id)
+	mu.Lock()
+	defer mu.Unlock()
+
+	result := &models.NucleiCustomValidationResult{
+		SourceID: id,
+		OK:       true,
+	}
+
+	// Collect all available templates for workflow reference validation
+	files, err := m.layout.WalkFiles(id)
+	if err != nil {
+		return nil, fmt.Errorf("walk source files: %w", err)
+	}
+
+	availableTemplates := make(map[string]bool)
+	for _, f := range files {
+		availableTemplates[f.Path] = true
+	}
+
+	// Validate each YAML file
+	for _, f := range files {
+		if !isYAMLFile(f.Path) {
+			continue
+		}
+		data, err := m.layout.ReadFile(id, f.Path)
+		if err != nil {
+			result.OK = false
+			result.Errors = append(result.Errors, fmt.Sprintf("read %s: %v", f.Path, err))
+			continue
+		}
+		vr := ValidateYAML(data, availableTemplates)
+		if !vr.OK {
+			result.OK = false
+			for _, e := range vr.Errors {
+				result.Errors = append(result.Errors, fmt.Sprintf("%s: %s", f.Path, e))
+			}
+		}
+	}
+
+	// Update validation timestamp
+	now := time.Now().UTC()
+	src, _ := m.GetByID(id)
+	src.LastValidateAt = &now
+	if !result.OK {
+		errMsg := strings.Join(result.Errors, "; ")
+		src.LastError = &errMsg
+		src.Status = models.NucleiCustomSourceStatusError
+	} else {
+		src.LastError = nil
+		if src.Status == models.NucleiCustomSourceStatusError {
+			src.Status = models.NucleiCustomSourceStatusReady
+		}
+	}
+	src.UpdatedAt = now
+	_ = m.q.UpdateNucleiCustomSource(src)
+
+	return result, nil
+}
+
+// ValidateAll validates all enabled sources and returns per-source results.
+func (m *Manager) ValidateAll() ([]*models.NucleiCustomValidationResult, error) {
+	sources, err := m.q.ListNucleiCustomSources()
+	if err != nil {
+		return nil, fmt.Errorf("list sources: %w", err)
+	}
+
+	results := make([]*models.NucleiCustomValidationResult, 0, len(sources))
+	for _, src := range sources {
+		if !src.Enabled {
+			continue
+		}
+		r, err := m.ValidateSource(src.ID)
+		if err != nil {
+			r = &models.NucleiCustomValidationResult{
+				SourceID: src.ID,
+				OK:       false,
+				Errors:   []string{fmt.Sprintf("validation error: %v", err)},
+			}
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}
+
+// Publish builds a bundle from all enabled sources and activates it.
+func (m *Manager) Publish() (version string, err error) {
+	// First validate all sources
+	results, err := m.ValidateAll()
+	if err != nil {
+		return "", fmt.Errorf("validate: %w", err)
+	}
+	for _, r := range results {
+		if !r.OK {
+			return "", fmt.Errorf("validation failed for source %s: %s", r.SourceID, strings.Join(r.Errors, "; "))
+		}
+	}
+
+	// Build bundle
+	version, _, err = m.BuildBundle()
+	if err != nil {
+		return "", fmt.Errorf("build bundle: %w", err)
+	}
+
+	// Activate bundle
+	if err := m.ActivateBundle(version); err != nil {
+		return "", fmt.Errorf("activate bundle: %w", err)
+	}
+
+	return version, nil
+}
+
+func isYAMLFile(p string) bool {
+	lower := strings.ToLower(p)
+	return strings.HasSuffix(lower, ".yaml") || strings.HasSuffix(lower, ".yml")
+}
