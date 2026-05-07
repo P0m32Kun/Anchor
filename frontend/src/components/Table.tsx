@@ -73,7 +73,7 @@ export function Table<T extends Record<string, unknown>>({
                 className={`
                   border-b border-white/[0.04] relative
                   transition-colors duration-150
-                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_#38bdf8]" : "hover:bg-white/[0.04]"}
+                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_#00d4ff]" : "hover:bg-white/[0.04]"}
                 `}
               >
                 {columns.map((col) => (
