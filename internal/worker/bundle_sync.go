@@ -223,13 +223,14 @@ func extractTarGz(r io.Reader, destDir string) error {
 	defer gz.Close()
 
 	tr := tar.NewReader(gz)
+	count := 0
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("tar next: %w", err)
+			return fmt.Errorf("tar next (after %d entries): %w", count, err)
 		}
 
 		// Sanitize path
@@ -258,10 +259,12 @@ func extractTarGz(r io.Reader, destDir string) error {
 				return fmt.Errorf("write %s: %w", name, err)
 			}
 			f.Close()
+			count++
 		default:
 			// Skip non-regular files (symlinks etc.)
 			continue
 		}
 	}
+	log.Printf("[worker] extractTarGz: extracted %d files to %s", count, destDir)
 	return nil
 }
