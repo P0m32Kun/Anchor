@@ -39,14 +39,14 @@ export default {
           purple: "rgba(180, 130, 255, 0.06)",
           glow: "rgba(255, 255, 255, 0.02)",
         },
-        // Vibrant primary colors (Electric variants)
+        // Vibrant primary colors (Airport Dashboard)
         brand: {
-          primary: "#38bdf8",   // CyberOS 主色-蓝 (sky-400)
-          secondary: "#7D8590",
-          success: "#4ade80",   // CyberOS 成功-绿 (green-400)
-          warning: "#facc15",   // CyberOS 警告-黄 (yellow-400)
-          danger: "#f87171",    // CyberOS 警告-红 (red-400)
-          purple: "#A371F7",    // Electric purple
+          primary: "#00d4ff",   // 主色-青色
+          secondary: "#8b9dc3",
+          success: "#00e676",   // 成功-亮绿
+          warning: "#f5a623",   // 警告-金黄
+          danger: "#ff4757",    // 危险-红
+          purple: "#A371F7",
         },
         // Text colors (CyberOS)
         "text-primary": "#F0F6FC",
