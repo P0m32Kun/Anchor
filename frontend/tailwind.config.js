@@ -26,12 +26,12 @@ export default {
         ],
       },
       colors: {
-        // Dark theme surface hierarchy (VisionOS)
+        // Dark theme surface hierarchy (Airport Dashboard)
         surface: {
-          DEFAULT: "#0A0C10",
-          elevated: "#13161C",
-          "elevated-2": "#1C1F26",
-          "elevated-3": "#262A33",
+          DEFAULT: "#0a1628",
+          elevated: "#111d32",
+          "elevated-2": "#1a2a42",
+          "elevated-3": "#223555",
         },
         // Ambient light colors
         ambient: {
