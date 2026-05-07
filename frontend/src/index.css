@@ -182,11 +182,11 @@
 
   /* ===== Glow effects ===== */
   .glow-blue {
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.6), 0 0 40px rgba(56, 189, 248, 0.3);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.6), 0 0 40px rgba(0, 212, 255, 0.3);
   }
 
   .glow-red {
-    box-shadow: 0 0 20px rgba(248, 113, 113, 0.6), 0 0 40px rgba(248, 113, 113, 0.3);
+    box-shadow: 0 0 20px rgba(255, 71, 87, 0.6), 0 0 40px rgba(255, 71, 87, 0.3);
   }
 
   /* ===== CyberOS Glass ===== */
