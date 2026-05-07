@@ -47,10 +47,8 @@
 
 | 位置 | 说明 |
 | --- | --- |
-| [`../wiki/conventions/`](../wiki/conventions/) | 编码规范 |
-| [`../wiki/pitfalls/`](../wiki/pitfalls/) | 踩坑记录 |
-| [`../wiki/SCHEMA.md`](../wiki/SCHEMA.md) | 数据库 Schema |
-| [`../wiki/log.md`](../wiki/log.md) | 开发日志 |
+| [`conventions/`](conventions/) | 编码规范 |
+| [`pitfalls/`](pitfalls/) | 踩坑记录 |
 
 ## 维护规则
 
