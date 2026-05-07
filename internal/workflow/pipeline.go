@@ -270,8 +270,8 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 	// Initialize FOFA if enabled and not already set
 	if p.config.EnableFOFA && p.fofa == nil {
 		cred, err := p.queries.GetEngineCredential("fofa")
-		if err == nil && cred != nil && cred.Email != nil && *cred.Email != "" && cred.APIKey != "" {
-			p.fofa = search.NewFofaClient(*cred.Email, cred.APIKey)
+		if err == nil && cred != nil && cred.APIKey != "" {
+			p.fofa = search.NewFofaClient(cred.APIKey)
 		}
 	}
 
