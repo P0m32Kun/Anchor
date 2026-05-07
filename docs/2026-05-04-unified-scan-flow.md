@@ -1,3 +1,12 @@
+---
+status: superseded
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-04
+scope: scan-flow
+superseded_by: docs/current/architecture.md
+---
+
 # Unified Scan Flow
 
 > **Status: Superseded — Partially Implemented with Design Changes**
