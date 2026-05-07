@@ -41,6 +41,20 @@ The stable product narrative remains:
 
 FOFA 凭证不再绑定到项目，而是从全局 `engine_credentials` 表读取。Hunter 和 Quake 通过独立的 `/engines/search` API 调用，结果统一为 `SearchResult` 格式。
 
+### 多目标类型与 Company 目标自动展开
+
+`PipelineConfig.runFlow` 按 `Target.Type` 分流到不同入口：
+
+| 目标类型 | 入口 |
+| --- | --- |
+| `domain` | Subfinder → DNSx → CDN → Naabu → Nerva → httpx/Nuclei |
+| `ip` | CDNCheck → Naabu → Nerva → httpx/Nuclei |
+| `cidr` | Naabu → Nerva → httpx/Nuclei |
+| `url` | httpx → Nuclei（仅 Web） |
+| `company` | FOFA `org/cert/title` 三维搜索 → 展开为新 Target（domain/ip）→ 路由到对应 flow |
+
+Company 目标在 `runCompanyFlow` 中调用 FOFA：每个查询返回的资产被去重后作为 `source="fofa"` 的新 Target 写入 DB，再分别进入 domain/ip flow。`FOFA_BASE_URL` 环境变量可覆盖默认 `https://fofa.info` 用于 E2E mock。
+
 ### Nuclei 分层扫描策略
 
 `PipelineConfig.NucleiScanDepth` 控制 Nuclei 扫描方式，用户在 ScanModal Step 2 通过「Nuclei 扫描策略」面板选择：
