@@ -803,6 +803,8 @@ func (p *Pipeline) runNaabu(ctx context.Context, hosts []string) ([]parser.PortI
 	}
 	return ports, nil
 }
+
+func (p *Pipeline) runNerva(ctx context.Context, ports []parser.PortInfo) ([]fingerprint.NervaResult, error) {
 	if len(ports) == 0 {
 		return nil, nil
 	}
