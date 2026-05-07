@@ -114,21 +114,22 @@ const (
 )
 
 type ScanTask struct {
-	ID                string     `json:"id" db:"id"`
-	ProjectID         string     `json:"project_id" db:"project_id"`
-	PlanID            string     `json:"plan_id" db:"plan_id"`
-	RunID             *string    `json:"run_id" db:"run_id"`
-	DependsOnTaskID   *string    `json:"depends_on_task_id" db:"depends_on_task_id"`
-	TargetID          *string    `json:"target_id" db:"target_id"`
-	Tool              string     `json:"tool" db:"tool"`
-	CommandTemplate   string     `json:"command_template" db:"command_template"`
-	ArgumentsRedacted string     `json:"arguments_redacted" db:"arguments_redacted"`
-	Status            TaskStatus `json:"status" db:"status"`
-	StartedAt         *time.Time `json:"started_at" db:"started_at"`
-	FinishedAt        *time.Time `json:"finished_at" db:"finished_at"`
-	ExitCode          *int       `json:"exit_code" db:"exit_code"`
-	WorkerID          *string    `json:"worker_id" db:"worker_id"`
-	CreatedAt         time.Time  `json:"created_at" db:"created_at"`
+	ID                        string     `json:"id" db:"id"`
+	ProjectID                 string     `json:"project_id" db:"project_id"`
+	PlanID                    string     `json:"plan_id" db:"plan_id"`
+	RunID                     *string    `json:"run_id" db:"run_id"`
+	DependsOnTaskID           *string    `json:"depends_on_task_id" db:"depends_on_task_id"`
+	TargetID                  *string    `json:"target_id" db:"target_id"`
+	Tool                      string     `json:"tool" db:"tool"`
+	CommandTemplate           string     `json:"command_template" db:"command_template"`
+	ArgumentsRedacted         string     `json:"arguments_redacted" db:"arguments_redacted"`
+	Status                    TaskStatus `json:"status" db:"status"`
+	StartedAt                 *time.Time `json:"started_at" db:"started_at"`
+	FinishedAt                *time.Time `json:"finished_at" db:"finished_at"`
+	ExitCode                  *int       `json:"exit_code" db:"exit_code"`
+	WorkerID                  *string    `json:"worker_id" db:"worker_id"`
+	NucleiCustomBundleVersion *string    `json:"nuclei_custom_bundle_version,omitempty" db:"nuclei_custom_bundle_version"`
+	CreatedAt                 time.Time  `json:"created_at" db:"created_at"`
 }
 
 // --- ToolInvocation ---
