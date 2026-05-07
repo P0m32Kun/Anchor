@@ -41,3 +41,6 @@ COPY --from=tools-builder /go/bin/cdncheck /usr/local/bin/
 COPY --from=tools-builder /go/bin/nerva    /usr/local/bin/
 COPY --from=tools-builder /go/bin/dnsx     /usr/local/bin/
 COPY --from=tools-builder /root/nuclei-templates /root/nuclei-templates
+
+# RBKD-SEC/templates — workflow-driven precision scanning
+RUN git clone --depth 1 https://github.com/RBKD-SEC/templates.git /opt/rbkd-templates
