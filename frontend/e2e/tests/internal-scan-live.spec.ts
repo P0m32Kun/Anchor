@@ -90,14 +90,14 @@ test("内网扫描端到端流程：发现靶场 4 项预期漏洞", async ({ pa
 
 	// 限定到"添加目标"表单（避免与 Scope 规则表单的"添加"按钮冲突）
 	const addTargetForm = page.locator("form").filter({
-		has: page.getByPlaceholder("example.com 或 192.168.1.1 或 10.0.0.0/24 或 192.168.0.1-10"),
+		has: page.getByPlaceholder("example.com / 192.168.1.1 / 10.0.0.0/24 / 192.168.0.1-10 / 阿里巴巴"),
 	});
 
 	for (const ip of RANGEFIELD_IPS) {
 		log(`  添加目标: ${ip}`);
 		await addTargetForm.locator("select").selectOption("ip");
 		await addTargetForm
-			.getByPlaceholder("example.com 或 192.168.1.1 或 10.0.0.0/24 或 192.168.0.1-10")
+			.getByPlaceholder("example.com / 192.168.1.1 / 10.0.0.0/24 / 192.168.0.1-10 / 阿里巴巴")
 			.fill(ip);
 		await addTargetForm.getByRole("button", { name: /^添加($|中)/ }).click();
 
