@@ -417,7 +417,7 @@ export default function TargetPage() {
           </select>
           <input
             className="flex-1 rounded-lg border border-white/[0.10] bg-slate-950/40 px-3 py-2 text-zinc-200 placeholder-zinc-500"
-            placeholder="example.com 或 192.168.1.1 或 10.0.0.0/24 或 192.168.0.1-10"
+            placeholder="example.com / 192.168.1.1 / 10.0.0.0/24 / 192.168.0.1-10 / 阿里巴巴"
             value={targetValue}
             onChange={(e) => setTargetValue(e.target.value)}
           />
