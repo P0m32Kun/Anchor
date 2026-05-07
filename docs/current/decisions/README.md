@@ -13,7 +13,7 @@ There is no curated current ADR set yet.
 ## Temporary Rule
 
 - Treat [`../architecture.md`](../architecture.md) as the binding repository-level decision summary.
-- Treat files under `docs/archived/` and `wiki/decisions/` as historical context unless a task explicitly says to revive or migrate one of them.
+- Treat files under `docs/archived/` and `docs/archived/*/decisions/` as historical context unless a task explicitly says to revive or migrate one of them.
 
 ## When To Add A Current ADR
 
