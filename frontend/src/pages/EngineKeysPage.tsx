@@ -13,7 +13,7 @@ interface EngineForm {
 }
 
 const ENGINE_DEFS = [
-  { key: "fofa", label: "FOFA", needsEmail: true },
+  { key: "fofa", label: "FOFA", needsEmail: false },
   { key: "hunter", label: "Hunter", needsEmail: false },
   { key: "quake", label: "Quake", needsEmail: false },
 ];
