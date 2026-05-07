@@ -23,10 +23,10 @@
 | [`current/architecture.md`](current/architecture.md) | 当前唯一架构基线 | Yes |
 | [`current/design/README.md`](current/design/README.md) | 当前候选设计索引 | Yes |
 | [`current/decisions/README.md`](current/decisions/README.md) | 当前决策索引 | Yes |
-| [`acceptance-criteria.md`](acceptance-criteria.md) | 验收标准参考 | Supporting |
 | [`api-error-contract.md`](api-error-contract.md) | API 错误约定 | Supporting |
-| [`coverage-baseline.md`](coverage-baseline.md) | 测试覆盖率基线 | Supporting |
-| [`engineering-health.md`](engineering-health.md) | 工程健康基线 | Supporting |
+| [`tauri-testability.md`](tauri-testability.md) | Tauri 可测试性规范 | Supporting |
+| [`schema-migrations.md`](schema-migrations.md) | Schema 迁移策略与版本历史 | Supporting |
+| [`CHANGELOG.md`](CHANGELOG.md) | 项目变更日志 | Supporting |
 
 ## 候选方案与评审材料
 
@@ -36,8 +36,6 @@
 | --- | --- | --- |
 | [`design/`](design/) | In review | 新设计提案区 |
 | [`refactoring-plan.md`](refactoring-plan.md) | Backlog | 重构想法和拆分路线 |
-| [`active/plan/`](active/plan/) | Review material | 历史实施稿和评审汇总 |
-| [`active/review/`](active/review/) | Review material | 多模型评审记录 |
 
 ## 归档
 
