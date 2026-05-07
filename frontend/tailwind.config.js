@@ -48,11 +48,11 @@ export default {
           danger: "#ff4757",    // 危险-红
           purple: "#A371F7",
         },
-        // Text colors (CyberOS)
-        "text-primary": "#F0F6FC",
-        "text-secondary": "#e2e8f0",
-        "text-tertiary": "#94a3b8",
-        "text-quaternary": "#64748b",
+        // Text colors (Airport Dashboard)
+        "text-primary": "#ffffff",
+        "text-secondary": "#c9d8ef",
+        "text-tertiary": "#8b9dc3",
+        "text-quaternary": "#5a6e8a",
         // Apple accent colors (preserved but vibrant)
         accent: {
           blue: "#0A84FF",
