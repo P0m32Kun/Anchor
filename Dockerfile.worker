@@ -9,15 +9,16 @@
 #   docker run -e ANCHOR_CORE_URL=http://server:17421 anchor-worker
 
 # --- 编译阶段：只编译业务代码，不需要重新安装工具 ---
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26-bookworm AS builder
 
-RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
-RUN apk add --no-cache git gcc musl-dev sqlite-dev
+RUN apt-get update && apt-get install -y --no-install-recommends git gcc libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 COPY go.mod go.sum ./
 
 ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=off
 RUN go mod download
 
 COPY . .
