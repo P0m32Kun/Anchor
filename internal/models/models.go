@@ -773,10 +773,11 @@ type PipelineConfig struct {
 	EnableHttpx         bool   `json:"enable_httpx"`
 	HttpxRateLimit      int    `json:"httpx_rate_limit"`
 	HttpxThreads        int    `json:"httpx_threads"`
-	EnableNuclei        bool   `json:"enable_nuclei"`
-	NucleiRateLimit     int    `json:"nuclei_rate_limit"`
-	NucleiConcurrency   int    `json:"nuclei_concurrency"`
-	NucleiScanDepth     string `json:"nuclei_scan_depth"` // "workflow" | "tags" | "both"
+	EnableNuclei            bool   `json:"enable_nuclei"`
+	NucleiRateLimit         int    `json:"nuclei_rate_limit"`          // -rl: requests per second
+	NucleiRateLimitPerMinute int   `json:"nuclei_rate_limit_per_min"` // -rlm: requests per minute (for sensitive targets)
+	NucleiConcurrency       int    `json:"nuclei_concurrency"`        // -c: parallel templates/hosts
+	NucleiScanDepth         string `json:"nuclei_scan_depth"`         // "workflow" | "tags" | "both"
 }
 
 func DefaultPipelineConfig() PipelineConfig {
