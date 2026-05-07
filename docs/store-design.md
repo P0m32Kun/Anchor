@@ -1,9 +1,18 @@
+---
+status: superseded
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-07
+scope: store-design
+superseded_by: docs/current/architecture.md
+---
+
 # Zustand Store 设计草案
 
 > **文档版本**：v1.0  
 > **生成日期**：2026-04-29  
 > **对应 Sprint**：0.6  
-> **状态**：设计评审中，Sprint 1 启动前确认
+> **状态**：已过时，设计已融入当前架构
 
 ---
 
