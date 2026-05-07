@@ -805,10 +805,11 @@ func DefaultPipelineConfig() PipelineConfig {
 		EnableHttpx:        true,
 		HttpxRateLimit:     150,
 		HttpxThreads:       50,
-		EnableNuclei:       true,
-		NucleiRateLimit:    100,
-		NucleiConcurrency:  25,
-		NucleiScanDepth:    "tags",
+		EnableNuclei:            true,
+		NucleiRateLimit:         100,
+		NucleiRateLimitPerMinute: 0, // disabled by default, set for sensitive targets
+		NucleiConcurrency:       25,
+		NucleiScanDepth:         "tags",
 	}
 }
 
