@@ -4,6 +4,48 @@
 
 ---
 
+## 2026-05-07 — QA 修复 + FOFA email 清理
+
+### 关键修复:`scan_tasks.run_id` 外键 (问题3)
+
+**根因**:`migrateV02RunID` 在 v0.2 时给 `scan_tasks` 添加了 `run_id TEXT REFERENCES runs(id)`,但 v6 之后应用真正写入的是 `pipeline_runs.id`。每次创建扫描任务都被 FK 检查否决,日志只留一行 `naabu: create scan task: FOREIGN KEY constraint failed`,UI 上看到"扫描 1 秒就完成且无结果"。
+
+**修复**:`migrateV12` 重建 `scan_tasks` 把 FK 改指向 `pipeline_runs(id)`,无效 run_id 置 NULL。回归测试 `internal/db/migrate_v12_test.go` 已沉淀。
+
+### Stage 进度修复 (问题2)
+
+`runCIDRFlow` 里 naabu 报错时只记日志没调 `failStage`/`completeStage`,导致端口扫描阶段卡 running 直至收尾被误标 completed。已补全分支。
+
+### FOFA email 清理
+
+FOFA V1 API 不再需要 email,清掉:
+- `internal/search/fofa.go::NewFofaClient(apiKey)` 单参,请求 URL 不带 `email=`
+- `internal/workflow/pipeline.go::Pipeline.WithFOFA(apiKey)` 单参
+- `models.Project` 删 `FofaEmail`/`FofaAPIKey`,`models.EngineCredential` 删 `Email`
+- `migrateV11` 重建 `projects` 和 `engine_credentials` 去掉对应列
+- 前端 `EngineKeysPage.tsx` 移除 email 输入
+
+### UI 修复
+
+- ScanModal 端口范围卡片溢出 (问题1):卡片加 `min-w-0` + 描述文本 `break-words`
+- ScanModal 速度选项不持久 (问题4):配置 + 模式持久化到 localStorage(`anchor.scanModal.config` / `anchor.scanModal.mode`)
+
+### 沉淀的测试
+
+- `internal/db/migrate_v12_test.go` — Go 单元测试,验证 FK 修复后 scan_tasks 能用 pipeline_runs.id 插入
+- `frontend/e2e/tests/qa-regression.spec.ts` — Playwright spec,覆盖问题1+4
+
+### E2E 实测验证
+
+| 问题 | 验证证据 |
+|------|---------|
+| 1 | playwright `qa-regression.spec.ts` 实跑 PASS |
+| 2 | 真实扫描后 stages 时间线独立(portscan 4s / fingerprint 2s / httpx 2s / vuln 24s) |
+| 3 | 真实扫描 naabu 找到 2 端口,日志无 FK 错误 |
+| 4 | playwright `qa-regression.spec.ts` 实跑 PASS |
+
+---
+
 ## 2026-05-07 — v0.4.0 发布
 
 ### v0.4 智能扫描管线正式发布
