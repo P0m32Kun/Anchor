@@ -4,7 +4,7 @@
 .PHONY: build-worker-base push-worker-base pull-worker-base setup-worker-base
 .PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-full
 .PHONY: range-up range-down range-status range-logs
-.PHONY: dev-web tauri-build
+.PHONY: dev-web tauri-dev tauri-build
 
 GO_FILES := $(shell find . -name '*.go' -not -path './frontend/*')
 
