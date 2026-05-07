@@ -129,7 +129,8 @@ func (s *BundleSyncer) fetchManifest() (*BundleManifest, error) {
 
 // downloadAndExtract fetches the bundle .tar.gz and extracts it to a version directory.
 func (s *BundleSyncer) downloadAndExtract(version string) error {
-	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/nuclei/custom/bundles/%s", s.coreURL, version), nil)
+	url := fmt.Sprintf("%s/nuclei/custom/bundles/%s", s.coreURL, version)
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+s.apiToken)
 
 	resp, err := s.httpClient.Do(req)
@@ -137,6 +138,8 @@ func (s *BundleSyncer) downloadAndExtract(version string) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	log.Printf("[worker] bundle download: %s -> status=%d, content-length=%d", url, resp.StatusCode, resp.ContentLength)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download bundle: %s", resp.Status)
