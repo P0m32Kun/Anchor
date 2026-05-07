@@ -996,6 +996,13 @@ func (p *Pipeline) createAndRunTask(ctx context.Context, tool string, args []str
 		CreatedAt:       now,
 	}
 
+	// Record active custom bundle version for nuclei tasks
+	if tool == "nuclei" {
+		if version, err := p.queries.GetActiveNucleiCustomBundleVersion(); err == nil && version != "" {
+			task.NucleiCustomBundleVersion = &version
+		}
+	}
+
 	if err := p.queries.CreateScanTask(task); err != nil {
 		return nil, nil, fmt.Errorf("create scan task: %w", err)
 	}
