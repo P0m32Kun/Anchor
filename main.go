@@ -127,6 +127,7 @@ func runWorker(dataDir, coreURL string) {
 			log.Printf("[worker] continuing in standalone mode")
 		} else {
 			remoteClient.StartHeartbeat(30 * time.Second)
+			remoteClient.StartBundleSync(60 * time.Second)
 			remoteClient.StartPolling()
 			log.Printf("[worker] remote mode active")
 		}
