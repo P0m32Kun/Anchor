@@ -22,7 +22,7 @@ RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor .
 # --- Runtime ---
 FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates sqlite-libs wget
+RUN apk add --no-cache ca-certificates sqlite-libs wget git
 
 WORKDIR /app
 COPY --from=builder /build/anchor .
