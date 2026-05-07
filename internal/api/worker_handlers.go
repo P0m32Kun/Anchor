@@ -85,8 +85,9 @@ func (s *Server) handleWorkerHeartbeat(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	var req struct {
-		Status       string   `json:"status"`
-		Capabilities []string `json:"capabilities"`
+		Status            string   `json:"status"`
+		Capabilities      []string `json:"capabilities"`
+		TemplateVersions  string   `json:"template_versions"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid body"))
@@ -99,9 +100,16 @@ func (s *Server) handleWorkerHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UTC()
-	if err := s.queries.UpdateWorkerNodeStatus(id, status, now); err != nil {
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update heartbeat: %v", err))
-		return
+	if req.TemplateVersions != "" {
+		if err := s.queries.UpdateWorkerNodeTemplateVersions(id, status, now, req.TemplateVersions); err != nil {
+			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update heartbeat: %v", err))
+			return
+		}
+	} else {
+		if err := s.queries.UpdateWorkerNodeStatus(id, status, now); err != nil {
+			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update heartbeat: %v", err))
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
