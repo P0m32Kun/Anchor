@@ -136,7 +136,7 @@ func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string
 // customTemplatesDir and customWorkflowsDir are absolute paths on the worker;
 // either may be empty if that directory does not exist.
 func BuildNucleiCustomCommand(targetFile, profile string, rateLimit int, tags []string, customTemplatesDir, customWorkflowsDir string) []string {
-	args := BuildNucleiCommand(targetFile, profile, rateLimit, tags)
+	args := BuildNucleiCommand(targetFile, profile, rateLimit, tags, "tags", "")
 
 	if customTemplatesDir != "" {
 		args = append(args, "-t", customTemplatesDir)
