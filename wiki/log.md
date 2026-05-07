@@ -14,11 +14,20 @@
 | ---- | ---- |
 | 1. 多目标类型（含 company） | `v0.4-company-flow.spec.ts` Step 3 |
 | 2. FOFA 自动展开 | `v0.4-company-flow.spec.ts` Step 5/6（3 域名 + 3 IP 展开） |
-| 3. 完整 8 阶段扫描管线 | `internal-scan-live.spec.ts` |
+| 3. 完整 8 阶段扫描管线 | `internal-scan-live.spec.ts`（21 findings，4 IP 全部覆盖） |
 | 4. 智能服务指纹（Web + 非 Web） | `internal-scan-live.spec.ts` 验证 nginx/tomcat/grafana/redis/mysql 识别 |
-| 5. 指纹驱动 Nuclei tags | `internal-scan-live.spec.ts` 4 项漏洞 finding |
+| 5. 指纹驱动 Nuclei tags | `internal-scan-live.spec.ts` 13 个高危 finding |
 | 6（新增）. Nuclei 分层扫描 | `scan-modal.spec.ts` + `scan-modal-real.spec.ts` |
 | 7（新增）. Nuclei 速率防爆破 | `scan-modal-real.spec.ts` Worker 命令含 `-rlm 30 -c 3` |
+
+### 发布前修复：nerva 命令构建 bug
+
+`internal/worker/commands.go::BuildNervaCommand` 误用 nerva 标志：
+- 原：`-w` 给 workers（错），`-T` 给 timeout（不存在的标志）
+- 实际：`-W` 是 workers，`-w` 是 timeout（毫秒）
+- 修复：`-W <workers> -w <timeout*1000>`（秒转毫秒）
+
+修复前 nerva 全部失败 → redis/mysql 服务未被指纹识别 → Nuclei 仅扫 Web 服务。修复后 internal-scan-live 从 2/4 IP 命中变为 4/4 IP 命中（21 findings）。
 
 ### 本次发布前的最后一批改动
 
