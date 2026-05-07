@@ -53,17 +53,12 @@ bin/
 
 # Agent configuration
 .pi/
-agents/
 
 # ContextDB runtime data
 memory/
 .contextdb-enable
 .pi-lens/
 frontend/.pi-lens/
-
-# Task tracking
-tasks/
-!tasks/desktop-bugs.md
 
 # Local test and scratch data
 tmp-e2e-data/
