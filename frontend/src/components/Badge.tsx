@@ -50,10 +50,10 @@ const variantStyles: Record<
     glow: "shadow-[0_0_15px_rgba(6,182,212,0.25)]",
   },
   critical: {
-    bg: "bg-[#f87171]/20",
-    text: "text-[#f87171]",
-    border: "border-[#f87171]/30",
-    glow: "shadow-[0_0_18px_rgba(248,113,113,0.3)]",
+    bg: "bg-[#ff4757]/20",
+    text: "text-[#ff4757]",
+    border: "border-[#ff4757]/30",
+    glow: "shadow-[0_0_18px_rgba(255,71,87,0.3)]",
   },
 };
 
