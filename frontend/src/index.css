@@ -44,16 +44,16 @@
     background: transparent;
   }
 
-  /* Selection - Electric blue tint */
+  /* Selection - Cyan tint */
   ::selection {
-    background-color: rgba(56, 189, 248, 0.45);
+    background-color: rgba(0, 212, 255, 0.45);
     color: #ffffff;
   }
 
-  /* Focus ring - vibrant blue glow */
+  /* Focus ring - cyan glow */
   *:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 0 1px rgba(56, 189, 248, 0.6);
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.4), 0 0 0 1px rgba(0, 212, 255, 0.6);
     border-radius: 8px;
   }
 
@@ -63,7 +63,7 @@
   select:focus-visible,
   a:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 0 1px rgba(56, 189, 248, 0.6);
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.4), 0 0 0 1px rgba(0, 212, 255, 0.6);
     border-radius: 8px;
   }
 
