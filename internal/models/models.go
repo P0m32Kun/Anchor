@@ -776,6 +776,7 @@ type PipelineConfig struct {
 	EnableNuclei        bool   `json:"enable_nuclei"`
 	NucleiRateLimit     int    `json:"nuclei_rate_limit"`
 	NucleiConcurrency   int    `json:"nuclei_concurrency"`
+	NucleiScanDepth     string `json:"nuclei_scan_depth"` // "workflow" | "tags" | "both"
 }
 
 func DefaultPipelineConfig() PipelineConfig {
