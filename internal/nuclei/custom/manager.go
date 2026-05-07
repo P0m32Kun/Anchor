@@ -487,9 +487,13 @@ func (m *Manager) ValidateSource(id string) (*models.NucleiCustomValidationResul
 		availableTemplates[f.Path] = true
 	}
 
-	// Validate each YAML file
+	// Validate each YAML file in nuclei template directories
 	for _, f := range files {
 		if !isYAMLFile(f.Path) {
+			continue
+		}
+		// Only validate files in template/workflow/fingerprint directories
+		if !isNucleiTemplatePath(f.Path) {
 			continue
 		}
 		data, err := m.layout.ReadFile(id, f.Path)
