@@ -466,6 +466,12 @@ func (w *AssetDiscoveryWorkflow) createAndRunTask(ctx context.Context, projectID
 	if w.runID != "" {
 		task.RunID = &w.runID
 	}
+	// Record active custom bundle version for nuclei tasks
+	if tool == "nuclei" {
+		if version, err := w.queries.GetActiveNucleiCustomBundleVersion(); err == nil && version != "" {
+			task.NucleiCustomBundleVersion = &version
+		}
+	}
 	if err := w.queries.CreateScanTask(task); err != nil {
 		return nil, fmt.Errorf("create task: %w", err)
 	}
