@@ -15,17 +15,22 @@ type RemoteClient struct {
 	workerID   string
 	token      string
 	endpoint   string
+	dataDir    string
+	syncer     *BundleSyncer
 	httpClient *http.Client
 	stopCh     chan struct{}
 }
 
 // NewRemoteClient creates a client that registers with the core server.
 // apiToken is the global server token required for all API calls.
-func NewRemoteClient(coreURL, endpoint, apiToken string) *RemoteClient {
+// dataDir is used for local bundle storage.
+func NewRemoteClient(coreURL, endpoint, apiToken, dataDir string) *RemoteClient {
 	return &RemoteClient{
 		coreURL:    coreURL,
 		endpoint:   endpoint,
 		token:      apiToken,
+		dataDir:    dataDir,
+		syncer:     NewBundleSyncer(dataDir, coreURL, apiToken),
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		stopCh:     make(chan struct{}),
 	}
@@ -84,10 +89,41 @@ func (c *RemoteClient) StartHeartbeat(interval time.Duration) {
 	}()
 }
 
+// StartBundleSync starts a periodic bundle sync loop. It syncs immediately on
+// start, then every interval.
+func (c *RemoteClient) StartBundleSync(interval time.Duration) {
+	// Sync immediately on start
+	go func() {
+		c.syncBundle()
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				c.syncBundle()
+			case <-c.stopCh:
+				return
+			}
+		}
+	}()
+}
+
+func (c *RemoteClient) syncBundle() {
+	version, err := c.syncer.Sync()
+	if err != nil {
+		log.Printf("[worker] bundle sync error: %v", err)
+		return
+	}
+	if version != "" {
+		log.Printf("[worker] active bundle version: %s", version)
+	}
+}
+
 func (c *RemoteClient) heartbeat() {
 	body, _ := json.Marshal(map[string]interface{}{
-		"status":       "idle",
-		"capabilities": []string{"subfinder", "naabu", "httpx", "nuclei"},
+		"status":            "idle",
+		"capabilities":      []string{"subfinder", "naabu", "httpx", "nuclei"},
+		"template_versions": c.syncer.TemplateVersionsJSON(),
 	})
 	req, _ := http.NewRequest("POST", fmt.Sprintf("%s/workers/%s/heartbeat", c.coreURL, c.workerID), bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+c.token)
