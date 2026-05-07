@@ -886,7 +886,7 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 			targetFile = abs
 		}
 
-		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, tags, p.config.NucleiScanDepth, DefaultWorkflowDir))
+		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, tags, p.config.NucleiScanDepth, DefaultWorkflowDir))
 		if err != nil {
 			log.Printf("nuclei task for tags %s: %v", tagKey, err)
 			continue
