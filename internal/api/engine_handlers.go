@@ -17,7 +17,6 @@ import (
 type saveEngineCredentialRequest struct {
 	Engine string  `json:"engine"`
 	APIKey string  `json:"api_key"`
-	Email  *string `json:"email,omitempty"`
 	Extra  *string `json:"extra,omitempty"`
 }
 
