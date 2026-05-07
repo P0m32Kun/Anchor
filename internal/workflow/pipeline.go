@@ -738,9 +738,71 @@ func (p *Pipeline) runSubfinder(ctx context.Context, domain string) ([]string, e
 	return subs, nil
 }
 
-func (p *Pipeline) runNaabu(ctx context.Context, hosts []string) ([]parser.PortInfo, error) {
+func (p *Pipeline) runNmapAlive(ctx context.Context, hosts []string) ([]string, error) {
+	if len(hosts) == 0 {
+		return nil, nil
+	}
 
-func (p *Pipeline) runNerva(ctx context.Context, ports []parser.PortInfo) ([]fingerprint.NervaResult, error) {
+	hostFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nmap-%s.txt", util.GenerateID()))
+	if err := os.MkdirAll(filepath.Dir(hostFile), 0750); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(hostFile, []byte(strings.Join(hosts, "\n")), 0640); err != nil {
+		return nil, err
+	}
+	if abs, err := filepath.Abs(hostFile); err == nil {
+		hostFile = abs
+	}
+
+	task, stdout, err := p.createAndRunTask(ctx, "nmap", worker.BuildNmapAliveCommand(hostFile))
+	if err != nil {
+		return nil, err
+	}
+	_ = task
+
+	alive := parser.ParseNmapAlive(bytes.NewReader(stdout))
+	log.Printf("[pipeline] nmap alive: input=%d alive=%d for project %s", len(hosts), len(alive), p.projectID)
+	return alive, nil
+}
+
+func (p *Pipeline) runNaabu(ctx context.Context, hosts []string) ([]parser.PortInfo, error) {
+	if len(hosts) == 0 {
+		return nil, nil
+	}
+
+	hostFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("naabu-%s.txt", util.GenerateID()))
+	if err := os.MkdirAll(filepath.Dir(hostFile), 0750); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(hostFile, []byte(strings.Join(hosts, "\n")), 0640); err != nil {
+		return nil, err
+	}
+	// Ensure absolute path so worker can find it regardless of cmd.Dir.
+	if abs, err := filepath.Abs(hostFile); err == nil {
+		hostFile = abs
+	}
+
+	task, stdout, err := p.createAndRunTask(ctx, "naabu", worker.BuildNaabuCommand(hostFile, p.config.PortRange, p.config.NaabuRate, p.config.NaabuThreads, p.config.NaabuTimeout))
+	if err != nil {
+		return nil, err
+	}
+	_ = task
+
+	ports := parser.ParseNaabuOutput(bytes.NewReader(stdout))
+	log.Printf("[pipeline] naabu parsed %d ports for project %s (stdout len=%d)", len(ports), p.projectID, len(stdout))
+	for _, port := range ports {
+		ipAsset, _, err := p.merger.MergeOrCreateAsset(p.projectID, "ip", port.IP, "naabu")
+		if err != nil {
+			log.Printf("[pipeline] merge/create asset %s: %v", port.IP, err)
+			continue
+		}
+		_, _, err = p.merger.CreatePortIfNotExists(ipAsset.ID, port.Port, "tcp", "naabu")
+		if err != nil {
+			log.Printf("[pipeline] create port %s:%d: %v", port.IP, port.Port, err)
+		}
+	}
+	return ports, nil
+}
 	if len(ports) == 0 {
 		return nil, nil
 	}
