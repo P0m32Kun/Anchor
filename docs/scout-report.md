@@ -1,7 +1,17 @@
+---
+status: archived
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-07
+scope: scout-report
+archive_reason: Sprint 0 扫描报告，已过时
+---
+
 # Sprint 0 代码库全景扫描报告
 
 > 扫描时间: 2026-04-29
-> 项目: Anchor — 网络安全扫描平台
+> 项目: Anchor — 网络安全扫描平台  
+> ⚠️ 此文档已归档，数据基于 Sprint 0 代码库，仅供参考
 
 ---
 
