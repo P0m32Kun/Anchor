@@ -69,6 +69,12 @@ tasks/
 tmp-e2e-data/
 tmp-tag-test/
 
+# Debug screenshots / scratch notes at repo root (not e2e screenshots or icons)
+/image*.png
+/Gemini_Generated_*.png
+/qa.md
+/plan.md
+
 # Tauri generated
 src-tauri/gen/
 .gitnexus
