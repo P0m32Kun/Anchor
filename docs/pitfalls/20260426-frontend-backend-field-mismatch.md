@@ -10,7 +10,7 @@
 将前端字段名统一为 `"file"`，与后端保持一致。
 
 ## 预防
-- 在 `wiki/conventions/api-contracts.md` 中明确 multipart 字段命名
+- 在 `docs/conventions/api-contracts.md` 中明确 multipart 字段命名
 - 前后端对接口字段名做交叉校验
 
 ## 相关文件
