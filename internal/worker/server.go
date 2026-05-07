@@ -265,6 +265,43 @@ func (ws *WorkerServer) reportResult(taskID, status string, artifacts []map[stri
 	log.Printf("[worker] task %s finished: %s artifacts=%d error=%q", taskID, status, len(artifacts), errorMsg)
 }
 
+// injectCustomNucleiTemplates checks for a local custom bundle and appends
+// -t (templates) and -w (workflows) flags to the nuclei command if the
+// directories exist and are not already present in the command.
+func (ws *WorkerServer) injectCustomNucleiTemplates(command []string, taskID string) []string {
+	syncer := NewBundleSyncer(ws.dataDir, "", "")
+	templatesDir := syncer.TemplatesDir()
+	workflowsDir := syncer.WorkflowsDir()
+
+	// Check if custom template paths are already in the command
+	hasTemplatesFlag := false
+	hasWorkflowsFlag := false
+	for _, arg := range command {
+		if arg == "-t" {
+			hasTemplatesFlag = true
+		}
+		if arg == "-w" {
+			hasWorkflowsFlag = true
+		}
+	}
+
+	if !hasTemplatesFlag {
+		if info, err := os.Stat(templatesDir); err == nil && info.IsDir() {
+			command = append(command, "-t", templatesDir)
+			log.Printf("[worker] task %s injected custom templates: %s", taskID, templatesDir)
+		}
+	}
+
+	if !hasWorkflowsFlag {
+		if info, err := os.Stat(workflowsDir); err == nil && info.IsDir() {
+			command = append(command, "-w", workflowsDir)
+			log.Printf("[worker] task %s injected custom workflows: %s", taskID, workflowsDir)
+		}
+	}
+
+	return command
+}
+
 func (ws *WorkerServer) handleProgress(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
