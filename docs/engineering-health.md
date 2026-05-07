@@ -1,8 +1,18 @@
+---
+status: archived
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-07
+scope: engineering-health
+archive_reason: Sprint 0 基线数据，已过时
+---
+
 # 工程健康检查报告（Sprint 0.11）
 
 > 生成日期：2026-04-29  
 > 检查范围：Go 后端 + TypeScript 前端 + Tauri 桌面端  
-> 基线版本：Sprint 0 代码库
+> 基线版本：Sprint 0 代码库  
+> ⚠️ 此文档已归档，数据基于 Sprint 0 代码库，仅供参考
 
 ---
 
