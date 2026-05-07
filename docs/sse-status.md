@@ -1,9 +1,18 @@
+---
+status: superseded
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-07
+scope: sse-architecture
+superseded_by: docs/current/architecture.md
+---
+
 # SSE 通信现状与架构决策
 
 > **文档版本**：v1.0  
 > **生成日期**：2026-04-29  
 > **对应 Sprint**：0.7  
-> **状态**：架构决策已确认，Sprint 2 实现
+> **状态**：已过时，SSE 架构已融入当前架构
 
 ---
 
