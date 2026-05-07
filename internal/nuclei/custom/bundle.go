@@ -119,7 +119,7 @@ func (m *Manager) BuildBundle() (version string, archivePath string, err error) 
 
 	archivePath = m.layout.BundleArchivePath(version)
 	if err := m.createArchive(tmpDir, entries, manifestJSON); err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 
 	// Move archive to final location
