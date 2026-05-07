@@ -205,58 +205,58 @@
 
   /* ===== CyberOS Text Glow ===== */
   .text-glow-blue {
-    color: #7dd3fc;
-    text-shadow: 0 0 10px rgba(56, 189, 248, 0.8), 0 0 30px rgba(56, 189, 248, 0.4), 0 0 60px rgba(56, 189, 248, 0.2);
+    color: #33ddff;
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.8), 0 0 30px rgba(0, 212, 255, 0.4), 0 0 60px rgba(0, 212, 255, 0.2);
   }
 
   .text-glow-red {
-    color: #fca5a5;
-    text-shadow: 0 0 10px rgba(248, 113, 113, 0.8), 0 0 30px rgba(248, 113, 113, 0.4), 0 0 60px rgba(248, 113, 113, 0.2);
+    color: #ff6b7a;
+    text-shadow: 0 0 10px rgba(255, 71, 87, 0.8), 0 0 30px rgba(255, 71, 87, 0.4), 0 0 60px rgba(255, 71, 87, 0.2);
   }
 
   /* ===== CyberOS Buttons ===== */
   .btn-cyber-primary {
     @apply inline-flex items-center justify-center gap-1.5 font-medium px-4 py-2 text-sm rounded-lg transition-colors duration-150 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed;
-    background: #0ea5e9;
-    border: 1px solid rgba(14, 165, 233, 0.85);
+    background: #00b8e6;
+    border: 1px solid rgba(0, 212, 255, 0.85);
     color: #ffffff;
-    box-shadow: 0 8px 18px rgba(14, 165, 233, 0.22);
+    box-shadow: 0 8px 18px rgba(0, 212, 255, 0.22);
   }
 
   .btn-cyber-primary:hover {
-    background: #0284c7;
-    border-color: #38bdf8;
+    background: #0099cc;
+    border-color: #00d4ff;
   }
 
   .btn-cyber-secondary {
     @apply inline-flex items-center justify-center gap-1.5 font-medium px-4 py-2 text-sm rounded-lg transition-colors duration-150 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed;
-    background: rgba(30, 41, 59, 0.72);
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    color: #e2e8f0;
+    background: rgba(17, 29, 50, 0.72);
+    border: 1px solid rgba(30, 58, 95, 0.4);
+    color: #c9d8ef;
   }
 
   .btn-cyber-secondary:hover {
-    background: rgba(51, 65, 85, 0.82);
-    border-color: rgba(148, 163, 184, 0.36);
-    color: #e6edf3;
+    background: rgba(26, 42, 66, 0.82);
+    border-color: rgba(30, 58, 95, 0.6);
+    color: #e0ecff;
   }
 
   .btn-cyber-danger {
     @apply inline-flex items-center justify-center gap-1.5 font-medium px-4 py-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
-    background: linear-gradient(180deg, #f87171 0%, #ef4444 100%);
-    border: 1px solid rgba(248, 113, 113, 0.5);
+    background: linear-gradient(180deg, #ff4757 0%, #e03e4c 100%);
+    border: 1px solid rgba(255, 71, 87, 0.5);
     color: #ffffff;
     box-shadow:
-      0 0 20px rgba(248, 113, 113, 0.5),
-      0 0 40px rgba(248, 113, 113, 0.2),
+      0 0 20px rgba(255, 71, 87, 0.5),
+      0 0 40px rgba(255, 71, 87, 0.2),
       inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
   .btn-cyber-danger:hover {
-    background: linear-gradient(180deg, #fca5a5 0%, #f87171 100%);
+    background: linear-gradient(180deg, #ff6b7a 0%, #ff4757 100%);
     box-shadow:
-      0 0 30px rgba(248, 113, 113, 0.7),
-      0 0 60px rgba(248, 113, 113, 0.3),
+      0 0 30px rgba(255, 71, 87, 0.7),
+      0 0 60px rgba(255, 71, 87, 0.3),
       inset 0 1px 0 rgba(255, 255, 255, 0.2);
     transform: translateY(-1px);
   }
@@ -265,24 +265,24 @@
     @apply inline-flex items-center justify-center gap-1.5 font-medium px-4 py-2 text-sm rounded-lg transition-colors duration-150 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed;
     background: transparent;
     border: 1px solid transparent;
-    color: #8b949e;
+    color: #5a6e8a;
   }
 
   .btn-cyber-ghost:hover {
-    background: rgba(148, 163, 184, 0.1);
-    border-color: rgba(148, 163, 184, 0.16);
-    color: #c9d1d9;
+    background: rgba(30, 58, 95, 0.15);
+    border-color: rgba(30, 58, 95, 0.3);
+    color: #8b9dc3;
   }
 
   .app-shell {
     min-height: 100vh;
-    background: #080b10;
-    color: #f8fafc;
+    background: #0a1628;
+    color: #ffffff;
   }
 
   .app-sidebar {
-    background: #0d1118;
-    border-right: 1px solid rgba(148, 163, 184, 0.14);
+    background: #0d1e36;
+    border-right: 1px solid rgba(30, 58, 95, 0.4);
   }
 
   .app-main {
@@ -307,7 +307,7 @@
   .page-eyebrow {
     font-size: 12px;
     font-weight: 600;
-    color: #38bdf8;
+    color: #00d4ff;
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
@@ -316,18 +316,18 @@
     font-size: 24px;
     line-height: 1.25;
     font-weight: 700;
-    color: #f8fafc;
+    color: #ffffff;
   }
 
   .page-subtitle {
     margin-top: 4px;
     font-size: 14px;
-    color: #94a3b8;
+    color: #8b9dc3;
   }
 
   .panel {
-    background: rgba(18, 23, 32, 0.92);
-    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(17, 29, 50, 0.92);
+    border: 1px solid rgba(30, 58, 95, 0.5);
     border-radius: 8px;
   }
 
@@ -337,13 +337,13 @@
     justify-content: space-between;
     gap: 12px;
     padding: 16px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    border-bottom: 1px solid rgba(30, 58, 95, 0.4);
   }
 
   .panel-title {
     font-size: 14px;
     font-weight: 650;
-    color: #e2e8f0;
+    color: #c9d8ef;
   }
 
   .panel-body {
@@ -351,15 +351,15 @@
   }
 
   .metric-card {
-    background: rgba(15, 23, 42, 0.72);
-    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(10, 22, 40, 0.72);
+    border: 1px solid rgba(30, 58, 95, 0.4);
     border-radius: 8px;
     padding: 16px;
   }
 
   .metric-label {
     font-size: 12px;
-    color: #94a3b8;
+    color: #5a6e8a;
   }
 
   .metric-value {
@@ -367,7 +367,7 @@
     font-size: 28px;
     line-height: 1;
     font-weight: 750;
-    color: #f8fafc;
+    color: #00d4ff;
     font-variant-numeric: tabular-nums;
   }
 
@@ -376,62 +376,62 @@
     align-items: center;
     gap: 6px;
     border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(15, 23, 42, 0.68);
-    color: #cbd5e1;
+    border: 1px solid rgba(30, 58, 95, 0.4);
+    background: rgba(10, 22, 40, 0.68);
+    color: #8b9dc3;
     font-size: 12px;
     line-height: 1;
     padding: 7px 10px;
   }
 
   .chip-active {
-    border-color: rgba(56, 189, 248, 0.45);
-    background: rgba(14, 165, 233, 0.14);
-    color: #e0f2fe;
+    border-color: rgba(0, 212, 255, 0.45);
+    background: rgba(0, 212, 255, 0.1);
+    color: #b3f0ff;
   }
 
   /* ===== CyberOS Input ===== */
   .input-cyber {
     @apply w-full px-3.5 py-2.5 rounded-md text-sm transition-all duration-150;
     background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(56, 189, 248, 0.2);
+    border: 1px solid rgba(0, 212, 255, 0.2);
     color: #e6edf3;
     font-family: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
   }
 
   .input-cyber::placeholder {
-    color: #484f58;
+    color: #3a4a5e;
   }
 
   .input-cyber:hover {
-    border-color: rgba(56, 189, 248, 0.35);
+    border-color: rgba(0, 212, 255, 0.35);
   }
 
   .input-cyber:focus {
     background: rgba(0, 0, 0, 0.5);
-    border-color: #38bdf8;
+    border-color: #00d4ff;
     box-shadow:
-      0 0 0 3px rgba(56, 189, 248, 0.25),
-      0 0 20px rgba(56, 189, 248, 0.2);
+      0 0 0 3px rgba(0, 212, 255, 0.25),
+      0 0 20px rgba(0, 212, 255, 0.2);
     outline: none;
   }
 
   /* ===== CyberOS Nav ===== */
   .nav-cyber {
-    background: rgba(11, 17, 32, 0.8);
+    background: rgba(10, 22, 40, 0.8);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border-bottom: 1px solid rgba(56, 189, 248, 0.2);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.1);
+    border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 212, 255, 0.1);
   }
 
   /* ===== CyberOS Glow Pulse Animation ===== */
   @keyframes glow-pulse {
     0%, 100% {
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4), 0 0 40px rgba(56, 189, 248, 0.2);
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.4), 0 0 40px rgba(0, 212, 255, 0.2);
     }
     50% {
-      box-shadow: 0 0 30px rgba(56, 189, 248, 0.6), 0 0 60px rgba(56, 189, 248, 0.3);
+      box-shadow: 0 0 30px rgba(0, 212, 255, 0.6), 0 0 60px rgba(0, 212, 255, 0.3);
     }
   }
 
