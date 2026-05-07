@@ -31,7 +31,7 @@ RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && 
 FROM alpine:latest
 
 RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
-    apk add --no-cache ca-certificates libpcap-dev chromium
+    apk add --no-cache ca-certificates libpcap-dev chromium git
 
 COPY --from=tools-builder /go/bin/subfinder /usr/local/bin/
 COPY --from=tools-builder /go/bin/naabu    /usr/local/bin/
