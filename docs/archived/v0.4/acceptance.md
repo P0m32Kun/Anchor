@@ -61,4 +61,4 @@ cd frontend && npx playwright test --config=playwright.e2e-minimal.config.ts \
 
 ## 修复纪要（2026-05-07）
 
-发布前 nerva 命令构建器修复：原代码 `BuildNervaCommand` 误用 `-w` 作 workers（实际是 timeout）、`-T` 作 timeout（不存在），导致 nerva 全部失败。修复后 21 个 findings 全部匹配预期。详见 `wiki/log.md` v0.4.0 章节。
+发布前 nerva 命令构建器修复：原代码 `BuildNervaCommand` 误用 `-w` 作 workers（实际是 timeout）、`-T` 作 timeout（不存在），导致 nerva 全部失败。修复后 21 个 findings 全部匹配预期。详见 `docs/CHANGELOG.md` v0.4.0 章节。
