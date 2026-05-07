@@ -457,7 +457,7 @@ export const api = {
   // --- Engine Search ---
   listEngineCredentials: (signal?: AbortSignal) =>
     fetchAPI<EngineCredential[]>("/engines/credentials", { signal }),
-  saveEngineCredential: (data: { engine: string; api_key: string; email?: string; extra?: string }, signal?: AbortSignal) =>
+  saveEngineCredential: (data: { engine: string; api_key: string; extra?: string }, signal?: AbortSignal) =>
     fetchAPI<EngineCredential>("/engines/credentials", { method: "POST", body: JSON.stringify(data), signal }),
   deleteEngineCredential: (engine: string, signal?: AbortSignal) =>
     fetchAPI<void>(`/engines/credentials/${engine}`, { method: "DELETE", signal }),
