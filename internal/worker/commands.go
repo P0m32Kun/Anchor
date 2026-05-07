@@ -159,16 +159,17 @@ func BuildNucleiCustomCommand(targetFile, profile string, rateLimit int, tags []
 
 // BuildNervaCommand builds a nerva command for service fingerprinting.
 // targets should be in "host:port" format, comma-separated.
+// nerva flags reference: -R rate-limit, -W workers (concurrent), -w timeout (ms).
 func BuildNervaCommand(targets string, rateLimit, workers, timeout int) []string {
 	args := []string{"nerva", "--json", "-t", targets}
 	if rateLimit > 0 {
 		args = append(args, "-R", fmt.Sprintf("%d", rateLimit))
 	}
 	if workers > 0 {
-		args = append(args, "-w", fmt.Sprintf("%d", workers))
+		args = append(args, "-W", fmt.Sprintf("%d", workers))
 	}
 	if timeout > 0 {
-		args = append(args, "-T", fmt.Sprintf("%d", timeout))
+		args = append(args, "-w", fmt.Sprintf("%d", timeout*1000))
 	}
 	return args
 }
