@@ -1,3 +1,11 @@
+---
+status: in-review
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-04
+scope: ui-redesign
+---
+
 # VisionOS Glassmorphism Redesign
 
 Date: 2026-05-04
