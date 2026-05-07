@@ -158,7 +158,7 @@
 | v0.2 Phase 1 容器化与远程 Worker | ✅ 已完成 | `v0.2.0-p1` | Docker + 远程 Worker + 心跳清理 + WorkersPage                                             |
 | v0.2 Phase 2 项目管理与体验修复  | ✅ 已完成 | `v0.2.0-p2` | 项目创建/删除/级联清理 + 导航修复 + Dashboard 快捷入口                                    |
 | v0.3 桌面可用性与可靠性          | ✅ 已完成 | `v0.3.0`    | 网络服务扫描 + CPE 指纹补充 + 路由统一 + 扫描入口统一 + httpx follow-redirects + 靶场修复 |
-| v0.4 智能扫描管线                | ✅ 已完成 | `v0.4.0`    | 多目标类型（company）+ FOFA 集成 + CDN 过滤 + nerva 服务指纹 + dnsx DNS 解析 + Pipeline 编排 + Hunter/Quake 搜索引擎 + 工具解析器 |
+| v0.4 智能扫描管线                | 🔄 开发中 | —           | 多目标类型（company）+ FOFA 集成 + CDN 过滤 + nerva 服务指纹 + dnsx DNS 解析 + Pipeline 编排 + Hunter/Quake 搜索引擎 + 工具解析器（功能已实现，待正式发布） |
 
 ---
 
