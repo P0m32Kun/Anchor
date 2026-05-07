@@ -322,12 +322,12 @@ func (q *Queries) CreateScanTask(t *models.ScanTask) error {
 }
 
 func (q *Queries) GetScanTask(id string) (*models.ScanTask, error) {
-	row := q.db.QueryRow(`SELECT id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, worker_id, created_at FROM scan_tasks WHERE id = ?`, id)
+	row := q.db.QueryRow(`SELECT id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, worker_id, nuclei_custom_bundle_version, created_at FROM scan_tasks WHERE id = ?`, id)
 	t := &models.ScanTask{}
-	var planID, runID sql.NullString
+	var planID, runID, customVersion sql.NullString
 	var startedAt, finishedAt sql.NullTime
 	var exitCode sql.NullInt64
-	err := row.Scan(&t.ID, &t.ProjectID, &planID, &runID, &t.DependsOnTaskID, &t.TargetID, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &startedAt, &finishedAt, &exitCode, &t.WorkerID, &t.CreatedAt)
+	err := row.Scan(&t.ID, &t.ProjectID, &planID, &runID, &t.DependsOnTaskID, &t.TargetID, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &startedAt, &finishedAt, &exitCode, &t.WorkerID, &customVersion, &t.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -339,6 +339,9 @@ func (q *Queries) GetScanTask(id string) (*models.ScanTask, error) {
 	}
 	if runID.Valid {
 		t.RunID = &runID.String
+	}
+	if customVersion.Valid {
+		t.NucleiCustomBundleVersion = &customVersion.String
 	}
 	if startedAt.Valid {
 		t.StartedAt = &startedAt.Time
