@@ -5,7 +5,6 @@ import { useToast, Button, Input } from "../components";
 interface EngineForm {
   engine: string;
   apiKey: string;
-  email: string;
   showKey: boolean;
   saving: boolean;
   deleting: boolean;
@@ -13,9 +12,9 @@ interface EngineForm {
 }
 
 const ENGINE_DEFS = [
-  { key: "fofa", label: "FOFA", needsEmail: false },
-  { key: "hunter", label: "Hunter", needsEmail: false },
-  { key: "quake", label: "Quake", needsEmail: false },
+  { key: "fofa", label: "FOFA" },
+  { key: "hunter", label: "Hunter" },
+  { key: "quake", label: "Quake" },
 ];
 
 function maskKey(key: string): string {
