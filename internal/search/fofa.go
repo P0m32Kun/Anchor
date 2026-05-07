@@ -15,7 +15,6 @@ import (
 
 // FofaClient is a client for the FOFA API.
 type FofaClient struct {
-	email   string
 	apiKey  string
 	baseURL string
 	client  *http.Client
