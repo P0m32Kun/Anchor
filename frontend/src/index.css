@@ -191,16 +191,16 @@
 
   /* ===== CyberOS Glass ===== */
   .cyber-glass {
-    background: rgba(18, 23, 32, 0.92);
-    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(17, 29, 50, 0.92);
+    border: 1px solid rgba(30, 58, 95, 0.5);
     border-radius: 8px;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
     transition: border-color 0.16s ease, background 0.16s ease;
   }
 
   .cyber-glass-hover:hover {
-    background: rgba(22, 28, 38, 0.96);
-    border-color: rgba(56, 189, 248, 0.35);
+    background: rgba(22, 38, 65, 0.96);
+    border-color: rgba(0, 212, 255, 0.35);
   }
 
   /* ===== CyberOS Text Glow ===== */
