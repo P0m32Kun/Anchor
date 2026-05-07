@@ -84,9 +84,9 @@ func (p *Pipeline) WithConfig(cfg models.PipelineConfig) *Pipeline {
 }
 
 // WithFOFA sets the FOFA client.
-func (p *Pipeline) WithFOFA(email, apiKey string) *Pipeline {
-	if email != "" && apiKey != "" {
-		p.fofa = search.NewFofaClient(email, apiKey)
+func (p *Pipeline) WithFOFA(apiKey string) *Pipeline {
+	if apiKey != "" {
+		p.fofa = search.NewFofaClient(apiKey)
 	}
 	return p
 }
