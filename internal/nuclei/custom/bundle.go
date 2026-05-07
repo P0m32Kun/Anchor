@@ -102,7 +102,7 @@ func (m *Manager) BuildBundle() (version string, archivePath string, err error) 
 	version = "sha256:" + hex.EncodeToString(hash[:])
 
 	// Check if this version already exists
-	existing, err := m.q.Getmodels.NucleiCustomBundle(version)
+	existing, err := m.q.GetNucleiCustomBundle(version)
 	if err != nil {
 		return "", "", fmt.Errorf("check existing bundle: %w", err)
 	}
@@ -211,7 +211,7 @@ func (m *Manager) computeSourceChecksum(sourceID string, filePaths []string) (st
 // ActivateBundle marks a bundle version as active and deactivates any
 // previously active bundle.
 func (m *Manager) ActivateBundle(version string) error {
-	bundle, err := m.q.Getmodels.NucleiCustomBundle(version)
+	bundle, err := m.q.GetNucleiCustomBundle(version)
 	if err != nil {
 		return fmt.Errorf("get bundle: %w", err)
 	}
@@ -280,7 +280,7 @@ func (m *Manager) GetActiveBundle() (*models.NucleiCustomBundle, error) {
 
 // GetBundleManifest returns the manifest for a specific bundle version.
 func (m *Manager) GetBundleManifest(version string) (*BundleManifest, error) {
-	bundle, err := m.q.Getmodels.NucleiCustomBundle(version)
+	bundle, err := m.q.GetNucleiCustomBundle(version)
 	if err != nil {
 		return nil, fmt.Errorf("get bundle: %w", err)
 	}
