@@ -94,7 +94,10 @@ func BuildNaabuCommand(hostFile, portRange string, rate, threads, timeout int) [
 //   - "workflow": run pre-built workflows from workflowDir (precision scan)
 //   - "tags": run tag-based template matching (current behavior, broad coverage)
 //   - "both": run workflows first, then tag-based for uncovered targets
-func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string, scanDepth string, workflowDir string) []string {
+//
+// rateLimit is -rl (requests/second), rateLimitPerMin is -rlm (requests/minute for sensitive targets).
+// concurrency is -c (parallel templates/hosts).
+func BuildNucleiCommand(targetFile, profile string, rateLimit, rateLimitPerMin, concurrency int, tags []string, scanDepth string, workflowDir string) []string {
 	args := []string{"nuclei", "-jsonl", "-l", targetFile}
 
 	switch profile {
@@ -124,6 +127,12 @@ func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string
 		}
 	}
 
+	if concurrency > 0 {
+		args = append(args, "-c", fmt.Sprintf("%d", concurrency))
+	}
+	if rateLimitPerMin > 0 {
+		args = append(args, "-rlm", fmt.Sprintf("%d", rateLimitPerMin))
+	}
 	if rateLimit > 0 {
 		args = append(args, "-rl", fmt.Sprintf("%d", rateLimit))
 	}
