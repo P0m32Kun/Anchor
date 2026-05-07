@@ -2020,3 +2020,17 @@ func (q *Queries) SetNucleiCustomBundleStatus(version, status string, activatedA
 		status, activatedAt, version)
 	return err
 }
+
+// GetActiveNucleiCustomBundleVersion returns the version string of the
+// currently active bundle, or "" if none is active.
+func (q *Queries) GetActiveNucleiCustomBundleVersion() (string, error) {
+	var version string
+	err := q.db.QueryRow(`SELECT version FROM nuclei_custom_bundles WHERE status = 'active' LIMIT 1`).Scan(&version)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return version, nil
+}
