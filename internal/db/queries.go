@@ -1163,6 +1163,14 @@ func (q *Queries) UpdateWorkerNodeStatus(id string, status models.WorkerStatus, 
 	return err
 }
 
+// UpdateWorkerNodeTemplateVersions persists the worker's template version
+// report (JSON blob) alongside the heartbeat status update.
+func (q *Queries) UpdateWorkerNodeTemplateVersions(id string, status models.WorkerStatus, lastSeen time.Time, templateVersions string) error {
+	_, err := q.db.Exec(`UPDATE worker_nodes SET status = ?, last_seen = ?, template_versions = ? WHERE id = ?`,
+		status, lastSeen, templateVersions, id)
+	return err
+}
+
 func (q *Queries) RevokeWorkerNode(id string, revokedAt time.Time) error {
 	_, err := q.db.Exec(`UPDATE worker_nodes SET status = ?, revoked_at = ? WHERE id = ?`, models.WorkerStatusOffline, revokedAt, id)
 	return err
