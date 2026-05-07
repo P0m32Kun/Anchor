@@ -26,12 +26,6 @@ RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor .
 # --- 运行阶段：使用预装工具的精简基础镜像 ---
 FROM anchor-worker-base:latest
 
-# nmap is needed by the alive-check stage. Installed here (small ~5MB) instead of
-# in worker-base because rebuilding the base is currently expensive on this host.
-# When worker-base is next rebuilt it already has nmap baked in, and this layer
-# becomes a no-op.
-RUN apk add --no-cache nmap
-
 WORKDIR /app
 COPY --from=builder /build/anchor .
 
