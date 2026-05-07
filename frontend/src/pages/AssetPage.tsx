@@ -9,10 +9,10 @@ const ASSET_TYPES = ["all", "domain", "url", "ip", "cidr", "service"] as const;
 function AssetTypeBadge({ type }: { type: string }) {
   const colors: Record<string, string> = {
     domain: "bg-brand-primary/15 text-brand-primary",
-    ip: "bg-purple-100 text-purple-700",
+    ip: "bg-brand-purple/15 text-brand-purple",
     url: "bg-brand-success/15 text-brand-success",
-    cidr: "bg-orange-100 text-orange-700",
-    service: "bg-sky-100 text-sky-700",
+    cidr: "bg-brand-warning/15 text-brand-warning",
+    service: "bg-accent-teal/15 text-accent-teal",
   };
   return (
     <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || "bg-zinc-800/60 text-zinc-400"}`}>
@@ -199,7 +199,7 @@ export default function AssetPage() {
     <div className="page-shell space-y-6">
       <div className="page-header">
         <div>
-          <div className="page-eyebrow">Step 2</div>
+          <div className="page-eyebrow text-accent-teal">Step 2</div>
           <h1 className="page-title">资产清单</h1>
           <p className="page-subtitle">按资产、Web 端点和开放端口查看发现结果，为后续指纹驱动扫描做准备。</p>
         </div>

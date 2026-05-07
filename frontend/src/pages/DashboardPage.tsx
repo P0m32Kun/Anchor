@@ -240,6 +240,13 @@ function ActivityPanel({
   );
 }
 
+const STAT_COLOR_MAP: Record<string, { active: string; text: string }> = {
+  "项目":     { active: "border-purple-400/35 bg-purple-500/5",        text: "metric-value-purple" },
+  "运行中扫描": { active: "border-sky-400/35 bg-sky-500/5",             text: "metric-value" },
+  "待审核发现": { active: "border-amber-400/35 bg-amber-500/5",          text: "metric-value-warning" },
+  "在线 Worker": { active: "border-green-400/35 bg-green-500/5",         text: "metric-value-success" },
+};
+
 function StatCard({
   title,
   value,
@@ -251,13 +258,14 @@ function StatCard({
   loading: boolean;
   active?: boolean;
 }) {
+  const colors = STAT_COLOR_MAP[title] ?? { active: "border-sky-400/35 bg-sky-500/5", text: "metric-value" };
   return (
-    <div className={`metric-card ${active ? "border-sky-400/35 bg-sky-500/5" : ""}`}>
+    <div className={`metric-card ${active ? colors.active : ""}`}>
       <div className="metric-label">{title}</div>
       {loading && value === 0 ? (
         <div className="h-8 bg-white/[0.06] rounded-lg animate-pulse w-16 mt-3" />
       ) : (
-        <div className={`metric-value ${active ? "text-brand-primary" : "text-text-primary"}`}>
+        <div className={`metric-value ${active ? colors.text : "!text-text-primary"}`}>
           {value}
         </div>
       )}

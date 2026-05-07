@@ -219,7 +219,7 @@ export default function ReportsPage() {
     <div className="page-shell space-y-6">
       <div className="page-header">
         <div>
-          <div className="page-eyebrow">Step 5</div>
+          <div className="page-eyebrow text-brand-purple">Step 5</div>
           <h1 className="page-title">安全评估报告</h1>
           <p className="page-subtitle">
             <span className="font-mono text-zinc-300">{confirmedCount}</span> 个确认漏洞，

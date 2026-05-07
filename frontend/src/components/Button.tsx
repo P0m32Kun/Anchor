@@ -31,6 +31,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         "btn-cyber-ghost",
       danger:
         "btn-cyber-danger",
+      purple:
+        "btn-cyber-purple",
     };
 
     const sizes = {

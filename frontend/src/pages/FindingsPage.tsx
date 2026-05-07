@@ -178,7 +178,7 @@ export default function FindingsPage() {
     <div className="page-shell space-y-6">
       <div className="page-header">
         <div>
-          <div className="page-eyebrow">Step 4</div>
+          <div className="page-eyebrow text-brand-danger">Step 4</div>
           <h1 className="page-title">发现审核</h1>
           <p className="page-subtitle">按严重级别、状态和关键词筛选，确认真实风险、标记误报或接受风险。</p>
         </div>

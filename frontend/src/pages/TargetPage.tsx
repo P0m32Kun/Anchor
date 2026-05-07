@@ -391,7 +391,7 @@ export default function TargetPage() {
     <div className="page-shell space-y-6">
       <div className="page-header">
         <div>
-          <div className="page-eyebrow">Step 1</div>
+          <div className="page-eyebrow text-brand-success">Step 1</div>
           <h1 className="page-title">目标与 Scope</h1>
           <p className="page-subtitle">先确认授权边界，再导入域名、URL、IP 或 CIDR；所有后续扫描都从这里开始。</p>
         </div>

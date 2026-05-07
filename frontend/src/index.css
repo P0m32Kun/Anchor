@@ -274,6 +274,27 @@
     color: #8b9dc3;
   }
 
+  /* ===== CyberOS Purple (Settings / Configuration) ===== */
+  .btn-cyber-purple {
+    @apply inline-flex items-center justify-center gap-1.5 font-medium px-4 py-2 text-sm rounded-lg transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
+    background: linear-gradient(180deg, #A371F7 0%, #7C3AED 100%);
+    border: 1px solid rgba(163, 113, 247, 0.5);
+    color: #ffffff;
+    box-shadow:
+      0 0 20px rgba(163, 113, 247, 0.35),
+      0 0 40px rgba(163, 113, 247, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  .btn-cyber-purple:hover {
+    background: linear-gradient(180deg, #B388FF 0%, #A371F7 100%);
+    box-shadow:
+      0 0 30px rgba(163, 113, 247, 0.55),
+      0 0 60px rgba(163, 113, 247, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+  }
+
   .app-shell {
     min-height: 100vh;
     background: #0a1628;
@@ -370,6 +391,10 @@
     color: #00d4ff;
     font-variant-numeric: tabular-nums;
   }
+  .metric-value-success { color: #00e676; }
+  .metric-value-warning { color: #f5a623; }
+  .metric-value-danger  { color: #ff4757; }
+  .metric-value-purple  { color: #A371F7; }
 
   .chip {
     display: inline-flex;
