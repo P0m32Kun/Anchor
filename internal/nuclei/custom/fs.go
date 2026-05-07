@@ -237,6 +237,35 @@ func (l Layout) WalkFiles(id string) ([]models.NucleiCustomFileEntry, error) {
 	return entries, nil
 }
 
+// --- Bundle directory methods (Phase 2) ---
+
+// BundlesRoot returns {Root}/bundles.
+func (l Layout) BundlesRoot() string { return filepath.Join(l.Root, "bundles") }
+
+// BundleDir returns {Root}/bundles/{version}.
+func (l Layout) BundleDir(version string) string {
+	return filepath.Join(l.BundlesRoot(), version)
+}
+
+// BundleArchivePath returns the .tar.gz path for a bundle version.
+func (l Layout) BundleArchivePath(version string) string {
+	return filepath.Join(l.BundlesRoot(), version+".tar.gz")
+}
+
+// CurrentSymlink returns the path to the "current" symlink that points to the
+// active bundle directory.
+func (l Layout) CurrentSymlink() string {
+	return filepath.Join(l.BundlesRoot(), "current")
+}
+
+// EnsureBundlesRoot creates {Root}/bundles if missing.
+func (l Layout) EnsureBundlesRoot() error {
+	if err := os.MkdirAll(l.BundlesRoot(), 0o755); err != nil {
+		return fmt.Errorf("ensure bundles root: %w", err)
+	}
+	return nil
+}
+
 // SwapFilesDir is the atomic-rename primitive used by Refresh:
 // it expects newDir to be a freshly built sibling of FilesDir(id), and
 // renames it into place after preserving the previous tree under a
