@@ -4,6 +4,40 @@
 
 ---
 
+## 2026-05-07 — v0.4.0 发布
+
+### v0.4 智能扫描管线正式发布
+
+里程碑 v0.4 五个核心目标全部实现并通过 E2E 验收（详见 `docs/active/review/v0.4-acceptance.md`）：
+
+| Goal | 验证 |
+| ---- | ---- |
+| 1. 多目标类型（含 company） | `v0.4-company-flow.spec.ts` Step 3 |
+| 2. FOFA 自动展开 | `v0.4-company-flow.spec.ts` Step 5/6（3 域名 + 3 IP 展开） |
+| 3. 完整 8 阶段扫描管线 | `internal-scan-live.spec.ts` |
+| 4. 智能服务指纹（Web + 非 Web） | `internal-scan-live.spec.ts` 验证 nginx/tomcat/grafana/redis/mysql 识别 |
+| 5. 指纹驱动 Nuclei tags | `internal-scan-live.spec.ts` 4 项漏洞 finding |
+| 6（新增）. Nuclei 分层扫描 | `scan-modal.spec.ts` + `scan-modal-real.spec.ts` |
+| 7（新增）. Nuclei 速率防爆破 | `scan-modal-real.spec.ts` Worker 命令含 `-rlm 30 -c 3` |
+
+### 本次发布前的最后一批改动
+
+- **前端**：`TargetPage.tsx` 下拉新增 `company` 选项
+- **后端**：`internal/search/fofa.go` 支持 `FOFA_BASE_URL` 环境变量覆盖（用于 E2E mock）
+- **E2E 基础设施**：
+  - 新增 `frontend/e2e/fixtures/fofa-mock.nginx.conf` — nginx 容器返回 FOFA 假数据
+  - 新增 `frontend/e2e/tests/v0.4-company-flow.spec.ts` — Goals 1+2 验收
+  - `docker-compose.e2e.yml` 新增 `fofa-mock` 服务，server 注入 `FOFA_BASE_URL=http://fofa-mock:8888`
+- **文档**：
+  - 新增 `docs/active/review/v0.4-acceptance.md` — v0.4 验收清单
+  - `docs/design/v0.4-scan-pipeline.md` 状态从 `in_review` 改为 `accepted`，verification 改为 `passed`
+  - `docs/current/plan.md` v0.4 升为 baseline
+  - `docs/current/architecture.md` 增补 Company 目标流和 FOFA 自动展开说明
+  - `README.md` 版本表新增 `v0.4.0`，功能清单合并 v0.4 章节
+  - `wiki/SCHEMA.md` 里程碑 v0.4 改为 ✅ 已完成 + `v0.4.0` tag
+
+---
+
 ## 2026-05-07
 
 ### Nuclei 分层扫描策略 + 速率防爆破
