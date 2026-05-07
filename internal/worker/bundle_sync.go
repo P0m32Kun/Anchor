@@ -153,7 +153,7 @@ func (s *BundleSyncer) downloadAndExtract(version string) error {
 	}
 	defer resp.Body.Close()
 
-	log.Printf("[worker] bundle download: %s -> status=%d, content-length=%d", url, resp.StatusCode, resp.ContentLength)
+	log.Printf("[worker] bundle download: status=%d, content-length=%d", resp.StatusCode, resp.ContentLength)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download bundle: %s", resp.Status)
