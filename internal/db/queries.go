@@ -315,8 +315,9 @@ func (q *Queries) CreateScanTask(t *models.ScanTask) error {
 	runID := sqlNullString(t.RunID)
 	dependsOn := sqlNullString(t.DependsOnTaskID)
 	targetID := sqlNullString(t.TargetID)
-	_, err := q.db.Exec(`INSERT INTO scan_tasks (id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.ProjectID, planID, runID, dependsOn, targetID, t.Tool, t.CommandTemplate, t.ArgumentsRedacted, t.Status, t.CreatedAt)
+	customVersion := sqlNullString(t.NucleiCustomBundleVersion)
+	_, err := q.db.Exec(`INSERT INTO scan_tasks (id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, nuclei_custom_bundle_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.ProjectID, planID, runID, dependsOn, targetID, t.Tool, t.CommandTemplate, t.ArgumentsRedacted, t.Status, customVersion, t.CreatedAt)
 	return err
 }
 
