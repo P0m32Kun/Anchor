@@ -34,13 +34,12 @@ type FofaResult struct {
 // NewFofaClient creates a new FOFA client.
 // The base URL defaults to https://fofa.info but can be overridden via the
 // FOFA_BASE_URL environment variable (used by E2E tests to point at a mock).
-func NewFofaClient(email, apiKey string) *FofaClient {
+func NewFofaClient(apiKey string) *FofaClient {
 	baseURL := "https://fofa.info"
 	if override := os.Getenv("FOFA_BASE_URL"); override != "" {
 		baseURL = strings.TrimRight(override, "/")
 	}
 	return &FofaClient{
-		email:   email,
 		apiKey:  apiKey,
 		baseURL: baseURL,
 		client:  defaultHTTPClient,
@@ -50,7 +49,7 @@ func NewFofaClient(email, apiKey string) *FofaClient {
 // SearchCompany searches FOFA for assets associated with a company name.
 // It combines org, cert, and title queries for better coverage.
 func (c *FofaClient) SearchCompany(ctx context.Context, company string) ([]FofaResult, error) {
-	if c.email == "" || c.apiKey == "" {
+	if c.apiKey == "" {
 		return nil, fmt.Errorf("FOFA credentials not configured")
 	}
 
@@ -83,7 +82,7 @@ func (c *FofaClient) SearchCompany(ctx context.Context, company string) ([]FofaR
 
 // SearchDomain searches FOFA for assets associated with a domain.
 func (c *FofaClient) SearchDomain(ctx context.Context, domain string) ([]FofaResult, error) {
-	if c.email == "" || c.apiKey == "" {
+	if c.apiKey == "" {
 		return nil, fmt.Errorf("FOFA credentials not configured")
 	}
 	q := fmt.Sprintf(`domain="%s"`, domain)
@@ -92,7 +91,7 @@ func (c *FofaClient) SearchDomain(ctx context.Context, domain string) ([]FofaRes
 
 // SearchIP searches FOFA for assets associated with an IP.
 func (c *FofaClient) SearchIP(ctx context.Context, ip string) ([]FofaResult, error) {
-	if c.email == "" || c.apiKey == "" {
+	if c.apiKey == "" {
 		return nil, fmt.Errorf("FOFA credentials not configured")
 	}
 	q := fmt.Sprintf(`ip="%s"`, ip)
@@ -104,7 +103,6 @@ func (c *FofaClient) search(ctx context.Context, query string, size int) ([]Fofa
 
 	u, _ := url.Parse(c.baseURL + "/api/v1/search/all")
 	q := u.Query()
-	q.Set("email", c.email)
 	q.Set("key", c.apiKey)
 	q.Set("qbase64", qbase64)
 	q.Set("size", strconv.Itoa(size))
