@@ -252,6 +252,93 @@ func splitNucleiCustomFilePath(r *http.Request) (id, rel string, ok bool) {
 	return id, rel, true
 }
 
+// --- Phase 2: Validation & Publishing ---
+
+func (s *Server) handleValidateNucleiCustomSource(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id is required"))
+		return
+	}
+	result, err := s.nucleiCustomMgr.ValidateSource(id)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleValidateAllNucleiCustom(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	results, err := s.nucleiCustomMgr.ValidateAll()
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
+func (s *Server) handlePublishNucleiCustom(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	version, err := s.nucleiCustomMgr.Publish()
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"version": version})
+}
+
+func (s *Server) handleGetNucleiCustomManifest(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	manifest, err := s.nucleiCustomMgr.GetActiveManifest()
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	if manifest == nil {
+		writeError(w, http.StatusNotFound, apperrors.New(apperrors.ErrNotFound, "no active bundle"))
+		return
+	}
+	writeJSON(w, http.StatusOK, manifest)
+}
+
+func (s *Server) handleDownloadNucleiCustomBundle(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	version := r.PathValue("version")
+	if version == "" {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "version is required"))
+		return
+	}
+	bundle, err := s.nucleiCustomMgr.GetBundleManifest(version)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	if bundle == nil {
+		writeError(w, http.StatusNotFound, apperrors.New(apperrors.ErrNotFound, "bundle not found"))
+		return
+	}
+
+	archivePath := s.nucleiCustomMgr.Layout().BundleArchivePath(version)
+	http.ServeFile(w, r, archivePath)
+}
+
 // writeNucleiCustomError maps a Manager-layer error onto an HTTP response.
 // AppError keeps its own status code; everything else becomes 500.
 func writeNucleiCustomError(w http.ResponseWriter, err error) {
