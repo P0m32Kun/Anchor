@@ -145,6 +145,7 @@ func (m *Manager) BuildBundle() (version string, archivePath string, err error) 
 }
 
 // createArchive builds the .tar.gz file in tmpDir.
+// Files are organized into templates/ and workflows/ directories in the archive.
 func (m *Manager) createArchive(tmpDir string, entries []BundleSourceEntry, manifestJSON []byte) error {
 	archiveFile := filepath.Join(tmpDir, "bundle.tar.gz")
 	f, err := os.Create(archiveFile)
@@ -170,14 +171,31 @@ func (m *Manager) createArchive(tmpDir string, entries []BundleSourceEntry, mani
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
-	// Write source files
+	// Write source files, organizing into templates/ and workflows/
 	for _, entry := range entries {
 		for _, filePath := range entry.Files {
 			data, err := m.layout.ReadFile(entry.ID, filePath)
 			if err != nil {
 				return fmt.Errorf("read %s/%s: %w", entry.ID, filePath, err)
 			}
-			archivePath := filepath.Join("sources", entry.ID, filePath)
+
+			// Determine the archive path based on file location
+			var archivePath string
+			if strings.HasPrefix(filePath, "templates/") {
+				// Keep in templates/ directory
+				archivePath = filePath
+			} else if strings.HasPrefix(filePath, "workflows/") {
+				// Keep in workflows/ directory
+				archivePath = filePath
+			} else if strings.HasPrefix(filePath, "fingerprints/") || strings.HasPrefix(filePath, "http/") ||
+				strings.HasPrefix(filePath, "network/") || strings.HasPrefix(filePath, "javascript/") {
+				// These are template files, put in templates/
+				archivePath = "templates/" + filePath
+			} else {
+				// Skip non-template files (metadata, scripts, etc.)
+				continue
+			}
+
 			if err := tw.WriteHeader(&tar.Header{
 				Name: archivePath,
 				Mode: 0o644,
