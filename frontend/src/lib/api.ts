@@ -640,7 +640,6 @@ export interface EngineCredential {
   id: string;
   engine: string;
   api_key: string;
-  email?: string;
   extra?: string;
   created_at: string;
   updated_at: string;
