@@ -679,14 +679,28 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 	return nil
 }
 
-// runCIDRFlow: Naabu → nerva → split → httpx → Nuclei.
+// runCIDRFlow: nmap-alive → Naabu → nerva → split → httpx → Nuclei.
 func (p *Pipeline) runCIDRFlow(ctx context.Context, targets []*models.Target) error {
-	p.setStage(StagePortScan)
-
 	cidrs := extractTargetValues(targets)
 
+	// Alive check via nmap (nmap expands CIDR and filters dead IPs)
+	p.setStage(StageAlive)
+	aliveIPs, aliveErr := p.runNmapAlive(ctx, cidrs)
+	if aliveErr != nil {
+		log.Printf("nmap alive: %v", aliveErr)
+		p.failStage(StageAlive, aliveErr.Error())
+		aliveIPs = cidrs
+	} else {
+		if len(aliveIPs) == 0 && len(cidrs) > 0 {
+			log.Printf("[pipeline] nmap reported 0 alive, falling back to %d CIDR inputs", len(cidrs))
+			aliveIPs = cidrs
+		}
+		p.completeStage(StageAlive)
+	}
+
 	// Port scan
-	ports, err := p.runNaabu(ctx, cidrs)
+	p.setStage(StagePortScan)
+	ports, err := p.runNaabu(ctx, aliveIPs)
 	if err != nil {
 		log.Printf("naabu: %v", err)
 		p.failStage(StagePortScan, err.Error())
