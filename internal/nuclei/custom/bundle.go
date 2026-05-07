@@ -137,7 +137,7 @@ func (m *Manager) BuildBundle() (version string, archivePath string, err error) 
 		Status:       "draft",
 		CreatedAt:    time.Now().UTC(),
 	}
-	if err := m.q.Createmodels.NucleiCustomBundle(bundle); err != nil {
+	if err := m.q.CreateNucleiCustomBundle(bundle); err != nil {
 		return "", "", fmt.Errorf("save bundle: %w", err)
 	}
 
