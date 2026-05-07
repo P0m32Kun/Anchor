@@ -6,6 +6,25 @@ import { PipelineConfig, DEFAULT_PIPELINE_CONFIG, PORT_RANGE_PRESETS } from "../
 
 export type ScanMode = "external" | "internal";
 
+const SCAN_CONFIG_STORAGE_KEY = "anchor.scanModal.config";
+const SCAN_MODE_STORAGE_KEY = "anchor.scanModal.mode";
+
+function loadStoredConfig(): PipelineConfig {
+  try {
+    const raw = localStorage.getItem(SCAN_CONFIG_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_PIPELINE_CONFIG };
+    const parsed = JSON.parse(raw) as Partial<PipelineConfig>;
+    return { ...DEFAULT_PIPELINE_CONFIG, ...parsed };
+  } catch {
+    return { ...DEFAULT_PIPELINE_CONFIG };
+  }
+}
+
+function loadStoredMode(): ScanMode {
+  const raw = localStorage.getItem(SCAN_MODE_STORAGE_KEY);
+  return raw === "internal" ? "internal" : "external";
+}
+
 interface ScanModalProps {
   open: boolean;
   onClose: () => void;
