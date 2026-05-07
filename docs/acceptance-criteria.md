@@ -1,7 +1,17 @@
+---
+status: archived
+source_of_truth: false
+owner: kun
+last_updated: 2026-05-07
+scope: acceptance-criteria
+archive_reason: Sprint 0 验收用例，路由结构已变更
+---
+
 # Sprint 0.5 主流程验收用例
 
 > 基于 `docs/v0.3-plan.md` 阶段目标与 Sprint 0 Scout 代码现状编写。
-> 所有用例对齐当前代码实际能力，不做超出当前实现范围的假设。
+> 所有用例对齐当前代码实际能力，不做超出当前实现范围的假设。  
+> ⚠️ 此文档已归档，路由结构已发生重大变更，仅供参考
 
 ---
 
