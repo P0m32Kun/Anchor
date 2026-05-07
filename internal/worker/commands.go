@@ -90,8 +90,11 @@ func BuildNaabuCommand(hostFile, portRange string, rate, threads, timeout int) [
 }
 
 // BuildNucleiCommand builds a Nuclei command.
-// If tags is non-empty, adds -tags flag. Otherwise runs without tag filter.
-func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string) []string {
+// scanDepth controls the scanning strategy:
+//   - "workflow": run pre-built workflows from workflowDir (precision scan)
+//   - "tags": run tag-based template matching (current behavior, broad coverage)
+//   - "both": run workflows first, then tag-based for uncovered targets
+func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string, scanDepth string, workflowDir string) []string {
 	args := []string{"nuclei", "-jsonl", "-l", targetFile}
 
 	switch profile {
@@ -103,8 +106,22 @@ func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string
 		args = append(args, "-severity", "critical,high,medium,low,info", "-timeout", "10")
 	}
 
-	if len(tags) > 0 {
-		args = append(args, "-tags", strings.Join(tags, ","))
+	switch scanDepth {
+	case "workflow":
+		if workflowDir != "" {
+			args = append(args, "-w", workflowDir)
+		}
+	case "both":
+		if workflowDir != "" {
+			args = append(args, "-w", workflowDir)
+		}
+		if len(tags) > 0 {
+			args = append(args, "-tags", strings.Join(tags, ","))
+		}
+	default: // "tags" or empty
+		if len(tags) > 0 {
+			args = append(args, "-tags", strings.Join(tags, ","))
+		}
 	}
 
 	if rateLimit > 0 {
