@@ -114,6 +114,23 @@ func BuildNucleiCommand(targetFile, profile string, rateLimit int, tags []string
 	return args
 }
 
+// BuildNucleiCustomCommand builds a Nuclei command that includes custom
+// templates (-t) and workflows (-w) from the active custom bundle.
+// customTemplatesDir and customWorkflowsDir are absolute paths on the worker;
+// either may be empty if that directory does not exist.
+func BuildNucleiCustomCommand(targetFile, profile string, rateLimit int, tags []string, customTemplatesDir, customWorkflowsDir string) []string {
+	args := BuildNucleiCommand(targetFile, profile, rateLimit, tags)
+
+	if customTemplatesDir != "" {
+		args = append(args, "-t", customTemplatesDir)
+	}
+	if customWorkflowsDir != "" {
+		args = append(args, "-w", customWorkflowsDir)
+	}
+
+	return args
+}
+
 // BuildNervaCommand builds a nerva command for service fingerprinting.
 // targets should be in "host:port" format, comma-separated.
 func BuildNervaCommand(targets string, rateLimit, workers, timeout int) []string {
