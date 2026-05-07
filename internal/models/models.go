@@ -807,6 +807,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		EnableNuclei:       true,
 		NucleiRateLimit:    100,
 		NucleiConcurrency:  25,
+		NucleiScanDepth:    "tags",
 	}
 }
 
