@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-04
+last_updated: 2026-05-07
 scope: repository-wide
 ---
 
@@ -12,8 +12,8 @@ This is the only repository-wide implementation plan that agents should treat as
 
 ## Current Baseline
 
-- The last clearly completed milestone is `v0.3` ("desktop usability and reliability").
-- The repository is in a transition period with multiple newer design and refactor documents, but they are not automatically the current truth.
+- The last clearly completed milestone is `v0.4` ("smart scan pipeline + multi-target-type + Nuclei layered scanning").
+- v0.4 acceptance criteria and test mapping live in [`../active/review/v0.4-acceptance.md`](../active/review/v0.4-acceptance.md).
 - If a document conflicts with this file, treat this file as the planning baseline unless the task explicitly says otherwise.
 
 ## Active Workstreams
@@ -22,8 +22,8 @@ This is the only repository-wide implementation plan that agents should treat as
 | --- | --- | --- | --- |
 | Documentation governance | Active | Yes | Consolidate navigation, mark document lifecycle, reduce agent confusion |
 | Current architecture baseline | Active | Yes | Defined in [`architecture.md`](architecture.md) |
-| v0.4 scan pipeline | In review | No | Candidate direction only; see [`design/README.md`](design/README.md) |
-| Database migration notes for v0.4 | In review | No | Tied to the v0.4 pipeline design; not baseline by itself |
+| v0.4 scan pipeline | Accepted | Yes | Verified by `docs/active/review/v0.4-acceptance.md`; design doc `docs/design/v0.4-scan-pipeline.md` is `accepted` |
+| Database migration notes for v0.4 | Accepted | Yes | Tied to v0.4; superseded plans now archived |
 | Large-scale refactoring | Backlog | No | See [`../refactoring-plan.md`](../refactoring-plan.md) as an idea pool, not an approved release plan |
 
 ## Rules For New Work
