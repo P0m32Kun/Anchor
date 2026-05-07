@@ -100,6 +100,28 @@ const EXTERNAL_TOOL_FIELDS: { group: string; fields: ToolField[] }[] = [
 
 const INTERNAL_TOOL_FIELDS = BASE_TOOL_FIELDS;
 
+const SCAN_DEPTH_OPTIONS: {
+  value: string;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "workflow",
+    label: "精确扫描",
+    description: "Workflow 驱动，先指纹再检测，误报低",
+  },
+  {
+    value: "tags",
+    label: "广度扫描",
+    description: "Tag 匹配模板，覆盖面广（默认）",
+  },
+  {
+    value: "both",
+    label: "综合扫描",
+    description: "Workflow + Tag 双重检测，耗时较长",
+  },
+];
+
 export default function ScanModal({ open, onClose, onStart, loading }: ScanModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mode, setMode] = useState<ScanMode>("external");
