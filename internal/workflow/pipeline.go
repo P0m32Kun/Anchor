@@ -624,9 +624,24 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 		p.completeStage(StageCDNFilter)
 	}
 
+	// Alive check via nmap
+	p.setStage(StageAlive)
+	aliveIPs, aliveErr := p.runNmapAlive(ctx, nonCDNIPs)
+	if aliveErr != nil {
+		log.Printf("nmap alive: %v", aliveErr)
+		p.failStage(StageAlive, aliveErr.Error())
+		aliveIPs = nonCDNIPs
+	} else {
+		if len(aliveIPs) == 0 && len(nonCDNIPs) > 0 {
+			log.Printf("[pipeline] nmap reported 0 alive, falling back to %d input hosts", len(nonCDNIPs))
+			aliveIPs = nonCDNIPs
+		}
+		p.completeStage(StageAlive)
+	}
+
 	// Port scan
 	p.setStage(StagePortScan)
-	ports, err := p.runNaabu(ctx, nonCDNIPs)
+	ports, err := p.runNaabu(ctx, aliveIPs)
 	if err != nil {
 		log.Printf("naabu: %v", err)
 		p.failStage(StagePortScan, err.Error())
