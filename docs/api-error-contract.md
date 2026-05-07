@@ -1,3 +1,11 @@
+---
+status: active
+source_of_truth: true
+owner: kun
+last_updated: 2026-05-07
+scope: api-error-contract
+---
+
 # API 错误格式契约审计报告
 
 > 审计范围：`internal/api/*`、`internal/worker/server.go`  
