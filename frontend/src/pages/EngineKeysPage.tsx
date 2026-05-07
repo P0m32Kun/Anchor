@@ -32,7 +32,6 @@ export default function EngineKeysPage() {
       init[def.key] = {
         engine: def.key,
         apiKey: "",
-        email: "",
         showKey: false,
         saving: false,
         deleting: false,
