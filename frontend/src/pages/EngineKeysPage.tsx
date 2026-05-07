@@ -168,15 +168,6 @@ export default function EngineKeysPage() {
               </div>
 
               <div className="space-y-3">
-                {def.needsEmail && (
-                  <Input
-                    label="Email"
-                    placeholder="请输入 Email"
-                    value={form.email}
-                    onChange={(e) => updateForm(def.key, { email: e.target.value })}
-                  />
-                )}
-
                 <div className="flex gap-2 items-start">
                   <Input
                     type={form.showKey ? "text" : "password"}
