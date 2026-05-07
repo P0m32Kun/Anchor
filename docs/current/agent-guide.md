@@ -64,7 +64,7 @@ If E2E cannot run because Docker, browsers, or external tools are missing, repor
 | In-review design proposal | `docs/design/` |
 | Accepted design index entry | `docs/current/design/README.md` |
 | Historical milestone material | `docs/archived/` |
-| Engineering conventions and pitfalls | `wiki/` |
+| Engineering conventions and pitfalls | `docs/conventions/` · `docs/pitfalls/` |
 | Short-lived task notes | Existing task issue or a scoped task doc, not a new top-level plan |
 
 ## Local Artifact Hygiene
