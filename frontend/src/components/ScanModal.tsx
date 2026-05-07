@@ -144,13 +144,11 @@ const SCAN_DEPTH_OPTIONS: {
 
 export default function ScanModal({ open, onClose, onStart, loading }: ScanModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [mode, setMode] = useState<ScanMode>("external");
-  const [config, setConfig] = useState<PipelineConfig>({ ...DEFAULT_PIPELINE_CONFIG });
+  const [mode, setMode] = useState<ScanMode>(() => loadStoredMode());
+  const [config, setConfig] = useState<PipelineConfig>(() => loadStoredConfig());
 
   const handleReset = () => {
     setStep(1);
-    setMode("external");
-    setConfig({ ...DEFAULT_PIPELINE_CONFIG });
   };
 
   const handleClose = () => {
@@ -160,6 +158,7 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
 
   const handleSelectMode = (m: ScanMode) => {
     setMode(m);
+    localStorage.setItem(SCAN_MODE_STORAGE_KEY, m);
   };
 
   const handleNext = () => {
@@ -167,11 +166,14 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
   };
 
   const handleStart = () => {
+    localStorage.setItem(SCAN_CONFIG_STORAGE_KEY, JSON.stringify(config));
+    localStorage.setItem(SCAN_MODE_STORAGE_KEY, mode);
     onStart(mode, config);
   };
 
   const handleResetDefaults = () => {
     setConfig({ ...DEFAULT_PIPELINE_CONFIG });
+    localStorage.removeItem(SCAN_CONFIG_STORAGE_KEY);
   };
 
   const updateConfig = (key: keyof PipelineConfig, value: string) => {
