@@ -272,6 +272,18 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 - [x] **ScanModal Nuclei 策略选择面板**：精确/广度/综合三选一卡片
 - [x] **Playwright E2E 测试**：覆盖 UI 交互、请求体、Worker 命令链路（`frontend/e2e/scan-modal*.spec.ts`）
 
+### v0.4: 智能扫描管线 ✅
+
+- [x] **多目标类型导入**：domain / ip / cidr / url / **company**（新增）
+- [x] **Company 目标自动展开**：FOFA `org/cert/title` 三维搜索 → 展开为 domain/ip 子目标 → 路由到对应 flow
+- [x] **完整 8 阶段扫描管线**：classify → search → subdomain → resolve → cdn_filter → portscan → fingerprint → vuln
+- [x] **智能服务指纹**：nerva 识别 Web + 非 Web 服务，不依赖端口号
+- [x] **指纹驱动 Nuclei tags**：服务类型精确映射到 Nuclei `-tags`
+- [x] **Nuclei 分层扫描**：tags / workflow / both 三选一（含 RBKD-SEC/templates 集成）
+- [x] **Nuclei 速率防爆破**：`-rlm`（每分钟限速）+ `-c`（并发）防止账号锁定
+- [x] **互联网搜索引擎页面**：FOFA / Hunter / Quake 统一搜索 + 全局 API Key 配置
+- [x] **E2E 验收**：5 个 v0.4 目标全部通过测试覆盖（见 `docs/active/review/v0.4-acceptance.md`）
+
 ## 外部工具依赖
 
 | 工具                                                       | 用途                 | 最低版本 |
