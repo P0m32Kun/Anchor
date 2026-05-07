@@ -220,7 +220,7 @@ func (m *Manager) ActivateBundle(version string) error {
 	}
 
 	// Deactivate current active bundle (if any)
-	bundles, err := m.q.Listmodels.NucleiCustomBundles()
+	bundles, err := m.q.ListNucleiCustomBundles()
 	if err != nil {
 		return fmt.Errorf("list bundles: %w", err)
 	}
@@ -266,7 +266,7 @@ func (m *Manager) ActivateBundle(version string) error {
 
 // GetActiveBundle returns the currently active bundle, or nil if none.
 func (m *Manager) GetActiveBundle() (*models.NucleiCustomBundle, error) {
-	bundles, err := m.q.Listmodels.NucleiCustomBundles()
+	bundles, err := m.q.ListNucleiCustomBundles()
 	if err != nil {
 		return nil, fmt.Errorf("list bundles: %w", err)
 	}
