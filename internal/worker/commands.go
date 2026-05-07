@@ -204,6 +204,27 @@ func BuildCDNCheckCommand(ips string) []string {
 	return []string{"cdncheck", "-i", ips, "-jsonl"}
 }
 
+// BuildNmapAliveCommand builds an nmap host-discovery command that reads
+// targets from a file (IPs and/or CIDRs, one per line) and writes greppable
+// output to stdout. Same-subnet targets are detected via ARP automatically;
+// cross-subnet uses ICMP echo + TCP SYN/ACK probes (nmap defaults).
+//
+//   -sn        ping scan only (no port scan)
+//   -n         skip DNS resolution
+//   -T4        aggressive timing (safe in trusted/internal networks)
+//   -oG -      greppable output to stdout (parsed by parser.ParseNmapAlive)
+//   -iL <file> input from file
+func BuildNmapAliveCommand(hostFile string) []string {
+	return []string{
+		"nmap",
+		"-sn",
+		"-n",
+		"-T4",
+		"-oG", "-",
+		"-iL", hostFile,
+	}
+}
+
 // appendRateLimitArgs appends tool-specific rate limit flags to the argument list.
 // Only adds flags when rate > 0 and the tool supports it.
 func appendRateLimitArgs(args []string, tool string, rate int) []string {
