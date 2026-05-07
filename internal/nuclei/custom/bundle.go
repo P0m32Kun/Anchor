@@ -102,7 +102,7 @@ func (m *Manager) BuildBundle() (version string, archivePath string, err error) 
 	version = "sha256:" + hex.EncodeToString(hash[:])
 
 	// Check if this version already exists
-	existing, err := m.q.GetNucleiCustomBundle(version)
+	existing, err := m.q.Getmodels.NucleiCustomBundle(version)
 	if err != nil {
 		return "", "", fmt.Errorf("check existing bundle: %w", err)
 	}
@@ -130,14 +130,14 @@ func (m *Manager) BuildBundle() (version string, archivePath string, err error) 
 	// Persist bundle record
 	manifest.Version = version
 	manifestJSON, _ = json.Marshal(manifest)
-	bundle := &NucleiCustomBundle{
+	bundle := &models.NucleiCustomBundle{
 		Version:      version,
 		ManifestJSON: string(manifestJSON),
 		ArchivePath:  archivePath,
 		Status:       "draft",
 		CreatedAt:    time.Now().UTC(),
 	}
-	if err := m.q.CreateNucleiCustomBundle(bundle); err != nil {
+	if err := m.q.Createmodels.NucleiCustomBundle(bundle); err != nil {
 		return "", "", fmt.Errorf("save bundle: %w", err)
 	}
 
@@ -211,7 +211,7 @@ func (m *Manager) computeSourceChecksum(sourceID string, filePaths []string) (st
 // ActivateBundle marks a bundle version as active and deactivates any
 // previously active bundle.
 func (m *Manager) ActivateBundle(version string) error {
-	bundle, err := m.q.GetNucleiCustomBundle(version)
+	bundle, err := m.q.Getmodels.NucleiCustomBundle(version)
 	if err != nil {
 		return fmt.Errorf("get bundle: %w", err)
 	}
@@ -220,21 +220,21 @@ func (m *Manager) ActivateBundle(version string) error {
 	}
 
 	// Deactivate current active bundle (if any)
-	bundles, err := m.q.ListNucleiCustomBundles()
+	bundles, err := m.q.Listmodels.NucleiCustomBundles()
 	if err != nil {
 		return fmt.Errorf("list bundles: %w", err)
 	}
 	now := time.Now().UTC()
 	for _, b := range bundles {
 		if b.Status == "active" {
-			if err := m.q.SetNucleiCustomBundleStatus(b.Version, "archived", &now); err != nil {
+			if err := m.q.Setmodels.NucleiCustomBundleStatus(b.Version, "archived", &now); err != nil {
 				return fmt.Errorf("deactivate bundle %s: %w", b.Version, err)
 			}
 		}
 	}
 
 	// Activate new bundle
-	if err := m.q.SetNucleiCustomBundleStatus(version, "active", &now); err != nil {
+	if err := m.q.Setmodels.NucleiCustomBundleStatus(version, "active", &now); err != nil {
 		return fmt.Errorf("activate bundle: %w", err)
 	}
 
@@ -265,8 +265,8 @@ func (m *Manager) ActivateBundle(version string) error {
 }
 
 // GetActiveBundle returns the currently active bundle, or nil if none.
-func (m *Manager) GetActiveBundle() (*NucleiCustomBundle, error) {
-	bundles, err := m.q.ListNucleiCustomBundles()
+func (m *Manager) GetActiveBundle() (*models.NucleiCustomBundle, error) {
+	bundles, err := m.q.Listmodels.NucleiCustomBundles()
 	if err != nil {
 		return nil, fmt.Errorf("list bundles: %w", err)
 	}
@@ -280,7 +280,7 @@ func (m *Manager) GetActiveBundle() (*NucleiCustomBundle, error) {
 
 // GetBundleManifest returns the manifest for a specific bundle version.
 func (m *Manager) GetBundleManifest(version string) (*BundleManifest, error) {
-	bundle, err := m.q.GetNucleiCustomBundle(version)
+	bundle, err := m.q.Getmodels.NucleiCustomBundle(version)
 	if err != nil {
 		return nil, fmt.Errorf("get bundle: %w", err)
 	}
