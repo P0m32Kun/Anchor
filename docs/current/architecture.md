@@ -81,9 +81,8 @@ Workflow 模板来自 [RBKD-SEC/templates](https://github.com/RBKD-SEC/templates
 
 ## What Is Not Baseline Yet
 
-- `docs/design/v0.4-scan-pipeline.md` describes a newer pipeline direction, but it is still an in-review design document.
-- `docs/design/v0.4-migrations.md` is migration support material for that same proposal.
 - `docs/refactoring-plan.md` is a backlog/refactor inventory, not the current product architecture.
+- `docs/design/custom-nuclei-template-management.md` is an in-review design for custom Nuclei template management.
 
 ## How To Use This File
 
