@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-05
+last_updated: 2026-05-07
 scope: runtime-baseline
 ---
 
@@ -41,7 +41,45 @@ The stable product narrative remains:
 
 FOFA 凭证不再绑定到项目，而是从全局 `engine_credentials` 表读取。Hunter 和 Quake 通过独立的 `/engines/search` API 调用，结果统一为 `SearchResult` 格式。
 
+### Nuclei 分层扫描策略
+
+`PipelineConfig.NucleiScanDepth` 控制 Nuclei 扫描方式，用户在 ScanModal Step 2 通过「Nuclei 扫描策略」面板选择：
+
+| 模式 | 命令行 | 适用场景 |
+| ---- | ------ | -------- |
+| `tags`（默认） | `-tags <fingerprint-tags>` | 广度扫描，按 httpx 指纹精确匹配模板 |
+| `workflow` | `-w /opt/rbkd-templates/workflows` | 精确扫描，使用预定义 workflow 串联指纹检测和漏洞利用 |
+| `both` | `-w ... -tags ...` | 综合扫描，workflow + tags 双重检测，覆盖最全 |
+
+Workflow 模板来自 [RBKD-SEC/templates](https://github.com/RBKD-SEC/templates)，由 `Dockerfile.worker-base` 在镜像构建阶段克隆到 `/opt/rbkd-templates`。
+
+### Nuclei 速率与并发控制
+
+`PipelineConfig` 暴露三个 Nuclei 速率字段，用户在 ScanModal Step 2 → Nuclei 区域配置：
+
+| 字段 | Nuclei flag | 默认 | 用途 |
+| ---- | ----------- | ---- | ---- |
+| `nuclei_rate_limit` | `-rl` | 100 rps | 每秒请求数（常规限速） |
+| `nuclei_rate_limit_per_min` | `-rlm` | 0（禁用） | 每分钟请求数（防止账号锁定/告警） |
+| `nuclei_concurrency` | `-c` | 25 | 并行模板/主机数 |
+
+扫描内网敏感目标（认证页面、ICS/SCADA、网络设备）时，建议将 `nuclei_rate_limit_per_min` 设为 30 以下、`nuclei_concurrency` 压到 1-5，避免触发账号锁定。
+
 ## What Is Not Baseline Yet
+
+- `docs/design/v0.4-scan-pipeline.md` describes a newer pipeline direction, but it is still an in-review design document.
+- `docs/design/v0.4-migrations.md` is migration support material for that same proposal.
+- `docs/refactoring-plan.md` is a backlog/refactor inventory, not the current product architecture.
+
+## How To Use This File
+
+- Use this file for repo-level orientation.
+- Use the implementation and tests to answer behavior questions.
+- Use `docs/current/design/README.md` only when a task explicitly targets a proposal or review stream.
+
+## Documentation Contract
+
+If architecture changes materially, update this file first or in the same change set. Proposal documents should explain the delta from this baseline instead of redefining the entire system from scratch.
 
 - `docs/design/v0.4-scan-pipeline.md` describes a newer pipeline direction, but it is still an in-review design document.
 - `docs/design/v0.4-migrations.md` is migration support material for that same proposal.
