@@ -31,7 +31,16 @@ RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && 
 FROM alpine:latest
 
 RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
-    apk add --no-cache ca-certificates libpcap-dev chromium git nmap
+    apk add --no-cache ca-certificates libpcap-dev git nmap nss freetype harfbuzz ttf-freefont
+
+# Chrome for Testing headless-shell — 无头截图专用，比完整 chromium 轻量 60%+
+RUN wget -q -O /tmp/chrome.zip \
+      "https://storage.googleapis.com/chrome-for-testing-public/135.0.7049.95/linux64/chrome-headless-shell-linux64.zip" && \
+    unzip -q /tmp/chrome.zip -d /opt/chrome && \
+    rm /tmp/chrome.zip && \
+    ln -s /opt/chrome/chrome-headless-shell-linux64/chrome-headless-shell /usr/bin/chromium
+
+ENV CHROME_PATH=/usr/bin/chromium
 
 COPY --from=tools-builder /go/bin/subfinder /usr/local/bin/
 COPY --from=tools-builder /go/bin/naabu    /usr/local/bin/
