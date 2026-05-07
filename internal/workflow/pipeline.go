@@ -35,6 +35,7 @@ const (
 	StageSubdomain   StageID = "subdomain"
 	StageResolve     StageID = "resolve"
 	StageCDNFilter   StageID = "cdn_filter"
+	StageAlive       StageID = "alive"
 	StagePortScan    StageID = "portscan"
 	StageFingerprint StageID = "fingerprint"
 	StageHTTPX       StageID = "httpx"
