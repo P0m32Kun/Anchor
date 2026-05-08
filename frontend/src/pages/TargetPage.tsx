@@ -24,20 +24,15 @@ import {
   TableHead,
   TableCell
 } from "../components";
-import { 
-  Info,
-  Upload,
+import {
   Target as TargetIcon,
   ShieldCheck,
   Plus,
   Play,
-  FileText,
-  Search,
   CheckCircle2,
   AlertCircle,
   Clock,
   Zap,
-  ChevronRight,
   FileUp,
   X,
   Users
