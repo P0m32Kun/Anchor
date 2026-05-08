@@ -113,7 +113,7 @@ func migrateV04(db *sql.DB) error {
 			is_web BOOLEAN DEFAULT FALSE,
 			service TEXT NOT NULL,
 			metadata TEXT,
-			source TEXT DEFAULT 'nerva',
+			source TEXT DEFAULT 'nmap',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(project_id, ip, port)
 		);
