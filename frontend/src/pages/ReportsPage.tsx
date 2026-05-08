@@ -204,9 +204,6 @@ export default function ReportsPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  const confirmedCount = findings.filter((f) => f.finding.status === "confirmed").length;
-  const acceptedCount = findings.filter((f) => f.finding.status === "accepted_risk").length;
-
   const severityCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const fd of findings) {
