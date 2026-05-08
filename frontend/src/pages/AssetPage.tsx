@@ -43,18 +43,17 @@ export default function AssetPage() {
   const setAssets = useStore((state) => state.setAssets);
   const webEndpoints = useStore((state) => state.webEndpoints) ?? [];
   const setWebEndpoints = useStore((state) => state.setWebEndpoints);
-  const ports = useStore((state) => state.ports);
-  const setPorts = useStore((state) => state.setPorts);
-  const services = useStore((state) => state.services);
-  const setServices = useStore((state) => state.setServices);
-
   const [activeTab, setActiveTab] = useState<"assets" | "web" | "ports">("assets");
   const loading = useStore((state) => state.assetsLoading);
   const error = useStore((state) => state.assetsError);
   const setAssetsLoading = useStore((state) => state.setAssetsLoading);
   const setAssetsError = useStore((state) => state.setAssetsError);
   const toast = useToast();
-  const [portsAllLoading, setPortsAllLoading] = useState(false);
+
+  const servicePorts = useStore((state) => state.servicePorts);
+  const servicePortsLoading = useStore((state) => state.servicePortsLoading);
+  const setServicePorts = useStore((state) => state.setServicePorts);
+  const setServicePortsLoading = useStore((state) => state.setServicePortsLoading);
   const [portPage, setPortPage] = useState(1);
   const PORT_PAGE_SIZE = 20;
 
