@@ -878,7 +878,7 @@ func (p *Pipeline) runNerva(ctx context.Context, ports []parser.PortInfo) ([]fin
 		targets = append(targets, fmt.Sprintf("%s:%d", port.IP, port.Port))
 	}
 
-	cmd := worker.BuildNervaCommand(strings.Join(targets, ","), p.config.NervaRateLimit, p.config.NervaWorkers, p.config.NervaTimeout)
+	cmd := worker.BuildNervaCommand(strings.Join(targets, ","), p.config.NervaFastMode, p.config.NervaRateLimit, p.config.NervaWorkers, p.config.NervaTimeout)
 	task, stdout, err := p.createAndRunTask(ctx, "nerva", cmd)
 	if err != nil {
 		return nil, err
