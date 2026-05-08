@@ -3,7 +3,6 @@ import {
   api,
   type NucleiCustomSource,
   type NucleiCustomFileEntry,
-  type NucleiCustomValidationResult,
 } from "../lib/api";
 import {
   useToast,
