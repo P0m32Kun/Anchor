@@ -49,9 +49,7 @@ export default function RunsPage() {
   const projectId = useProjectId();
   const toast = useToast();
   const runs = useStore((state) => state.runs) ?? [];
-  const runsLoading = useStore((state) => state.runsLoading);
   const setRuns = useStore((state) => state.setRuns);
-  const setRunsLoading = useStore((state) => state.setRunsLoading);
   const setRunsError = useStore((state) => state.setRunsError);
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
   const [tasks, setTasks] = useState<ScanTask[]>([]);
@@ -80,25 +78,19 @@ export default function RunsPage() {
     lastToastErrorRef.current = null;
   }, []);
 
-  const loadRuns = useCallback(
-    async (signal?: AbortSignal) => {
+  const {
+    loading: runsLoading,
+    reload: loadRuns,
+  } = useResource(
+    async (signal) => {
       if (!projectId) return;
-      setRunsLoading(true);
+      const data = await api.listScanRuns(projectId, PAGE_ALL, signal);
+      setRuns(data.data ?? []);
       setRunsError(null);
-      try {
-        const data = await api.listScanRuns(projectId, PAGE_ALL, signal);
-        setRuns(data.data ?? []);
-        clearToastError();
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        const msg = err instanceof Error ? err.message : String(err);
-        setRunsError(msg);
-        maybeToastError(msg);
-      } finally {
-        setRunsLoading(false);
-      }
+      clearToastError();
     },
-    [projectId, setRuns, setRunsLoading, setRunsError, maybeToastError, clearToastError]
+    [projectId],
+    undefined
   );
 
   const loadRunDetails = async (runId: string, signal?: AbortSignal) => {
@@ -123,13 +115,6 @@ export default function RunsPage() {
       setStagesLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!projectId) return;
-    const ctrl = new AbortController();
-    loadRuns(ctrl.signal);
-    return () => ctrl.abort();
-  }, [projectId, loadRuns]);
 
   // SSE for real-time updates
   const sseUrl = projectId ? `${getApiBase()}/projects/${projectId}/events` : `${getApiBase()}/events`;
