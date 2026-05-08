@@ -73,10 +73,6 @@ export default function AssetPage() {
   const webEndpoints = useStore((state) => state.webEndpoints) ?? [];
   const setWebEndpoints = useStore((state) => state.setWebEndpoints);
   const [activeTab, setActiveTab] = useState<"assets" | "web" | "ports">("assets");
-  const loading = useStore((state) => state.assetsLoading);
-  const error = useStore((state) => state.assetsError);
-  const setAssetsLoading = useStore((state) => state.setAssetsLoading);
-  const setAssetsError = useStore((state) => state.setAssetsError);
   const toast = useToast();
 
   const servicePorts = useStore((state) => state.servicePorts);
@@ -86,22 +82,19 @@ export default function AssetPage() {
   const [portPage, setPortPage] = useState(1);
   const PORT_PAGE_SIZE = 20;
 
-  const loadAssets = useCallback(async (signal?: AbortSignal) => {
-    if (!projectId) return;
-    setAssetsLoading(true);
-    setAssetsError(null);
-    try {
+  const {
+    loading,
+    error,
+    reload: loadAssets,
+  } = useResource(
+    async (signal) => {
+      if (!projectId) return;
       const data = await api.listAssets(projectId, PAGE_ALL, signal);
       setAssets(data.data ?? []);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      const msg = err instanceof Error ? err.message : String(err);
-      setAssetsError(msg);
-      console.error(err);
-    } finally {
-      setAssetsLoading(false);
-    }
-  }, [projectId, setAssets, setAssetsLoading, setAssetsError]);
+    },
+    [projectId],
+    undefined
+  );
 
   const loadWebEndpoints = useCallback((signal?: AbortSignal) => {
     if (!projectId) return;
@@ -133,10 +126,9 @@ export default function AssetPage() {
   useEffect(() => {
     if (!projectId) return;
     const ctrl = new AbortController();
-    loadAssets(ctrl.signal);
     loadWebEndpoints(ctrl.signal);
     return () => ctrl.abort();
-  }, [projectId, loadAssets, loadWebEndpoints]);
+  }, [projectId, loadWebEndpoints]);
 
   useEffect(() => {
     if (activeTab !== "ports" || !projectId) return;
