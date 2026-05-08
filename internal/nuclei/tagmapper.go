@@ -163,7 +163,7 @@ func MapPreciseTags(technologies []string, webserver string) []string {
 	return tags
 }
 
-// serviceToTag maps nerva-detected service names to Nuclei tags.
+// serviceToTag maps nmap-detected service names to Nuclei tags.
 var serviceToTag = map[string]string{
 	"mysql":         "mysql",
 	"postgresql":    "postgresql",
