@@ -246,14 +246,8 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 	if cfg.NaabuTimeout == 0 {
 		cfg.NaabuTimeout = defaults.NaabuTimeout
 	}
-	if cfg.NervaRateLimit == 0 {
-		cfg.NervaRateLimit = defaults.NervaRateLimit
-	}
-	if cfg.NervaWorkers == 0 {
-		cfg.NervaWorkers = defaults.NervaWorkers
-	}
-	if cfg.NervaTimeout == 0 {
-		cfg.NervaTimeout = defaults.NervaTimeout
+	if cfg.NmapServiceTimeout == 0 {
+		cfg.NmapServiceTimeout = defaults.NmapServiceTimeout
 	}
 	if cfg.HttpxRateLimit == 0 {
 		cfg.HttpxRateLimit = defaults.HttpxRateLimit
