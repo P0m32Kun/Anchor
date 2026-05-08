@@ -444,31 +444,30 @@ export default function RunsPage() {
 
           <div className="divide-y divide-glass-border-light">
             {tasks.map((task) => (
-              <div
-                key={task.id}
-                className="py-3 px-2 flex items-center justify-between text-sm"
-              >
-                <div className="flex items-center gap-4">
-                  <span className="font-medium text-text-secondary w-20">
-                    {task.tool}
-                  </span>
-                  <span className="font-mono text-text-quaternary text-xs">
-                    {task.id.slice(-8)}
+              <div key={task.id} className="py-3 px-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="font-medium text-text-secondary w-20">
+                      {task.tool}
+                    </span>
+                    <span className="font-mono text-text-quaternary text-xs">
+                      {task.id.slice(-8)}
+                    </span>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      taskStatusColors[task.status] || "bg-white/[0.04] text-text-tertiary"
+                    }`}
+                  >
+                    {task.status}
                   </span>
                 </div>
-                <span
-                  className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    taskStatusColors[task.status] || "bg-white/[0.04] text-text-tertiary"
-                  }`}
-                >
-                  {task.status}
-                </span>
+                {task.error_message && (
+                  <div className="mt-1 text-xs text-brand-danger font-mono truncate">
+                    {task.error_message}
+                  </div>
+                )}
               </div>
-              {task.error_message && (
-                <div className="px-2 mt-1 text-xs text-brand-danger font-mono truncate">
-                  {task.error_message}
-                </div>
-              )}
             ))}
             {tasks.length === 0 && !tasksLoading && (
               <div className="py-8 text-center text-text-quaternary">暂无任务</div>
