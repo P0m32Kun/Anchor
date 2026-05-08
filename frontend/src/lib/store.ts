@@ -87,6 +87,8 @@ export const useStore = create<AppState>()(
       webEndpoints: [],
       ports: {},
       services: {},
+      servicePorts: [],
+      servicePortsLoading: false,
       findings: [],
       findingsLoading: false,
       findingsError: null,
