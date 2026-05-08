@@ -53,6 +53,8 @@ interface AppState {
   setWebEndpoints: (w: WebEndpoint[]) => void;
   setPorts: (assetId: string, p: Port[]) => void;
   setServices: (assetId: string, s: Service[]) => void;
+  setServicePorts: (sp: ServicePort[]) => void;
+  setServicePortsLoading: (loading: boolean) => void;
   setFindings: (f: Finding[] | ((prev: Finding[]) => Finding[])) => void;
   setFindingsLoading: (loading: boolean) => void;
   setFindingsError: (error: string | null) => void;
