@@ -149,7 +149,7 @@ export default function EnginesPage() {
         {hasSearched && results.length === 0 && !loading ? (
           <EmptyState title="未找到结果" description="尝试修改查询语句后重新搜索" />
         ) : (
-          <Table<SearchResult>
+          <Table
             columns={[
               { key: "ip", header: "IP" },
               { key: "port", header: "端口", render: (r) => (r.port ? String(r.port) : "-") },
