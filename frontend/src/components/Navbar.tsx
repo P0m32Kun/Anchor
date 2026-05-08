@@ -13,21 +13,23 @@ import {
   Play, 
   AlertTriangle, 
   FileText,
-  ChevronDown
+  ChevronDown,
+  Sparkles
 } from "lucide-react";
 
 type NavItem = {
   path: string;
   label: string;
   icon: React.ElementType;
+  color: string; // 增加图标基础色
 };
 
 const globalNavItems: NavItem[] = [
-  { path: "/", label: "总览", icon: LayoutDashboard },
-  { path: "/projects", label: "项目", icon: Files },
-  { path: "/engines", label: "搜索引擎", icon: Search },
-  { path: "/workers", label: "Workers", icon: Cpu },
-  { path: "/settings", label: "设置", icon: Settings },
+  { path: "/", label: "总览", icon: LayoutDashboard, color: "text-blue-400" },
+  { path: "/projects", label: "项目", icon: Files, color: "text-indigo-400" },
+  { path: "/engines", label: "引擎", icon: Search, color: "text-cyan-400" },
+  { path: "/workers", label: "Workers", icon: Cpu, color: "text-emerald-400" },
+  { path: "/settings", label: "设置", icon: Settings, color: "text-slate-400" },
 ];
 
 function isItemActive(locationPathname: string, itemPath: string): boolean {
@@ -42,14 +44,20 @@ function NavLinkItem({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       to={item.path}
       className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all",
+        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
         active
-          ? "bg-secondary text-foreground shadow-sm"
-          : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          ? "bg-primary/10 text-primary shadow-[inset_0_0_12px_rgba(0,212,255,0.1)] border border-primary/20"
+          : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
       )}
     >
-      <item.icon className="h-4 w-4" strokeWidth={2} />
+      <item.icon className={cn(
+        "h-4 w-4 transition-transform duration-300 group-hover:scale-110",
+        active ? "text-primary" : item.color
+      )} strokeWidth={2.5} />
       <span>{item.label}</span>
+      {active && (
+         <div className="absolute left-[-12px] top-1/4 h-1/2 w-1 rounded-r-full bg-primary shadow-[0_0_10px_rgba(0,212,255,0.8)]" />
+      )}
     </Link>
   );
 }
@@ -63,11 +71,11 @@ export function Navbar() {
 
   const projectLinks: NavItem[] = currentProjectId
     ? [
-        { path: `/projects/${currentProjectId}/targets`, label: "目标与 Scope", icon: Target },
-        { path: `/projects/${currentProjectId}/assets`, label: "资产清单", icon: Box },
-        { path: `/projects/${currentProjectId}/runs`, label: "扫描执行", icon: Play },
-        { path: `/projects/${currentProjectId}/findings`, label: "发现审核", icon: AlertTriangle },
-        { path: `/projects/${currentProjectId}/reports`, label: "报告交付", icon: FileText },
+        { path: `/projects/${currentProjectId}/targets`, label: "目标与 Scope", icon: Target, color: "text-emerald-400" },
+        { path: `/projects/${currentProjectId}/assets`, label: "资产清单", icon: Box, color: "text-blue-400" },
+        { path: `/projects/${currentProjectId}/runs`, label: "扫描执行", icon: Play, color: "text-violet-400" },
+        { path: `/projects/${currentProjectId}/findings`, label: "发现审核", icon: AlertTriangle, color: "text-rose-400" },
+        { path: `/projects/${currentProjectId}/reports`, label: "报告交付", icon: FileText, color: "text-amber-400" },
       ]
     : [];
 
@@ -80,20 +88,22 @@ export function Navbar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-right bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r border-border">
-      <div className="flex h-14 items-center gap-2 px-6 border-b border-border">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-foreground text-background">
-           <Box className="h-4 w-4" />
+    <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col glass-panel border-r border-white/5 shadow-2xl">
+      <div className="flex h-16 items-center gap-3 px-6 border-b border-white/5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-violet-600 shadow-lg shadow-primary/20">
+           <Box className="h-5 w-5 text-white" />
         </div>
-        <span className="font-bold tracking-tight text-foreground">Anchor</span>
+        <span className="font-black text-lg tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
+            ANCHOR
+        </span>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+      <div className="flex-1 space-y-6 overflow-y-auto px-4 py-6 custom-scrollbar">
         <div>
-          <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-muted-foreground uppercase">
+          <h2 className="mb-3 px-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
             Workspace
           </h2>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {globalNavItems.map((item) => (
               <NavLinkItem
                 key={item.path}
@@ -105,29 +115,29 @@ export function Navbar() {
         </div>
 
         {currentProjectId && (
-          <div>
-             <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-muted-foreground uppercase">
-              Current Project
+          <div className="animate-in slide-in-from-left-4 duration-500">
+             <h2 className="mb-3 px-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 flex items-center gap-2">
+              <Sparkles className="h-3 w-3" />
+              Active Project
             </h2>
-            <div className="px-3 mb-2">
-              <div className="relative">
+            <div className="px-1 mb-4">
+              <div className="relative group">
                 <select
                   value={currentProjectId ?? ""}
                   onChange={handleProjectSwitch}
-                  className="w-full appearance-none rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all hover:bg-white/10"
                 >
-                  <option value="" disabled>选择项目</option>
                   {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
+                    <option key={project.id} value={project.id} className="bg-slate-900">
                       {project.name}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-3 top-2.5 h-3.5 w-3.5 opacity-50" />
+                <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 group-hover:text-primary transition-colors pointer-events-none" />
               </div>
             </div>
             
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {projectLinks.map((item) => (
                 <NavLinkItem
                   key={item.path}
@@ -141,18 +151,21 @@ export function Navbar() {
       </div>
 
       <div className="mt-auto p-4">
-        <div className="rounded-lg border border-border bg-muted/50 p-3">
-          <div className="text-[10px] font-medium uppercase text-muted-foreground mb-2">Workflow Status</div>
-          <div className="flex gap-1">
+        <div className="rounded-2xl border border-white/5 bg-white/5 p-4 shadow-inner">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-3 flex justify-between items-center">
+            Nodes Online
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          </div>
+          <div className="flex gap-1.5">
              {[1,2,3,4,5,6].map(i => (
                <div key={i} className={cn(
                  "h-1.5 flex-1 rounded-full",
-                 currentProjectId ? "bg-foreground/20" : "bg-muted"
+                 currentProjectId ? "bg-primary/30" : "bg-white/5"
                )} />
              ))}
           </div>
-          <div className="mt-2 text-[11px] text-muted-foreground">
-            {currentProjectId ? "Ready for audit" : "No project active"}
+          <div className="mt-3 text-[11px] font-semibold text-muted-foreground">
+            System status nominal
           </div>
         </div>
       </div>

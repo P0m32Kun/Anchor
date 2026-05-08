@@ -9,17 +9,19 @@ type BadgeVariant =
   | "success"
   | "warning"
   | "info"
-  | "critical";
+  | "critical"
+  | "purple";
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-  secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
-  outline: "text-foreground border-border hover:bg-accent",
-  destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
-  success: "border-transparent bg-brand-success/15 text-brand-success",
-  warning: "border-transparent bg-brand-warning/15 text-brand-warning",
-  info: "border-transparent bg-brand-info/15 text-brand-info",
-  critical: "border-transparent bg-destructive text-destructive-foreground animate-pulse",
+  default: "bg-primary/20 text-primary border-primary/30",
+  secondary: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+  outline: "text-foreground border-white/10 bg-white/5",
+  destructive: "bg-rose-500/20 text-rose-400 border-rose-500/30",
+  success: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  warning: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  info: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+  purple: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+  critical: "bg-rose-600 text-white border-rose-400 shadow-[0_0_15px_rgba(225,29,72,0.4)] animate-pulse",
 };
 
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
@@ -37,7 +39,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all",
         variantStyles[variant],
         className
       )}
@@ -46,7 +48,7 @@ export function Badge({
       {dot && (
         <span
           className={cn(
-            "mr-1.5 h-1.5 w-1.5 rounded-full bg-current"
+            "mr-1.5 h-1 w-1 rounded-full bg-current animate-pulse"
           )}
         />
       )}
@@ -71,7 +73,7 @@ export function SeverityBadge({
   };
   return (
     <Badge variant={map[severity] || "outline"} className={className}>
-      {severity.toUpperCase()}
+      {severity}
     </Badge>
   );
 }
@@ -88,20 +90,20 @@ export function StatusBadge({
     accepted_risk: "info",
     pending_review: "warning",
     false_positive: "outline",
-    ignored: "outline",
+    ignored: "secondary",
     active: "success",
     expired: "destructive",
     pending: "secondary",
-    running: "info",
+    running: "purple",
     failed: "destructive",
     completed: "success",
   };
   const label: Record<string, string> = {
     confirmed: "已确认",
-    accepted_risk: "已接受风险",
+    accepted_risk: "接受风险",
     pending_review: "待审核",
     false_positive: "误报",
-    ignored: "已忽略",
+    ignored: "忽略",
     active: "进行中",
     expired: "已过期",
     pending: "未开始",
@@ -110,7 +112,7 @@ export function StatusBadge({
     completed: "已完成",
   };
   return (
-    <Badge variant={map[status] || "outline"} className={className} dot={status === 'running'}>
+    <Badge variant={map[status] || "outline"} className={cn("px-3 py-1", className)} dot={status === 'running'}>
       {label[status] || status}
     </Badge>
   );

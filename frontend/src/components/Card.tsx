@@ -11,12 +11,14 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          "rounded-xl border border-border bg-card text-card-foreground shadow-sm",
-          hover && "hover:bg-accent/50 transition-colors cursor-pointer",
+          "rounded-2xl border border-white/5 bg-card/50 backdrop-blur-sm text-card-foreground shadow-xl transition-all duration-300",
+          hover && "hover:bg-card/80 hover:border-primary/30 hover:shadow-primary/5 cursor-pointer hover:-translate-y-0.5",
           className
         )}
         {...props}
       >
+        {/* 内置一个极其微弱的顶部光辉边框，增加高级感 */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
         {children}
       </div>
     );
@@ -42,7 +44,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTM
     return (
       <h3 
         ref={ref} 
-        className={cn("text-lg font-semibold leading-none tracking-tight text-foreground", className)} 
+        className={cn("text-lg font-bold leading-none tracking-tight text-foreground/90", className)} 
         {...props}
       >
         {children}
@@ -56,7 +58,7 @@ export const CardDescription = forwardRef<HTMLParagraphElement, React.HTMLAttrib
     return (
       <p 
         ref={ref} 
-        className={cn("text-sm text-muted-foreground", className)} 
+        className={cn("text-sm text-muted-foreground font-medium", className)} 
         {...props}
       >
         {children}
