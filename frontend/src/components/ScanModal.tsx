@@ -46,7 +46,7 @@ const MODE_OPTIONS: {
     mode: "external",
     label: "外网扫描",
     description: "面向互联网的资产发现与漏洞检测",
-    tools: ["FOFA", "Subfinder", "DNSx", "CDNCheck", "Naabu", "Nerva", "HTTPX", "Nuclei"],
+    tools: ["FOFA", "Subfinder", "DNSx", "CDNCheck", "Naabu", "nmap -sV", "HTTPX", "Nuclei"],
     icon: Globe,
     color: "text-blue-400",
   },
