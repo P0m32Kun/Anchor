@@ -62,8 +62,8 @@ export default function EnginesPage() {
     setLoading(true);
     setHasSearched(true);
     try {
-      const res = await api.searchEngine(activeEngine, query, currentPage, PAGE_SIZE, ctrl.signal);
-      setResults(res.results || []);
+      const res = await api.searchEngine({ engine: activeEngine, query, page: currentPage, size: PAGE_SIZE }, ctrl.signal);
+      setResults(res.data || []);
       setTotal(res.total || 0);
     } catch (err: any) {
       if (err.name === "AbortError") return;
