@@ -54,7 +54,7 @@ const MODE_OPTIONS: {
     mode: "internal",
     label: "内网扫描",
     description: "内网资产端口、服务与漏洞检测",
-    tools: ["Naabu", "Nerva", "HTTPX", "Nuclei"],
+    tools: ["Naabu", "nmap -sV", "HTTPX", "Nuclei"],
     icon: Shield,
     color: "text-emerald-400",
   },
