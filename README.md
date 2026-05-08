@@ -275,7 +275,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 - [x] **多目标类型导入**：domain / ip / cidr / url / **company**（新增）
 - [x] **Company 目标自动展开**：FOFA `org/cert/title` 三维搜索 → 展开为 domain/ip 子目标 → 路由到对应 flow
 - [x] **完整 8 阶段扫描管线**：classify → search → subdomain → resolve → cdn_filter → portscan → fingerprint → vuln
-- [x] **智能服务指纹**：nerva 识别 Web + 非 Web 服务，不依赖端口号
+- [x] **智能服务指纹**：nmap -sV 识别 Web + 非 Web 服务，不依赖端口号
 - [x] **指纹驱动 Nuclei tags**：服务类型精确映射到 Nuclei `-tags`
 - [x] **Nuclei 分层扫描**：tags / workflow / both 三选一（含 RBKD-SEC/templates 集成）
 - [x] **Nuclei 速率防爆破**：`-rlm`（每分钟限速）+ `-c`（并发）防止账号锁定
