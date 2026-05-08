@@ -1,26 +1,16 @@
 # Anchor Remote Worker Dockerfile
-# 基于 anchor-worker-base（预装安全工具）快速构建
+# 基于 anchor-worker-base（预装安全工具）和 anchor-worker-builder-base（预装构建依赖）快速构建
 #
-# 首次使用请先构建基础镜像：
-#   make build-worker-base
+# 首次使用前请先构建两个基础镜像：
+#   make setup-worker-base
 #
 # 然后正常构建 worker：
 #   docker build -f Dockerfile.worker -t anchor-worker .
-#   docker run -e ANCHOR_CORE_URL=http://server:17421 anchor-worker
 
-# --- 编译阶段：只编译业务代码，不需要重新安装工具 ---
-FROM golang:1.26-bookworm AS builder
-
-RUN apt-get update && apt-get install -y --no-install-recommends git gcc libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
+# --- 编译阶段：从 builder base 开始，跳过 apt + go mod download ---
+FROM anchor-worker-builder-base:latest AS builder
 
 WORKDIR /build
-COPY go.mod go.sum ./
-
-ENV GOPROXY=https://goproxy.cn,direct
-ENV GOSUMDB=off
-RUN go mod download
-
 COPY . .
 RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor .
 
