@@ -385,7 +385,7 @@ export default function ReportsPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                    <Button variant="outline" className="w-full justify-between group" onClick={() => handleExport("md")} loading={exporting === 'md'}>
+                    <Button variant="secondary" className="w-full justify-between group" onClick={() => handleExport("md")} loading={exporting === 'md'}>
                         <div className="flex items-center">
                             <FileCode className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary" />
                             <span>Markdown (.md)</span>
