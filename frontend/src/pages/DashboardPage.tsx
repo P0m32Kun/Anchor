@@ -11,8 +11,7 @@ import {
   Card, 
   CardHeader, 
   CardTitle, 
-  CardContent,
-  CardDescription
+  CardContent
 } from "../components";
 import type { DashboardStats } from "../lib/api";
 import { 
