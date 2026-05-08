@@ -29,6 +29,7 @@ const globalNavItems: NavItem[] = [
   { path: "/", label: "总览", icon: LayoutDashboard, color: "text-blue-400" },
   { path: "/projects", label: "项目", icon: Files, color: "text-indigo-400" },
   { path: "/engines", label: "引擎", icon: Search, color: "text-cyan-400" },
+  { path: "/templates", label: "模板", icon: Layers, color: "text-violet-400" },
   { path: "/workers", label: "Workers", icon: Cpu, color: "text-emerald-400" },
   { path: "/settings", label: "设置", icon: Settings, color: "text-slate-400" },
 ];
