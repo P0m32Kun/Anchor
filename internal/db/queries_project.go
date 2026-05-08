@@ -1,6 +1,8 @@
 package db
 
 import (
+	"database/sql"
+
 	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
