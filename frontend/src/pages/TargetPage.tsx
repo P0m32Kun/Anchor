@@ -223,14 +223,25 @@ function StatItem({ label, value, color = "text-muted-foreground" }: { label: st
 export default function TargetPage() {
   const navigate = useNavigate();
   const projectId = useProjectId();
-  const targets = useStore((state) => state.targets) ?? [];
-  const setTargets = useStore((state) => state.setTargets);
   const currentProject = useStore((state) => state.currentProject);
-  const loading = useStore((state) => state.targetsLoading);
-  const error = useStore((state) => state.targetsError);
-  const setTargetsLoading = useStore((state) => state.setTargetsLoading);
-  const setTargetsError = useStore((state) => state.setTargetsError);
-  
+  const setTargets = useStore((state) => state.setTargets);
+  const targets = useStore((state) => state.targets) ?? [];
+  const toast = useToast();
+
+  const {
+    loading,
+    error,
+    reload: loadTargets,
+  } = useResource(
+    async (signal) => {
+      if (!projectId) return;
+      const data = await api.listTargets(projectId, PAGE_ALL, signal);
+      setTargets(data.data ?? []);
+    },
+    [projectId],
+    undefined
+  );
+
   const [targetValue, setTargetValue] = useState("");
   const [targetType, setTargetType] = useState("auto");
   const [scopeAction, setScopeAction] = useState<"include" | "exclude">("include");
@@ -249,32 +260,6 @@ export default function TargetPage() {
   const [addingScope, setAddingScope] = useState(false);
   const [dryRunLoading, setDryRunLoading] = useState(false);
   const [dryRunConfirmOpen, setDryRunConfirmOpen] = useState(false);
-
-  const toast = useToast();
-
-  const loadTargets = useCallback(async (signal?: AbortSignal) => {
-    if (!projectId) return;
-    setTargetsLoading(true);
-    setTargetsError(null);
-    try {
-      const data = await api.listTargets(projectId, PAGE_ALL, signal);
-      setTargets(data.data ?? []);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      const msg = err instanceof Error ? err.message : String(err);
-      setTargetsError(msg);
-      toast("加载目标失败: " + msg, "error");
-    } finally {
-      setTargetsLoading(false);
-    }
-  }, [projectId, setTargets, setTargetsLoading, setTargetsError]);
-
-  useEffect(() => {
-    if (!projectId) return;
-    const ctrl = new AbortController();
-    loadTargets(ctrl.signal);
-    return () => ctrl.abort();
-  }, [projectId, loadTargets]);
 
   const addTarget = async (e: React.FormEvent) => {
     e.preventDefault();
