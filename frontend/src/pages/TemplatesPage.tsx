@@ -495,22 +495,29 @@ export default function TemplatesPage() {
                                         </span>
                                       </div>
                                       <div className="flex gap-1 opacity-0 group-hover/file:opacity-100 transition-opacity">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-7 w-7 p-0"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            openFileEditor(src.id, f.path);
-                                          }}
-                                        >
-                                          <Edit3 className="h-3 w-3" />
-                                        </Button>
+                                        {(f.path.endsWith(".yaml") || f.path.endsWith(".yml") || f.path.startsWith("payloads/")) && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 w-7 p-0"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openFileEditor(src.id, f.path);
+                                            }}
+                                            title="编辑"
+                                          >
+                                            <Edit3 className="h-3 w-3" />
+                                          </Button>
+                                        )}
                                         <Button
                                           variant="ghost"
                                           size="sm"
                                           className="h-7 w-7 p-0 text-rose-400"
-                                          onClick={() => handleDeleteFile(src.id, f.path)}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteFile(src.id, f.path);
+                                          }}
+                                          title="删除"
                                         >
                                           <Trash2 className="h-3 w-3" />
                                         </Button>
