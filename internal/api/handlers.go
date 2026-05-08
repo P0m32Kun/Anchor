@@ -94,6 +94,20 @@ func defaultToolTimeout(tool string) time.Duration {
 	}
 }
 
+// handleServiceError handles errors returned by service layer methods.
+// It returns true if an error was written to the response (caller should return).
+func (s *Server) handleServiceError(w http.ResponseWriter, err error, fallbackMsg string) bool {
+	if err == nil {
+		return false
+	}
+	if appErr, ok := err.(*errors.AppError); ok {
+		writeError(w, appErr.StatusCode(), appErr)
+		return true
+	}
+	writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "%s: %v", fallbackMsg, err))
+	return true
+}
+
 func redactArgs(cmd string) string {
 	parts := strings.Fields(cmd)
 	for i, p := range parts {
