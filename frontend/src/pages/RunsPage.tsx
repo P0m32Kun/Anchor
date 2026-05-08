@@ -21,18 +21,16 @@ import { useSSE, usePolling } from "../hooks";
 import { getApiBase } from "../lib/config";
 import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
-import { 
-  Play, 
-  Activity, 
-  Clock, 
-  XCircle, 
-  CheckCircle2, 
-  AlertCircle, 
-  Terminal, 
+import {
+  Play,
+  Activity,
+  Clock,
+  XCircle,
+  CheckCircle2,
+  AlertCircle,
+  Terminal,
   History,
   Zap,
-  MoreVertical,
-  ChevronRight,
   Loader2
 } from "lucide-react";
 import { cn } from "../lib/utils";
