@@ -85,18 +85,6 @@ export default function AssetPage() {
       });
   }, [projectId, setWebEndpoints]);
 
-  const loadPorts = useCallback(
-    (assetId: string, signal?: AbortSignal) => {
-      api.listPorts(assetId, signal)
-        .then((p) => setPorts(assetId, p))
-        .catch((err) => {
-          if (err instanceof DOMException && err.name === "AbortError") return;
-          console.error(err);
-        });
-    },
-    [setPorts]
-  );
-
   const loadAllPortsAndServices = useCallback(
     async (signal?: AbortSignal) => {
       const ipAssets = assets.filter((a) => a.type === "ip");
