@@ -589,6 +589,7 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   naabu_threads: 100,
   naabu_timeout: 600,
   enable_nerva: true,
+  nerva_fast_mode: true,
   nerva_rate_limit: 100,
   nerva_workers: 50,
   nerva_timeout: 10,
