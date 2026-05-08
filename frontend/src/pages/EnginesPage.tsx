@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { api, SearchResult } from "../lib/api";
-import { useToast, EmptyState, Table, Button, Input } from "../components";
+import { useToast, EmptyState, Button, Input } from "../components";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../components/Table";
 
 const ENGINES = [
   { key: "fofa", label: "FOFA", placeholder: 'domain="example.com"' },
