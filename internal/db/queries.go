@@ -376,7 +376,7 @@ func (q *Queries) SetScanTaskRunning(id string, startedAt time.Time) error {
 }
 
 func (q *Queries) ListScanTasksByPlan(planID string) ([]*models.ScanTask, error) {
-	rows, err := q.db.Query(`SELECT id, project_id, plan_id, depends_on_task_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, worker_id, nuclei_custom_bundle_version, created_at FROM scan_tasks WHERE plan_id = ? ORDER BY created_at`, planID)
+	rows, err := q.db.Query(`SELECT id, project_id, plan_id, depends_on_task_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, error_message, worker_id, nuclei_custom_bundle_version, created_at FROM scan_tasks WHERE plan_id = ? ORDER BY created_at`, planID)
 	if err != nil {
 		return nil, err
 	}
@@ -385,11 +385,15 @@ func (q *Queries) ListScanTasksByPlan(planID string) ([]*models.ScanTask, error)
 	for rows.Next() {
 		t := &models.ScanTask{}
 		var customVersion sql.NullString
-		if err := rows.Scan(&t.ID, &t.ProjectID, &t.PlanID, &t.DependsOnTaskID, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &t.StartedAt, &t.FinishedAt, &t.ExitCode, &t.WorkerID, &customVersion, &t.CreatedAt); err != nil {
+		var errorMsg sql.NullString
+		if err := rows.Scan(&t.ID, &t.ProjectID, &t.PlanID, &t.DependsOnTaskID, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &t.StartedAt, &t.FinishedAt, &t.ExitCode, &errorMsg, &t.WorkerID, &customVersion, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		if customVersion.Valid {
 			t.NucleiCustomBundleVersion = &customVersion.String
+		}
+		if errorMsg.Valid {
+			t.ErrorMessage = errorMsg.String
 		}
 		list = append(list, t)
 	}
