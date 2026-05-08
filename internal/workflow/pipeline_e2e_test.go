@@ -7,6 +7,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
