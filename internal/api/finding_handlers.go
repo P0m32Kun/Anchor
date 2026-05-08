@@ -14,12 +14,7 @@ func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
 	page := parsePagination(r)
 
 	result, err := s.findingSvc.ListPaginated(r.Context(), projectID, status, service.PaginationParams{Page: page.Page, PageSize: page.PageSize})
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list findings failed: %v", err))
+	if s.handleServiceError(w, err, "list findings failed") {
 		return
 	}
 	writePaginatedJSON(w, result.Data, result.Total, page)
