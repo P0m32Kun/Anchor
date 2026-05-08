@@ -47,7 +47,7 @@ export default function DashboardPage() {
   const currentProject = useStore((state) => state.currentProject);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchDashboard = async (signal?: AbortSignal) => {
