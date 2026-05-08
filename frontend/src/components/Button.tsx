@@ -1,7 +1,7 @@
 import React, { forwardRef } from "react";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "purple" | "success" | "warning" | "info";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
 }
@@ -33,6 +33,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         "btn-cyber-danger",
       purple:
         "btn-cyber-purple",
+      success:
+        "btn-cyber-success",
+      warning:
+        "btn-cyber-warning",
+      info:
+        "btn-cyber-info",
     };
 
     const sizes = {

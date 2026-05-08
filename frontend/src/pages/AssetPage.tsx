@@ -15,14 +15,14 @@ function AssetTypeBadge({ type }: { type: string }) {
     service: "bg-accent-teal/15 text-accent-teal",
   };
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || "bg-zinc-800/60 text-zinc-400"}`}>
+    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || "bg-white/[0.04] text-text-tertiary"}`}>
       {type}
     </span>
   );
 }
 
 function StatusCodeBadge({ code }: { code?: number }) {
-  if (!code) return <span className="text-zinc-500 text-xs">—</span>;
+  if (!code) return <span className="text-text-quaternary text-xs">—</span>;
   const color =
     code >= 200 && code < 300
       ? "bg-brand-success/15 text-brand-success"
@@ -159,7 +159,7 @@ export default function AssetPage() {
       key: "normalized_value",
       header: "归一化值",
       render: (row) => (
-        <span className="text-zinc-500 text-xs">{String(row.normalized_value)}</span>
+        <span className="text-text-quaternary text-xs">{String(row.normalized_value)}</span>
       ),
     },
     {
@@ -167,7 +167,7 @@ export default function AssetPage() {
       header: "来源工具",
       width: "180px",
       render: (row) => (
-        <span className="text-zinc-500 text-xs">
+        <span className="text-text-quaternary text-xs">
           {Array.isArray(row.source_tools) ? row.source_tools.join(", ") : "—"}
         </span>
       ),
@@ -185,11 +185,11 @@ export default function AssetPage() {
       <div className="page-shell space-y-6">
         <div>
           <h1 className="text-2xl font-bold">资产清单</h1>
-          <p className="text-zinc-400 text-sm mt-1">查看和管理项目发现的资产、Web 端点和端口信息</p>
+          <p className="text-text-tertiary text-sm mt-1">查看和管理项目发现的资产、Web 端点和端口信息</p>
         </div>
         <div className="panel p-8 text-center">
-          <p className="text-zinc-400 mb-4">请先从 Dashboard 选择一个项目</p>
-          <Link to="/" className="text-blue-600 hover:underline">前往 Dashboard</Link>
+          <p className="text-text-tertiary mb-4">请先从 Dashboard 选择一个项目</p>
+          <Link to="/" className="link-cyber">前往 Dashboard</Link>
         </div>
       </div>
     );
@@ -223,8 +223,8 @@ export default function AssetPage() {
             onClick={() => setActiveTab(t.key as any)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
               activeTab === t.key
-                ? "border-sky-400 text-sky-200"
-                : "border-transparent text-zinc-400 hover:text-zinc-300"
+                ? "border-brand-primary text-text-primary"
+                : "border-transparent text-text-tertiary hover:text-text-secondary"
             }`}
           >
             {t.label}
@@ -242,8 +242,8 @@ export default function AssetPage() {
                   onClick={() => setFilterType(t)}
                   className={`px-3 py-1 rounded text-xs font-medium border transition ${
                     filterType === t
-                      ? "bg-sky-500/15 border-sky-400/50 text-sky-200"
-                      : "bg-zinc-800/60 border-zinc-700/60 text-zinc-400 hover:text-zinc-200"
+                      ? "filter-pill-active"
+                      : "filter-pill"
                   }`}
                 >
                   {t === "all" ? "全部" : t}
@@ -256,15 +256,15 @@ export default function AssetPage() {
                 placeholder="筛选资产值..."
                 value={filterAsset}
                 onChange={(e) => setFilterAsset(e.target.value)}
-                className="bg-slate-950/40 border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-sky-400/50 w-48"
+                className="input-dark w-48 !py-1.5"
               />
               <button
                 onClick={() => { setFilterType("all"); setFilterAsset(""); }}
-                className="text-zinc-500 text-sm hover:text-zinc-300 px-2"
+                className="text-text-quaternary text-sm hover:text-text-secondary px-2"
               >
                 清除
               </button>
-              <span className="text-zinc-500 text-xs ml-auto">共 {filteredAssets.length} 个资产</span>
+              <span className="text-text-quaternary text-xs ml-auto">共 {filteredAssets.length} 个资产</span>
             </div>
           </div>
           {loading ? (
@@ -272,7 +272,7 @@ export default function AssetPage() {
           ) : error ? (
             <div className="py-12 text-center">
               <p className="text-brand-danger mb-2">加载失败: {error}</p>
-              <button onClick={() => loadAssets()} className="text-sm text-blue-600 hover:underline">
+              <button onClick={() => loadAssets()} className="text-sm link-cyber">
                 重试
               </button>
             </div>
@@ -300,28 +300,28 @@ export default function AssetPage() {
               placeholder="筛选标题..."
               value={filterTitle}
               onChange={(e) => setFilterTitle(e.target.value)}
-              className="bg-slate-950/40 border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-sky-400/50 w-48"
+              className="input-dark w-48 !py-1.5"
             />
             <input
               type="text"
               placeholder="搜索技术栈..."
               value={filterTech}
               onChange={(e) => setFilterTech(e.target.value)}
-              className="bg-slate-950/40 border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-sky-400/50 w-48"
+              className="input-dark w-48 !py-1.5"
             />
             <button
               onClick={() => { setFilterTitle(""); setFilterTech(""); }}
-              className="text-zinc-500 text-sm hover:text-zinc-300 px-2"
+              className="text-text-quaternary text-sm hover:text-text-secondary px-2"
             >
               清除
             </button>
-            <span className="text-zinc-500 text-xs ml-auto">共 {filteredWeb.length} 个端点</span>
+            <span className="text-text-quaternary text-xs ml-auto">共 {filteredWeb.length} 个端点</span>
           </div>
           {filteredWeb.length > 0 ? (
             <div className="max-h-[480px] overflow-auto">
-            <table className="w-full text-sm">
+            <table className="table-cyber text-sm">
               <thead>
-                <tr className="text-left text-zinc-400 border-b">
+                <tr>
                   <th className="pb-2">URL</th>
                   <th className="pb-2">状态码</th>
                   <th className="pb-2">Title</th>
@@ -330,24 +330,24 @@ export default function AssetPage() {
               </thead>
               <tbody>
                 {filteredWeb.map((we) => (
-                  <tr key={we.id} className="border-b last:border-0 hover:bg-zinc-800/40">
+                  <tr key={we.id}>
                     <td className="py-2 font-mono text-xs">
-                      <a href={we.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                      <a href={we.url} target="_blank" rel="noreferrer" className="link-cyber">
                         {we.url}
                       </a>
                     </td>
                     <td className="py-2">
                       <StatusCodeBadge code={we.status_code} />
                     </td>
-                    <td className="py-2 text-zinc-300">{we.title || "—"}</td>
+                    <td className="py-2 text-text-secondary">{we.title || "—"}</td>
                     <td className="py-2">
                       <div className="flex flex-wrap gap-1">
                         {(we.technologies || []).map((t) => (
-                          <span key={t} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">
+                          <span key={t} className="px-1.5 py-0.5 bg-brand-primary/10 text-brand-primary rounded text-xs border border-brand-primary/20">
                             {t}
                           </span>
                         ))}
-                        {!(we.technologies || []).length && <span className="text-zinc-500">—</span>}
+                        {!(we.technologies || []).length && <span className="text-text-quaternary">—</span>}
                       </div>
                     </td>
                   </tr>
@@ -364,7 +364,7 @@ export default function AssetPage() {
       {activeTab === "ports" && (
         <div className="space-y-4">
           <section className="panel p-4">
-            <h3 className="font-semibold mb-2 text-sm text-zinc-400">选择 IP 资产查看端口</h3>
+            <h3 className="font-semibold mb-2 text-sm text-text-tertiary">选择 IP 资产查看端口</h3>
             <div className="flex flex-wrap gap-2">
               {assets.filter((a) => a.type === "ip").map((a) => (
                 <button
@@ -375,8 +375,8 @@ export default function AssetPage() {
                   }}
                   className={`px-3 py-1 rounded text-sm border ${
                     selectedAsset === a.id
-                      ? "bg-sky-500/15 border-sky-400/50 text-sky-200"
-                      : "bg-white/[0.03] border-white/[0.10] text-zinc-400 hover:bg-zinc-800/40"
+                      ? "filter-pill-active"
+                      : "filter-pill"
                   }`}
                 >
                   {a.value}
@@ -395,26 +395,26 @@ export default function AssetPage() {
                     placeholder="筛选端口..."
                     value={filterPort}
                     onChange={(e) => setFilterPort(e.target.value)}
-                    className="bg-slate-950/40 border border-white/[0.10] rounded-lg px-3 py-1 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-sky-400/50 w-32"
+                    className="input-dark w-32 !py-1"
                   />
                   <button
                     onClick={() => setFilterPort("")}
-                    className="text-zinc-500 text-sm hover:text-zinc-300 px-2"
+                    className="text-text-quaternary text-sm hover:text-text-secondary px-2"
                   >
                     清除
                   </button>
                 </div>
               </div>
-              <p className="text-zinc-500 text-xs mb-2">共 {filteredPorts.length} 个端口</p>
+              <p className="text-text-quaternary text-xs mb-2">共 {filteredPorts.length} 个端口</p>
               {filteredPorts.length > 0 ? (
                 <div className="grid grid-cols-4 gap-2">
                   {filteredPorts.map((p) => (
                     <div
                       key={p.id}
-                      className="border rounded p-2 text-center text-sm hover:bg-zinc-800/40"
+                      className="surface-item p-2 text-center text-sm"
                     >
                       <div className="font-mono font-semibold text-lg">{p.port}</div>
-                      <div className="text-zinc-500 text-xs">
+                      <div className="text-text-quaternary text-xs">
                         {p.protocol} / {p.state}
                       </div>
                     </div>

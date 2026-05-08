@@ -16,17 +16,17 @@ function ProjectInfo({ project }: { project: Project }) {
     <section className="panel p-4">
       <h2 className="font-semibold mb-2">项目信息</h2>
       <div className="text-sm space-y-1">
-        <div className="text-zinc-400">
+        <div className="text-text-tertiary">
           <span className="font-medium">组织:</span> {project.organization || "—"}
         </div>
         {project.purpose && (
-          <div className="text-zinc-400">
+          <div className="text-text-tertiary">
             <span className="font-medium">目的:</span> {project.purpose}
           </div>
         )}
         {start && end ? (
           <div className="flex items-center gap-2">
-            <span className="text-zinc-400">
+            <span className="text-text-tertiary">
               时间窗口: {start.toLocaleDateString()} ~ {end.toLocaleDateString()}
             </span>
             {isExpired && (
@@ -46,16 +46,16 @@ function ProjectInfo({ project }: { project: Project }) {
             )}
           </div>
         ) : (
-          <div className="text-zinc-500 text-xs">未配置时间窗口 (始终可用)</div>
+          <div className="text-text-quaternary text-xs">未配置时间窗口 (始终可用)</div>
         )}
-        <div className="text-zinc-400">
+        <div className="text-text-tertiary">
           <span className="font-medium">速率限制:</span>{" "}
           {project.rate_limit !== undefined && project.rate_limit > 0
             ? `${project.rate_limit} 包/秒`
             : "无限制"}
         </div>
         {project.default_profile && (
-          <div className="text-zinc-400">
+          <div className="text-text-tertiary">
             <span className="font-medium">默认 Profile:</span> {project.default_profile}
           </div>
         )}
@@ -117,7 +117,7 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
           importing
             ? "border-white/[0.08] bg-white/[0.03] pointer-events-none"
             : dragOver
-            ? "border-sky-400 bg-sky-500/10"
+            ? "border-brand-primary bg-brand-primary/10"
             : "border-white/[0.12] bg-white/[0.025] hover:border-white/[0.24]"
         }`}
       >
@@ -133,15 +133,15 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
           }}
         />
         {importing ? (
-          <div className="text-zinc-400">
+          <div className="text-text-tertiary">
             <div className="animate-pulse mb-2">⏳</div>
             正在导入...
           </div>
         ) : (
-          <div className="text-zinc-400">
+          <div className="text-text-tertiary">
             <div className="text-2xl mb-2">📂</div>
             <div className="font-medium">点击上传 或将文件拖拽到此处</div>
-            <div className="text-xs text-zinc-500 mt-1">支持 .txt / .csv 格式，每行一个目标</div>
+            <div className="text-xs text-text-quaternary mt-1">支持 .txt / .csv 格式，每行一个目标</div>
           </div>
         )}
       </div>
@@ -160,14 +160,14 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
           </div>
           {result.denied_targets.length > 0 && (
             <div>
-              <div className="text-xs font-medium text-yellow-700 mb-1">
+              <div className="text-xs font-medium text-accent-yellow mb-1">
                 被 Scope 拒绝的目标:
               </div>
               <ul className="text-xs space-y-0.5 max-h-32 overflow-auto">
                 {result.denied_targets.map((d, i) => (
-                  <li key={i} className="text-zinc-400">
-                    <code className="bg-yellow-500/10 px-1 rounded text-accent-yellow">{d.value}</code>
-                    <span className="text-yellow-700 ml-2">— {d.reason}</span>
+                  <li key={i} className="text-text-tertiary">
+                    <code className="bg-accent-yellow/10 px-1 rounded text-accent-yellow">{d.value}</code>
+                    <span className="text-accent-yellow ml-2">- {d.reason}</span>
                   </li>
                 ))}
               </ul>
@@ -192,7 +192,7 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
       <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[color] || colors.gray}`}>
         {value}
       </span>
-      <span className="text-xs text-zinc-400">{label}</span>
+      <span className="text-xs text-text-tertiary">{label}</span>
     </div>
   );
 }
@@ -377,11 +377,11 @@ export default function TargetPage() {
       <div className="page-shell space-y-6">
         <div>
           <h1 className="text-2xl font-bold">目标管理</h1>
-          <p className="text-zinc-400 text-sm mt-1">管理项目目标、Scope 规则和批量导入</p>
+          <p className="text-text-tertiary text-sm mt-1">管理项目目标、Scope 规则和批量导入</p>
         </div>
         <div className="panel p-8 text-center">
-          <p className="text-zinc-400 mb-4">请先从 Dashboard 选择一个项目</p>
-          <Link to="/" className="text-blue-600 hover:underline">前往 Dashboard</Link>
+          <p className="text-text-tertiary mb-4">请先从 Dashboard 选择一个项目</p>
+          <Link to="/" className="link-cyber">前往 Dashboard</Link>
         </div>
       </div>
     );
@@ -404,7 +404,7 @@ export default function TargetPage() {
         <h2 className="font-semibold">添加目标</h2>
         <form onSubmit={addTarget} className="flex gap-2">
           <select
-            className="rounded-lg border border-white/[0.10] bg-slate-950/40 px-2 text-zinc-200"
+            className="input-dark w-28 px-2"
             value={targetType}
             onChange={(e) => setTargetType(e.target.value)}
           >
@@ -416,7 +416,7 @@ export default function TargetPage() {
             <option value="company">公司</option>
           </select>
           <input
-            className="flex-1 rounded-lg border border-white/[0.10] bg-slate-950/40 px-3 py-2 text-zinc-200 placeholder-zinc-500"
+            className="input-dark flex-1"
             placeholder="example.com / 192.168.1.1 / 10.0.0.0/24 / 192.168.0.1-10 / 阿里巴巴"
             value={targetValue}
             onChange={(e) => setTargetValue(e.target.value)}
@@ -444,7 +444,7 @@ export default function TargetPage() {
             <p className="text-brand-danger mb-2">加载失败: {error}</p>
             <button
               onClick={() => loadTargets()}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm link-cyber"
             >
               重试
             </button>
@@ -469,7 +469,7 @@ export default function TargetPage() {
         <h2 className="font-semibold mb-3">Scope 规则</h2>
         <form onSubmit={addScopeRule} className="flex gap-2 mb-3">
           <select
-            className="rounded-lg border border-white/[0.10] bg-slate-950/40 px-2 text-zinc-200"
+            className="input-dark w-24 px-2"
             value={scopeAction}
             onChange={(e) => setScopeAction(e.target.value as any)}
           >
@@ -477,7 +477,7 @@ export default function TargetPage() {
             <option value="exclude">排除</option>
           </select>
           <input
-            className="flex-1 rounded-lg border border-white/[0.10] bg-slate-950/40 px-3 py-2 text-zinc-200 placeholder-zinc-500"
+            className="input-dark flex-1"
             placeholder="域名规则，如 example.com"
             value={scopeValue}
             onChange={(e) => setScopeValue(e.target.value)}
@@ -518,22 +518,22 @@ export default function TargetPage() {
             <div className="font-semibold">授权检测结果 ({dryRunResult.mode})</div>
             <div className="flex gap-4 text-xs">
               <div>
-                <span className="text-zinc-400">时间窗口:</span>{" "}
+                <span className="text-text-tertiary">时间窗口:</span>{" "}
                 {dryRunResult.time_window_valid === undefined
                   ? "—"
                   : dryRunResult.time_window_valid
-                  ? <span className="text-green-600 font-medium">有效</span>
-                  : <span className="text-red-600 font-medium">无效</span>}
+                  ? <span className="text-brand-success font-medium">有效</span>
+                  : <span className="text-brand-danger font-medium">无效</span>}
               </div>
               <div>
-                <span className="text-zinc-400">速率限制:</span>{" "}
+                <span className="text-text-tertiary">速率限制:</span>{" "}
                 {dryRunResult.rate_limit !== undefined && dryRunResult.rate_limit > 0
                   ? `${dryRunResult.rate_limit} 包/秒`
                   : "无限制"}
               </div>
               {dryRunResult.estimated_duration_seconds !== undefined && (
                 <div>
-                  <span className="text-zinc-400">预计耗时:</span>{" "}
+                  <span className="text-text-tertiary">预计耗时:</span>{" "}
                   <span className="font-medium">
                     {dryRunResult.estimated_duration_seconds < 60
                       ? `${dryRunResult.estimated_duration_seconds} 秒`
@@ -544,7 +544,7 @@ export default function TargetPage() {
             </div>
             {dryRunResult.results && dryRunResult.results.length > 0 && (
               <div>
-                <div className="text-xs font-medium text-zinc-400 mt-2 mb-1">
+                <div className="text-xs font-medium text-text-tertiary mt-2 mb-1">
                   目标决策 ({dryRunResult.results.length}):
                 </div>
                 <ul className="space-y-0.5 max-h-64 overflow-auto">
@@ -553,10 +553,10 @@ export default function TargetPage() {
                       key={i}
                       className={
                         r.decision === "allow"
-                          ? "text-green-700"
+                          ? "text-brand-success"
                           : r.decision === "deny"
-                          ? "text-red-700"
-                          : "text-yellow-700"
+                          ? "text-brand-danger"
+                          : "text-accent-yellow"
                       }
                     >
                       [{r.decision}] {r.target} — {r.reason}

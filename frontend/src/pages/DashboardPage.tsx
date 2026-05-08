@@ -192,9 +192,9 @@ export default function DashboardPage() {
                 <button
                   key={step}
                   onClick={() => navigate(path)}
-                  className="flex w-full gap-3 rounded-lg border border-white/[0.08] bg-white/[0.025] p-3 text-left transition-colors hover:border-sky-400/30 hover:bg-sky-500/5"
+                  className="surface-item flex w-full gap-3 p-3 text-left"
                 >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sky-500/12 text-xs font-semibold text-sky-200">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-primary/12 text-xs font-semibold text-brand-primary ring-1 ring-brand-primary/25">
                     {step}
                   </span>
                   <span>
@@ -231,7 +231,7 @@ function ActivityPanel({
           <h2 className="panel-title">{title}</h2>
           <p className="text-xs text-text-tertiary mt-1">{description}</p>
         </div>
-        <button onClick={onAction} className="text-xs text-brand-primary hover:text-sky-200 transition-colors">
+        <button onClick={onAction} className="text-xs link-cyber">
           {actionLabel}
         </button>
       </div>
@@ -241,10 +241,10 @@ function ActivityPanel({
 }
 
 const STAT_COLOR_MAP: Record<string, { active: string; text: string }> = {
-  "项目":     { active: "border-purple-400/35 bg-purple-500/5",        text: "metric-value-purple" },
-  "运行中扫描": { active: "border-sky-400/35 bg-sky-500/5",             text: "metric-value" },
-  "待审核发现": { active: "border-amber-400/35 bg-amber-500/5",          text: "metric-value-warning" },
-  "在线 Worker": { active: "border-green-400/35 bg-green-500/5",         text: "metric-value-success" },
+  "项目":     { active: "border-brand-purple/35 bg-brand-purple/5",        text: "metric-value-purple" },
+  "运行中扫描": { active: "border-brand-primary/35 bg-brand-primary/5",      text: "metric-value" },
+  "待审核发现": { active: "border-brand-warning/35 bg-brand-warning/5",      text: "metric-value-warning" },
+  "在线 Worker": { active: "border-brand-success/35 bg-brand-success/5",    text: "metric-value-success" },
 };
 
 function StatCard({
@@ -258,7 +258,7 @@ function StatCard({
   loading: boolean;
   active?: boolean;
 }) {
-  const colors = STAT_COLOR_MAP[title] ?? { active: "border-sky-400/35 bg-sky-500/5", text: "metric-value" };
+  const colors = STAT_COLOR_MAP[title] ?? { active: "border-brand-primary/35 bg-brand-primary/5", text: "metric-value" };
   return (
     <div className={`metric-card ${active ? colors.active : ""}`}>
       <div className="metric-label">{title}</div>

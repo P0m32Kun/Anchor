@@ -26,20 +26,26 @@ export default {
         ],
       },
       colors: {
-        // Dark theme surface hierarchy (Airport Dashboard)
+        // Dark theme surface hierarchy (operations screen)
         surface: {
           DEFAULT: "#0a1628",
+          base: "#081020",
+          muted: "#0d1e36",
           elevated: "#111d32",
           "elevated-2": "#1a2a42",
           "elevated-3": "#223555",
         },
-        // Ambient light colors
+        // Ambient light colors, kept subtle for daily use
         ambient: {
-          blue: "rgba(100, 150, 255, 0.08)",
-          purple: "rgba(180, 130, 255, 0.06)",
+          cyan: "rgba(0, 212, 255, 0.10)",
+          blue: "rgba(35, 120, 255, 0.08)",
+          green: "rgba(0, 230, 118, 0.07)",
+          amber: "rgba(245, 166, 35, 0.08)",
+          red: "rgba(255, 71, 87, 0.08)",
+          purple: "rgba(163, 113, 247, 0.07)",
           glow: "rgba(255, 255, 255, 0.02)",
         },
-        // Vibrant primary colors (Airport Dashboard)
+        // Semantic monitoring colors
         brand: {
           primary: "#00d4ff",   // 主色-青色
           secondary: "#8b9dc3",
@@ -47,6 +53,7 @@ export default {
           warning: "#f5a623",   // 警告-金黄
           danger: "#ff4757",    // 危险-红
           purple: "#A371F7",
+          info: "#5AC8FA",
         },
         // Text colors (Airport Dashboard)
         "text-primary": "#ffffff",

@@ -38,7 +38,7 @@ export function Table<T extends Record<string, unknown>>({
     <div className={`panel overflow-auto ${className}`} style={containerStyle}>
       <table className="w-full text-left border-collapse">
         <thead className="sticky top-0 z-10">
-          <tr className="border-b border-white/[0.06] bg-white/[0.03]">
+          <tr className="border-b border-brand-primary/10 bg-brand-primary/[0.055]">
             {columns.map((col) => (
               <th
                 key={col.key}
@@ -71,9 +71,9 @@ export function Table<T extends Record<string, unknown>>({
                 key={rowIdx}
                 onClick={isClickable ? () => onRowClick!(row) : undefined}
                 className={`
-                  border-b border-white/[0.04] relative
+                  border-b border-brand-primary/[0.08] relative
                   transition-colors duration-150
-                  ${isClickable ? "cursor-pointer hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_#00d4ff]" : "hover:bg-white/[0.04]"}
+                  ${isClickable ? "cursor-pointer hover:bg-brand-primary/[0.06] hover:shadow-[inset_3px_0_0_0_var(--color-brand-primary)]" : "hover:bg-brand-primary/[0.045]"}
                 `}
               >
                 {columns.map((col) => (

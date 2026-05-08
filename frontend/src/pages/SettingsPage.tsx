@@ -40,15 +40,18 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Settings</h1>
-        <p className="text-sm text-text-tertiary mt-1">
+    <div className="page-shell space-y-6">
+      <div className="page-header">
+        <div>
+        <div className="page-eyebrow">System</div>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-subtitle">
           应用配置和偏好设置
         </p>
+        </div>
       </div>
 
-      <div className="cyber-glass p-5 space-y-4">
+      <div className="panel p-5 space-y-4">
         {/* Server URL */}
         <div>
           <div className="text-sm font-medium mb-2">Server 地址</div>
@@ -63,17 +66,17 @@ export default function SettingsPage() {
               value={apiBase}
               onChange={(e) => setApiBaseState(e.target.value)}
               placeholder={placeholderText}
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary/50"
+              className="input-dark flex-1"
             />
             <button
               onClick={handleSave}
-              className="bg-brand-primary text-white text-sm px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
+              className="btn-cyber-primary"
             >
               {saved ? "已保存 ✓" : "保存并刷新"}
             </button>
             <button
               onClick={handleReset}
-              className="bg-white/5 text-text-secondary text-sm px-4 py-2 rounded-lg hover:bg-white/10 transition-colors"
+              className="btn-cyber-secondary"
             >
               重置
             </button>
@@ -98,7 +101,7 @@ export default function SettingsPage() {
                 value={apiToken}
                 onChange={(e) => setApiTokenState(e.target.value)}
                 placeholder="输入新的 API Token"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary/50 pr-10"
+                className="input-dark w-full pr-10"
               />
               <button
                 type="button"

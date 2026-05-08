@@ -80,13 +80,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border ${bgMap[t.type]} animate-slide-down`}
+            className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-lg border ${bgMap[t.type]} animate-slide-down`}
             style={{
-              background: "rgba(18, 18, 26, 0.85)",
-              backdropFilter: "saturate(200%) blur(60px)",
-              WebkitBackdropFilter: "saturate(200%) blur(60px)",
+              background: "linear-gradient(180deg, rgba(18,35,62,0.94), rgba(10,22,40,0.96))",
+              backdropFilter: "saturate(180%) blur(28px)",
+              WebkitBackdropFilter: "saturate(180%) blur(28px)",
               boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 12px rgba(0,0,0,0.4), 0 16px 40px rgba(0,0,0,0.3)",
+                "inset 0 1px 0 rgba(255,255,255,0.06), inset 0 0 18px rgba(0,212,255,0.04), 0 8px 24px rgba(0,0,0,0.34)",
             }}
           >
             {iconMap[t.type]}

@@ -87,19 +87,20 @@ export default function EnginesPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="page-shell space-y-6">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-semibold">互联网搜索引擎</h1>
-          <p className="text-sm text-text-tertiary mt-1">
+          <div className="page-eyebrow">Discovery</div>
+          <h1 className="page-title">互联网搜索引擎</h1>
+          <p className="page-subtitle">
             集成 FOFA、Hunter、Quake 三大平台，快速发现互联网资产
           </p>
         </div>
         <Link
           to="/engines/keys"
-          className="text-sm text-brand-primary hover:text-brand-secondary transition-colors"
+          className="text-sm link-cyber"
         >
-          配置 API Key →
+          配置 API Key -&gt;
         </Link>
       </div>
 
@@ -116,8 +117,8 @@ export default function EnginesPage() {
             }}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               activeEngine === e.key
-                ? "bg-brand-primary/12 text-brand-primary ring-1 ring-brand-primary/25"
-                : "text-text-tertiary hover:bg-white/[0.04] hover:text-text-secondary"
+                ? "filter-pill-active"
+                : "filter-pill"
             }`}
           >
             {e.label}
@@ -126,7 +127,7 @@ export default function EnginesPage() {
       </div>
 
       {/* Search Input */}
-      <div className="cyber-glass p-5">
+      <div className="panel p-5">
         <div className="flex gap-3">
           <div className="flex-1">
             <Input
@@ -144,7 +145,7 @@ export default function EnginesPage() {
       </div>
 
       {/* Results */}
-      <div className="cyber-glass p-0 overflow-hidden">
+      <div className="panel p-0 overflow-hidden">
         {hasSearched && results.length === 0 && !loading ? (
           <EmptyState title="未找到结果" description="尝试修改查询语句后重新搜索" />
         ) : (

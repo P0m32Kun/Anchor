@@ -133,12 +133,15 @@ export default function EngineKeysPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold">API Key 配置</h1>
-          <p className="text-sm text-text-tertiary mt-1">管理搜索引擎平台的 API 凭证</p>
+      <div className="page-shell space-y-6">
+        <div className="page-header">
+          <div>
+          <div className="page-eyebrow">Discovery</div>
+          <h1 className="page-title">API Key 配置</h1>
+          <p className="page-subtitle">管理搜索引擎平台的 API 凭证</p>
+          </div>
         </div>
-        <div className="cyber-glass p-5 animate-pulse">
+        <div className="panel p-5 animate-pulse">
           <div className="h-4 w-32 bg-white/[0.06] rounded mb-4" />
           <div className="h-10 bg-white/[0.06] rounded" />
         </div>
@@ -147,17 +150,20 @@ export default function EngineKeysPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">API Key 配置</h1>
-        <p className="text-sm text-text-tertiary mt-1">管理搜索引擎平台的 API 凭证</p>
+    <div className="page-shell space-y-6">
+      <div className="page-header">
+        <div>
+        <div className="page-eyebrow">Discovery</div>
+        <h1 className="page-title">API Key 配置</h1>
+        <p className="page-subtitle">管理搜索引擎平台的 API 凭证</p>
+        </div>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {ENGINE_DEFS.map((def) => {
           const form = forms[def.key];
           return (
-            <div key={def.key} className="cyber-glass p-5">
+            <div key={def.key} className="panel p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-text-primary">{def.label}</h3>
                 {form.exists && (

@@ -186,15 +186,15 @@ export default function FindingsPage() {
 
       {/* Severity filter */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-zinc-400">严重级别：</span>
+        <span className="text-sm text-text-tertiary">严重级别：</span>
         {["", "critical", "high", "medium", "low", "info"].map((s) => (
           <button
             key={s || "all"}
             onClick={() => setSeverityFilter(s)}
             className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
               severityFilter === s
-                ? "bg-slate-800 text-white"
-                : "bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60"
+                ? "filter-pill-active"
+                : "filter-pill"
             }`}
           >
             {s ? s.charAt(0).toUpperCase() + s.slice(1) : "全部"}
@@ -204,15 +204,15 @@ export default function FindingsPage() {
 
       {/* Status filter */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-zinc-400">状态：</span>
+        <span className="text-sm text-text-tertiary">状态：</span>
         {["", "pending_review", "confirmed", "false_positive", "accepted_risk", "ignored"].map((s) => (
           <button
             key={s || "all"}
             onClick={() => setStatusFilter(s)}
             className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
               statusFilter === s
-                ? "bg-slate-800 text-white"
-                : "bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60"
+                ? "filter-pill-active"
+                : "filter-pill"
             }`}
           >
             {s ? statusLabels[s] || s : "全部"}
@@ -230,19 +230,19 @@ export default function FindingsPage() {
       </div>
 
       {/* Result count */}
-      <div className="text-sm text-zinc-400">
+      <div className="text-sm text-text-tertiary">
         共 {filteredFindings.length} 个 findings
         {(statusFilter || severityFilter || debouncedKeyword) && "（已筛选）"}
       </div>
 
       {/* Batch operations */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 bg-zinc-800/40 border border-zinc-700/50 rounded-lg px-4 py-2">
-          <span className="text-sm text-zinc-300">已选择 {selectedIds.size} 项</span>
+        <div className="surface-item flex items-center gap-3 px-4 py-2">
+          <span className="text-sm text-text-secondary">已选择 {selectedIds.size} 项</span>
           <select
             value={batchStatus}
             onChange={(e) => setBatchStatus(e.target.value)}
-            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200"
+            className="input-dark !py-1 !px-2 text-xs"
           >
             <option value="">选择状态...</option>
             {Object.entries(statusLabels).map(([value, label]) => (
@@ -252,13 +252,13 @@ export default function FindingsPage() {
           <button
             onClick={batchChangeStatus}
             disabled={!batchStatus || batchUpdating}
-            className="px-3 py-1 bg-slate-800 text-white rounded text-xs disabled:opacity-50"
+            className="btn-cyber-primary !px-3 !py-1 text-xs disabled:opacity-50"
           >
             {batchUpdating ? "更新中..." : "批量修改"}
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="text-zinc-400 hover:text-zinc-200 text-xs"
+            className="text-text-tertiary hover:text-text-secondary text-xs"
           >
             取消选择
           </button>
@@ -279,14 +279,14 @@ export default function FindingsPage() {
       {!loading && filteredFindings.length > 0 && (
         <div className="panel overflow-auto max-h-[560px]">
         <table className="min-w-full text-sm">
-          <thead className="bg-zinc-800/40 text-zinc-400">
+          <thead className="bg-brand-primary/[0.055] text-text-tertiary">
             <tr>
               <th className="px-3 py-2 text-left w-10">
                 <input
                   type="checkbox"
                   checked={filteredFindings.length > 0 && selectedIds.size === filteredFindings.length}
                   onChange={toggleSelectAll}
-                  className="rounded border-zinc-600 bg-zinc-800 text-blue-600 focus:ring-0"
+                  className="rounded border-brand-primary/30 bg-surface-elevated-2 text-brand-primary focus:ring-0"
                 />
               </th>
               <th className="px-4 py-2 text-left">标题</th>
@@ -300,18 +300,18 @@ export default function FindingsPage() {
           </thead>
           <tbody>
             {filteredFindings.map((f) => (
-              <tr key={f.id} className="border-t hover:bg-zinc-800/40">
+              <tr key={f.id} className="border-t border-brand-primary/[0.08] hover:bg-brand-primary/[0.055]">
                 <td className="px-3 py-2">
                   <input
                     type="checkbox"
                     checked={selectedIds.has(f.id)}
                     onChange={() => toggleSelect(f.id)}
-                    className="rounded border-zinc-600 bg-zinc-800 text-blue-600 focus:ring-0"
+                    className="rounded border-brand-primary/30 bg-surface-elevated-2 text-brand-primary focus:ring-0"
                   />
                 </td>
                 <td className="px-4 py-2 font-medium">{f.title}</td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityColors[f.severity] || "bg-zinc-800/60"}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityColors[f.severity] || "bg-white/[0.04] text-text-tertiary"}`}>
                     {f.severity}
                   </span>
                 </td>
@@ -325,7 +325,7 @@ export default function FindingsPage() {
                     className="w-28"
                   />
                 </td>
-                <td className="px-4 py-2 text-xs text-zinc-500">
+                <td className="px-4 py-2 text-xs text-text-quaternary">
                   {findingStatusHistory[f.id]
                     ? formatTimeAgo(findingStatusHistory[f.id].updatedAt)
                     : "—"}
@@ -333,7 +333,7 @@ export default function FindingsPage() {
                 <td className="px-4 py-2 flex gap-2">
                   <button
                     onClick={() => openDetail(f.id)}
-                    className="text-blue-600 hover:underline text-xs"
+                    className="link-cyber text-xs"
                   >
                     详情
                   </button>
@@ -346,7 +346,7 @@ export default function FindingsPage() {
                         toast("复测失败: " + String(e), "error");
                       }
                     }}
-                    className="text-green-600 hover:underline text-xs"
+                    className="text-brand-success hover:text-brand-success/80 text-xs"
                   >
                     复测
                   </button>
@@ -401,21 +401,21 @@ function FindingDetail({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-base/70 backdrop-blur-xl">
       <div className="panel w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold">Finding 详情</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200">✕</button>
+          <button onClick={onClose} className="text-text-quaternary hover:text-text-secondary">x</button>
         </div>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-zinc-400">标题</span>
+              <span className="text-text-tertiary">标题</span>
               <p className="font-medium">{finding.title}</p>
             </div>
             <div>
-              <span className="text-zinc-400">严重级别</span>
+              <span className="text-text-tertiary">严重级别</span>
               <p>
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityColors[finding.severity] || ""}`}>
                   {finding.severity}
@@ -423,19 +423,19 @@ function FindingDetail({
               </p>
             </div>
             <div>
-              <span className="text-zinc-400">可信度</span>
+              <span className="text-text-tertiary">可信度</span>
               <p className="font-medium">{finding.confidence}</p>
             </div>
             <div>
-              <span className="text-zinc-400">优先级</span>
+              <span className="text-text-tertiary">优先级</span>
               <p className="font-medium">{finding.priority}</p>
             </div>
             <div>
-              <span className="text-zinc-400">来源工具</span>
+              <span className="text-text-tertiary">来源工具</span>
               <p className="font-medium">{finding.source_tool}</p>
             </div>
             <div>
-              <span className="text-zinc-400">规则 ID</span>
+              <span className="text-text-tertiary">规则 ID</span>
               <p className="font-medium">{finding.source_rule_id || "—"}</p>
             </div>
           </div>
@@ -450,8 +450,8 @@ function FindingDetail({
                   disabled={finding.status === s}
                   className={`px-3 py-1 rounded text-xs ${
                     finding.status === s
-                      ? "bg-slate-800 text-white cursor-default"
-                      : "bg-zinc-800/60 text-zinc-300 hover:bg-gray-200"
+                      ? "filter-pill-active cursor-default"
+                      : "filter-pill"
                   }`}
                 >
                   {statusLabels[s]}
@@ -462,15 +462,15 @@ function FindingDetail({
 
           <div>
             <h3 className="font-semibold text-sm mb-2">Evidence</h3>
-            {evidence.length === 0 && <p className="text-zinc-500 text-sm">暂无 Evidence</p>}
+            {evidence.length === 0 && <p className="text-text-quaternary text-sm">暂无 Evidence</p>}
             <div className="space-y-2">
               {evidence.map((e) => (
                 <div key={e.id} className="border border-white/[0.10] rounded-lg p-3 text-sm">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 rounded bg-zinc-800/60 text-xs">{e.type}</span>
-                    <span className="text-zinc-500 text-xs">{e.created_at}</span>
+                    <span className="px-2 py-0.5 rounded bg-brand-primary/10 text-brand-primary border border-brand-primary/20 text-xs">{e.type}</span>
+                    <span className="text-text-quaternary text-xs">{e.created_at}</span>
                   </div>
-                  {e.excerpt && <pre className="whitespace-pre-wrap text-xs bg-zinc-800/40 p-2 rounded">{e.excerpt}</pre>}
+                  {e.excerpt && <pre className="whitespace-pre-wrap text-xs bg-surface-elevated-2/70 p-2 rounded">{e.excerpt}</pre>}
                 </div>
               ))}
             </div>
@@ -479,7 +479,7 @@ function FindingDetail({
           <div>
             <h3 className="font-semibold text-sm mb-2">添加备注</h3>
             <textarea
-              className="w-full rounded-lg border border-white/[0.10] bg-slate-950/40 p-2 text-sm text-text-primary placeholder:text-text-quaternary"
+              className="input-dark w-full"
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -488,7 +488,7 @@ function FindingDetail({
             <button
               onClick={addNote}
               disabled={adding || !note.trim()}
-              className="mt-2 px-4 py-1 bg-slate-800 text-white rounded text-sm disabled:opacity-50"
+              className="btn-cyber-primary mt-2 !px-4 !py-1 text-sm disabled:opacity-50"
             >
               {adding ? "保存中..." : "保存备注"}
             </button>

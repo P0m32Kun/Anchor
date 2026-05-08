@@ -267,7 +267,7 @@ export default function RunsPage() {
 
       <section className="panel p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-base font-medium text-zinc-200">执行历史</h2>
+          <h2 className="text-base font-medium text-text-secondary">执行历史</h2>
           {projectId && (
             <div className="flex items-center gap-2">
               {sseStatus === "open" ? (
@@ -284,8 +284,8 @@ export default function RunsPage() {
                   轮询中
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-                  <span className="inline-flex rounded-full h-2 w-2 bg-zinc-500" />
+                <span className="flex items-center gap-1.5 text-xs text-text-quaternary">
+                  <span className="inline-flex rounded-full h-2 w-2 bg-text-quaternary" />
                   未连接
                 </span>
               )}
@@ -307,8 +307,8 @@ export default function RunsPage() {
               key={run.id}
               className={`py-3 px-2 flex items-center justify-between text-sm rounded-lg transition-all ${
                 selectedRun === run.id
-                  ? "bg-white/[0.04]"
-                  : "hover:bg-white/[0.02]"
+                  ? "bg-brand-primary/[0.06] shadow-[inset_3px_0_0_0_var(--color-brand-primary)]"
+                  : "hover:bg-brand-primary/[0.035]"
               }`}
             >
               <button
@@ -322,11 +322,11 @@ export default function RunsPage() {
                 >
                   {modeLabels[run.mode] || run.mode}
                 </span>
-                <span className="text-zinc-500 text-xs font-mono">
+                <span className="text-text-quaternary text-xs font-mono">
                   {run.id.slice(-8)}
                 </span>
                 {run.stage && (
-                  <span className="text-xs text-zinc-500 bg-white/[0.04] px-2 py-0.5 rounded">
+                  <span className="text-xs text-text-quaternary bg-white/[0.04] px-2 py-0.5 rounded">
                     {run.stage}
                   </span>
                 )}
@@ -334,12 +334,12 @@ export default function RunsPage() {
               <div className="flex items-center gap-3">
                 <span
                   className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    statusColors[run.status] || "bg-white/[0.04] text-zinc-400"
+                    statusColors[run.status] || "bg-white/[0.04] text-text-tertiary"
                   }`}
                 >
                   {statusLabels[run.status] || run.status}
                 </span>
-                <span className="text-zinc-500 text-xs">
+                <span className="text-text-quaternary text-xs">
                   {run.created_at
                     ? new Date(run.created_at).toLocaleString("zh-CN")
                     : "—"}
@@ -352,7 +352,7 @@ export default function RunsPage() {
                     title="取消扫描"
                   >
                     <svg
-                      className="w-3.5 h-3.5 text-zinc-400 hover:text-brand-danger transition-colors"
+                      className="w-3.5 h-3.5 text-text-tertiary hover:text-brand-danger transition-colors"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -394,7 +394,7 @@ export default function RunsPage() {
                   </span>
                   创建项目
                 </button>
-                <span className="text-zinc-600">→</span>
+                <span className="text-text-quaternary">-&gt;</span>
                 <button
                   onClick={() => navigate("/targets")}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-colors"
@@ -404,7 +404,7 @@ export default function RunsPage() {
                   </span>
                   导入目标
                 </button>
-                <span className="text-zinc-600">→</span>
+                <span className="text-text-quaternary">-&gt;</span>
                 <button
                   onClick={() => setShowScanModal(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-brand-primary hover:bg-brand-primary/20 transition-colors"
@@ -429,15 +429,15 @@ export default function RunsPage() {
       {selectedRun && (
         <section className="panel p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-base font-medium text-zinc-200">任务详情</h2>
+            <h2 className="text-base font-medium text-text-secondary">任务详情</h2>
             {(tasksLoading || stagesLoading) && (
-              <span className="text-zinc-500 text-sm">加载中...</span>
+              <span className="text-text-quaternary text-sm">加载中...</span>
             )}
           </div>
 
           {stages.length > 0 && (
             <div className="mb-4">
-              <h3 className="text-xs font-medium text-zinc-400 mb-2">阶段进度</h3>
+              <h3 className="text-xs font-medium text-text-tertiary mb-2">阶段进度</h3>
               <StageProgress stages={stages} />
             </div>
           )}
@@ -449,16 +449,16 @@ export default function RunsPage() {
                 className="py-3 px-2 flex items-center justify-between text-sm"
               >
                 <div className="flex items-center gap-4">
-                  <span className="font-medium text-zinc-200 w-20">
+                  <span className="font-medium text-text-secondary w-20">
                     {task.tool}
                   </span>
-                  <span className="font-mono text-zinc-500 text-xs">
+                  <span className="font-mono text-text-quaternary text-xs">
                     {task.id.slice(-8)}
                   </span>
                 </div>
                 <span
                   className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    taskStatusColors[task.status] || "bg-white/[0.04] text-zinc-400"
+                    taskStatusColors[task.status] || "bg-white/[0.04] text-text-tertiary"
                   }`}
                 >
                   {task.status}
@@ -466,7 +466,7 @@ export default function RunsPage() {
               </div>
             ))}
             {tasks.length === 0 && !tasksLoading && (
-              <div className="py-8 text-center text-zinc-500">暂无任务</div>
+              <div className="py-8 text-center text-text-quaternary">暂无任务</div>
             )}
           </div>
         </section>
@@ -511,11 +511,11 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const STAGE_STATUS_COLORS: Record<string, string> = {
-  pending: "bg-zinc-700",
+  pending: "bg-text-quaternary",
   running: "bg-brand-primary animate-pulse",
   completed: "bg-brand-success",
   failed: "bg-brand-danger",
-  skipped: "bg-zinc-600",
+  skipped: "bg-text-tertiary",
 };
 
 function StageProgress({ stages }: { stages: PipelineRunStage[] }) {
@@ -525,10 +525,10 @@ function StageProgress({ stages }: { stages: PipelineRunStage[] }) {
         <div key={s.id} className="flex items-center gap-3 text-sm">
           <div
             className={`w-2 h-2 rounded-full shrink-0 ${
-              STAGE_STATUS_COLORS[s.status] || "bg-zinc-600"
+              STAGE_STATUS_COLORS[s.status] || "bg-text-tertiary"
             }`}
           />
-          <span className="text-zinc-300 w-24 shrink-0">
+          <span className="text-text-secondary w-24 shrink-0">
             {STAGE_LABELS[s.stage] || s.stage}
           </span>
           <span
@@ -539,7 +539,7 @@ function StageProgress({ stages }: { stages: PipelineRunStage[] }) {
                 ? "text-brand-primary"
                 : s.status === "completed"
                 ? "text-brand-success"
-                : "text-zinc-500"
+                : "text-text-quaternary"
             }`}
           >
             {s.status === "pending" && "待执行"}
@@ -549,7 +549,7 @@ function StageProgress({ stages }: { stages: PipelineRunStage[] }) {
             {s.status === "skipped" && "已跳过"}
           </span>
           {s.started_at && (
-            <span className="text-zinc-600 text-xs ml-auto">
+            <span className="text-text-quaternary text-xs ml-auto">
               {new Date(s.started_at).toLocaleTimeString("zh-CN")}
             </span>
           )}

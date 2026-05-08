@@ -138,17 +138,18 @@ export default function WorkersPage() {
   }, [setWorkersLoading, setWorkersError]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="page-shell space-y-6">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-semibold">Workers</h1>
-          <p className="text-sm text-text-tertiary mt-1">
+          <div className="page-eyebrow">Runtime</div>
+          <h1 className="page-title">Workers</h1>
+          <p className="page-subtitle">
             管理扫描节点，查看工具健康状态
           </p>
         </div>
       </div>
 
-      <div className="cyber-glass p-5">
+      <div className="panel p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-sm font-medium">已注册 Worker</div>
@@ -161,7 +162,7 @@ export default function WorkersPage() {
         {loading ? (
           <SkeletonList count={3} />
         ) : error ? (
-          <div className="text-sm text-red-400 py-6 text-center bg-white/[0.02] rounded-lg">
+          <div className="text-sm text-brand-danger py-6 text-center bg-brand-danger/[0.05] rounded-lg border border-brand-danger/15">
             {error}
           </div>
         ) : workers.length === 0 && offlineWorkers.length === 0 ? (
@@ -173,7 +174,7 @@ export default function WorkersPage() {
           <div className="space-y-3">
             {offlineWorkers.length > 0 && (
               <div
-                className="flex items-center gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2"
+                className="flex items-center gap-2 text-xs text-accent-yellow bg-accent-yellow/10 border border-accent-yellow/20 rounded-lg px-3 py-2"
                 role="status"
               >
                 <span className="flex-1">
@@ -182,7 +183,7 @@ export default function WorkersPage() {
                 <button
                   onClick={handleBulkDelete}
                   disabled={bulkDeleting}
-                  className="text-xs text-red-400 border border-red-400/30 rounded px-2 py-0.5 hover:bg-red-400/10 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  className="text-xs text-brand-danger border border-brand-danger/30 rounded px-2 py-0.5 hover:bg-brand-danger/10 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                   title="删除全部离线 Worker"
                 >
                   {bulkDeleting ? "清理中..." : "一键清理"}
@@ -192,7 +193,7 @@ export default function WorkersPage() {
             {workers.map((w) => (
               <div
                 key={w.id}
-                className="flex items-center justify-between bg-white/[0.02] rounded-lg px-4 py-3"
+                className="surface-item flex items-center justify-between px-4 py-3"
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -214,7 +215,7 @@ export default function WorkersPage() {
             {offlineWorkers.map((w) => (
               <div
                 key={w.id}
-                className="flex items-center justify-between bg-white/[0.02] rounded-lg px-4 py-3 opacity-50 group"
+                className="surface-item flex items-center justify-between px-4 py-3 opacity-60 group"
                 title="该 Worker 当前离线"
               >
                 <div className="flex items-center gap-3">
@@ -233,7 +234,7 @@ export default function WorkersPage() {
                   <button
                     onClick={() => handleDeleteWorker(w)}
                     disabled={deletingWorkerId === w.id}
-                    className="text-xs text-red-400 hover:text-red-300 hover:underline disabled:opacity-50 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-xs text-brand-danger hover:text-brand-danger/80 disabled:opacity-50 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 transition-opacity"
                     title="删除 Worker"
                   >
                     {deletingWorkerId === w.id ? "删除中..." : "删除"}

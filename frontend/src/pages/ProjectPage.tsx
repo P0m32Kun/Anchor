@@ -135,7 +135,7 @@ export default function ProjectPage() {
                   return (
                     <div
                       key={p.id}
-                      className="group rounded-lg border border-white/[0.08] bg-white/[0.025] p-4 transition-colors hover:border-sky-400/30 hover:bg-sky-500/5"
+                      className="surface-item group p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <button
@@ -158,7 +158,7 @@ export default function ProjectPage() {
                             setDeleteTarget(p);
                             setDeleteDialogOpen(true);
                           }}
-                          className="rounded p-1 text-text-quaternary transition-colors hover:bg-red-500/10 hover:text-red-400"
+                          className="rounded p-1 text-text-quaternary transition-colors hover:bg-brand-danger/10 hover:text-brand-danger"
                           title="删除项目"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -180,7 +180,7 @@ export default function ProjectPage() {
                               setCurrentProject(p);
                               navigate(`/projects/${p.id}/${route}`);
                             }}
-                            className="chip hover:border-sky-400/40 hover:text-sky-100"
+                            className="chip hover:border-brand-primary/40 hover:text-text-primary"
                           >
                             {label}
                           </button>

@@ -234,6 +234,9 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 		return fmt.Errorf("update task completed: %w", err)
 	}
 
+	if status == models.TaskFailed {
+		return fmt.Errorf("command exited with code %d", exitCode)
+	}
 	return nil
 }
 

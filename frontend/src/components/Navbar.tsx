@@ -110,8 +110,8 @@ function NavLinkItem({ item, active }: { item: NavItem; active: boolean }) {
       aria-current={active ? "page" : undefined}
       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
         active
-          ? "bg-sky-500/12 text-sky-100 ring-1 ring-sky-400/25"
-          : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-100"
+          ? "bg-brand-primary/12 text-text-primary ring-1 ring-brand-primary/30 shadow-[0_0_16px_rgba(0,212,255,0.10)]"
+          : "text-text-tertiary hover:bg-brand-primary/[0.055] hover:text-text-secondary"
       }`}
     >
       <Icon name={item.icon} />
@@ -148,10 +148,10 @@ export function Navbar() {
 
   return (
     <>
-    <div className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#0d1e36]/95 px-4 py-3 backdrop-blur lg:hidden">
+    <div className="sticky top-0 z-50 border-b border-brand-primary/15 bg-surface-muted/95 px-4 py-3 backdrop-blur lg:hidden">
       <div className="flex items-center justify-between gap-3">
-        <Link to="/" className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/12 text-sky-300 ring-1 ring-sky-400/25">
+        <Link to="/" className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-primary/12 text-brand-primary ring-1 ring-brand-primary/30">
             <Icon name="asset" />
           </span>
           Anchor
@@ -163,8 +163,8 @@ export function Navbar() {
               to={item.path}
               className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs ${
                 isItemActive(location.pathname, item.path)
-                  ? "bg-sky-500/12 text-sky-100"
-                  : "text-slate-400"
+                  ? "bg-brand-primary/12 text-text-primary"
+                  : "text-text-tertiary"
               }`}
             >
               {item.label}
@@ -176,18 +176,18 @@ export function Navbar() {
 
     <aside className="app-sidebar fixed inset-y-0 left-0 z-50 hidden w-72 flex-col lg:flex">
       <div className="flex h-16 items-center gap-3 border-b border-white/[0.08] px-5">
-        <Link to="/" className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/12 text-sky-300 ring-1 ring-sky-400/25">
+        <Link to="/" className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-primary/12 text-brand-primary ring-1 ring-brand-primary/30 shadow-[0_0_18px_rgba(0,212,255,0.16)]">
           <Icon name="asset" />
         </Link>
         <div>
-          <div className="text-sm font-semibold text-slate-100">Anchor</div>
-          <div className="text-xs text-slate-500">Security operations workspace</div>
+          <div className="text-sm font-semibold text-text-primary">Anchor</div>
+          <div className="text-xs text-text-quaternary">Security operations workspace</div>
         </div>
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5">
         <section>
-          <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Workspace</div>
+          <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-text-quaternary">Workspace</div>
           <div className="space-y-1">
             {globalNavItems.map((item) => (
               <NavLinkItem
@@ -201,12 +201,12 @@ export function Navbar() {
 
         <section className="space-y-3">
           <div className="px-2">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Current Project</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-quaternary">Current Project</div>
             {projects.length > 0 ? (
               <select
                 value={currentProjectId ?? ""}
                 onChange={handleProjectSwitch}
-                className="mt-2 w-full rounded-lg border border-white/[0.10] bg-slate-950/60 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
+                className="mt-2 input-dark"
                 aria-label="Switch project"
               >
                 <option value="" disabled>选择项目</option>
@@ -217,7 +217,7 @@ export function Navbar() {
                 ))}
               </select>
             ) : (
-              <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-slate-300">
+              <div className="mt-2 surface-item px-3 py-2 text-sm text-text-secondary">
                 {currentProject?.name ?? "未选择项目"}
               </div>
             )}
@@ -238,15 +238,15 @@ export function Navbar() {
       </div>
 
       <div className="border-t border-white/[0.08] px-4 py-4">
-        <div className="mb-3 flex items-center justify-between text-[11px] uppercase tracking-wider text-slate-500">
+        <div className="mb-3 flex items-center justify-between text-[11px] uppercase tracking-wider text-text-quaternary">
           <span>Workflow</span>
           <span>{currentProjectId ? "Ready" : "Select project"}</span>
         </div>
         <div className="grid grid-cols-3 gap-1.5">
           {workflowLabels.map((label, index) => (
             <div key={label} className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1.5 text-center">
-              <div className="text-[10px] text-slate-500">{index + 1}</div>
-              <div className="text-[11px] text-slate-300">{label}</div>
+              <div className="text-[10px] text-text-quaternary">{index + 1}</div>
+              <div className="text-[11px] text-text-secondary">{label}</div>
             </div>
           ))}
         </div>

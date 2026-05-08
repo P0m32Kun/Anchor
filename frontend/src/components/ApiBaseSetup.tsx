@@ -62,13 +62,13 @@ export default function ApiBaseSetup() {
 				请配置 Anchor Server 地址以继续。
 			</p>
 
-			<div className="w-full max-w-sm space-y-3">
+			<div className="panel w-full max-w-sm space-y-3 p-5">
 				<input
 					type="text"
 					value={url}
 					onChange={(e) => setUrl(e.target.value)}
 					placeholder="http://localhost:17421"
-					className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-brand-primary/50"
+					className="input-dark w-full"
 					onKeyDown={(e) => e.key === "Enter" && handleSave()}
 				/>
 				<div className="relative">
@@ -77,7 +77,7 @@ export default function ApiBaseSetup() {
 						value={token}
 						onChange={(e) => setToken(e.target.value)}
 						placeholder="请输入 Server 管理员提供的 API Token"
-						className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-brand-primary/50 pr-10"
+						className="input-dark w-full pr-10"
 						onKeyDown={(e) => e.key === "Enter" && handleSave()}
 					/>
 					<button
@@ -89,11 +89,11 @@ export default function ApiBaseSetup() {
 						{showToken ? "🙈" : "👁️"}
 					</button>
 				</div>
-				{error && <div className="text-xs text-red-400">{error}</div>}
+				{error && <div className="text-xs text-brand-danger">{error}</div>}
 				<button
 					onClick={handleSave}
 					disabled={testing}
-					className="w-full bg-brand-primary text-white text-sm px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+					className="btn-cyber-primary w-full disabled:opacity-50"
 				>
 					{testing ? "连接测试中..." : "保存并进入"}
 				</button>

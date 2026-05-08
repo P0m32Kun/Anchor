@@ -60,11 +60,11 @@ function downloadWithAnchor(blob: Blob, filename: string): void {
 
 /** Severity config for summary cards. */
 const SEVERITY_META: { key: string; label: string; colorClass: string }[] = [
-  { key: "critical", label: "严重", colorClass: "text-red-400 bg-red-400/10 border-red-400/20" },
-  { key: "high", label: "高危", colorClass: "text-orange-400 bg-orange-400/10 border-orange-400/20" },
-  { key: "medium", label: "中危", colorClass: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
-  { key: "low", label: "低危", colorClass: "text-teal-400 bg-teal-400/10 border-teal-400/20" },
-  { key: "info", label: "信息", colorClass: "text-zinc-400 bg-zinc-400/10 border-zinc-400/20" },
+  { key: "critical", label: "严重", colorClass: "text-brand-danger bg-brand-danger/10 border-brand-danger/20" },
+  { key: "high", label: "高危", colorClass: "text-brand-warning bg-brand-warning/10 border-brand-warning/20" },
+  { key: "medium", label: "中危", colorClass: "text-accent-yellow bg-accent-yellow/10 border-accent-yellow/20" },
+  { key: "low", label: "低危", colorClass: "text-accent-teal bg-accent-teal/10 border-accent-teal/20" },
+  { key: "info", label: "信息", colorClass: "text-text-tertiary bg-white/[0.04] border-white/[0.08]" },
 ];
 
 export default function ReportsPage() {
@@ -222,8 +222,8 @@ export default function ReportsPage() {
           <div className="page-eyebrow text-brand-purple">Step 5</div>
           <h1 className="page-title">安全评估报告</h1>
           <p className="page-subtitle">
-            <span className="font-mono text-zinc-300">{confirmedCount}</span> 个确认漏洞，
-            <span className="font-mono text-zinc-300">{acceptedCount}</span> 个接受风险可进入交付报告。
+            <span className="font-mono text-text-secondary">{confirmedCount}</span> 个确认漏洞，
+            <span className="font-mono text-text-secondary">{acceptedCount}</span> 个接受风险可进入交付报告。
           </p>
         </div>
       </div>
@@ -301,10 +301,10 @@ export default function ReportsPage() {
       {/* Report Outline */}
       {!loading && findings.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-sm font-semibold text-zinc-300 mb-3">报告大纲</h2>
+          <h2 className="text-sm font-semibold text-text-secondary mb-3">报告大纲</h2>
 
           {/* Section overview */}
-          <div className="flex flex-wrap gap-3 mb-4 text-sm text-zinc-500">
+          <div className="flex flex-wrap gap-3 mb-4 text-sm text-text-quaternary">
             <span className="chip">概览</span>
             <span className="chip">范围</span>
             <span className="chip">方法</span>
@@ -317,7 +317,7 @@ export default function ReportsPage() {
           {/* Findings outline — clickable */}
           {findings.length > 0 && (
             <div className="panel p-3">
-              <h3 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">
+              <h3 className="text-xs font-medium text-text-tertiary mb-2 uppercase tracking-wider">
                 Findings 列表
               </h3>
               <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -325,14 +325,14 @@ export default function ReportsPage() {
                   <button
                     key={fd.finding.id}
                     onClick={() => scrollToFinding(fd.finding.id)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-zinc-800/60 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-brand-primary/[0.055] transition-colors text-left"
                     title={`查看 ${fd.finding.title}`}
                   >
-                    <span className="text-xs text-zinc-500 font-mono w-5 shrink-0">
+                    <span className="text-xs text-text-quaternary font-mono w-5 shrink-0">
                       {idx + 1}.
                     </span>
                     <SeverityBadge severity={fd.finding.severity} />
-                    <span className="text-sm text-zinc-300 truncate">
+                    <span className="text-sm text-text-secondary truncate">
                       {fd.finding.title}
                     </span>
                   </button>
@@ -347,24 +347,24 @@ export default function ReportsPage() {
               <div
                 key={fd.finding.id}
                 id={`finding-${fd.finding.id}`}
-                className="panel p-4 hover:border-zinc-700/80 transition-all scroll-mt-6"
+                className="panel p-4 hover:border-brand-primary/35 transition-all scroll-mt-6"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <SeverityBadge severity={fd.finding.severity} />
-                    <span className="font-medium text-zinc-200">{fd.finding.title}</span>
+                    <span className="font-medium text-text-secondary">{fd.finding.title}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusBadge status={fd.finding.status} />
-                    <span className="text-xs text-zinc-500 font-mono">
+                    <span className="text-xs text-text-quaternary font-mono">
                       可信度 {fd.finding.confidence}
                     </span>
                   </div>
                 </div>
                 {fd.finding.summary && (
-                  <p className="text-sm text-zinc-400 mt-2 line-clamp-2">{fd.finding.summary}</p>
+                  <p className="text-sm text-text-tertiary mt-2 line-clamp-2">{fd.finding.summary}</p>
                 )}
-                <div className="flex items-center gap-2 mt-2 text-xs text-zinc-500">
+                <div className="flex items-center gap-2 mt-2 text-xs text-text-quaternary">
                   <span>来源: {fd.finding.source_tool}</span>
                   {fd.evidence.length > 0 && (
                     <span>• {fd.evidence.length} 条证据</span>
@@ -378,18 +378,18 @@ export default function ReportsPage() {
 
       {/* Markdown Preview Panel */}
       {showPreview && previewText && (
-        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800/80 rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/80 border-b border-zinc-800/60">
-            <span className="font-medium text-sm text-zinc-200">Markdown 报告预览</span>
+        <div className="panel overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-brand-primary/10 bg-brand-primary/[0.045]">
+            <span className="font-medium text-sm text-text-secondary">Markdown 报告预览</span>
             <div className="flex items-center gap-2">
               {/* Mode toggle */}
-              <div className="flex bg-zinc-800/80 rounded-lg p-0.5">
+              <div className="flex bg-surface-elevated-2/70 rounded-lg p-0.5 ring-1 ring-brand-primary/10">
                 <button
                   onClick={() => setPreviewMode("rendered")}
                   className={`px-3 py-1 text-xs rounded-md transition-colors ${
                     previewMode === "rendered"
-                      ? "bg-zinc-700 text-zinc-100"
-                      : "text-zinc-400 hover:text-zinc-200"
+                      ? "bg-brand-primary/15 text-text-primary"
+                      : "text-text-tertiary hover:text-text-secondary"
                   }`}
                   aria-pressed={previewMode === "rendered"}
                 >
@@ -399,8 +399,8 @@ export default function ReportsPage() {
                   onClick={() => setPreviewMode("raw")}
                   className={`px-3 py-1 text-xs rounded-md transition-colors ${
                     previewMode === "raw"
-                      ? "bg-zinc-700 text-zinc-100"
-                      : "text-zinc-400 hover:text-zinc-200"
+                      ? "bg-brand-primary/15 text-text-primary"
+                      : "text-text-tertiary hover:text-text-secondary"
                   }`}
                   aria-pressed={previewMode === "raw"}
                 >
@@ -409,7 +409,7 @@ export default function ReportsPage() {
               </div>
               <button
                 onClick={() => { setShowPreview(false); setPreviewText(null); setPreviewRawText(null); }}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors ml-1"
+                className="text-text-quaternary hover:text-text-secondary transition-colors ml-1"
                 aria-label="关闭预览"
               >
                 ✕
@@ -419,11 +419,11 @@ export default function ReportsPage() {
           <div className="p-4 overflow-auto max-h-[70vh]">
             {previewMode === "rendered" ? (
               <div
-                className="prose prose-invert prose-sm max-w-none prose-headings:text-zinc-100 prose-p:text-zinc-300 prose-a:text-brand-primary hover:prose-a:text-brand-primary/80 prose-strong:text-zinc-200 prose-code:text-zinc-200 prose-code:bg-zinc-800 prose-pre:bg-zinc-800/80 prose-pre:text-zinc-300 prose-li:text-zinc-300"
+                className="prose prose-invert prose-sm max-w-none prose-headings:text-text-primary prose-p:text-text-secondary prose-a:text-brand-primary hover:prose-a:text-brand-primary/80 prose-strong:text-text-primary prose-code:text-text-secondary prose-code:bg-surface-elevated-2 prose-pre:bg-surface-elevated-2/80 prose-pre:text-text-secondary prose-li:text-text-secondary"
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(previewText) }}
               />
             ) : (
-              <pre className="text-xs font-mono whitespace-pre-wrap text-zinc-300">
+              <pre className="text-xs font-mono whitespace-pre-wrap text-text-secondary">
                 {previewRawText}
               </pre>
             )}

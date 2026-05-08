@@ -44,15 +44,15 @@ const variantStyles: Record<
     glow: "shadow-[0_0_15px_rgba(248,113,113,0.25)]",
   },
   info: {
-    bg: "bg-[#06b6d4]/10",
-    text: "text-[#06b6d4]",
-    border: "border-[#06b6d4]/20",
+    bg: "bg-brand-info/10",
+    text: "text-brand-info",
+    border: "border-brand-info/20",
     glow: "shadow-[0_0_15px_rgba(6,182,212,0.25)]",
   },
   critical: {
-    bg: "bg-[#ff4757]/20",
-    text: "text-[#ff4757]",
-    border: "border-[#ff4757]/30",
+    bg: "bg-brand-danger/20",
+    text: "text-brand-danger",
+    border: "border-brand-danger/30",
     glow: "shadow-[0_0_18px_rgba(255,71,87,0.3)]",
   },
 };
@@ -76,7 +76,7 @@ export function Badge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-lg font-medium border backdrop-blur-sm ${styles.bg} ${styles.text} ${styles.border} ${styles.glow || ""} ${sizeCls} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-md font-medium border backdrop-blur-sm ${styles.bg} ${styles.text} ${styles.border} ${styles.glow || ""} ${sizeCls} ${className}`}
       {...props}
     >
       {dot && (
