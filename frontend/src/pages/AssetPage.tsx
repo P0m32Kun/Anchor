@@ -98,6 +98,32 @@ export default function AssetPage() {
     [setPorts]
   );
 
+  const loadAllPortsAndServices = useCallback(
+    async (signal?: AbortSignal) => {
+      const ipAssets = assets.filter((a) => a.type === "ip");
+      if (ipAssets.length === 0) return;
+      setPortsAllLoading(true);
+      try {
+        await Promise.all(
+          ipAssets.map(async (a) => {
+            const [p, s] = await Promise.all([
+              api.listPorts(a.id, signal),
+              api.listServices(a.id, signal),
+            ]);
+            setPorts(a.id, p);
+            setServices(a.id, s);
+          })
+        );
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error(err);
+      } finally {
+        setPortsAllLoading(false);
+      }
+    },
+    [assets, setPorts, setServices]
+  );
+
   useEffect(() => {
     if (!projectId) return;
     const ctrl = new AbortController();
@@ -105,6 +131,16 @@ export default function AssetPage() {
     loadWebEndpoints(ctrl.signal);
     return () => ctrl.abort();
   }, [projectId, loadAssets, loadWebEndpoints]);
+
+  useEffect(() => {
+    if (activeTab !== "ports" || !projectId) return;
+    const ipAssets = assets.filter((a) => a.type === "ip");
+    const allLoaded = ipAssets.length > 0 && ipAssets.every((a) => ports[a.id]);
+    if (allLoaded) return;
+    const ctrl = new AbortController();
+    loadAllPortsAndServices(ctrl.signal);
+    return () => ctrl.abort();
+  }, [activeTab, projectId, assets, ports, loadAllPortsAndServices]);
 
   const startDiscovery = async () => {
     if (!projectId) return;
