@@ -78,7 +78,7 @@ func (p *Pipeline) WithStageCallback(cb StageEventCallback) *Pipeline {
 	return p
 }
 
-var requiredTools = []string{"subfinder", "naabu", "nerva", "cdncheck", "httpx", "nuclei", "dnsx", "nmap"}
+var requiredTools = []string{"subfinder", "naabu", "cdncheck", "httpx", "nuclei", "dnsx", "nmap"}
 
 func (p *Pipeline) checkTools() []string {
 	var missing []string
