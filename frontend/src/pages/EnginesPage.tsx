@@ -150,21 +150,48 @@ export default function EnginesPage() {
         {hasSearched && results.length === 0 && !loading ? (
           <EmptyState title="未找到结果" description="尝试修改查询语句后重新搜索" />
         ) : (
-          <Table
-            columns={[
-              { key: "ip", header: "IP" },
-              { key: "port", header: "端口", render: (r) => (r.port ? String(r.port) : "-") },
-              { key: "domain", header: "域名", render: (r) => r.domain || "-" },
-              { key: "title", header: "标题", render: (r) => r.title || "-" },
-              { key: "service", header: "服务", render: (r) => r.service || "-" },
-              { key: "protocol", header: "协议", render: (r) => r.protocol || "-" },
-              { key: "location", header: "位置", render: (r) => r.location || "-" },
-              { key: "os", header: "系统", render: (r) => r.os || "-" },
-            ]}
-            data={results}
-            loading={loading}
-            emptyText={hasSearched ? "暂无数据" : "输入查询语句并点击搜索"}
-          />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>IP</TableHead>
+                <TableHead>端口</TableHead>
+                <TableHead>域名</TableHead>
+                <TableHead>标题</TableHead>
+                <TableHead>服务</TableHead>
+                <TableHead>协议</TableHead>
+                <TableHead>位置</TableHead>
+                <TableHead>系统</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    加载中...
+                  </TableCell>
+                </TableRow>
+              ) : results.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    {hasSearched ? "暂无数据" : "输入查询语句并点击搜索"}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                results.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{r.ip}</TableCell>
+                    <TableCell>{r.port ? String(r.port) : "-"}</TableCell>
+                    <TableCell>{r.domain || "-"}</TableCell>
+                    <TableCell>{r.title || "-"}</TableCell>
+                    <TableCell>{r.service || "-"}</TableCell>
+                    <TableCell>{r.protocol || "-"}</TableCell>
+                    <TableCell>{r.location || "-"}</TableCell>
+                    <TableCell>{r.os || "-"}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         )}
 
         {/* Pagination */}
