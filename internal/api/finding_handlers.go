@@ -23,12 +23,7 @@ func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetFinding(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	finding, err := s.findingSvc.Get(r.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get finding failed: %v", err))
+	if s.handleServiceError(w, err, "get finding failed") {
 		return
 	}
 	writeJSON(w, http.StatusOK, finding)
