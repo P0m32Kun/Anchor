@@ -47,7 +47,6 @@ const canCancel = (status: string) =>
 
 export default function RunsPage() {
   const projectId = useProjectId();
-  const navigate = useNavigate();
   const toast = useToast();
   const runs = useStore((state) => state.runs) ?? [];
   const runsLoading = useStore((state) => state.runsLoading);
