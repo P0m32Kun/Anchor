@@ -20,9 +20,10 @@ When you need to change the schema:
 
 1. Increment the target version number.
 2. Add a new `if version < N` block in `internal/db/db.go` → `migrate()`.
-3. Implement the migration logic in a dedicated function (e.g., `migrateV4`).
-4. Update the version history table below.
-5. Run `go test ./...` and `go build ./...`.
+3. Implement the migration logic in a dedicated file (e.g., `internal/db/v14.go` with `migrateV14`).
+4. Import the new migration function in `db.go` (if needed; for `package db` it should be auto-available).
+5. Update the version history table below.
+6. Run `go test ./...` and `go build ./...`.
 
 Example:
 
