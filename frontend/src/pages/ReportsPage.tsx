@@ -95,12 +95,11 @@ const SEVERITY_META: Record<string, { label: string; icon: any; color: string; b
 
 export default function ReportsPage() {
   const projectId = useProjectId();
-  const navigate = useNavigate();
   const toast = useToast();
 
   const [findings, setFindings] = useState<FindingDetail[]>([]);
   const loading = useStore((state) => state.reportsLoading);
-  const error = useStore((state) => state.reportsError);
+  const _error = useStore((state) => state.reportsError);
   const setReportsLoading = useStore((state) => state.setReportsLoading);
   const setReportsError = useStore((state) => state.setReportsError);
   const [previewText, setPreviewText] = useState<string | null>(null);
