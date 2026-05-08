@@ -29,7 +29,7 @@ The stable product narrative remains:
 实际执行管线（当前已实现）：
 
 ```
-目标导入 → 分类 → (FOFA/Subfinder) → DNSx 解析 → CDN 过滤 → Naabu 端口扫描 → nerva 服务指纹 → httpx Web 探活 → Nuclei 漏洞扫描
+目标导入 → 分类 → (FOFA/Subfinder) → DNSx 解析 → CDN 过滤 → Naabu 端口扫描 → nmap -sV 服务指纹 → httpx Web 探活 → Nuclei 漏洞扫描
 ```
 
 扫描模式由前端 `ScanModal` 选择：
