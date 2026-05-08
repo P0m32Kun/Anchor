@@ -38,22 +38,10 @@ func ParseNaabu(r io.Reader) ([]NaabuResult, []ParseError) {
 }
 
 func parseNaabuJSONL(r io.Reader) ([]NaabuResult, []ParseError) {
-	var results []NaabuResult
-	var errs []ParseError
-
-	scanner := bufio.NewScanner(r)
-	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-
+	return parseJSONLines(r, func(line []byte, lineNo int) (NaabuResult, ParseError) {
 		var raw map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "invalid JSON: " + err.Error()})
-			continue
+		if err := json.Unmarshal(line, &raw); err != nil {
+			return NaabuResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "invalid JSON: " + err.Error()}
 		}
 
 		res := NaabuResult{}
@@ -79,22 +67,14 @@ func parseNaabuJSONL(r io.Reader) ([]NaabuResult, []ParseError) {
 		}
 
 		if res.Host == "" && res.IP == "" {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "missing host and ip"})
-			continue
+			return res, ParseError{Line: lineNo, Raw: string(line), Message: "missing host and ip"}
 		}
 		if res.Port == 0 {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "missing or zero port"})
-			continue
+			return res, ParseError{Line: lineNo, Raw: string(line), Message: "missing or zero port"}
 		}
 
-		results = append(results, res)
-	}
-
-	if err := scanner.Err(); err != nil {
-		errs = append(errs, ParseError{Line: lineNo, Raw: "", Message: "scanner error: " + err.Error()})
-	}
-
-	return results, errs
+		return res, ParseError{}
+	})
 }
 
 func parseNaabuCSV(r io.Reader) ([]NaabuResult, []ParseError) {
