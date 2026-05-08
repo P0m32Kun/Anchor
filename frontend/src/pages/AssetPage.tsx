@@ -246,7 +246,7 @@ export default function AssetPage() {
         {[
           { key: "assets", label: `资产 (${assets.length})` },
           { key: "web", label: `Web 端点 (${webEndpoints.length})` },
-          { key: "ports", label: "端口" },
+          { key: "ports", label: `端口 (${servicePorts.length})` },
         ].map((t) => (
           <button
             key={t.key}
