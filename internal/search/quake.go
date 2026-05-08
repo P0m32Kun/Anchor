@@ -43,9 +43,9 @@ type QuakeResult struct {
 // NewQuakeClient creates a new Quake client.
 func NewQuakeClient(apiKey string) *QuakeClient {
 	return &QuakeClient{
-		apiKey:  apiKey,
-		baseURL: "https://quake.360.net",
-		client:  defaultHTTPClient,
+		baseClient: baseClient{client: defaultHTTPClient},
+		apiKey:     apiKey,
+		baseURL:    "https://quake.360.net",
 	}
 }
 
