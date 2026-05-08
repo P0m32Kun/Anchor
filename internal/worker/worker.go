@@ -305,6 +305,40 @@ func (r *Runner) Cancel(taskID string) error {
 	return nil
 }
 
+// injectCustomNucleiTemplates checks for a local custom bundle and appends
+// -t (templates) and -w (workflows) flags to the nuclei command if the
+// directories exist and are not already present in the command.
+func (r *Runner) injectCustomNucleiTemplates(command []string) []string {
+	syncer := NewBundleSyncer(r.dataDir, "", "")
+	templatesDir := syncer.TemplatesDir()
+	workflowsDir := syncer.WorkflowsDir()
+
+	hasTemplatesFlag := false
+	hasWorkflowsFlag := false
+	for _, arg := range command {
+		if arg == "-t" {
+			hasTemplatesFlag = true
+		}
+		if arg == "-w" {
+			hasWorkflowsFlag = true
+		}
+	}
+
+	if !hasTemplatesFlag {
+		if info, err := os.Stat(templatesDir); err == nil && info.IsDir() {
+			command = append(command, "-t", templatesDir)
+		}
+	}
+
+	if !hasWorkflowsFlag {
+		if info, err := os.Stat(workflowsDir); err == nil && info.IsDir() {
+			command = append(command, "-w", workflowsDir)
+		}
+	}
+
+	return command
+}
+
 // limitedBuffer wraps bytes.Buffer with a max size limit.
 type limitedBuffer struct {
 	buf       bytes.Buffer
