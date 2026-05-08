@@ -174,7 +174,7 @@ export default function SettingsPage() {
                     ~/.anchor
                   </p>
                 </div>
-                <Button variant="outline" size="sm">打开目录</Button>
+                <Button variant="secondary" size="sm">打开目录</Button>
               </div>
             </CardContent>
           </Card>
