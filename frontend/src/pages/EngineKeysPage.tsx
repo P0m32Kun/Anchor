@@ -175,14 +175,16 @@ export default function EngineKeysPage() {
 
               <div className="space-y-3">
                 <div className="flex gap-2 items-start">
-                  <Input
-                    type={form.showKey ? "text" : "password"}
-                    label="API Key"
-                    placeholder="请输入 API Key"
-                    value={form.apiKey}
-                    onChange={(e) => updateForm(def.key, { apiKey: e.target.value })}
-                    className="flex-1"
-                  />
+                  <div className="flex-1 space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">API Key</label>
+                    <Input
+                      type={form.showKey ? "text" : "password"}
+                      placeholder="请输入 API Key"
+                      value={form.apiKey}
+                      onChange={(e) => updateForm(def.key, { apiKey: e.target.value })}
+                      className="w-full"
+                    />
+                  </div>
                   <button
                     onClick={() => updateForm(def.key, { showKey: !form.showKey })}
                     className="shrink-0 rounded-lg border border-white/[0.10] bg-white/[0.03] px-3 py-2 text-xs text-text-tertiary hover:bg-white/[0.06] transition-colors mt-7"
