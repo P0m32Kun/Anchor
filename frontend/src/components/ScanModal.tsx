@@ -182,6 +182,10 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
     setConfig((prev) => ({ ...prev, [key]: num }));
   };
 
+  const updateBoolConfig = (key: keyof PipelineConfig, checked: boolean) => {
+    setConfig((prev) => ({ ...prev, [key]: checked }));
+  };
+
   const toolFields = mode === "external" ? EXTERNAL_TOOL_FIELDS : INTERNAL_TOOL_FIELDS;
 
   return (
