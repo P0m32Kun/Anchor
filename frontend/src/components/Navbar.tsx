@@ -2,19 +2,20 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import type React from "react";
 import { useStore } from "../lib/store";
 import { cn } from "../lib/utils";
-import { 
-  LayoutDashboard, 
-  Files, 
-  Search, 
-  Cpu, 
-  Settings, 
-  Target, 
-  Box, 
-  Play, 
-  AlertTriangle, 
+import {
+  LayoutDashboard,
+  Files,
+  Search,
+  Cpu,
+  Settings,
+  Target,
+  Box,
+  Play,
+  AlertTriangle,
   FileText,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  Layers
 } from "lucide-react";
 
 type NavItem = {
