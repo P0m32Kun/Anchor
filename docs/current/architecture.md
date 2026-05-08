@@ -35,7 +35,7 @@ The stable product narrative remains:
 扫描模式由前端 `ScanModal` 选择：
 
 - **外网扫描 (`external`)**：启用全部工具链（FOFA → Subfinder → DNSx → CDNCheck → Naabu → nmap -sV → HTTPX → Nuclei）
-- **内网扫描 (`internal`)**：仅启用 Naabu → Nerva → HTTPX → Nuclei
+- **内网扫描 (`internal`)**：仅启用 Naabu → nmap -sV → HTTPX → Nuclei
 
 各工具的速率限制、并发线程、超时参数在 `ScanModal` Step 2 中配置，通过 `POST /projects/{id}/scan` 的 `config` 字段传递。端口范围支持 top100 / top1000 / high-risk / full / custom 五种预设。
 
