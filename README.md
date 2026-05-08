@@ -290,7 +290,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 | [dnsx](https://github.com/projectdiscovery/dnsx)           | DNS 解析             | latest   |
 | [httpx](https://github.com/projectdiscovery/httpx)         | Web 存活与指纹       | v1.3+    |
 | [Naabu](https://github.com/projectdiscovery/naabu)         | 端口发现             | v2.1+    |
-| [nerva](https://github.com/praetorian-inc/nerva)           | 服务指纹识别         | latest   |
+| [nmap](https://nmap.org/)                                | 服务指纹识别 (-sV)   | system   |
 | [cdncheck](https://github.com/projectdiscovery/cdncheck)   | CDN/WAF 过滤         | latest   |
 | [Nuclei](https://github.com/projectdiscovery/nuclei)       | 漏洞初筛             | v3.0+    |
 | [Nmap](https://nmap.org/)                                  | 深度服务识别（可选） | v7.92+   |
