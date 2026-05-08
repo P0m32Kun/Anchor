@@ -158,17 +158,11 @@ func (s *Server) handleListServicePorts(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 4. Get all ports (naabu results) - map by asset then to IP
-	allPorts := make([]*models.Port, 0)
-	for _, a := range assets {
-		if a.Type != "ip" {
-			continue
-		}
-		ports, err := s.queries.ListPortsByAsset(a.ID)
-		if err != nil {
-			continue
-		}
-		allPorts = append(allPorts, ports...)
+	// 4. Get all ports for this project in one query
+	allPorts, err := s.queries.ListPortsByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list ports: %v", err))
+		return
 	}
 
 	// Aggregate by (IP, Port) key
