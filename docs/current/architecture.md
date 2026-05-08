@@ -16,7 +16,7 @@ This file describes the current repository baseline that agents should assume un
 - Local/remote service: Go application providing API, orchestration, and worker-facing endpoints
 - Persistence: SQLite in WAL mode
 - Realtime updates: SSE
-- Scan execution: worker processes running external security tools (subfinder, dnsx, httpx, naabu, nerva, cdncheck, nuclei)
+- Scan execution: worker processes running external security tools (subfinder, dnsx, httpx, naabu, nmap, cdncheck, nuclei)
 - Pipeline configuration: mode-driven (`external`/`internal`) tool selection, per-tool speed params (rate limit, threads, timeout), port range presets
 - Global engine credentials: FOFA/Hunter/Quake API keys stored in `engine_credentials` table, configured via `/engines/keys`
 
