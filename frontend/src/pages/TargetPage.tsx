@@ -49,7 +49,6 @@ function ProjectInfo({ project }: { project: Project }) {
   const start = project.start_time ? new Date(project.start_time) : null;
   const end = project.end_time ? new Date(project.end_time) : null;
   const isExpired = end && end < now;
-  const isPending = start && start > now;
   const isActive = (!start || start <= now) && (!end || end >= now);
 
   return (
