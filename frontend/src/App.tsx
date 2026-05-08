@@ -195,6 +195,7 @@ function AppContent() {
             <Route path="/reports" element={<LegacyRouteGuard />} />
             <Route path="/engines" element={<EnginesPage />} />
             <Route path="/engines/keys" element={<EngineKeysPage />} />
+            <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/workers" element={<WorkersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/projects" element={<ProjectPage />} />
