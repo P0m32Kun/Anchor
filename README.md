@@ -144,20 +144,22 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 │   ├── archived/              # 历史归档
 │   └── 部署指南.md             # 部署指南
 ├── internal/                   # Go 内部包
-│   ├── api/                   # HTTP API handlers
+│   ├── api/                   # HTTP API handlers（已按 domain 拆分）
 │   ├── asset/                 # 资产归一化与去重
-│   ├── db/                    # SQLite schema + queries
+│   ├── db/                    # SQLite + queries（按 domain 拆分）+ migrations（v1~v13 独立文件）
 │   ├── errors/                # 结构化错误模型
 │   ├── health/                # 工具健康检查
-│   ├── models/                # 数据模型
+│   ├── models/                # 数据模型（按 domain 拆分为 14 个文件）
 │   ├── nuclei/                # Nuclei 指纹-Tag 映射
-│   ├── parser/                # 工具输出解析器
+│   ├── parser/                # 工具输出解析器（共享 parseJSONLines 泛型骨架）
+│   │   ├── common.go          # 泛型解析骨架 + 共享类型
 │   │   ├── subfinder.go       # Subfinder JSONL 解析
 │   │   ├── dnsx.go            # dnsx JSONL 解析
 │   │   ├── httpx.go           # httpx JSONL 解析
 │   │   ├── naabu.go           # Naabu 输出解析
+│   │   ├── nmap.go            # Nmap 输出解析
 │   │   └── nuclei.go          # Nuclei JSONL 解析
-│   ├── search/                # 互联网搜索引擎客户端
+│   ├── search/                # 互联网搜索引擎客户端（共享 baseClient HTTP 基础）
 │   │   ├── fofa.go            # FOFA API 客户端
 │   │   ├── hunter.go          # Hunter API 客户端
 │   │   ├── quake.go           # Quake API 客户端
@@ -167,12 +169,16 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 │   ├── scoring/               # Finding confidence/priority 评分
 │   ├── util/                  # 工具函数（脱敏、ID 生成等）
 │   ├── worker/                # Worker subprocess runner + 远程客户端
-│   └── workflow/              # 工作流编排
-│       ├── discovery.go       # 资产发现工作流
-│       └── screenshot.go      # Web 初筛工作流
+│   └── workflow/              # 工作流编排（按职责拆分为 5 个文件）
+│       ├── pipeline.go        # Pipeline 结构体、Builder、Run 入口
+│       ├── pipeline_stage.go  # 阶段状态管理
+│       ├── pipeline_flow.go   # 5 个目标类型 Flow
+│       ├── pipeline_tool.go   # 8 个工具执行器
+│       └── pipeline_result.go # 结果保存
 ├── frontend/                   # Tauri + React 前端
 │   ├── src/
 │   │   ├── lib/              # API 客户端 + Zustand store
+│   │   ├── hooks/            # 共享 Hooks（useResource 通用数据加载）
 │   │   ├── components/       # 共享 UI 组件
 │   │   ├── pages/            # 页面组件
 │   │   └── App.tsx           # 路由与布局
