@@ -484,6 +484,54 @@ export const api = {
     fetchAPI<void>(`/engines/credentials/${engine}`, { method: "DELETE", signal }),
   searchEngine: (params: { engine: string; query: string; page?: number; size?: number }, signal?: AbortSignal) =>
     fetchAPI<SearchEngineResponse>(buildQueryString("/engines/search", params), { signal }),
+
+  // --- Nuclei Custom Templates ---
+  listNucleiCustomSources: (signal?: AbortSignal) =>
+    fetchAPI<NucleiCustomSource[]>("/nuclei/custom/sources", { signal }),
+
+  createNucleiCustomGitSource: (data: { name: string; uri: string; branch?: string; routing_policy: string }, signal?: AbortSignal) =>
+    fetchAPI<NucleiCustomSource>("/nuclei/custom/sources/git", { method: "POST", body: JSON.stringify(data), signal }),
+
+  createNucleiCustomUploadSource: (name: string, routingPolicy: string, file: File, signal?: AbortSignal) => {
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("routing_policy", routingPolicy);
+    formData.append("file", file);
+    return fetchAPI<NucleiCustomSource>("/nuclei/custom/sources/upload", { method: "POST", body: formData, signal });
+  },
+
+  refreshNucleiCustomSource: (id: string, signal?: AbortSignal) =>
+    fetchAPI<NucleiCustomSource>(`/nuclei/custom/sources/${id}/refresh`, { method: "POST", signal }),
+
+  patchNucleiCustomSource: (id: string, data: { name?: string; enabled?: boolean; routing_policy?: string }, signal?: AbortSignal) =>
+    fetchAPI<NucleiCustomSource>(`/nuclei/custom/sources/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
+
+  deleteNucleiCustomSource: (id: string, signal?: AbortSignal) =>
+    fetchAPI<void>(`/nuclei/custom/sources/${id}`, { method: "DELETE", signal }),
+
+  listNucleiCustomFiles: (id: string, signal?: AbortSignal) =>
+    fetchAPI<NucleiCustomFileEntry[]>(`/nuclei/custom/sources/${id}/files`, { signal }),
+
+  readNucleiCustomFile: (id: string, path: string, signal?: AbortSignal) =>
+    fetchBlob(`/nuclei/custom/sources/${id}/files/${path}`, { signal }),
+
+  writeNucleiCustomFile: (id: string, path: string, content: string, signal?: AbortSignal) =>
+    fetchAPI<void>(`/nuclei/custom/sources/${id}/files/${path}`, { method: "PUT", body: content, signal }),
+
+  deleteNucleiCustomFile: (id: string, path: string, signal?: AbortSignal) =>
+    fetchAPI<void>(`/nuclei/custom/sources/${id}/files/${path}`, { method: "DELETE", signal }),
+
+  validateNucleiCustomSource: (id: string, signal?: AbortSignal) =>
+    fetchAPI<NucleiCustomValidationResult>(`/nuclei/custom/sources/${id}/validate`, { method: "POST", signal }),
+
+  validateAllNucleiCustom: (signal?: AbortSignal) =>
+    fetchAPI<NucleiCustomValidationResult[]>("/nuclei/custom/validate", { method: "POST", signal }),
+
+  publishNucleiCustom: (signal?: AbortSignal) =>
+    fetchAPI<{ version: string }>("/nuclei/custom/publish", { method: "POST", signal }),
+
+  getNucleiCustomManifest: (signal?: AbortSignal) =>
+    fetchAPI<NucleiCustomManifest>("/nuclei/custom/manifest", { signal }),
 };
 
 export interface Run {
