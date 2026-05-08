@@ -159,7 +159,7 @@ export default function EngineKeysPage() {
         </div>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-5 grid-cols-3">
         {ENGINE_DEFS.map((def) => {
           const form = forms[def.key];
           return (
