@@ -35,12 +35,7 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	project, err := s.projectSvc.Get(r.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get project failed: %v", err))
+	if s.handleServiceError(w, err, "get project failed") {
 		return
 	}
 	writeJSON(w, http.StatusOK, project)
