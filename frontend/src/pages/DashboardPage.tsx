@@ -111,7 +111,7 @@ export default function DashboardPage() {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
+        <div className="grid grid-cols-[1fr_360px] gap-6">
           <div className="space-y-6">
             <ActivityPanel
               title="最近扫描活动"
