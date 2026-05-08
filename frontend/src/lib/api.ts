@@ -226,6 +226,7 @@ export interface ScanTask {
   project_id: string;
   tool: string;
   status: string;
+  error_message?: string;
   created_at: string;
 }
 
