@@ -25,6 +25,18 @@ pull-worker-base:
 	docker pull p0m32kun/anchor-worker-base:latest
 	docker tag p0m32kun/anchor-worker-base:latest anchor-worker-base:latest
 
+# --- Worker Builder Base Image ---
+build-worker-builder-base:
+	docker build --platform linux/amd64 -f Dockerfile.worker-builder-base -t anchor-worker-builder-base:latest .
+
+push-worker-builder-base:
+	docker tag anchor-worker-builder-base:latest p0m32kun/anchor-worker-builder-base:latest
+	docker push p0m32kun/anchor-worker-builder-base:latest
+
+pull-worker-builder-base:
+	docker pull p0m32kun/anchor-worker-builder-base:latest
+	docker tag p0m32kun/anchor-worker-builder-base:latest anchor-worker-builder-base:latest
+
 # --- Server Base Image ---
 build-server-base:
 	# 强制 linux/amd64 — 部署目标为 x64 服务器，本地 ARM Mac 通过 QEMU 自动模拟
