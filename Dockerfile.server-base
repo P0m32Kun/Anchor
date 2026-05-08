@@ -1,13 +1,14 @@
 # Anchor Server Base Image
-# 预装 Alpine 构建环境和 Go 模块依赖，极少更新
+# 预装构建环境和 Go 模块依赖，极少更新
 # 首次使用: docker build -f Dockerfile.server-base -t anchor-server-base:latest .
 
-FROM golang:1.26-alpine
+FROM golang:1.26-bookworm
 
-# 使用国内镜像源加速构建
-RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
-
-RUN apk add --no-cache git gcc musl-dev sqlite-dev
+RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+    git gcc libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 ENV GOPROXY=https://goproxy.cn,direct
