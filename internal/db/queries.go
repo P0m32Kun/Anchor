@@ -322,12 +322,13 @@ func (q *Queries) CreateScanTask(t *models.ScanTask) error {
 }
 
 func (q *Queries) GetScanTask(id string) (*models.ScanTask, error) {
-	row := q.db.QueryRow(`SELECT id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, worker_id, nuclei_custom_bundle_version, created_at FROM scan_tasks WHERE id = ?`, id)
+	row := q.db.QueryRow(`SELECT id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, error_message, worker_id, nuclei_custom_bundle_version, created_at FROM scan_tasks WHERE id = ?`, id)
 	t := &models.ScanTask{}
 	var planID, runID, customVersion sql.NullString
 	var startedAt, finishedAt sql.NullTime
 	var exitCode sql.NullInt64
-	err := row.Scan(&t.ID, &t.ProjectID, &planID, &runID, &t.DependsOnTaskID, &t.TargetID, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &startedAt, &finishedAt, &exitCode, &t.WorkerID, &customVersion, &t.CreatedAt)
+	var errorMsg sql.NullString
+	err := row.Scan(&t.ID, &t.ProjectID, &planID, &runID, &t.DependsOnTaskID, &t.TargetID, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &startedAt, &finishedAt, &exitCode, &errorMsg, &t.WorkerID, &customVersion, &t.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
