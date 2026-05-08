@@ -1,0 +1,17 @@
+# Anchor Server Base Image
+# 预装 Alpine 构建环境和 Go 模块依赖，极少更新
+# 首次使用: docker build -f Dockerfile.server-base -t anchor-server-base:latest .
+
+FROM golang:1.26-alpine
+
+# 使用国内镜像源加速构建
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
+
+RUN apk add --no-cache git gcc musl-dev sqlite-dev
+
+WORKDIR /build
+ENV GOPROXY=https://goproxy.cn,direct
+
+# 预下载 Go 模块依赖（go.mod 变化时才需重建 base）
+COPY go.mod go.sum ./
+RUN go mod download
