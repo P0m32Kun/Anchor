@@ -192,7 +192,7 @@ export default function AssetPage() {
           port: p.port,
           protocol: p.protocol,
           state: p.state,
-          serviceName: svc?.name || getCommonServiceName(p.port) || "—",
+          serviceName: svc?.name || "未知服务",
           sourceTool: p.source_tool || "—",
         });
       }
