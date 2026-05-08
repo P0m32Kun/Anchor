@@ -3,8 +3,22 @@ import type React from "react";
 import { useNavigate } from "react-router-dom";
 import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { Button } from "../components/Button";
-import { useToast, ConfirmDialog, EmptyState, SkeletonList } from "../components";
+import { 
+  Button, 
+  Input, 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription, 
+  CardContent,
+  useToast, 
+  ConfirmDialog, 
+  EmptyState, 
+  SkeletonList,
+  Badge
+} from "../components";
+import { Plus, Trash2, Folder, ExternalLink, Calendar, Users, Target } from "lucide-react";
+import { cn } from "../lib/utils";
 
 export default function ProjectPage() {
   const navigate = useNavigate();
@@ -62,6 +76,7 @@ export default function ProjectPage() {
       setName("");
       setOrg("");
       setPurpose("");
+      toast("项目创建成功", "success");
     } catch (err) {
       toast("创建失败: " + (err instanceof Error ? err.message : String(err)), "error");
     } finally {
@@ -70,103 +85,132 @@ export default function ProjectPage() {
   };
 
   return (
-    <div className="page-shell space-y-6">
-      <div className="page-header">
-        <div>
-          <div className="page-eyebrow">Projects</div>
-          <h1 className="page-title">项目与授权边界</h1>
-          <p className="page-subtitle">每个项目承载一次授权测试交付，后续目标、资产、扫描、发现和报告都围绕项目展开。</p>
-        </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">项目与授权边界</h1>
+        <p className="text-muted-foreground mt-1">每个项目承载一次授权测试交付，后续所有的安全操作都围绕项目展开。</p>
       </div>
 
-      <div className="grid gap-6 grid-cols-[380px_1fr]">
-        <form onSubmit={handleCreate} className="panel h-fit">
-          <div className="panel-header">
-            <div>
-              <h2 className="panel-title">新建项目</h2>
-              <p className="text-xs text-text-tertiary mt-1">先建立授权容器，再导入目标范围</p>
-            </div>
-          </div>
-          <div className="panel-body space-y-4">
-            <input
-              className="input-dark"
-              placeholder="项目名称 *"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <input
-              className="input-dark"
-              placeholder="组织/客户"
-              value={org}
-              onChange={(e) => setOrg(e.target.value)}
-            />
-            <input
-              className="input-dark"
-              placeholder="目的/描述"
-              value={purpose}
-              onChange={(e) => setPurpose(e.target.value)}
-            />
-            <Button type="submit" variant="primary" loading={creating} className="w-full">
-              创建项目
-            </Button>
-          </div>
-        </form>
+      <div className="grid gap-8 lg:grid-cols-[360px_1fr]">
+        <aside className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">新建项目</CardTitle>
+              <CardDescription>先建立授权容器，再导入目标范围。</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">项目名称 *</label>
+                  <Input
+                    placeholder="例如：2024 Q2 外部红队评估"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">组织 / 客户</label>
+                  <Input
+                    placeholder="客户名称或部门"
+                    value={org}
+                    onChange={(e) => setOrg(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">目的描述</label>
+                  <Input
+                    placeholder="测试目的或项目背景"
+                    value={purpose}
+                    onChange={(e) => setPurpose(e.target.value)}
+                  />
+                </div>
+                <Button type="submit" variant="primary" loading={creating} className="w-full mt-2">
+                  <Plus className="mr-2 h-4 w-4" />
+                  创建项目
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2 className="panel-title">项目列表</h2>
-              <p className="text-xs text-text-tertiary mt-1">选择项目后从目标与 Scope 开始推进</p>
-            </div>
-            <span className="chip">{projects.length} 个项目</span>
+          <Card className="bg-muted/30 border-dashed">
+            <CardContent className="p-6 text-center">
+               <Folder className="h-8 w-8 text-muted-foreground mx-auto mb-3 opacity-50" />
+               <p className="text-xs text-muted-foreground">
+                 需要导入大量项目？<br />请联系管理员通过命令行工具导入。
+               </p>
+            </CardContent>
+          </Card>
+        </aside>
+
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+             <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+               所有项目
+               <Badge variant="secondary" className="ml-2">{projects.length}</Badge>
+             </h2>
           </div>
-          <div className="panel-body">
-            {projectsLoading ? (
+
+          {projectsLoading ? (
+            <div className="grid gap-4">
               <SkeletonList count={3} />
-            ) : projects.length === 0 ? (
+            </div>
+          ) : projects.length === 0 ? (
+            <Card className="p-12 text-center border-dashed">
               <EmptyState
                 title="暂无项目"
                 description="创建第一个项目后即可导入目标并启动扫描"
               />
-            ) : (
-              <div className="space-y-3">
-                {projects.map((p) => {
-                  return (
-                    <div
-                      key={p.id}
-                      className="surface-item group p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <button
-                          onClick={() => {
-                            setCurrentProject(p);
-                            navigate(`/projects/${p.id}/targets`);
-                          }}
-                          className="min-w-0 text-left"
-                        >
-                          <div className="font-semibold text-text-primary group-hover:text-brand-primary transition-colors text-base">{p.name}</div>
-                          <div className="text-[13px] text-text-tertiary mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                            <span>组织: <span className="text-text-secondary">{p.organization || "-"}</span></span>
-                            {p.purpose && <span>目的: <span className="text-text-secondary">{p.purpose}</span></span>}
-                            <span>创建: <span className="text-text-secondary">{new Date(p.created_at).toLocaleDateString()}</span></span>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {projects.map((p) => (
+                <Card key={p.id} className="group overflow-hidden transition-all hover:border-primary/50 hover:shadow-md">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="flex-1 p-5">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h3 
+                            className="text-lg font-bold text-foreground group-hover:text-primary transition-colors cursor-pointer flex items-center gap-2"
+                            onClick={() => {
+                              setCurrentProject(p);
+                              navigate(`/projects/${p.id}/targets`);
+                            }}
+                          >
+                            {p.name}
+                            <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </h3>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-2">
+                             <div className="flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5" />
+                                <span>{p.organization || "未指定组织"}</span>
+                             </div>
+                             <div className="flex items-center gap-1.5 border-l pl-4 border-border">
+                                <Calendar className="h-3.5 w-3.5" />
+                                <span>{new Date(p.created_at).toLocaleDateString()}</span>
+                             </div>
+                             {p.purpose && (
+                               <div className="flex items-center gap-1.5 border-l pl-4 border-border">
+                                  <Target className="h-3.5 w-3.5" />
+                                  <span className="truncate max-w-[200px]">{p.purpose}</span>
+                               </div>
+                             )}
                           </div>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
                             setDeleteTarget(p);
                             setDeleteDialogOpen(true);
                           }}
-                          className="rounded p-1 text-text-quaternary transition-colors hover:bg-brand-danger/10 hover:text-brand-danger"
-                          title="删除项目"
+                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mt-2 -mr-2"
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
+
+                      <div className="mt-6 flex flex-wrap gap-2">
                         {[
                           ["目标", "targets"],
                           ["资产", "assets"],
@@ -174,24 +218,26 @@ export default function ProjectPage() {
                           ["发现", "findings"],
                           ["报告", "reports"],
                         ].map(([label, route]) => (
-                          <button
+                          <Button
                             key={route}
+                            variant="secondary"
+                            size="sm"
                             onClick={() => {
                               setCurrentProject(p);
                               navigate(`/projects/${p.id}/${route}`);
                             }}
-                            className="chip hover:border-brand-primary/40 hover:text-text-primary"
+                            className="h-7 text-xs font-medium bg-muted/50 hover:bg-primary hover:text-primary-foreground transition-all"
                           >
                             {label}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </section>
       </div>
 
@@ -217,8 +263,8 @@ export default function ProjectPage() {
           }
         }}
         title="删除项目"
-        description={deleteTarget ? `确认删除项目 "${deleteTarget.name}"？此操作不可恢复。` : ""}
-        confirmText="删除"
+        description={deleteTarget ? `确认删除项目 "${deleteTarget.name}"？此操作不可恢复，所有关联的目标和扫描记录将被清空。` : ""}
+        confirmText="彻底删除"
         cancelText="取消"
         variant="danger"
         loading={deletingId !== null}

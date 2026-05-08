@@ -1,7 +1,9 @@
 package parser
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 )
 
 // ParseError records a single line parse failure.

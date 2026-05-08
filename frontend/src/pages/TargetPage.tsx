@@ -2,7 +2,46 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { useProjectId, ConfirmDialog, useToast, EmptyState, Table, Badge, SkeletonList } from "../components";
+import { 
+  useProjectId, 
+  ConfirmDialog, 
+  useToast, 
+  EmptyState, 
+  Badge, 
+  SkeletonList,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Button,
+  Input,
+  Select,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell
+} from "../components";
+import { 
+  Info, 
+  Upload, 
+  Target as TargetIcon, 
+  ShieldCheck, 
+  Plus, 
+  Play, 
+  FileText, 
+  Search,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Zap,
+  ChevronRight,
+  FileUp,
+  X
+} from "lucide-react";
+import { cn } from "../lib/utils";
 
 function ProjectInfo({ project }: { project: Project }) {
   const now = new Date();
@@ -13,55 +52,48 @@ function ProjectInfo({ project }: { project: Project }) {
   const isActive = (!start || start <= now) && (!end || end >= now);
 
   return (
-    <section className="panel p-4">
-      <h2 className="font-semibold mb-2">项目信息</h2>
-      <div className="text-sm space-y-1">
-        <div className="text-text-tertiary">
-          <span className="font-medium">组织:</span> {project.organization || "—"}
+    <Card className="bg-muted/30 border-none shadow-none">
+      <CardContent className="p-4 flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <UsersIcon className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+                <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Organization</div>
+                <div className="text-sm font-medium">{project.organization || "—"}</div>
+            </div>
         </div>
-        {project.purpose && (
-          <div className="text-text-tertiary">
-            <span className="font-medium">目的:</span> {project.purpose}
-          </div>
-        )}
-        {start && end ? (
-          <div className="flex items-center gap-2">
-            <span className="text-text-tertiary">
-              时间窗口: {start.toLocaleDateString()} ~ {end.toLocaleDateString()}
-            </span>
-            {isExpired && (
-              <span className="text-xs bg-brand-danger/15 text-brand-danger px-2 py-0.5 rounded font-medium">
-                已过期
-              </span>
-            )}
-            {isPending && (
-              <span className="text-xs bg-accent-yellow/15 text-accent-yellow px-2 py-0.5 rounded font-medium">
-                未开始
-              </span>
-            )}
-            {isActive && (
-              <span className="text-xs bg-brand-success/15 text-brand-success px-2 py-0.5 rounded font-medium">
-                进行中
-              </span>
-            )}
-          </div>
-        ) : (
-          <div className="text-text-quaternary text-xs">未配置时间窗口 (始终可用)</div>
-        )}
-        <div className="text-text-tertiary">
-          <span className="font-medium">速率限制:</span>{" "}
-          {project.rate_limit !== undefined && project.rate_limit > 0
-            ? `${project.rate_limit} 包/秒`
-            : "无限制"}
+
+        <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Clock className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+                <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Window</div>
+                <div className="flex items-center gap-2">
+                   <span className="text-sm font-medium">{start && end ? `${start.toLocaleDateString()} - ${end.toLocaleDateString()}` : "Unlimited"}</span>
+                   {isExpired && <Badge variant="destructive" className="h-4 px-1 text-[9px]">EXPIRED</Badge>}
+                   {isActive && <Badge variant="success" className="h-4 px-1 text-[9px]">ACTIVE</Badge>}
+                </div>
+            </div>
         </div>
-        {project.default_profile && (
-          <div className="text-text-tertiary">
-            <span className="font-medium">默认 Profile:</span> {project.default_profile}
-          </div>
-        )}
-      </div>
-    </section>
+
+        <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Zap className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+                <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Rate Limit</div>
+                <div className="text-sm font-medium">{project.rate_limit && project.rate_limit > 0 ? `${project.rate_limit} pkts/s` : "No Limit"}</div>
+            </div>
+        </div>
+      </CardContent>
+    </Card>
   );
+}
+
+function UsersIcon(props: any) {
+    return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 }
 
 function FileImport({ projectId, onImported }: { projectId: string; onImported: () => void }) {
@@ -104,7 +136,7 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -113,13 +145,11 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         onClick={() => fileRef.current?.click()}
-        className={`border border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-          importing
-            ? "border-white/[0.08] bg-white/[0.03] pointer-events-none"
-            : dragOver
-            ? "border-brand-primary bg-brand-primary/10"
-            : "border-white/[0.12] bg-white/[0.025] hover:border-white/[0.24]"
-        }`}
+        className={cn(
+            "relative group border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all",
+            importing ? "opacity-50 cursor-not-allowed" : "hover:border-primary/50 hover:bg-primary/[0.02]",
+            dragOver ? "border-primary bg-primary/10" : "border-border"
+        )}
       >
         <input
           ref={fileRef}
@@ -132,69 +162,70 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
             e.target.value = "";
           }}
         />
-        {importing ? (
-          <div className="text-text-tertiary">
-            <div className="animate-pulse mb-2">⏳</div>
-            正在导入...
-          </div>
-        ) : (
-          <div className="text-text-tertiary">
-            <div className="text-2xl mb-2">📂</div>
-            <div className="font-medium">点击上传 或将文件拖拽到此处</div>
-            <div className="text-xs text-text-quaternary mt-1">支持 .txt / .csv 格式，每行一个目标</div>
-          </div>
-        )}
+        <div className="flex flex-col items-center">
+            <div className={cn(
+                "mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center transition-transform group-hover:scale-110",
+                dragOver && "bg-primary text-primary-foreground"
+            )}>
+                {importing ? <div className="animate-spin text-lg">⏳</div> : <FileUp className="h-6 w-6" />}
+            </div>
+            <div className="font-semibold text-foreground">
+                {importing ? "正在上传并处理..." : "点击或拖拽文件到此处"}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground max-w-[280px] mx-auto">
+                支持每行一个目标的 .txt 或 .csv 文本文件。
+            </p>
+        </div>
       </div>
 
       {result && (
-        <div className="panel p-3 text-sm space-y-2">
-          <div className="font-semibold">导入结果</div>
-          <div className="flex gap-4 flex-wrap">
-            <StatBadge label="成功导入" value={result.imported} color="green" />
-            {result.expanded !== undefined && result.expanded > 0 && (
-              <StatBadge label="展开后目标" value={result.expanded} color="blue" />
-            )}
-            <StatBadge label="重复跳过" value={result.duplicates} color="gray" />
-            <StatBadge label="Scope 拒绝" value={result.denied} color="yellow" />
-            <StatBadge label="错误" value={result.errors} color="red" />
-          </div>
-          {result.denied_targets.length > 0 && (
-            <div>
-              <div className="text-xs font-medium text-accent-yellow mb-1">
-                被 Scope 拒绝的目标:
-              </div>
-              <ul className="text-xs space-y-0.5 max-h-32 overflow-auto">
-                {result.denied_targets.map((d, i) => (
-                  <li key={i} className="text-text-tertiary">
-                    <code className="bg-accent-yellow/10 px-1 rounded text-accent-yellow">{d.value}</code>
-                    <span className="text-accent-yellow ml-2">- {d.reason}</span>
-                  </li>
-                ))}
-              </ul>
+        <Card className="bg-muted/30 border-dashed animate-in slide-in-from-top-2 duration-300">
+          <CardHeader className="py-3 px-4">
+            <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-brand-success" />
+                    导入报告
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setResult(null)}>
+                    <X className="h-3 w-3" />
+                </Button>
             </div>
-          )}
-        </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <StatItem label="成功" value={result.imported} color="text-brand-success" />
+              <StatItem label="总目标" value={result.expanded ?? 0} color="text-brand-primary" />
+              <StatItem label="重复" value={result.duplicates} />
+              <StatItem label="拒绝" value={result.denied} color="text-brand-warning" />
+              <StatItem label="错误" value={result.errors} color="text-brand-danger" />
+            </div>
+            {result.denied_targets.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <div className="text-xs font-semibold text-brand-warning mb-2 uppercase tracking-tight">Scope Denied:</div>
+                <div className="space-y-1.5 max-h-32 overflow-auto pr-2 custom-scrollbar">
+                    {result.denied_targets.map((d, i) => (
+                    <div key={i} className="text-xs flex items-center justify-between p-2 rounded bg-background/50 border border-border/50">
+                        <code className="text-brand-warning font-mono">{d.value}</code>
+                        <span className="text-muted-foreground italic text-[10px]">{d.reason}</span>
+                    </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
 }
 
-function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
-  const colors: Record<string, string> = {
-    green: "bg-brand-success/15 text-brand-success",
-    gray: "bg-white/[0.04] text-text-tertiary",
-    yellow: "bg-accent-yellow/15 text-accent-yellow",
-    red: "bg-brand-danger/15 text-brand-danger",
-    blue: "bg-brand-primary/15 text-brand-primary",
-  };
-  return (
-    <div className="flex items-center gap-1">
-      <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[color] || colors.gray}`}>
-        {value}
-      </span>
-      <span className="text-xs text-text-tertiary">{label}</span>
-    </div>
-  );
+function StatItem({ label, value, color = "text-muted-foreground" }: { label: string; value: number; color?: string }) {
+    return (
+        <div className="rounded-lg bg-background/50 p-2 border border-border/50">
+            <div className="text-[10px] font-bold text-muted-foreground uppercase leading-none mb-1.5">{label}</div>
+            <div className={cn("text-lg font-bold tabular-nums leading-none", color)}>{value}</div>
+        </div>
+    )
 }
 
 export default function TargetPage() {
@@ -206,6 +237,7 @@ export default function TargetPage() {
   const error = useStore((state) => state.targetsError);
   const setTargetsLoading = useStore((state) => state.setTargetsLoading);
   const setTargetsError = useStore((state) => state.setTargetsError);
+  
   const [targetValue, setTargetValue] = useState("");
   const [targetType, setTargetType] = useState("auto");
   const [scopeAction, setScopeAction] = useState<"include" | "exclude">("include");
@@ -225,7 +257,6 @@ export default function TargetPage() {
   const [dryRunLoading, setDryRunLoading] = useState(false);
   const [dryRunConfirmOpen, setDryRunConfirmOpen] = useState(false);
 
-
   const toast = useToast();
 
   const loadTargets = useCallback(async (signal?: AbortSignal) => {
@@ -240,7 +271,6 @@ export default function TargetPage() {
       const msg = err instanceof Error ? err.message : String(err);
       setTargetsError(msg);
       toast("加载目标失败: " + msg, "error");
-      console.error(err);
     } finally {
       setTargetsLoading(false);
     }
@@ -350,224 +380,244 @@ export default function TargetPage() {
     }
   };
 
-
-
-  const targetColumns: { key: string; header: string; width?: string; render?: (row: Record<string, unknown>) => React.ReactNode }[] = [
-    {
-      key: "type",
-      header: "类型",
-      width: "120px",
-      render: (row) => (
-        <Badge variant="default">
-          {String(row.type)}
-        </Badge>
-      ),
-    },
-    { key: "value", header: "目标值" },
-    {
-      key: "created_at",
-      header: "创建时间",
-      width: "200px",
-      render: (row) => new Date(String(row.created_at)).toLocaleString(),
-    },
-  ];
-
   if (!currentProject) {
     return (
-      <div className="page-shell space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">目标管理</h1>
-          <p className="text-text-tertiary text-sm mt-1">管理项目目标、Scope 规则和批量导入</p>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <TargetIcon className="h-8 w-8 text-muted-foreground opacity-50" />
         </div>
-        <div className="panel p-8 text-center">
-          <p className="text-text-tertiary mb-4">请先从 Dashboard 选择一个项目</p>
-          <Link to="/" className="link-cyber">前往 Dashboard</Link>
-        </div>
+        <h2 className="text-xl font-bold">目标管理</h2>
+        <p className="text-muted-foreground mt-1 mb-6">请先从左侧菜单或总览选择一个项目</p>
+        <Link to="/">
+            <Button variant="primary">前往总览</Button>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="page-shell space-y-6">
-      <div className="page-header">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-start justify-between">
         <div>
-          <div className="page-eyebrow text-brand-success">Step 1</div>
-          <h1 className="page-title">目标与 Scope</h1>
-          <p className="page-subtitle">先确认授权边界，再导入域名、URL、IP 或 CIDR；所有后续扫描都从这里开始。</p>
+          <div className="flex items-center gap-2 text-brand-success font-bold text-xs uppercase tracking-widest mb-1.5">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Step 1: Scoping
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">目标与 Scope</h1>
+          <p className="text-muted-foreground mt-1">确认授权边界，导入需要测试的域名、URL、IP 或 CIDR。</p>
+        </div>
+        <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDryRunConfirmOpen(true)} disabled={dryRunLoading}>
+                <Zap className={cn("mr-2 h-4 w-4 text-brand-warning", dryRunLoading && "animate-pulse")} />
+                {dryRunLoading ? "正在评估..." : "授权 Dry Run"}
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => navigate(`/projects/${currentProject.id}/runs`)}>
+                <Play className="mr-2 h-4 w-4 fill-current" />
+                下一步：扫描
+            </Button>
         </div>
       </div>
 
       <ProjectInfo project={currentProject} />
 
-      {/* 操作区 */}
-      <section className="panel p-4 space-y-4">
-        <h2 className="font-semibold">添加目标</h2>
-        <form onSubmit={addTarget} className="flex gap-2">
-          <select
-            className="input-dark w-28 px-2"
-            value={targetType}
-            onChange={(e) => setTargetType(e.target.value)}
-          >
-            <option value="auto">自动检测</option>
-            <option value="domain">域名</option>
-            <option value="url">URL</option>
-            <option value="ip">IP</option>
-            <option value="cidr">CIDR</option>
-            <option value="company">公司</option>
-          </select>
-          <input
-            className="input-dark flex-1"
-            placeholder="example.com / 192.168.1.1 / 10.0.0.0/24 / 192.168.0.1-10 / 阿里巴巴"
-            value={targetValue}
-            onChange={(e) => setTargetValue(e.target.value)}
-          />
-          <button
-            type="submit"
-            disabled={addingTarget}
-            className="btn-cyber-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {addingTarget ? "添加中..." : "添加"}
-          </button>
-        </form>
-
-        <h2 className="font-semibold">批量导入</h2>
-        <FileImport projectId={currentProject.id} onImported={loadTargets} />
-      </section>
-
-      {/* 内容区 */}
-      <section className="panel p-4">
-        <h2 className="font-semibold mb-3">目标列表</h2>
-        {loading ? (
-          <SkeletonList count={3} />
-        ) : error ? (
-          <div className="py-12 text-center">
-            <p className="text-brand-danger mb-2">加载失败: {error}</p>
-            <button
-              onClick={() => loadTargets()}
-              className="text-sm link-cyber"
-            >
-              重试
-            </button>
-          </div>
-        ) : targets.length === 0 ? (
-          <EmptyState
-            title="暂无目标"
-            description="当前项目还没有添加任何目标，请在上方添加或导入。"
-          />
-        ) : (
-          <Table
-            columns={targetColumns}
-            data={targets as unknown as Record<string, unknown>[]}
-            emptyText="暂无目标"
-            maxHeight={480}
-          />
-        )}
-      </section>
-
-      {/* Scope 规则 */}
-      <section className="panel p-4">
-        <h2 className="font-semibold mb-3">Scope 规则</h2>
-        <form onSubmit={addScopeRule} className="flex gap-2 mb-3">
-          <select
-            className="input-dark w-24 px-2"
-            value={scopeAction}
-            onChange={(e) => setScopeAction(e.target.value as any)}
-          >
-            <option value="include">包含</option>
-            <option value="exclude">排除</option>
-          </select>
-          <input
-            className="input-dark flex-1"
-            placeholder="域名规则，如 example.com"
-            value={scopeValue}
-            onChange={(e) => setScopeValue(e.target.value)}
-          />
-          <button type="submit" disabled={addingScope} className="btn-cyber-secondary disabled:opacity-50 disabled:cursor-not-allowed">
-            {addingScope ? "添加中..." : "添加"}
-          </button>
-        </form>
-      </section>
-
-      {/* 操作 */}
-      <section className="panel p-4">
-        <h2 className="font-semibold mb-3">操作</h2>
-        <div className="flex gap-3 flex-wrap">
-          <button
-            onClick={() => setDryRunConfirmOpen(true)}
-            disabled={dryRunLoading}
-            className="btn-cyber-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {dryRunLoading ? "检测中..." : "授权检测 (Scope Check)"}
-          </button>
-          <Link to={`/projects/${currentProject.id}/runs`} className="btn-cyber-secondary">
-            前往扫描
-          </Link>
-          <Link to={`/projects/${currentProject.id}/assets`} className="btn-cyber-secondary">
-            查看资产
-          </Link>
-          <Link to={`/projects/${currentProject.id}/findings`} className="btn-cyber-secondary">
-            漏洞发现
-          </Link>
-          <Link to={`/projects/${currentProject.id}/reports`} className="btn-cyber-secondary">
-            报告
-          </Link>
-        </div>
-
-        {dryRunResult && (
-          <div className="mt-4 panel p-3 text-sm space-y-2">
-            <div className="font-semibold">授权检测结果 ({dryRunResult.mode})</div>
-            <div className="flex gap-4 text-xs">
-              <div>
-                <span className="text-text-tertiary">时间窗口:</span>{" "}
-                {dryRunResult.time_window_valid === undefined
-                  ? "—"
-                  : dryRunResult.time_window_valid
-                  ? <span className="text-brand-success font-medium">有效</span>
-                  : <span className="text-brand-danger font-medium">无效</span>}
-              </div>
-              <div>
-                <span className="text-text-tertiary">速率限制:</span>{" "}
-                {dryRunResult.rate_limit !== undefined && dryRunResult.rate_limit > 0
-                  ? `${dryRunResult.rate_limit} 包/秒`
-                  : "无限制"}
-              </div>
-              {dryRunResult.estimated_duration_seconds !== undefined && (
-                <div>
-                  <span className="text-text-tertiary">预计耗时:</span>{" "}
-                  <span className="font-medium">
-                    {dryRunResult.estimated_duration_seconds < 60
-                      ? `${dryRunResult.estimated_duration_seconds} 秒`
-                      : `${Math.round(dryRunResult.estimated_duration_seconds / 60)} 分钟`}
-                  </span>
+      <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+        <section className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold tracking-tight">目标列表</h2>
+                <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="h-6">{targets.length} Targets</Badge>
                 </div>
-              )}
             </div>
-            {dryRunResult.results && dryRunResult.results.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-text-tertiary mt-2 mb-1">
-                  目标决策 ({dryRunResult.results.length}):
+
+            <Card>
+                {loading ? (
+                <div className="p-6">
+                    <SkeletonList count={5} />
                 </div>
-                <ul className="space-y-0.5 max-h-64 overflow-auto">
-                  {dryRunResult.results.map((r, i) => (
-                    <li
-                      key={i}
-                      className={
-                        r.decision === "allow"
-                          ? "text-brand-success"
-                          : r.decision === "deny"
-                          ? "text-brand-danger"
-                          : "text-accent-yellow"
-                      }
-                    >
-                      [{r.decision}] {r.target} — {r.reason}
-                    </li>
-                  ))}
-                </ul>
+                ) : error ? (
+                <div className="py-20 text-center">
+                    <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-4 opacity-50" />
+                    <p className="text-destructive font-medium mb-4">加载失败: {error}</p>
+                    <Button variant="outline" size="sm" onClick={() => loadTargets()}>
+                        重试
+                    </Button>
+                </div>
+                ) : targets.length === 0 ? (
+                <div className="py-20 text-center">
+                    <EmptyState
+                        title="暂无目标"
+                        description="当前项目还没有添加任何目标，请在右侧添加或批量导入。"
+                    />
+                </div>
+                ) : (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-24">类型</TableHead>
+                            <TableHead>目标值</TableHead>
+                            <TableHead className="w-48 text-right text-muted-foreground">创建时间</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {targets.map((t) => (
+                        <TableRow key={t.id}>
+                            <TableCell>
+                                <Badge variant="secondary" className="font-mono text-[10px] uppercase">
+                                    {t.type}
+                                </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium font-mono text-sm">{t.value}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                                {new Date(t.created_at).toLocaleString()}
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+                )}
+            </Card>
+        </section>
+
+        <aside className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">添加单个目标</CardTitle>
+                    <CardDescription>支持 IP, CIDR, 域名, URL 等类型。</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <form onSubmit={addTarget} className="space-y-3">
+                        <div className="grid grid-cols-[100px_1fr] gap-2">
+                            <Select
+                                value={targetType}
+                                onChange={(e) => setTargetType(e.target.value)}
+                            >
+                                <option value="auto">自动</option>
+                                <option value="domain">域名</option>
+                                <option value="url">URL</option>
+                                <option value="ip">IP</option>
+                                <option value="cidr">CIDR</option>
+                            </Select>
+                            <Input
+                                placeholder="example.com"
+                                value={targetValue}
+                                onChange={(e) => setTargetValue(e.target.value)}
+                            />
+                        </div>
+                        <Button type="submit" variant="primary" loading={addingTarget} className="w-full">
+                            <Plus className="mr-2 h-4 w-4" />
+                            添加目标
+                        </Button>
+                    </form>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">批量导入</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <FileImport projectId={currentProject.id} onImported={loadTargets} />
+                </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30">
+                <CardHeader>
+                    <CardTitle className="text-sm">Scope 规则</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">决定哪些目标在授权范围内。</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <form onSubmit={addScopeRule} className="space-y-3">
+                        <div className="grid grid-cols-[80px_1fr] gap-2">
+                            <Select
+                                value={scopeAction}
+                                onChange={(e) => setScopeAction(e.target.value as any)}
+                            >
+                                <option value="include">包含</option>
+                                <option value="exclude">排除</option>
+                            </Select>
+                            <Input
+                                placeholder="例如 *.example.com"
+                                value={scopeValue}
+                                onChange={(e) => setScopeValue(e.target.value)}
+                            />
+                        </div>
+                        <Button type="submit" size="sm" disabled={addingScope} variant="secondary" className="w-full h-8">
+                            添加规则
+                        </Button>
+                    </form>
+                </CardContent>
+            </Card>
+        </aside>
+      </div>
+
+      {dryRunResult && (
+        <Card className="border-brand-warning/30 bg-brand-warning/[0.02]">
+           <CardHeader className="flex flex-row items-center justify-between py-4">
+              <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full bg-brand-warning/10 flex items-center justify-center">
+                    <ShieldCheck className="h-4 w-4 text-brand-warning" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base text-brand-warning">授权检测评估 (Dry Run Result)</CardTitle>
+                    <CardDescription className="text-xs">
+                        基于当前 {dryRunResult.results?.length ?? 0} 个目标的 Scope 评估
+                    </CardDescription>
+                  </div>
               </div>
-            )}
-          </div>
-        )}
-      </section>
+              <Button variant="ghost" size="sm" onClick={() => setDryRunResult(null)}>关闭报告</Button>
+           </CardHeader>
+           <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="p-3 rounded-lg border bg-background/50">
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Time Window</div>
+                        <div className="flex items-center gap-2">
+                            {dryRunResult.time_window_valid ? 
+                                <span className="text-sm font-semibold text-brand-success flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Valid</span> : 
+                                <span className="text-sm font-semibold text-brand-danger flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Invalid</span>
+                            }
+                        </div>
+                    </div>
+                    <div className="p-3 rounded-lg border bg-background/50">
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Estimated Time</div>
+                        <div className="text-sm font-semibold">
+                            {dryRunResult.estimated_duration_seconds ? 
+                                (dryRunResult.estimated_duration_seconds < 60 ? `${dryRunResult.estimated_duration_seconds}s` : `${Math.round(dryRunResult.estimated_duration_seconds/60)}m`) 
+                                : "N/A"}
+                        </div>
+                    </div>
+                    <div className="p-3 rounded-lg border bg-background/50">
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Decision Mode</div>
+                        <div className="text-sm font-semibold uppercase">{dryRunResult.mode}</div>
+                    </div>
+                </div>
+
+                {dryRunResult.results && (
+                   <div className="border rounded-lg overflow-hidden">
+                      <div className="max-h-60 overflow-auto custom-scrollbar">
+                        <Table>
+                            <TableBody>
+                                {dryRunResult.results.map((r, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell className="w-12 text-center p-2">
+                                            {r.decision === "allow" ? 
+                                                <div className="h-2 w-2 rounded-full bg-brand-success mx-auto" /> : 
+                                                <div className="h-2 w-2 rounded-full bg-brand-danger mx-auto" />
+                                            }
+                                        </TableCell>
+                                        <TableCell className="p-2 font-mono text-xs">{r.target}</TableCell>
+                                        <TableCell className={cn("p-2 text-xs", r.decision === 'allow' ? 'text-brand-success' : 'text-brand-danger')}>
+                                            {r.reason}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                      </div>
+                   </div>
+                )}
+           </CardContent>
+        </Card>
+      )}
 
       <ConfirmDialog
         open={scopeConfirmOpen}
@@ -576,13 +626,13 @@ export default function TargetPage() {
           setPendingScopeConfirm(null);
         }}
         onConfirm={handleConfirmScope}
-        title="Scope 确认"
+        title="自动修正 Scope"
         description={
           pendingScopeConfirm
-            ? `${pendingScopeConfirm.message}\n\n建议添加 Scope 规则: [${pendingScopeConfirm.suggested.action}] ${pendingScopeConfirm.suggested.type} = ${pendingScopeConfirm.suggested.value}\n\n是否自动添加该规则并重新添加目标？`
+            ? `添加此目标需要额外的 Scope 授权规则。是否自动添加规则: [${pendingScopeConfirm.suggested.action}] ${pendingScopeConfirm.suggested.type} = ${pendingScopeConfirm.suggested.value}？`
             : ""
         }
-        confirmText="添加规则并继续"
+        confirmText="添加并继续"
         cancelText="取消"
         loading={scopeConfirmLoading}
       />
@@ -591,14 +641,12 @@ export default function TargetPage() {
         open={dryRunConfirmOpen}
         onClose={() => setDryRunConfirmOpen(false)}
         onConfirm={runDryRun}
-        title="授权检测"
-        description="即将对当前项目的所有目标执行授权检测（Dry Run），确认时间窗口和 Scope 规则是否有效。是否继续？"
-        confirmText="开始检测"
+        title="启动授权 Dry Run"
+        description="系统将模拟扫描引擎对当前项目的所有目标进行授权校验，并评估预计耗时。此操作不会产生实际扫描流量。"
+        confirmText="开始评估"
         cancelText="取消"
         loading={dryRunLoading}
       />
-
-
     </div>
   );
 }

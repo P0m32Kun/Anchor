@@ -1,66 +1,24 @@
-import React, { forwardRef } from "react";
+import * as React from "react"
+import { cn } from "../lib/utils"
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
-  helperText?: string;
-}
+export interface InputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {}
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  function Input(
-    { label, error, helperText, disabled, className = "", ...props },
-    ref
-  ) {
-    const inputBase =
-      "w-full input-dark appearance-none";
-
-    const inputState = error
-      ? "border-brand-danger"
-      : "";
-
-    const inputDisabled = disabled
-      ? "opacity-50 cursor-not-allowed"
-      : "";
-
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, ...props }, ref) => {
     return (
-      <div className={`space-y-1.5 ${className}`}>
-        {label && (
-          <label className="block text-sm font-medium text-text-secondary">
-            {label}
-          </label>
+      <input
+        type={type}
+        className={cn(
+          "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+          className
         )}
-        <input
-          ref={ref}
-          className={`${inputBase} ${inputState} ${inputDisabled}`}
-          disabled={disabled}
-          aria-invalid={!!error}
-          aria-describedby={
-            error
-              ? `${props.id ?? props.name}-error`
-              : helperText
-              ? `${props.id ?? props.name}-help`
-              : undefined
-          }
-          {...props}
-        />
-        {error && (
-          <p
-            id={`${props.id ?? props.name}-error`}
-            className="text-xs text-brand-danger"
-            role="alert"
-          >
-            {error}
-          </p>
-        )}
-        {!error && helperText && (
-          <p
-            id={`${props.id ?? props.name}-help`}
-            className="text-xs text-text-tertiary"
-          >
-            {helperText}
-          </p>
-        )}
-      </div>
-    );
+        ref={ref}
+        {...props}
+      />
+    )
   }
-);
+)
+Input.displayName = "Input"
+
+export { Input }

@@ -2,37 +2,71 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { useProjectId, useToast, EmptyState, Table, SkeletonList } from "../components";
+import { 
+  useProjectId, 
+  useToast, 
+  EmptyState, 
+  Table, 
+  TableHeader, 
+  TableBody, 
+  TableRow, 
+  TableHead, 
+  TableCell, 
+  Badge, 
+  SkeletonList,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Button,
+  Input
+} from "../components";
+import { 
+  Box, 
+  Globe, 
+  Network, 
+  Search, 
+  Zap, 
+  ChevronLeft, 
+  ChevronRight, 
+  ExternalLink,
+  Filter,
+  RefreshCcw,
+  Layers,
+  Terminal
+} from "lucide-react";
+import { cn } from "../lib/utils";
 
 const ASSET_TYPES = ["all", "domain", "url", "ip", "cidr", "service"] as const;
 
 function AssetTypeBadge({ type }: { type: string }) {
-  const colors: Record<string, string> = {
-    domain: "bg-brand-primary/15 text-brand-primary",
-    ip: "bg-brand-purple/15 text-brand-purple",
-    url: "bg-brand-success/15 text-brand-success",
-    cidr: "bg-brand-warning/15 text-brand-warning",
-    service: "bg-accent-teal/15 text-accent-teal",
+  const map: Record<string, string> = {
+    domain: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    ip: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    url: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    cidr: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    service: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
   };
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || "bg-white/[0.04] text-text-tertiary"}`}>
+    <Badge variant="outline" className={cn("px-1.5 py-0 text-[10px] uppercase tracking-wider", map[type])}>
       {type}
-    </span>
+    </Badge>
   );
 }
 
 function StatusCodeBadge({ code }: { code?: number }) {
-  if (!code) return <span className="text-text-quaternary text-xs">—</span>;
-  const color =
+  if (!code) return <span className="text-muted-foreground text-xs">—</span>;
+  const variant =
     code >= 200 && code < 300
-      ? "bg-brand-success/15 text-brand-success"
+      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
       : code >= 300 && code < 400
-      ? "bg-accent-yellow/15 text-accent-yellow"
-      : "bg-brand-danger/15 text-brand-danger";
+      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+      : "bg-rose-500/10 text-rose-400 border-rose-500/20";
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>
+    <Badge variant="outline" className={cn("px-1.5 py-0 text-[10px] font-bold font-mono", variant)}>
       {code}
-    </span>
+    </Badge>
   );
 }
 
@@ -177,378 +211,307 @@ export default function AssetPage() {
     setPortPage(1);
   }, [filterPort]);
 
-  const assetColumns: { key: string; header: string; width?: string; render?: (row: Record<string, unknown>) => React.ReactNode }[] = [
-    {
-      key: "type",
-      header: "类型",
-      width: "100px",
-      render: (row) => <AssetTypeBadge type={String(row.type)} />,
-    },
-    { key: "value", header: "资产值" },
-    {
-      key: "normalized_value",
-      header: "归一化值",
-      render: (row) => (
-        <span className="text-text-quaternary text-xs">{String(row.normalized_value)}</span>
-      ),
-    },
-    {
-      key: "source_tools",
-      header: "来源工具",
-      width: "180px",
-      render: (row) => (
-        <span className="text-text-quaternary text-xs">
-          {Array.isArray(row.source_tools) ? row.source_tools.join(", ") : "—"}
-        </span>
-      ),
-    },
-    {
-      key: "first_seen",
-      header: "首次发现",
-      width: "180px",
-      render: (row) => new Date(String(row.first_seen)).toLocaleString(),
-    },
-  ];
-
   if (!currentProject) {
     return (
-      <div className="page-shell space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">资产清单</h1>
-          <p className="text-text-tertiary text-sm mt-1">查看和管理项目发现的资产、Web 端点和端口信息</p>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Box className="h-8 w-8 text-muted-foreground opacity-50" />
         </div>
-        <div className="panel p-8 text-center">
-          <p className="text-text-tertiary mb-4">请先从 Dashboard 选择一个项目</p>
-          <Link to="/" className="link-cyber">前往 Dashboard</Link>
-        </div>
+        <h2 className="text-xl font-bold">资产清单</h2>
+        <p className="text-muted-foreground mt-1 mb-6">请先从左侧菜单或总览选择一个项目</p>
+        <Link to="/">
+            <Button variant="primary">前往总览</Button>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="page-shell space-y-6">
-      <div className="page-header">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-start justify-between">
         <div>
-          <div className="page-eyebrow text-accent-teal">Step 2</div>
-          <h1 className="page-title">资产清单</h1>
-          <p className="page-subtitle">按资产、Web 端点和开放端口查看发现结果，为后续指纹驱动扫描做准备。</p>
+          <div className="flex items-center gap-2 text-cyan-500 font-bold text-xs uppercase tracking-widest mb-1.5">
+            <Layers className="h-3.5 w-3.5" />
+            Step 2: Asset Discovery
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">资产清单</h1>
+          <p className="text-muted-foreground mt-1">汇总管理域名、IP、Web 端点及开放端口。</p>
         </div>
-        <button
-          onClick={startDiscovery}
-          disabled={loading}
-          className="btn-cyber-primary disabled:opacity-50"
-        >
-          {loading ? "启动中..." : "资产发现"}
-        </button>
+        <Button variant="primary" onClick={startDiscovery} loading={loading}>
+          <RefreshCcw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+          资产发现
+        </Button>
       </div>
 
-      <div className="flex gap-2 border-b border-white/[0.08]">
+      <div className="flex items-center gap-1 border-b border-border w-full">
         {[
-          { key: "assets", label: `资产 (${assets.length})` },
-          { key: "web", label: `Web 端点 (${webEndpoints.length})` },
-          { key: "ports", label: `端口 (${servicePorts.length})` },
+          { key: "assets", label: "基础资产", count: assets.length, icon: Box },
+          { key: "web", label: "Web 端点", count: webEndpoints.length, icon: Globe },
+          { key: "ports", label: "开放端口", count: servicePorts.length, icon: Network },
         ].map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key as any)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
+            className={cn(
+              "group relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all",
               activeTab === t.key
-                ? "border-brand-primary text-text-primary"
-                : "border-transparent text-text-tertiary hover:text-text-secondary"
-            }`}
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-t-md"
+            )}
           >
+            <t.icon className={cn("h-4 w-4", activeTab === t.key ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
             {t.label}
+            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] ml-1">{t.count}</Badge>
+            {activeTab === t.key && (
+              <div className="absolute bottom-0 left-0 h-0.5 w-full bg-primary" />
+            )}
           </button>
         ))}
       </div>
 
       {activeTab === "assets" && (
-        <section className="panel p-4">
-          <div className="flex flex-col gap-3 mb-4">
-            <div className="flex flex-wrap gap-2">
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-wrap gap-1.5">
               {ASSET_TYPES.map((t) => (
-                <button
+                <Button
                   key={t}
+                  variant={filterType === t ? "primary" : "outline"}
+                  size="sm"
                   onClick={() => setFilterType(t)}
-                  className={`px-3 py-1 rounded text-xs font-medium border transition ${
-                    filterType === t
-                      ? "filter-pill-active"
-                      : "filter-pill"
-                  }`}
+                  className="h-7 px-3 text-xs capitalize"
                 >
-                  {t === "all" ? "全部" : t}
-                </button>
+                  {t === "all" ? "全部类型" : t}
+                </Button>
               ))}
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="筛选资产值..."
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="搜索资产值..."
                 value={filterAsset}
                 onChange={(e) => setFilterAsset(e.target.value)}
-                className="input-dark w-48 !py-1.5"
+                className="pl-9 h-9 w-64"
               />
-              <button
-                onClick={() => { setFilterType("all"); setFilterAsset(""); }}
-                className="text-text-quaternary text-sm hover:text-text-secondary px-2"
-              >
-                清除
-              </button>
-              <span className="text-text-quaternary text-xs ml-auto">共 {filteredAssets.length} 个资产</span>
             </div>
           </div>
-          {loading ? (
-            <SkeletonList count={5} />
-          ) : error ? (
-            <div className="py-12 text-center">
-              <p className="text-brand-danger mb-2">加载失败: {error}</p>
-              <button onClick={() => loadAssets()} className="text-sm link-cyber">
-                重试
-              </button>
-            </div>
-          ) : filteredAssets.length === 0 ? (
-            <EmptyState
-              title="暂无资产"
-              description="当前项目还没有发现任何资产，点击右上角「资产发现」开始扫描。"
-            />
-          ) : (
-            <Table
-              columns={assetColumns}
-              data={filteredAssets as unknown as Record<string, unknown>[]}
-              emptyText="暂无匹配的资产"
-              maxHeight={480}
-            />
-          )}
+
+          <Card>
+            {loading ? (
+              <div className="p-6">
+                <SkeletonList count={8} />
+              </div>
+            ) : error ? (
+              <div className="py-20 text-center">
+                <p className="text-destructive font-medium mb-4">加载失败: {error}</p>
+                <Button variant="outline" size="sm" onClick={() => loadAssets()}>重试</Button>
+              </div>
+            ) : filteredAssets.length === 0 ? (
+              <div className="py-20 text-center">
+                <EmptyState title="未找到资产" description="当前筛选条件下没有资产数据。" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-24">类型</TableHead>
+                    <TableHead>资产值</TableHead>
+                    <TableHead className="hidden md:table-cell">归一化</TableHead>
+                    <TableHead>来源</TableHead>
+                    <TableHead className="text-right">发现时间</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAssets.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell><AssetTypeBadge type={a.type} /></TableCell>
+                      <TableCell className="font-mono text-sm font-medium">{a.value}</TableCell>
+                      <TableCell className="hidden md:table-cell font-mono text-xs text-muted-foreground truncate max-w-[150px]">
+                        {a.normalized_value}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 flex-wrap">
+                            {a.source_tools?.map(s => (
+                                <Badge key={s} variant="secondary" className="px-1 py-0 text-[9px] uppercase font-bold text-muted-foreground">{s}</Badge>
+                            ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">
+                        {new Date(a.first_seen).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
         </section>
       )}
 
       {activeTab === "web" && (
-        <section className="panel p-4">
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <input
-              type="text"
-              placeholder="筛选标题..."
-              value={filterTitle}
-              onChange={(e) => setFilterTitle(e.target.value)}
-              className="input-dark w-48 !py-1.5"
-            />
-            <input
-              type="text"
-              placeholder="搜索技术栈..."
-              value={filterTech}
-              onChange={(e) => setFilterTech(e.target.value)}
-              className="input-dark w-48 !py-1.5"
-            />
-            <button
-              onClick={() => { setFilterTitle(""); setFilterTech(""); }}
-              className="text-text-quaternary text-sm hover:text-text-secondary px-2"
-            >
-              清除
-            </button>
-            <span className="text-text-quaternary text-xs ml-auto">共 {filteredWeb.length} 个端点</span>
-          </div>
-          {filteredWeb.length > 0 ? (
-            <div className="max-h-[480px] overflow-auto">
-            <table className="table-cyber text-sm">
-              <thead>
-                <tr>
-                  <th className="pb-2">URL</th>
-                  <th className="pb-2">状态码</th>
-                  <th className="pb-2">Title</th>
-                  <th className="pb-2">技术栈</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredWeb.map((we) => (
-                  <tr key={we.id}>
-                    <td className="py-2 font-mono text-xs">
-                      <a href={we.url} target="_blank" rel="noreferrer" className="link-cyber">
-                        {we.url}
-                      </a>
-                    </td>
-                    <td className="py-2">
-                      <StatusCodeBadge code={we.status_code} />
-                    </td>
-                    <td className="py-2 text-text-secondary">{we.title || "—"}</td>
-                    <td className="py-2">
-                      <div className="flex flex-wrap gap-1">
-                        {(we.technologies || []).map((t) => (
-                          <span key={t} className="px-1.5 py-0.5 bg-brand-primary/10 text-brand-primary rounded text-xs border border-brand-primary/20">
-                            {t}
-                          </span>
-                        ))}
-                        {!(we.technologies || []).length && <span className="text-text-quaternary">—</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-wrap gap-2 flex-1">
+               <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="搜索标题或 URL..."
+                    value={filterTitle}
+                    onChange={(e) => setFilterTitle(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+               </div>
+               <div className="relative flex-1 max-w-sm">
+                  <Terminal className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="搜索技术栈 (React, Nginx...)"
+                    value={filterTech}
+                    onChange={(e) => setFilterTech(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+               </div>
             </div>
-          ) : (
-            <EmptyState title="暂无 Web 端点" description="当前项目还没有发现任何 Web 端点" />
-          )}
+            <div className="text-xs text-muted-foreground">匹配到 {filteredWeb.length} 个端点</div>
+          </div>
+
+          <Card>
+            {filteredWeb.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>端点 URL</TableHead>
+                    <TableHead className="w-20">状态</TableHead>
+                    <TableHead>页面标题</TableHead>
+                    <TableHead>技术栈</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredWeb.map((we) => (
+                    <TableRow key={we.id}>
+                      <TableCell className="font-mono text-xs">
+                        <a href={we.url} target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                          {we.url}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </TableCell>
+                      <TableCell>
+                        <StatusCodeBadge code={we.status_code} />
+                      </TableCell>
+                      <TableCell className="text-sm font-medium text-foreground max-w-[200px] truncate">
+                        {we.title || <span className="text-muted-foreground italic">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {we.technologies?.map((t) => (
+                            <Badge key={t} variant="outline" className="h-5 px-1.5 text-[10px] bg-primary/5 text-primary border-primary/20">
+                              {t}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="py-20 text-center">
+                <EmptyState title="未找到 Web 端点" description="当前筛选条件下没有 Web 数据。" />
+              </div>
+            )}
+          </Card>
         </section>
       )}
 
       {activeTab === "ports" && (
-        <section className="panel p-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              placeholder="搜索 IP / 端口 / 服务 / 标题 / 技术栈..."
-              value={filterPort}
-              onChange={(e) => setFilterPort(e.target.value)}
-              className="input-dark w-64 !py-1.5"
-            />
-            <button
-              onClick={() => { setFilterPort(""); setPortPage(1); }}
-              className="text-text-quaternary text-sm hover:text-text-secondary px-2"
-            >
-              清除
-            </button>
-            <span className="text-text-quaternary text-xs ml-auto">
-              共 {filteredPortRows.length} 个端口
-              {filteredPortRows.length > PORT_PAGE_SIZE && (
-                <span className="ml-2">第 {portPage} / {totalPortPages} 页</span>
-              )}
-            </span>
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                    placeholder="搜索 IP, 端口, 服务名或技术栈..."
+                    value={filterPort}
+                    onChange={(e) => setFilterPort(e.target.value)}
+                    className="pl-9 h-9"
+                />
+            </div>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span>共 {filteredPortRows.length} 个端口</span>
+                {totalPortPages > 1 && (
+                    <div className="flex items-center gap-1.5">
+                        <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setPortPage(p => Math.max(1, p-1))} disabled={portPage <= 1}>
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span>{portPage} / {totalPortPages}</span>
+                        <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setPortPage(p => Math.min(totalPortPages, p+1))} disabled={portPage >= totalPortPages}>
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
+                )}
+            </div>
           </div>
 
-          {servicePortsLoading ? (
-            <SkeletonList count={5} />
-          ) : servicePorts.length === 0 ? (
-            <EmptyState
-              title="暂无端口数据"
-              description="当前项目还没有发现任何端口，点击右上角「资产发现」开始扫描。"
-            />
-          ) : (
-            <>
-              <Table
-                columns={[
-                  { key: "ip", header: "IP 地址", width: "140px" },
-                  {
-                    key: "port",
-                    header: "端口",
-                    width: "70px",
-                    render: (row) => (
-                      <span className="font-mono font-semibold text-brand-primary">
-                        {String(row.port)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "state",
-                    header: "状态",
-                    width: "80px",
-                    render: (row) => {
-                      const state = String(row.state).toLowerCase();
-                      const color =
-                        state === "open"
-                          ? "bg-brand-success/15 text-brand-success"
-                          : state === "filtered"
-                          ? "bg-accent-yellow/15 text-accent-yellow"
-                          : "bg-white/[0.04] text-text-quaternary";
-                      return (
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>
-                          {String(row.state)}
-                        </span>
-                      );
-                    },
-                  },
-                  { key: "protocol", header: "协议", width: "60px" },
-                  {
-                    key: "service_name",
-                    header: "服务",
-                    width: "120px",
-                    render: (row) => (
-                      <span className="font-medium text-accent-teal">{String(row.service_name)}</span>
-                    ),
-                  },
-                  {
-                    key: "title",
-                    header: "标题 / 应用",
-                    render: (row) => {
-                      const title = String(row.title || "");
-                      const url = String(row.url || "");
-                      if (!title && !url) return <span className="text-text-quaternary">—</span>;
-                      return (
-                        <div className="flex flex-col gap-0.5">
-                          {title && <span className="text-text-secondary text-xs">{title}</span>}
-                          {url && (
-                            <a href={url} target="_blank" rel="noreferrer" className="link-cyber text-xs truncate max-w-[200px]">
-                              {url}
-                            </a>
-                          )}
+          <Card>
+            {servicePortsLoading ? (
+              <div className="p-6">
+                <SkeletonList count={8} />
+              </div>
+            ) : servicePorts.length === 0 ? (
+              <div className="py-20 text-center">
+                <EmptyState title="未探测到端口" description="目前没有任何端口发现记录。" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>IP 地址</TableHead>
+                    <TableHead className="w-20">端口</TableHead>
+                    <TableHead className="w-20">状态</TableHead>
+                    <TableHead>服务</TableHead>
+                    <TableHead>指纹信息 / 标题</TableHead>
+                    <TableHead>技术栈</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedPortRows.map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-mono text-xs">{row.ip}</TableCell>
+                      <TableCell>
+                        <span className="font-mono font-bold text-primary">{row.port}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={row.state === 'open' ? 'success' : 'secondary'} className="px-1.5 py-0 text-[10px] font-bold uppercase tracking-wider">
+                            {row.state}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-semibold capitalize">{row.service_name}</span>
+                      </TableCell>
+                      <TableCell className="max-w-[240px]">
+                        <div className="flex flex-col">
+                            {row.title && <span className="text-sm font-medium text-foreground truncate">{row.title}</span>}
+                            {row.url && (
+                                <a href={row.url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline truncate">
+                                    {row.url}
+                                </a>
+                            )}
+                            {!row.title && !row.url && <span className="text-muted-foreground text-xs italic">No banner data</span>}
                         </div>
-                      );
-                    },
-                  },
-                  {
-                    key: "technologies",
-                    header: "技术栈",
-                    width: "160px",
-                    render: (row) => {
-                      const techs = row.technologies as string[] | undefined;
-                      if (!techs?.length) return <span className="text-text-quaternary">—</span>;
-                      return (
+                      </TableCell>
+                      <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {techs.map((t: string) => (
-                            <span key={t} className="px-1.5 py-0.5 bg-brand-primary/10 text-brand-primary rounded text-xs border border-brand-primary/20">
-                              {t}
-                            </span>
-                          ))}
+                            {row.technologies?.map((t: string) => (
+                                <Badge key={t} variant="outline" className="h-5 px-1.5 text-[10px] bg-primary/5 text-primary border-primary/20">
+                                    {t}
+                                </Badge>
+                            ))}
                         </div>
-                      );
-                    },
-                  },
-                  {
-                    key: "source_tools",
-                    header: "来源",
-                    width: "100px",
-                    render: (row) => {
-                      const sources = row.source_tools as string[] | undefined;
-                      if (!sources?.length) return <span className="text-text-quaternary text-xs">—</span>;
-                      return (
-                        <div className="flex flex-wrap gap-1">
-                          {sources.map((s: string) => (
-                            <span key={s} className="px-1.5 py-0.5 rounded text-xs bg-white/[0.04] text-text-quaternary border border-white/[0.06]">
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                      );
-                    },
-                  },
-                ]}
-                data={paginatedPortRows as unknown as Record<string, unknown>[]}
-                emptyText="暂无匹配的端口"
-                maxHeight={480}
-              />
-
-              {totalPortPages > 1 && (
-                <div className="flex items-center justify-center gap-2 pt-2">
-                  <button
-                    onClick={() => setPortPage((p) => Math.max(1, p - 1))}
-                    disabled={portPage <= 1}
-                    className="px-3 py-1 rounded text-sm border border-white/[0.08] text-text-secondary hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition"
-                  >
-                    上一页
-                  </button>
-                  <span className="text-text-quaternary text-sm">
-                    {portPage} / {totalPortPages}
-                  </span>
-                  <button
-                    onClick={() => setPortPage((p) => Math.min(totalPortPages, p + 1))}
-                    disabled={portPage >= totalPortPages}
-                    className="px-3 py-1 rounded text-sm border border-white/[0.08] text-text-secondary hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition"
-                  >
-                    下一页
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
         </section>
       )}
     </div>

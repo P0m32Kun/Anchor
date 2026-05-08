@@ -2,28 +2,40 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState, useProjectId, ConfirmDialog, Button, ScanModal } from "../components";
+import { 
+  EmptyState, 
+  useProjectId, 
+  ConfirmDialog, 
+  Button, 
+  ScanModal,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Badge,
+  SkeletonList
+} from "../components";
 import { useToast } from "../components/Toast";
 import { useSSE, usePolling } from "../hooks";
 import { getApiBase } from "../lib/config";
 import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
-
-const statusColors: Record<string, string> = {
-  pending: "bg-accent-yellow/15 text-accent-yellow",
-  running: "bg-brand-primary/15 text-brand-primary",
-  completed: "bg-brand-success/15 text-brand-success",
-  failed: "bg-brand-danger/15 text-brand-danger",
-  cancelled: "bg-white/[0.04] text-text-tertiary",
-};
-
-const statusLabels: Record<string, string> = {
-  pending: "待启动",
-  running: "运行中",
-  completed: "已完成",
-  failed: "失败",
-  cancelled: "已取消",
-};
+import { 
+  Play, 
+  Activity, 
+  Clock, 
+  XCircle, 
+  CheckCircle2, 
+  AlertCircle, 
+  Terminal, 
+  History,
+  Zap,
+  MoreVertical,
+  ChevronRight,
+  Loader2
+} from "lucide-react";
+import { cn } from "../lib/utils";
 
 const modeLabels: Record<string, string> = {
   quick: "快速",
@@ -32,20 +44,11 @@ const modeLabels: Record<string, string> = {
   custom: "自定义",
 };
 
-const modeColors: Record<string, string> = {
-  quick: "bg-accent-yellow/10 text-accent-yellow",
-  standard: "bg-brand-primary/10 text-brand-primary",
-  deep: "bg-accent-purple/10 text-accent-purple",
-  custom: "bg-white/[0.06] text-text-secondary",
-};
-
-const taskStatusColors: Record<string, string> = {
-  created: "bg-white/[0.04] text-text-tertiary",
-  queued: "bg-accent-yellow/15 text-accent-yellow",
-  running: "bg-brand-primary/15 text-brand-primary",
-  completed: "bg-brand-success/15 text-brand-success",
-  failed: "bg-brand-danger/15 text-brand-danger",
-  cancelled: "bg-white/[0.04] text-text-tertiary",
+const modeVariants: Record<string, any> = {
+  quick: "warning",
+  standard: "info",
+  deep: "purple",
+  custom: "secondary",
 };
 
 const canCancel = (status: string) =>
@@ -101,7 +104,6 @@ export default function RunsPage() {
         const msg = err instanceof Error ? err.message : String(err);
         setRunsError(msg);
         maybeToastError(msg);
-        console.error(err);
       } finally {
         setRunsLoading(false);
       }
@@ -126,7 +128,6 @@ export default function RunsPage() {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "加载任务详情失败";
       toast(msg, "error");
-      console.error(err);
     } finally {
       setTasksLoading(false);
       setStagesLoading(false);
@@ -174,7 +175,6 @@ export default function RunsPage() {
     },
   });
 
-  // Polling fallback when SSE is unavailable
   const isLive = sseStatus === "open";
   const shouldPoll = !isLive && !!projectId;
 
@@ -212,7 +212,6 @@ export default function RunsPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "启动扫描失败";
       toast(msg, "error");
-      console.error(err);
     } finally {
       setCreating(false);
     }
@@ -221,11 +220,6 @@ export default function RunsPage() {
   const openCancelDialog = (run: PipelineRun) => {
     setCancelTargetRun(run);
     setCancelDialogOpen(true);
-  };
-
-  const closeCancelDialog = () => {
-    setCancelDialogOpen(false);
-    setCancelTargetRun(null);
   };
 
   const handleCancelRun = async () => {
@@ -241,240 +235,263 @@ export default function RunsPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "取消扫描失败";
       toast(msg, "error");
-      console.error(err);
     } finally {
       setCancelling(false);
-      closeCancelDialog();
+      setCancelDialogOpen(false);
+      setCancelTargetRun(null);
     }
   };
 
-  const runsError = useStore((state) => state.runsError);
-
   return (
-    <div className="page-shell space-y-6">
-      <div className="page-header">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-start justify-between">
         <div>
-          <div className="page-eyebrow">Step 3</div>
-          <h1 className="page-title">扫描执行</h1>
-          <p className="page-subtitle">查看运行历史、实时连接状态、阶段进度和任务明细。</p>
+          <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-widest mb-1.5">
+            <Zap className="h-3.5 w-3.5 fill-current" />
+            Step 3: Scan Engine
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">扫描执行</h1>
+          <p className="text-muted-foreground mt-1">启动漏扫流水线，实时观察任务进度与各阶段状态。</p>
         </div>
-        {projectId && (
-          <Button variant="primary" size="sm" onClick={() => setShowScanModal(true)}>
-            新建扫描
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+            {projectId && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border text-xs font-medium">
+                    {isLive ? (
+                        <>
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-success opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-success" />
+                            </span>
+                            <span className="text-brand-success">SSE 实时连接</span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                            <span className="text-muted-foreground">轮询模式</span>
+                        </>
+                    )}
+                </div>
+            )}
+            <Button variant="primary" onClick={() => setShowScanModal(true)}>
+                <Play className="mr-2 h-4 w-4 fill-current" />
+                启动扫描
+            </Button>
+        </div>
       </div>
 
-      <section className="panel p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-base font-medium text-text-secondary">执行历史</h2>
-          {projectId && (
-            <div className="flex items-center gap-2">
-              {sseStatus === "open" ? (
-                <span className="flex items-center gap-1.5 text-xs text-brand-success">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-success opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-success" />
-                  </span>
-                  实时连接
-                </span>
-              ) : shouldPoll ? (
-                <span className="flex items-center gap-1.5 text-xs text-accent-yellow">
-                  <span className="inline-flex rounded-full h-2 w-2 bg-accent-yellow" />
-                  轮询中
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-xs text-text-quaternary">
-                  <span className="inline-flex rounded-full h-2 w-2 bg-text-quaternary" />
-                  未连接
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {runsLoading && runs.length === 0 && (
-          <div className="space-y-2 py-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-10 bg-white/[0.02] animate-pulse rounded-lg" />
-            ))}
+      <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+                <History className="h-5 w-5 text-muted-foreground" />
+                执行历史
+            </h2>
           </div>
-        )}
 
-        <div className="divide-y divide-glass-border-light">
-          {runs.map((run) => (
-            <div
-              key={run.id}
-              className={`py-3 px-2 flex items-center justify-between text-sm rounded-lg transition-all ${
-                selectedRun === run.id
-                  ? "bg-brand-primary/[0.06] shadow-[inset_3px_0_0_0_var(--color-brand-primary)]"
-                  : "hover:bg-brand-primary/[0.035]"
-              }`}
-            >
-              <button
-                onClick={() => loadRunDetails(run.id)}
-                className="flex items-center gap-3 flex-1 text-left cursor-pointer"
-              >
-                <span
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                    modeColors[run.mode] || modeColors.standard
-                  }`}
-                >
-                  {modeLabels[run.mode] || run.mode}
-                </span>
-                <span className="text-text-quaternary text-xs font-mono">
-                  {run.id.slice(-8)}
-                </span>
-                {run.stage && (
-                  <span className="text-xs text-text-quaternary bg-white/[0.04] px-2 py-0.5 rounded">
-                    {run.stage}
-                  </span>
-                )}
-              </button>
-              <div className="flex items-center gap-3">
-                <span
-                  className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    statusColors[run.status] || "bg-white/[0.04] text-text-tertiary"
-                  }`}
-                >
-                  {statusLabels[run.status] || run.status}
-                </span>
-                <span className="text-text-quaternary text-xs">
-                  {run.created_at
-                    ? new Date(run.created_at).toLocaleString("zh-CN")
-                    : "—"}
-                </span>
-                {canCancel(run.status) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openCancelDialog(run)}
-                    title="取消扫描"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5 text-text-tertiary hover:text-brand-danger transition-colors"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+          <div className="space-y-3">
+            {runsLoading && runs.length === 0 ? (
+                <SkeletonList count={5} />
+            ) : runs.length === 0 ? (
+                <Card className="border-dashed p-12 text-center">
+                    <EmptyState
+                        title="暂无扫描记录"
+                        description="请在右上方点击「启动扫描」开始你的第一次任务。"
+                    />
+                </Card>
+            ) : (
+                runs.map((run) => (
+                    <Card 
+                        key={run.id} 
+                        className={cn(
+                            "group cursor-pointer transition-all hover:border-primary/50",
+                            selectedRun === run.id && "ring-1 ring-primary border-primary shadow-sm bg-primary/[0.02]"
+                        )}
+                        onClick={() => loadRunDetails(run.id)}
                     >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))}
+                        <CardContent className="p-4 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 flex-1">
+                                <div className={cn(
+                                    "h-10 w-10 rounded-full flex items-center justify-center shrink-0 border",
+                                    run.status === 'running' ? 'bg-primary/10 border-primary/20 text-primary animate-pulse' :
+                                    run.status === 'completed' ? 'bg-brand-success/10 border-brand-success/20 text-brand-success' :
+                                    run.status === 'failed' ? 'bg-destructive/10 border-destructive/20 text-destructive' :
+                                    'bg-muted border-border text-muted-foreground'
+                                )}>
+                                    {run.status === 'running' ? <Activity className="h-5 w-5" /> : 
+                                     run.status === 'completed' ? <CheckCircle2 className="h-5 w-5" /> :
+                                     run.status === 'failed' ? <XCircle className="h-5 w-5" /> :
+                                     <Clock className="h-5 w-5" />
+                                    }
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-foreground truncate max-w-[200px]">
+                                            {run.id.slice(-8).toUpperCase()}
+                                        </span>
+                                        <Badge variant={modeVariants[run.mode] || 'secondary'} className="h-5 px-1.5 text-[10px] uppercase">
+                                            {run.mode}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                        <span>{new Date(run.created_at).toLocaleString()}</span>
+                                        {run.stage && (
+                                            <>
+                                                <span className="text-border">|</span>
+                                                <span className="font-medium text-primary uppercase text-[10px] tracking-tight">{run.stage}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
 
-          {runs.length === 0 && !runsLoading && !projectId && (
-            <EmptyState
-              title="请先选择一个项目"
-              description="选择一个项目后查看扫描任务"
-              actionLabel="前往项目列表"
-              onAction={() => navigate("/projects")}
-            />
-          )}
-
-          {runs.length === 0 && !runsLoading && projectId && (
-            <>
-              <EmptyState
-                title="暂无扫描任务"
-                description="按照以下步骤开始你的第一次扫描"
-              />
-              <div className="flex items-center justify-center gap-2 text-sm text-text-tertiary -mt-4 pb-4">
-                <button
-                  onClick={() => navigate("/projects")}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-colors"
-                >
-                  <span className="w-5 h-5 rounded-full bg-brand-primary/20 text-brand-primary text-xs flex items-center justify-center font-medium">
-                    1
-                  </span>
-                  创建项目
-                </button>
-                <span className="text-text-quaternary">-&gt;</span>
-                <button
-                  onClick={() => navigate("/targets")}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-colors"
-                >
-                  <span className="w-5 h-5 rounded-full bg-brand-primary/20 text-brand-primary text-xs flex items-center justify-center font-medium">
-                    2
-                  </span>
-                  导入目标
-                </button>
-                <span className="text-text-quaternary">-&gt;</span>
-                <button
-                  onClick={() => setShowScanModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-brand-primary hover:bg-brand-primary/20 transition-colors"
-                >
-                  <span className="w-5 h-5 rounded-full bg-brand-primary/20 text-brand-primary text-xs flex items-center justify-center font-medium">
-                    3
-                  </span>
-                  启动扫描
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-
-        {runsError && (
-          <div className="mt-4 p-3 rounded-lg bg-brand-danger/10 border border-brand-danger/20 text-brand-danger text-sm">
-            加载失败：{runsError}
-          </div>
-        )}
-      </section>
-
-      {selectedRun && (
-        <section className="panel p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-base font-medium text-text-secondary">任务详情</h2>
-            {(tasksLoading || stagesLoading) && (
-              <span className="text-text-quaternary text-sm">加载中...</span>
-            )}
-          </div>
-
-          {stages.length > 0 && (
-            <div className="mb-4">
-              <h3 className="text-xs font-medium text-text-tertiary mb-2">阶段进度</h3>
-              <StageProgress stages={stages} />
-            </div>
-          )}
-
-          <div className="divide-y divide-glass-border-light">
-            {tasks.map((task) => (
-              <div key={task.id} className="py-3 px-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <span className="font-medium text-text-secondary w-20">
-                      {task.tool}
-                    </span>
-                    <span className="font-mono text-text-quaternary text-xs">
-                      {task.id.slice(-8)}
-                    </span>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      taskStatusColors[task.status] || "bg-white/[0.04] text-text-tertiary"
-                    }`}
-                  >
-                    {task.status}
-                  </span>
-                </div>
-                {task.error_message && (
-                  <div className="mt-1 text-xs text-brand-danger font-mono truncate">
-                    {task.error_message}
-                  </div>
-                )}
-              </div>
-            ))}
-            {tasks.length === 0 && !tasksLoading && (
-              <div className="py-8 text-center text-text-quaternary">暂无任务</div>
+                            <div className="flex items-center gap-3">
+                                <div className="hidden sm:block text-right">
+                                    <div className={cn(
+                                        "text-xs font-bold uppercase",
+                                        run.status === 'running' ? 'text-primary' :
+                                        run.status === 'completed' ? 'text-brand-success' :
+                                        run.status === 'failed' ? 'text-destructive' :
+                                        'text-muted-foreground'
+                                    )}>
+                                        {run.status}
+                                    </div>
+                                </div>
+                                {canCancel(run.status) && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            openCancelDialog(run);
+                                        }}
+                                    >
+                                        <XCircle className="h-4 w-4" />
+                                    </Button>
+                                )}
+                                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 transition-all" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))
             )}
           </div>
         </section>
-      )}
+
+        <aside className="space-y-6">
+            <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+                <Terminal className="h-5 w-5 text-muted-foreground" />
+                流水线详情
+            </h2>
+
+            {!selectedRun ? (
+                <div className="rounded-xl border border-dashed p-10 text-center bg-muted/30">
+                    <p className="text-sm text-muted-foreground italic">选择左侧扫描记录查看详细进度</p>
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    <Card className="overflow-hidden">
+                        <CardHeader className="bg-muted/30 pb-3">
+                            <CardTitle className="text-sm">阶段进度报告</CardTitle>
+                            <CardDescription className="text-xs">Pipeline Execution Stages</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {stagesLoading ? (
+                                <div className="p-8 text-center flex flex-col items-center gap-2">
+                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                    <span className="text-xs text-muted-foreground font-mono">Loading pipeline stages...</span>
+                                </div>
+                            ) : stages.length === 0 ? (
+                                <div className="p-8 text-center text-xs text-muted-foreground italic">
+                                    暂无阶段数据 (可能为手动触发的单个任务)
+                                </div>
+                            ) : (
+                                <div className="divide-y border-t">
+                                    {stages.map((s, idx) => (
+                                        <div key={s.id} className="group relative flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
+                                            <div className="flex flex-col items-center relative h-full">
+                                                <div className={cn(
+                                                    "z-10 h-6 w-6 rounded-full border-2 bg-background flex items-center justify-center shrink-0",
+                                                    s.status === 'completed' ? 'border-brand-success text-brand-success' :
+                                                    s.status === 'running' ? 'border-primary text-primary animate-pulse' :
+                                                    s.status === 'failed' ? 'border-destructive text-destructive' :
+                                                    'border-border text-muted-foreground'
+                                                )}>
+                                                    {s.status === 'completed' ? <CheckCircle2 className="h-3 w-3" /> :
+                                                     s.status === 'failed' ? <AlertCircle className="h-3 w-3" /> :
+                                                     <span className="text-[9px] font-bold">{idx + 1}</span>
+                                                    }
+                                                </div>
+                                                {idx < stages.length - 1 && (
+                                                    <div className="absolute top-6 bottom-[-16px] w-[1px] bg-border group-hover:bg-primary/20 transition-colors" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-semibold uppercase tracking-tight truncate pr-2">
+                                                        {STAGE_LABELS[s.stage] || s.stage}
+                                                    </span>
+                                                    {s.started_at && (
+                                                        <span className="text-[10px] font-mono text-muted-foreground">
+                                                            {new Date(s.started_at).toLocaleTimeString()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className={cn(
+                                                    "text-[10px] mt-0.5 font-medium truncate",
+                                                    s.status === 'completed' ? 'text-brand-success' :
+                                                    s.status === 'running' ? 'text-primary' :
+                                                    s.status === 'failed' ? 'text-destructive' :
+                                                    'text-muted-foreground'
+                                                )}>
+                                                    {s.status.toUpperCase()}
+                                                    {s.error && <span className="ml-2 font-mono text-destructive opacity-80">— {s.error}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm">原子任务明细</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0 border-t">
+                            {tasksLoading ? (
+                                <div className="p-8"><SkeletonList count={3} /></div>
+                            ) : tasks.length === 0 ? (
+                                <div className="p-8 text-center text-xs text-muted-foreground italic">No atom tasks found</div>
+                            ) : (
+                                <div className="divide-y">
+                                    {tasks.map((task) => (
+                                        <div key={task.id} className="p-3 flex items-start justify-between gap-3 text-xs">
+                                            <div className="flex items-center gap-3">
+                                                <div className="px-2 py-0.5 rounded bg-muted font-mono font-bold text-muted-foreground">
+                                                    {task.tool}
+                                                </div>
+                                                <span className="font-mono text-muted-foreground opacity-50">#{task.id.slice(-6)}</span>
+                                            </div>
+                                            <Badge variant={
+                                                task.status === 'completed' ? 'success' :
+                                                task.status === 'failed' ? 'destructive' :
+                                                task.status === 'running' ? 'info' :
+                                                'secondary'
+                                            } className="h-5 px-1 text-[9px]">
+                                                {task.status}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+        </aside>
+      </div>
 
       <ScanModal
         open={showScanModal}
@@ -485,16 +502,16 @@ export default function RunsPage() {
 
       <ConfirmDialog
         open={cancelDialogOpen}
-        onClose={closeCancelDialog}
+        onClose={() => setCancelDialogOpen(false)}
         onConfirm={handleCancelRun}
-        title="确认取消扫描？"
+        title="确认终止扫描？"
         description={
-          cancelTargetRun
-            ? `即将取消扫描「${cancelTargetRun.id.slice(-8)}」，此操作不可撤销。`
-            : ""
-        }
-        confirmText="确认取消"
-        cancelText="返回"
+            cancelTargetRun
+              ? `即将向扫描任务「${cancelTargetRun.id.slice(-8).toUpperCase()}」发送 SIGINT 信号。已产生的发现结果将被保留，但后续阶段将不再执行。`
+              : ""
+          }
+        confirmText="强制终止"
+        cancelText="稍后处理"
         variant="danger"
         loading={cancelling}
       />
@@ -513,52 +530,3 @@ const STAGE_LABELS: Record<string, string> = {
   httpx: "Web 探活",
   vuln: "漏洞探测",
 };
-
-const STAGE_STATUS_COLORS: Record<string, string> = {
-  pending: "bg-text-quaternary",
-  running: "bg-brand-primary animate-pulse",
-  completed: "bg-brand-success",
-  failed: "bg-brand-danger",
-  skipped: "bg-text-tertiary",
-};
-
-function StageProgress({ stages }: { stages: PipelineRunStage[] }) {
-  return (
-    <div className="space-y-1.5">
-      {stages.map((s) => (
-        <div key={s.id} className="flex items-center gap-3 text-sm">
-          <div
-            className={`w-2 h-2 rounded-full shrink-0 ${
-              STAGE_STATUS_COLORS[s.status] || "bg-text-tertiary"
-            }`}
-          />
-          <span className="text-text-secondary w-24 shrink-0">
-            {STAGE_LABELS[s.stage] || s.stage}
-          </span>
-          <span
-            className={`text-xs ${
-              s.status === "failed"
-                ? "text-brand-danger"
-                : s.status === "running"
-                ? "text-brand-primary"
-                : s.status === "completed"
-                ? "text-brand-success"
-                : "text-text-quaternary"
-            }`}
-          >
-            {s.status === "pending" && "待执行"}
-            {s.status === "running" && "执行中"}
-            {s.status === "completed" && "已完成"}
-            {s.status === "failed" && `失败${s.error ? ": " + s.error : ""}`}
-            {s.status === "skipped" && "已跳过"}
-          </span>
-          {s.started_at && (
-            <span className="text-text-quaternary text-xs ml-auto">
-              {new Date(s.started_at).toLocaleTimeString("zh-CN")}
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}

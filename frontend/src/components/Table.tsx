@@ -1,118 +1,119 @@
-import React from "react";
-import { Skeleton } from "./Skeleton";
+import * as React from "react"
+import { cn } from "../lib/utils"
 
-export interface TableColumn<T> {
-  key: string;
-  header: string;
-  render?: (row: T) => React.ReactNode;
-  width?: string;
-}
+const Table = React.forwardRef<
+  HTMLTableElement,
+  React.HTMLAttributes<HTMLTableElement>
+>(({ className, ...props }, ref) => (
+  <div className="relative w-full overflow-auto">
+    <table
+      ref={ref}
+      className={cn("w-full caption-bottom text-sm", className)}
+      {...props}
+    />
+  </div>
+))
+Table.displayName = "Table"
 
-export interface TableProps<T> {
-  columns: TableColumn<T>[];
-  data: T[];
-  loading?: boolean;
-  emptyText?: string;
-  onRowClick?: (row: T) => void;
-  className?: string;
-  maxHeight?: number | string;
-}
+const TableHeader = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+))
+TableHeader.displayName = "TableHeader"
 
-export function Table<T extends Record<string, unknown>>({
-  columns,
-  data,
-  loading = false,
-  emptyText = "暂无数据",
-  onRowClick,
-  className = "",
-  maxHeight,
-}: TableProps<T>) {
-  const hasData = data.length > 0;
-  const isClickable = !!onRowClick;
+const TableBody = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <tbody
+    ref={ref}
+    className={cn("[&_tr:last-child]:border-0", className)}
+    {...props}
+  />
+))
+TableBody.displayName = "TableBody"
 
-  const containerStyle = maxHeight
-    ? { maxHeight: typeof maxHeight === "number" ? `${maxHeight}px` : maxHeight }
-    : undefined;
+const TableFooter = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <tfoot
+    ref={ref}
+    className={cn(
+      "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
+      className
+    )}
+    {...props}
+  />
+))
+TableFooter.displayName = "TableFooter"
 
-  return (
-    <div className={`panel overflow-auto ${className}`} style={containerStyle}>
-      <table className="w-full text-left border-collapse">
-        <thead className="sticky top-0 z-10">
-          <tr className="border-b border-brand-primary/10 bg-brand-primary/[0.055]">
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                className="px-4 py-3 text-xs font-semibold text-text-tertiary uppercase tracking-wider whitespace-nowrap"
-                style={col.width ? { width: col.width } : undefined}
-              >
-                {col.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {loading && (
-            <>
-              {Array.from({ length: 3 }).map((_, rowIdx) => (
-                <tr key={`loading-${rowIdx}`}>
-                  {columns.map((col) => (
-                    <td key={col.key} className="px-4 py-3">
-                      <Skeleton className="h-4 w-3/4" />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </>
-          )}
+const TableRow = React.forwardRef<
+  HTMLTableRowElement,
+  React.HTMLAttributes<HTMLTableRowElement>
+>(({ className, ...props }, ref) => (
+  <tr
+    ref={ref}
+    className={cn(
+      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      className
+    )}
+    {...props}
+  />
+))
+TableRow.displayName = "TableRow"
 
-          {!loading && hasData &&
-            data.map((row, rowIdx) => (
-              <tr
-                key={rowIdx}
-                onClick={isClickable ? () => onRowClick!(row) : undefined}
-                className={`
-                  border-b border-brand-primary/[0.08] relative
-                  transition-colors duration-150
-                  ${isClickable ? "cursor-pointer hover:bg-brand-primary/[0.06] hover:shadow-[inset_3px_0_0_0_var(--color-brand-primary)]" : "hover:bg-brand-primary/[0.045]"}
-                `}
-              >
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    className="px-4 py-3 text-sm text-text-primary whitespace-nowrap"
-                  >
-                    {col.render
-                      ? col.render(row)
-                      : String((row as Record<string, unknown>)[col.key] ?? "-")}
-                  </td>
-                ))}
-              </tr>
-            ))}
+const TableHead = React.forwardRef<
+  HTMLTableCellElement,
+  React.ThHTMLAttributes<HTMLTableCellElement>
+>(({ className, ...props }, ref) => (
+  <th
+    ref={ref}
+    className={cn(
+      "h-10 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      className
+    )}
+    {...props}
+  />
+))
+TableHead.displayName = "TableHead"
 
-          {!loading && !hasData && (
-            <tr>
-              <td colSpan={columns.length}>
-                <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
-                  <svg
-                    className="w-12 h-12 text-text-quaternary mb-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <path d="M3 9h18" />
-                    <path d="M9 21V9" />
-                  </svg>
-                  <p className="text-sm text-text-tertiary">{emptyText}</p>
-                </div>
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
+const TableCell = React.forwardRef<
+  HTMLTableCellElement,
+  React.TdHTMLAttributes<HTMLTableCellElement>
+>(({ className, ...props }, ref) => (
+  <td
+    ref={ref}
+    className={cn(
+      "p-4 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      className
+    )}
+    {...props}
+  />
+))
+TableCell.displayName = "TableCell"
+
+const TableCaption = React.forwardRef<
+  HTMLTableCaptionElement,
+  React.HTMLAttributes<HTMLTableCaptionElement>
+>(({ className, ...props }, ref) => (
+  <caption
+    ref={ref}
+    className={cn("mt-4 text-sm text-muted-foreground", className)}
+    {...props}
+  />
+))
+TableCaption.displayName = "TableCaption"
+
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableCaption,
 }

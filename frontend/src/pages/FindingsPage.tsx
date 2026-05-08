@@ -2,16 +2,47 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState, Input, Select, SkeletonList, useProjectId, useToast } from "../components";
+import { 
+  EmptyState, 
+  Input, 
+  Select, 
+  SkeletonList, 
+  useProjectId, 
+  useToast,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Button,
+  Badge,
+  SeverityBadge,
+  StatusBadge,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell
+} from "../components";
 import type { Finding, Evidence } from "../lib/api";
-
-const severityColors: Record<string, string> = {
-  critical: "bg-brand-danger text-white",
-  high: "bg-brand-warning text-white",
-  medium: "bg-accent-yellow text-black",
-  low: "bg-accent-teal text-black",
-  info: "bg-white/[0.04] text-text-tertiary",
-};
+import { 
+  Search, 
+  Filter, 
+  AlertCircle, 
+  CheckCircle2, 
+  Retweet, 
+  MoreVertical, 
+  ChevronRight, 
+  FileText,
+  Clock,
+  History,
+  ShieldAlert,
+  MessageSquare,
+  ArrowRight,
+  X
+} from "lucide-react";
+import { cn } from "../lib/utils";
 
 const statusLabels: Record<string, string> = {
   pending_review: "待审核",
@@ -23,6 +54,7 @@ const statusLabels: Record<string, string> = {
 
 export default function FindingsPage() {
   const projectId = useProjectId();
+  const navigate = useNavigate();
   const findings = useStore((state) => state.findings) ?? [];
   const setFindings = useStore((state) => state.setFindings);
   const currentFinding = useStore((state) => state.currentFinding);
@@ -30,6 +62,7 @@ export default function FindingsPage() {
   const loading = useStore((state) => state.findingsLoading);
   const setFindingsLoading = useStore((state) => state.setFindingsLoading);
   const setFindingsError = useStore((state) => state.setFindingsError);
+  
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [severityFilter, setSeverityFilter] = useState<string>("");
   const [keyword, setKeyword] = useState<string>("");
@@ -38,11 +71,11 @@ export default function FindingsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchStatus, setBatchStatus] = useState<string>("");
   const [batchUpdating, setBatchUpdating] = useState(false);
+  
   const findingStatusHistory = useStore((state) => state.findingStatusHistory);
   const recordStatusChange = useStore((state) => state.recordStatusChange);
   const toast = useToast();
 
-  // Debounce keyword input by 300ms
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedKeyword(keyword), 300);
     return () => clearTimeout(timer);
@@ -53,13 +86,11 @@ export default function FindingsPage() {
     const ctrl = new AbortController();
     setFindingsLoading(true);
     setFindingsError(null);
-    api
-      .listFindings(projectId, undefined, PAGE_ALL, ctrl.signal)
+    api.listFindings(projectId, undefined, PAGE_ALL, ctrl.signal)
       .then((res) => setFindings(res.data ?? []))
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setFindingsError(err instanceof Error ? err.message : String(err));
-        console.error(err);
       })
       .finally(() => setFindingsLoading(false));
     return () => ctrl.abort();
@@ -82,22 +113,14 @@ export default function FindingsPage() {
 
   const changeStatus = async (findingId: string, status: string) => {
     const previousStatus = findings.find((f) => f.id === findingId)?.status;
-
-    // Optimistic update
-    setFindings((prev) =>
-      prev.map((f) => (f.id === findingId ? { ...f, status } : f))
-    );
+    setFindings((prev) => prev.map((f) => (f.id === findingId ? { ...f, status } : f)));
     recordStatusChange(findingId, status);
-
     try {
       await api.updateFindingStatus(findingId, status);
       toast("状态已更新", "success");
     } catch (err) {
-      // Rollback on failure
       if (previousStatus !== undefined) {
-        setFindings((prev) =>
-          prev.map((f) => (f.id === findingId ? { ...f, status: previousStatus } : f))
-        );
+        setFindings((prev) => prev.map((f) => (f.id === findingId ? { ...f, status: previousStatus } : f)));
       }
       toast("更新失败: " + String(err), "error");
     }
@@ -125,7 +148,7 @@ export default function FindingsPage() {
     try {
       await api.batchUpdateFindingStatus(Array.from(selectedIds), batchStatus);
       selectedIds.forEach((id) => recordStatusChange(id, batchStatus));
-      toast(`已批量更新 ${selectedIds.size} 条 finding 状态`, "success");
+      toast(`已成功批量更新 ${selectedIds.size} 项状态`, "success");
       setSelectedIds(new Set());
       setBatchStatus("");
       if (projectId) {
@@ -139,222 +162,231 @@ export default function FindingsPage() {
     }
   };
 
-  // Client-side filtering: severity + status + keyword
   const filteredFindings = useMemo(() => {
     let result = findings;
-    if (statusFilter) {
-      result = result.filter((f) => f.status === statusFilter);
-    }
-    if (severityFilter) {
-      result = result.filter((f) => f.severity === severityFilter);
-    }
+    if (statusFilter) result = result.filter((f) => f.status === statusFilter);
+    if (severityFilter) result = result.filter((f) => f.severity === severityFilter);
     if (debouncedKeyword.trim()) {
       const kw = debouncedKeyword.trim().toLowerCase();
-      result = result.filter(
-        (f) =>
-          f.title.toLowerCase().includes(kw) ||
-          (f.summary && f.summary.toLowerCase().includes(kw))
-      );
+      result = result.filter((f) => f.title.toLowerCase().includes(kw) || (f.summary && f.summary.toLowerCase().includes(kw)));
     }
     return result;
   }, [findings, statusFilter, severityFilter, debouncedKeyword]);
 
-  const navigate = useNavigate();
-
   if (!projectId) {
     return (
-      <div className="p-8">
-        <EmptyState
-          title="请先选择一个项目"
-          description="选择一个项目后查看安全发现"
-          actionLabel="前往项目列表"
-          onAction={() => navigate("/projects")}
-        />
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <ShieldAlert className="h-8 w-8 text-muted-foreground opacity-50" />
+        </div>
+        <h2 className="text-xl font-bold">漏洞发现</h2>
+        <p className="text-muted-foreground mt-1 mb-6">请先从左侧菜单或总览选择一个项目</p>
+        <Link to="/">
+            <Button variant="primary">前往总览</Button>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="page-shell space-y-6">
-      <div className="page-header">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      <div className="flex items-start justify-between">
         <div>
-          <div className="page-eyebrow text-brand-danger">Step 4</div>
-          <h1 className="page-title">发现审核</h1>
-          <p className="page-subtitle">按严重级别、状态和关键词筛选，确认真实风险、标记误报或接受风险。</p>
+          <div className="flex items-center gap-2 text-rose-500 font-bold text-xs uppercase tracking-widest mb-1.5">
+            <AlertCircle className="h-3.5 w-3.5" />
+            Step 4: Finding Audit
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">发现审核</h1>
+          <p className="text-muted-foreground mt-1">对扫描发现的漏洞进行分类、验证和风险评估。</p>
         </div>
       </div>
 
-      {/* Severity filter */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-text-tertiary">严重级别：</span>
-        {["", "critical", "high", "medium", "low", "info"].map((s) => (
-          <button
-            key={s || "all"}
-            onClick={() => setSeverityFilter(s)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              severityFilter === s
-                ? "filter-pill-active"
-                : "filter-pill"
-            }`}
-          >
-            {s ? s.charAt(0).toUpperCase() + s.slice(1) : "全部"}
-          </button>
-        ))}
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-4">
+               <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="按漏洞名称或摘要搜索..." 
+                    className="pl-10 h-10" 
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                  />
+               </div>
+               <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="h-10 px-4 rounded-md border-border bg-card shadow-sm text-xs text-muted-foreground">
+                    <History className="h-3.5 w-3.5 mr-2" />
+                    共 {findings.length} 条记录
+                  </Badge>
+               </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-6 py-2 border-b border-border/50">
+               <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Severity:</span>
+                  <div className="flex items-center gap-1">
+                     {["", "critical", "high", "medium", "low", "info"].map((s) => (
+                        <button
+                          key={s || 'all'}
+                          onClick={() => setSeverityFilter(s)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-md text-[11px] font-bold transition-all",
+                            severityFilter === s 
+                                ? "bg-primary text-primary-foreground shadow-sm scale-105" 
+                                : "text-muted-foreground hover:bg-muted"
+                          )}
+                        >
+                          {s ? s.toUpperCase() : "ALL"}
+                        </button>
+                     ))}
+                  </div>
+               </div>
+
+               <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status:</span>
+                  <div className="flex items-center gap-1">
+                     {["", "pending_review", "confirmed", "false_positive"].map((s) => (
+                        <button
+                          key={s || 'all'}
+                          onClick={() => setStatusFilter(s)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-md text-[11px] font-bold transition-all",
+                            statusFilter === s 
+                                ? "bg-primary text-primary-foreground shadow-sm scale-105" 
+                                : "text-muted-foreground hover:bg-muted"
+                          )}
+                        >
+                          {s ? statusLabels[s] : "ALL"}
+                        </button>
+                     ))}
+                  </div>
+               </div>
+            </div>
+        </div>
+
+        {loading ? (
+            <SkeletonList count={6} />
+        ) : filteredFindings.length === 0 ? (
+            <Card className="border-dashed py-20 text-center">
+                <EmptyState title="未找到漏洞发现" description="试试调整筛选条件，或者运行一次新的扫描。" />
+            </Card>
+        ) : (
+            <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                    <input
+                      type="checkbox"
+                      checked={filteredFindings.length > 0 && selectedIds.size === filteredFindings.length}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-border bg-card text-primary focus:ring-primary"
+                    />
+                    <span className="text-xs text-muted-foreground font-medium">全选当前页</span>
+                </div>
+                
+                <div className="grid gap-3">
+                    {filteredFindings.map((f) => (
+                        <Card 
+                            key={f.id} 
+                            className={cn(
+                                "group border-l-4 transition-all hover:bg-muted/30 cursor-pointer",
+                                f.severity === 'critical' ? 'border-l-rose-600' : 
+                                f.severity === 'high' ? 'border-l-orange-500' :
+                                f.severity === 'medium' ? 'border-l-amber-500' :
+                                f.severity === 'low' ? 'border-l-cyan-500' : 'border-l-muted-foreground/30',
+                                selectedIds.has(f.id) && "bg-primary/[0.03] ring-1 ring-primary/20"
+                            )}
+                            onClick={() => openDetail(f.id)}
+                        >
+                            <CardContent className="p-4 flex items-center gap-4">
+                                <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedIds.has(f.id)}
+                                      onChange={() => toggleSelect(f.id)}
+                                      className="h-4 w-4 rounded border-border bg-card text-primary focus:ring-primary"
+                                    />
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <SeverityBadge severity={f.severity} />
+                                        <h3 className="font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                                            {f.title}
+                                        </h3>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                            <Badge variant="secondary" className="h-4 px-1 text-[9px] font-mono">
+                                                {f.source_tool}
+                                            </Badge>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                            <Clock className="h-3 w-3" />
+                                            {findingStatusHistory[f.id] ? formatTimeAgo(findingStatusHistory[f.id].updatedAt) : "发现于最近一次扫描"}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                            <span className="font-semibold text-muted-foreground/60">CONFIDENCE:</span>
+                                            <span className="font-mono">{f.confidence}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-6" onClick={e => e.stopPropagation()}>
+                                    <Select 
+                                        value={f.status}
+                                        onChange={(e) => changeStatus(f.id, e.target.value)}
+                                        className="h-8 w-32 text-xs font-medium"
+                                    >
+                                        {statusOptions.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </Select>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all">
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        )}
       </div>
 
-      {/* Status filter */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-text-tertiary">状态：</span>
-        {["", "pending_review", "confirmed", "false_positive", "accepted_risk", "ignored"].map((s) => (
-          <button
-            key={s || "all"}
-            onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              statusFilter === s
-                ? "filter-pill-active"
-                : "filter-pill"
-            }`}
-          >
-            {s ? statusLabels[s] || s : "全部"}
-          </button>
-        ))}
-      </div>
-
-      {/* Keyword search */}
-      <div className="max-w-md">
-        <Input
-          placeholder="搜索标题或描述..."
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-        />
-      </div>
-
-      {/* Result count */}
-      <div className="text-sm text-text-tertiary">
-        共 {filteredFindings.length} 个 findings
-        {(statusFilter || severityFilter || debouncedKeyword) && "（已筛选）"}
-      </div>
-
-      {/* Batch operations */}
+      {/* Floating Batch Actions Bar */}
       {selectedIds.size > 0 && (
-        <div className="surface-item flex items-center gap-3 px-4 py-2">
-          <span className="text-sm text-text-secondary">已选择 {selectedIds.size} 项</span>
-          <select
-            value={batchStatus}
-            onChange={(e) => setBatchStatus(e.target.value)}
-            className="input-dark !py-1 !px-2 text-xs"
-          >
-            <option value="">选择状态...</option>
-            {Object.entries(statusLabels).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <button
-            onClick={batchChangeStatus}
-            disabled={!batchStatus || batchUpdating}
-            className="btn-cyber-primary !px-3 !py-1 text-xs disabled:opacity-50"
-          >
-            {batchUpdating ? "更新中..." : "批量修改"}
-          </button>
-          <button
-            onClick={() => setSelectedIds(new Set())}
-            className="text-text-tertiary hover:text-text-secondary text-xs"
-          >
-            取消选择
-          </button>
-        </div>
-      )}
-
-      {loading && <SkeletonList count={5} />}
-
-      {!loading && filteredFindings.length === 0 && (
-        <div className="panel p-8">
-          <EmptyState
-            title="暂无 Finding"
-            description="当前项目还没有任何安全发现，请先运行扫描任务"
-          />
-        </div>
-      )}
-
-      {!loading && filteredFindings.length > 0 && (
-        <div className="panel overflow-auto max-h-[560px]">
-        <table className="min-w-full text-sm">
-          <thead className="bg-brand-primary/[0.055] text-text-tertiary">
-            <tr>
-              <th className="px-3 py-2 text-left w-10">
-                <input
-                  type="checkbox"
-                  checked={filteredFindings.length > 0 && selectedIds.size === filteredFindings.length}
-                  onChange={toggleSelectAll}
-                  className="rounded border-brand-primary/30 bg-surface-elevated-2 text-brand-primary focus:ring-0"
-                />
-              </th>
-              <th className="px-4 py-2 text-left">标题</th>
-              <th className="px-4 py-2 text-left">严重级别</th>
-              <th className="px-4 py-2 text-left">可信度</th>
-              <th className="px-4 py-2 text-left">优先级</th>
-              <th className="px-4 py-2 text-left">状态</th>
-              <th className="px-4 py-2 text-left">上次修改</th>
-              <th className="px-4 py-2 text-left">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredFindings.map((f) => (
-              <tr key={f.id} className="border-t border-brand-primary/[0.08] hover:bg-brand-primary/[0.055]">
-                <td className="px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(f.id)}
-                    onChange={() => toggleSelect(f.id)}
-                    className="rounded border-brand-primary/30 bg-surface-elevated-2 text-brand-primary focus:ring-0"
-                  />
-                </td>
-                <td className="px-4 py-2 font-medium">{f.title}</td>
-                <td className="px-4 py-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityColors[f.severity] || "bg-white/[0.04] text-text-tertiary"}`}>
-                    {f.severity}
-                  </span>
-                </td>
-                <td className="px-4 py-2">{f.confidence}</td>
-                <td className="px-4 py-2">{f.priority}</td>
-                <td className="px-4 py-2">
-                  <Select
-                    value={f.status}
-                    options={statusOptions}
-                    onChange={(value) => changeStatus(f.id, value)}
-                    className="w-28"
-                  />
-                </td>
-                <td className="px-4 py-2 text-xs text-text-quaternary">
-                  {findingStatusHistory[f.id]
-                    ? formatTimeAgo(findingStatusHistory[f.id].updatedAt)
-                    : "—"}
-                </td>
-                <td className="px-4 py-2 flex gap-2">
-                  <button
-                    onClick={() => openDetail(f.id)}
-                    className="link-cyber text-xs"
-                  >
-                    详情
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await api.retestFinding(f.id);
-                        toast("复测已发起", "success");
-                      } catch (e) {
-                        toast("复测失败: " + String(e), "error");
-                      }
-                    }}
-                    className="text-brand-success hover:text-brand-success/80 text-xs"
-                  >
-                    复测
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-8 duration-300">
+           <div className="flex items-center gap-4 px-6 py-3 rounded-full bg-foreground text-background shadow-2xl ring-1 ring-border border border-white/20">
+              <span className="text-sm font-bold border-r border-background/20 pr-4">
+                已选中 {selectedIds.size} 项
+              </span>
+              <div className="flex items-center gap-2">
+                 <Select 
+                    value={batchStatus} 
+                    onChange={e => setBatchStatus(e.target.value)}
+                    className="h-8 w-32 text-xs bg-background text-foreground border-none"
+                 >
+                    <option value="">批量修改状态...</option>
+                    {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                 </Select>
+                 <Button 
+                    variant="primary" 
+                    size="sm" 
+                    className="h-8 rounded-full px-4" 
+                    onClick={batchChangeStatus}
+                    loading={batchUpdating}
+                 >
+                    立即执行
+                 </Button>
+                 <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 w-8 p-0 text-background hover:bg-white/10 rounded-full"
+                    onClick={() => setSelectedIds(new Set())}
+                 >
+                    <X className="h-4 w-4" />
+                 </Button>
+              </div>
+           </div>
         </div>
       )}
 
@@ -401,100 +433,159 @@ function FindingDetail({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-base/70 backdrop-blur-xl">
-      <div className="panel w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold">Finding 详情</h2>
-          <button onClick={onClose} className="text-text-quaternary hover:text-text-secondary">x</button>
-        </div>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-text-tertiary">标题</span>
-              <p className="font-medium">{finding.title}</p>
-            </div>
-            <div>
-              <span className="text-text-tertiary">严重级别</span>
-              <p>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${severityColors[finding.severity] || ""}`}>
-                  {finding.severity}
-                </span>
-              </p>
-            </div>
-            <div>
-              <span className="text-text-tertiary">可信度</span>
-              <p className="font-medium">{finding.confidence}</p>
-            </div>
-            <div>
-              <span className="text-text-tertiary">优先级</span>
-              <p className="font-medium">{finding.priority}</p>
-            </div>
-            <div>
-              <span className="text-text-tertiary">来源工具</span>
-              <p className="font-medium">{finding.source_tool}</p>
-            </div>
-            <div>
-              <span className="text-text-tertiary">规则 ID</span>
-              <p className="font-medium">{finding.source_rule_id || "—"}</p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
+        <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+          <div className="flex items-center gap-3">
+             <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-primary" />
+             </div>
+             <div>
+                <CardTitle className="text-xl">漏洞详情报告</CardTitle>
+                <CardDescription className="text-xs font-mono uppercase tracking-tighter">#{finding.id.slice(-12)}</CardDescription>
+             </div>
+          </div>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onClose}>
+             <X className="h-5 w-5" />
+          </Button>
+        </CardHeader>
+        
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Card className="bg-muted/30 border-none">
+                <CardContent className="p-4">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Severity</div>
+                    <SeverityBadge severity={finding.severity} className="h-7 px-3 text-sm" />
+                </CardContent>
+            </Card>
+            <Card className="bg-muted/30 border-none">
+                <CardContent className="p-4">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Source Tool</div>
+                    <div className="text-lg font-bold text-foreground">{finding.source_tool}</div>
+                    <div className="text-[10px] text-muted-foreground font-mono truncate">{finding.source_rule_id || 'N/A'}</div>
+                </CardContent>
+            </Card>
+            <Card className="bg-muted/30 border-none">
+                <CardContent className="p-4">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Current Status</div>
+                    <StatusBadge status={finding.status} />
+                </CardContent>
+            </Card>
           </div>
 
-          <div>
-            <h3 className="font-semibold text-sm mb-2">状态变更</h3>
-            <div className="flex gap-2">
-              {["confirmed", "false_positive", "accepted_risk", "ignored", "pending_review"].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => onChangeStatus(finding.id, s)}
-                  disabled={finding.status === s}
-                  className={`px-3 py-1 rounded text-xs ${
-                    finding.status === s
-                      ? "filter-pill-active cursor-default"
-                      : "filter-pill"
-                  }`}
-                >
-                  {statusLabels[s]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-sm mb-2">Evidence</h3>
-            {evidence.length === 0 && <p className="text-text-quaternary text-sm">暂无 Evidence</p>}
-            <div className="space-y-2">
-              {evidence.map((e) => (
-                <div key={e.id} className="border border-white/[0.10] rounded-lg p-3 text-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 rounded bg-brand-primary/10 text-brand-primary border border-brand-primary/20 text-xs">{e.type}</span>
-                    <span className="text-text-quaternary text-xs">{e.created_at}</span>
-                  </div>
-                  {e.excerpt && <pre className="whitespace-pre-wrap text-xs bg-surface-elevated-2/70 p-2 rounded">{e.excerpt}</pre>}
+          <div className="space-y-8">
+             <section>
+                <h3 className="text-sm font-bold flex items-center gap-2 mb-3">
+                    <MessageSquare className="h-4 w-4 text-primary" />
+                    漏洞描述
+                </h3>
+                <div className="rounded-xl border p-4 bg-card shadow-sm">
+                    <h4 className="text-lg font-bold mb-2">{finding.title}</h4>
+                    <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+                        {finding.summary || "未提供详细摘要。"}
+                    </p>
                 </div>
-              ))}
-            </div>
-          </div>
+             </section>
 
-          <div>
-            <h3 className="font-semibold text-sm mb-2">添加备注</h3>
-            <textarea
-              className="input-dark w-full"
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="输入备注..."
-            />
-            <button
-              onClick={addNote}
-              disabled={adding || !note.trim()}
-              className="btn-cyber-primary mt-2 !px-4 !py-1 text-sm disabled:opacity-50"
-            >
-              {adding ? "保存中..." : "保存备注"}
-            </button>
+             <section>
+                <h3 className="text-sm font-bold flex items-center gap-2 mb-3">
+                    <ShieldAlert className="h-4 w-4 text-primary" />
+                    证据链 (Evidence)
+                </h3>
+                <div className="space-y-3">
+                    {evidence.length === 0 ? (
+                        <div className="p-8 text-center border rounded-xl border-dashed text-muted-foreground text-sm italic">
+                            暂无原始证据记录
+                        </div>
+                    ) : (
+                        evidence.map((e) => (
+                            <div key={e.id} className="rounded-xl border bg-muted/20 overflow-hidden">
+                                <div className="px-4 py-2 border-b bg-muted/30 flex items-center justify-between">
+                                    <Badge variant="outline" className="text-[9px] uppercase font-bold tracking-widest">{e.type}</Badge>
+                                    <span className="text-[10px] text-muted-foreground font-mono">{new Date(e.created_at).toLocaleString()}</span>
+                                </div>
+                                <div className="p-4 overflow-x-auto">
+                                    {e.excerpt ? (
+                                        <pre className="text-xs font-mono text-foreground/90 whitespace-pre">
+                                            {e.excerpt}
+                                        </pre>
+                                    ) : (
+                                        <span className="text-xs italic text-muted-foreground">Binary or empty content</span>
+                                    )}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+             </section>
+
+             <section>
+                <h3 className="text-sm font-bold flex items-center gap-2 mb-3">
+                    <History className="h-4 w-4 text-primary" />
+                    工作流更新
+                </h3>
+                <div className="rounded-xl border p-4 bg-muted/10 space-y-4">
+                    <div>
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase mb-2 tracking-widest">Update Finding Status</div>
+                        <div className="flex flex-wrap gap-2">
+                        {["confirmed", "false_positive", "accepted_risk", "ignored", "pending_review"].map((s) => (
+                            <Button
+                            key={s}
+                            variant={finding.status === s ? "primary" : "outline"}
+                            size="sm"
+                            onClick={() => onChangeStatus(finding.id, s)}
+                            className="h-8 text-xs px-3"
+                            >
+                            {statusLabels[s]}
+                            </Button>
+                        ))}
+                        </div>
+                    </div>
+                    
+                    <div className="pt-4 border-t border-border/50">
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase mb-2 tracking-widest">Add Internal Note</div>
+                        <div className="flex gap-3">
+                            <textarea
+                                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                                placeholder="输入关于此漏洞的内部审计备注..."
+                            />
+                        </div>
+                        <div className="flex justify-end mt-2">
+                             <Button
+                                onClick={addNote}
+                                disabled={adding || !note.trim()}
+                                variant="secondary"
+                                size="sm"
+                             >
+                                <Plus className="mr-2 h-3.5 w-3.5" />
+                                提交备注
+                             </Button>
+                        </div>
+                    </div>
+                </div>
+             </section>
           </div>
         </div>
-      </div>
+
+        <div className="p-4 border-t bg-muted/30 flex justify-between items-center">
+            <Button variant="outline" size="sm" onClick={async () => {
+                try {
+                    await api.retestFinding(finding.id);
+                    toast("漏洞复测任务已下发至 Worker", "success");
+                } catch (e) {
+                    toast("复测启动失败", "error");
+                }
+            }}>
+                <Retweet className="mr-2 h-4 w-4" />
+                漏洞复测 (Retest)
+            </Button>
+            <Button variant="secondary" size="sm" onClick={onClose}>
+                完成审计并关闭
+            </Button>
+        </div>
+      </Card>
     </div>
   );
 }

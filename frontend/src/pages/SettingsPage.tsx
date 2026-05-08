@@ -1,5 +1,15 @@
 import { useState, useEffect } from "react";
 import { getApiBase, setApiBase, resetApiBase, getApiToken, setApiToken, resetApiToken } from "../lib/config";
+import { 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription, 
+  CardContent, 
+  Button, 
+  Input 
+} from "../components";
+import { Eye, EyeOff, Save, RotateCcw, Info, Server, Key, Monitor } from "lucide-react";
 
 export default function SettingsPage() {
   const rawBase = getApiBase();
@@ -24,9 +34,10 @@ export default function SettingsPage() {
     setApiBase(apiBase);
     setApiToken(apiToken);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    // Force reload to pick up new API_BASE and API token
-    window.location.reload();
+    setTimeout(() => {
+        setSaved(false);
+        window.location.reload();
+    }, 500);
   };
 
   const handleReset = () => {
@@ -35,130 +46,158 @@ export default function SettingsPage() {
     setApiBaseState("http://localhost:17421");
     setApiTokenState("");
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    window.location.reload();
+    setTimeout(() => {
+        setSaved(false);
+        window.location.reload();
+    }, 500);
   };
 
   return (
-    <div className="page-shell space-y-6">
-      <div className="page-header">
-        <div>
-        <div className="page-eyebrow">System</div>
-        <h1 className="page-title">Settings</h1>
-        <p className="page-subtitle">
-          应用配置和偏好设置
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">设置</h1>
+        <p className="text-muted-foreground mt-1">
+          配置应用连接和系统偏好。
         </p>
-        </div>
       </div>
 
-      <div className="panel p-5 space-y-4">
-        {/* Server URL */}
-        <div>
-          <div className="text-sm font-medium mb-2">Server 地址</div>
-          <div className="text-xs text-text-tertiary mb-2">
-            {isTauri
-              ? "桌面模式：可连接远程 Server，或使用本地内置 Server"
-              : "Web 模式：输入 Anchor Server 的地址"}
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={apiBase}
-              onChange={(e) => setApiBaseState(e.target.value)}
-              placeholder={placeholderText}
-              className="input-dark flex-1"
-            />
-            <button
-              onClick={handleSave}
-              className="btn-cyber-primary"
-            >
-              {saved ? "已保存 ✓" : "保存并刷新"}
-            </button>
-            <button
-              onClick={handleReset}
-              className="btn-cyber-secondary"
-            >
-              重置
-            </button>
-          </div>
-          {isDefaultRelative && (
-            <div className="text-xs text-text-tertiary mt-1.5">
-              当前实际 API Base：{rawBase}（Vite proxy 自动转发到 http://localhost:17421）
+      <div className="grid gap-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+                <Server className="h-5 w-5 text-primary" />
+                <CardTitle>后端连接</CardTitle>
             </div>
-          )}
-        </div>
-
-        <div className="border-t border-white/[0.06] pt-4">
-          <div className="text-sm font-medium mb-2">API Token</div>
-          <div className="text-xs text-text-tertiary mb-2">
-            连接 Server 所需的认证 Token（由 Server 管理员提供）
-          </div>
-
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <input
-                type={showToken ? "text" : "password"}
-                value={apiToken}
-                onChange={(e) => setApiTokenState(e.target.value)}
-                placeholder="输入新的 API Token"
-                className="input-dark w-full pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowToken((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-tertiary hover:text-text-secondary"
-                title={showToken ? "隐藏" : "显示"}
-              >
-                {showToken ? "🙈" : "👁️"}
-              </button>
+            <CardDescription>
+                {isTauri
+                ? "配置桌面应用如何连接到 Anchor Server 服务。"
+                : "Web 模式：设置后端 API 接口地址。"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Server 地址
+              </label>
+              <div className="flex gap-3">
+                <Input
+                  type="text"
+                  value={apiBase}
+                  onChange={(e) => setApiBaseState(e.target.value)}
+                  placeholder={placeholderText}
+                  className="max-w-md"
+                />
+                <Button
+                  onClick={handleSave}
+                  variant="primary"
+                  loading={saved}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {saved ? "已保存" : "保存并刷新"}
+                </Button>
+                <Button
+                  onClick={handleReset}
+                  variant="secondary"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  重置
+                </Button>
+              </div>
+              {isDefaultRelative && (
+                <p className="text-xs text-muted-foreground">
+                  当前处于自动代理模式：{rawBase || "/api"}
+                </p>
+              )}
             </div>
-          </div>
-        </div>
+
+            <div className="space-y-2 pt-4 border-t">
+              <label className="text-sm font-medium leading-none flex items-center gap-2">
+                <Key className="h-4 w-4 text-muted-foreground" />
+                API Token
+              </label>
+              <p className="text-xs text-muted-foreground">
+                连接 Server 所需的认证令牌（由管理员提供）。
+              </p>
+              <div className="relative max-w-md">
+                <Input
+                  type={showToken ? "text" : "password"}
+                  value={apiToken}
+                  onChange={(e) => setApiTokenState(e.target.value)}
+                  placeholder="输入 API Token"
+                  className="pr-10 font-mono"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowToken(!showToken)}
+                >
+                  {showToken ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {isTauri && (
-          <>
-            <div className="border-t border-white/[0.06] pt-4">
-              <div className="flex items-center justify-between">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                  <Monitor className="h-5 w-5 text-primary" />
+                  <CardTitle>本地环境</CardTitle>
+              </div>
+              <CardDescription>
+                  管理本地资源和路径。
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between py-2">
                 <div>
                   <div className="text-sm font-medium">本地 Worker 自动启动</div>
-                  <div className="text-xs text-text-tertiary mt-0.5">
-                    应用启动时自动启动本地 Worker（仅本地模式）
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    应用启动时自动在后台启动扫描节点。
+                  </p>
                 </div>
-                {/* TODO: Static UI only — no state binding or click handler.
-                  Requires: Tauri config store or backend preference API.
-                  Currently always shows "ON" with no way to toggle.
-                  See: e2e/tests/SettingsPage.e2e.md Test 4
-                */}
-                <div className="w-10 h-5 bg-brand-primary rounded-full relative cursor-pointer">
-                  <div className="w-4 h-4 bg-white rounded-full absolute right-0.5 top-0.5" />
+                <div className="flex h-5 w-9 items-center rounded-full bg-primary/20 p-1">
+                    <div className="h-3 w-3 translate-x-4 rounded-full bg-primary transition-all" />
                 </div>
               </div>
-            </div>
-
-            <div className="border-t border-white/[0.06] pt-4">
-              <div className="flex items-center justify-between">
+              
+              <div className="flex items-center justify-between py-2 border-t">
                 <div>
-                  <div className="text-sm font-medium">数据目录</div>
-                  <div className="text-xs text-text-tertiary mt-0.5 font-mono">
+                  <div className="text-sm font-medium">数据存储目录</div>
+                  <p className="text-xs text-muted-foreground font-mono">
                     ~/.anchor
-                  </div>
+                  </p>
                 </div>
+                <Button variant="outline" size="sm">打开目录</Button>
               </div>
-            </div>
-          </>
+            </CardContent>
+          </Card>
         )}
 
-        <div className="border-t border-white/[0.06] pt-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium">版本</div>
-              <div className="text-xs text-text-tertiary mt-0.5">
-                v0.2.0
-              </div>
+        <Card className="bg-muted/30">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+                <Info className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-base text-muted-foreground">系统信息</CardTitle>
             </div>
-          </div>
-        </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">版本</span>
+                <span className="font-medium">v0.2.0 (Standard Edition)</span>
+            </div>
+            <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">构建环境</span>
+                <span className="font-mono text-xs">{isTauri ? "Tauri Native" : "React Web"}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
