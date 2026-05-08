@@ -40,12 +40,9 @@ func (s *Server) handlePatchFindingStatus(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := s.findingSvc.UpdateStatus(r.Context(), id, req.Status); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
+		if s.handleServiceError(w, err, "update finding status failed") {
 			return
 		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update finding status failed: %v", err))
-		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": req.Status})
 }
