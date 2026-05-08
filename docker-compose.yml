@@ -31,7 +31,6 @@ services:
 
   # --- Remote Worker ---
   worker:
-    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile.worker
