@@ -40,12 +40,7 @@ func (s *Server) handleListTargets(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
 	page := parsePagination(r)
 	result, err := s.targetSvc.ListPaginated(r.Context(), projectID, service.PaginationParams{Page: page.Page, PageSize: page.PageSize})
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list targets failed: %v", err))
+	if s.handleServiceError(w, err, "list targets failed") {
 		return
 	}
 	writePaginatedJSON(w, result.Data, result.Total, page)
