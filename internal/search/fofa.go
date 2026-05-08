@@ -40,9 +40,9 @@ func NewFofaClient(apiKey string) *FofaClient {
 		baseURL = strings.TrimRight(override, "/")
 	}
 	return &FofaClient{
-		apiKey:  apiKey,
-		baseURL: baseURL,
-		client:  defaultHTTPClient,
+		baseClient: baseClient{client: defaultHTTPClient},
+		apiKey:     apiKey,
+		baseURL:    baseURL,
 	}
 }
 
