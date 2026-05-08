@@ -335,7 +335,21 @@ export interface Evidence {
   created_at: string;
 }
 
+export interface WorkerNode {
+  id: string;
+  ip: string;
+  hostname: string;
+  os: string;
+  status: string;
+  busy: boolean;
+  last_seen: string;
+  created_at: string;
+}
+
 export const api = {
+  // ... rest of api object
+  listWorkers: (signal?: AbortSignal) =>
+    fetchAPI<WorkerNode[]>("/workers", { signal }),
   createProject: (data: { name: string; organization?: string; purpose?: string; start_time?: string; end_time?: string; rate_limit?: number }, signal?: AbortSignal) =>
     fetchAPI<Project>("/projects", { method: "POST", body: JSON.stringify(data), signal }),
 
