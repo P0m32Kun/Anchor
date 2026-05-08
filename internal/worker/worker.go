@@ -145,6 +145,11 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 		return fmt.Errorf("tool not found: %s", binary)
 	}
 
+	// Inject custom nuclei templates if available (local execution fallback)
+	if task.Tool == "nuclei" {
+		args = r.injectCustomNucleiTemplates(args)
+	}
+
 	// Append rate limit arguments if configured.
 	cmdArgs := appendRateLimitArgs(args[1:], task.Tool, project.RateLimit)
 
