@@ -16,12 +16,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	project, err := s.projectSvc.Create(r.Context(), req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "create project failed: %v", err))
+	if s.handleServiceError(w, err, "create project failed") {
 		return
 	}
 
