@@ -11,9 +11,9 @@ import (
 
 // HunterClient is a client for the Qianxin Hunter API.
 type HunterClient struct {
+	baseClient
 	apiKey  string
 	baseURL string
-	client  *http.Client
 }
 
 // HunterResult represents a single result from Hunter.
