@@ -5,3 +5,4 @@ export {
   type UseRealtimeDataOptions,
   type UseRealtimeDataReturn,
 } from "./useRealtimeData";
+export { useResource, type ResourceState, type UseResourceReturn } from "./useResource";
