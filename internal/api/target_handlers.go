@@ -20,12 +20,7 @@ func (s *Server) handleCreateTarget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := s.targetSvc.Create(r.Context(), projectID, req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "create target failed: %v", err))
+	if s.handleServiceError(w, err, "create target failed") {
 		return
 	}
 
