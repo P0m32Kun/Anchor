@@ -180,13 +180,74 @@ export default function AssetPage() {
     });
   }, [webEndpoints, filterTitle, filterTech]);
 
-  const filteredPorts = useMemo(() => {
-    if (!selectedAsset || !ports[selectedAsset]) return [];
-    return ports[selectedAsset].filter((p) => {
-      if (filterPort && !String(p.port).includes(filterPort)) return false;
-      return true;
-    });
-  }, [ports, selectedAsset, filterPort]);
+  function getCommonServiceName(port: number): string | undefined {
+    const map: Record<number, string> = {
+      20: "FTP-Data", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP",
+      53: "DNS", 67: "DHCP", 68: "DHCP", 80: "HTTP", 110: "POP3",
+      123: "NTP", 137: "NetBIOS", 138: "NetBIOS", 139: "NetBIOS",
+      143: "IMAP", 161: "SNMP", 162: "SNMP-Trap", 389: "LDAP",
+      443: "HTTPS", 445: "SMB", 465: "SMTPS", 500: "IKE",
+      587: "SMTP-Submission", 636: "LDAPS", 993: "IMAPS",
+      995: "POP3S", 1433: "MSSQL", 1521: "Oracle", 1723: "PPTP",
+      2049: "NFS", 3306: "MySQL", 3389: "RDP", 5432: "PostgreSQL",
+      5900: "VNC", 6379: "Redis", 8080: "HTTP-Alt", 8443: "HTTPS-Alt",
+      9200: "Elasticsearch", 11211: "Memcached", 27017: "MongoDB",
+    };
+    return map[port];
+  }
+
+  const portRows = useMemo(() => {
+    const ipAssets = assets.filter((a) => a.type === "ip");
+    const rows: {
+      id: string;
+      assetId: string;
+      ip: string;
+      port: number;
+      protocol: string;
+      state: string;
+      serviceName: string;
+      sourceTool: string;
+    }[] = [];
+    for (const asset of ipAssets) {
+      const assetPorts = ports[asset.id] || [];
+      const assetServices = services[asset.id] || [];
+      const serviceMap = new Map(assetServices.map((s) => [s.port_id, s]));
+      for (const p of assetPorts) {
+        const svc = p.id ? serviceMap.get(p.id) : undefined;
+        rows.push({
+          id: p.id,
+          assetId: asset.id,
+          ip: asset.value,
+          port: p.port,
+          protocol: p.protocol,
+          state: p.state,
+          serviceName: svc?.name || getCommonServiceName(p.port) || "—",
+          sourceTool: p.source_tool || "—",
+        });
+      }
+    }
+    return rows;
+  }, [assets, ports, services]);
+
+  const filteredPortRows = useMemo(() => {
+    if (!filterPort) return portRows;
+    const q = filterPort.toLowerCase();
+    return portRows.filter((row) =>
+      String(row.port).includes(q) ||
+      row.ip.toLowerCase().includes(q) ||
+      row.serviceName.toLowerCase().includes(q)
+    );
+  }, [portRows, filterPort]);
+
+  const totalPortPages = Math.max(1, Math.ceil(filteredPortRows.length / PORT_PAGE_SIZE));
+  const paginatedPortRows = useMemo(() => {
+    const start = (portPage - 1) * PORT_PAGE_SIZE;
+    return filteredPortRows.slice(start, start + PORT_PAGE_SIZE);
+  }, [filteredPortRows, portPage]);
+
+  useEffect(() => {
+    setPortPage(1);
+  }, [filterPort]);
 
   const assetColumns: { key: string; header: string; width?: string; render?: (row: Record<string, unknown>) => React.ReactNode }[] = [
     {
