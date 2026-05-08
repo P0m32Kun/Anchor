@@ -71,16 +71,6 @@ func (c *HunterClient) Search(ctx context.Context, query string, page, pageSize 
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Hunter API returned status %d", resp.StatusCode)
-	}
-
 	var result struct {
 		Code int    `json:"code"`
 		Msg  string `json:"msg"`
@@ -91,8 +81,8 @@ func (c *HunterClient) Search(ctx context.Context, query string, page, pageSize 
 		} `json:"data"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+	if err := c.doJSON(req, &result); err != nil {
+		return nil, err
 	}
 
 	if result.Code != 200 {
