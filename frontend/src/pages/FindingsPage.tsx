@@ -49,7 +49,6 @@ const statusLabels: Record<string, string> = {
 
 export default function FindingsPage() {
   const projectId = useProjectId();
-  const navigate = useNavigate();
   const findings = useStore((state) => state.findings) ?? [];
   const setFindings = useStore((state) => state.setFindings);
   const currentFinding = useStore((state) => state.currentFinding);
