@@ -689,4 +689,3 @@ export interface SearchEngineResponse {
   data: SearchResult[];
 }
 
-// Append to api object below existing methods
