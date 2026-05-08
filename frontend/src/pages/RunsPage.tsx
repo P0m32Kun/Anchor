@@ -30,7 +30,8 @@ import {
   Terminal,
   History,
   Zap,
-  Loader2
+  Loader2,
+  ChevronRight
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
