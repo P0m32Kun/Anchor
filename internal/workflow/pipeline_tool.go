@@ -103,24 +103,47 @@ func (p *Pipeline) runNaabu(ctx context.Context, hosts []string) ([]parser.PortI
 	return ports, nil
 }
 
-func (p *Pipeline) runNerva(ctx context.Context, ports []parser.PortInfo) ([]fingerprint.NervaResult, error) {
+func (p *Pipeline) runNmapServiceScan(ctx context.Context, ports []parser.PortInfo) ([]fingerprint.NmapServiceResult, error) {
 	if len(ports) == 0 {
 		return nil, nil
 	}
 
-	var targets []string
+	// Collect unique IPs and ports.
+	ipSet := make(map[string]bool)
+	portSet := make(map[int]bool)
 	for _, port := range ports {
-		targets = append(targets, fmt.Sprintf("%s:%d", port.IP, port.Port))
+		ipSet[port.IP] = true
+		portSet[port.Port] = true
+	}
+	var hosts []string
+	for ip := range ipSet {
+		hosts = append(hosts, ip)
+	}
+	var portList []int
+	for port := range portSet {
+		portList = append(portList, port)
 	}
 
-	cmd := worker.BuildNervaCommand(strings.Join(targets, ","), p.config.NervaFastMode, p.config.NervaRateLimit, p.config.NervaWorkers, p.config.NervaTimeout)
-	task, stdout, err := p.createAndRunTask(ctx, "nerva", cmd)
+	hostFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nmap-sv-%s.txt", util.GenerateID()))
+	if err := os.MkdirAll(filepath.Dir(hostFile), 0750); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(hostFile, []byte(strings.Join(hosts, "\n")), 0640); err != nil {
+		return nil, err
+	}
+	if abs, err := filepath.Abs(hostFile); err == nil {
+		hostFile = abs
+	}
+
+	cmd := worker.BuildNmapServiceScanCommand(hostFile, portList)
+	task, stdout, err := p.createAndRunTask(ctx, "nmap", cmd)
 	if err != nil {
 		return nil, err
 	}
 	_ = task
 
-	results := fingerprint.ParseNervaOutput(string(stdout))
+	results := fingerprint.ParseNmapXMLOutput(string(stdout))
+	log.Printf("[pipeline] nmap -sV: input=%d ports on %d hosts, results=%d for project %s", len(ports), len(hosts), len(results), p.projectID)
 	return results, nil
 }
 
