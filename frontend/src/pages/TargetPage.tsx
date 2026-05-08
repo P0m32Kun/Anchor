@@ -57,7 +57,7 @@ function ProjectInfo({ project }: { project: Project }) {
       <CardContent className="p-4 flex flex-wrap items-center gap-x-8 gap-y-3">
         <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <UsersIcon className="h-4 w-4 text-primary" />
+                <Users className="h-4 w-4 text-primary" />
             </div>
             <div>
                 <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Organization</div>
