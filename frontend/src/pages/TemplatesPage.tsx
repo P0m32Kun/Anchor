@@ -695,7 +695,7 @@ export default function TemplatesPage() {
           <textarea
             value={editFileContent}
             onChange={(e) => setEditFileContent(e.target.value)}
-            className="w-full h-96 rounded-lg border border-white/10 bg-surface-base px-4 py-3 text-sm font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
+            className="w-full h-96 rounded-lg border border-white/10 bg-card px-4 py-3 text-sm font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
             spellCheck={false}
           />
         )}
