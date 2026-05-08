@@ -13,13 +13,16 @@ GO_FILES := $(shell find . -name '*.go' -not -path './frontend/*')
 #  Base Image (预装安全工具，极少更新)
 # ============================================================
 
+# 本地开发构建 — 自动匹配 host 架构（ARM Mac 用 arm64，x86 用 amd64，不依赖 QEMU/Rosetta）
 build-worker-base:
-	# 强制 linux/amd64 — 部署目标为 x64 服务器，本地 ARM Mac 通过 QEMU 自动模拟
-	docker build --platform linux/amd64 -f Dockerfile.worker-base -t anchor-worker-base:latest .
+	docker build -f Dockerfile.worker-base -t anchor-worker-base:latest .
 
+# 多平台推送 — 同时构建 linux/amd64 + linux/arm64，部署时自动拉取匹配架构的镜像
 push-worker-base:
-	docker tag anchor-worker-base:latest p0m32kun/anchor-worker-base:latest
-	docker push p0m32kun/anchor-worker-base:latest
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		-f Dockerfile.worker-base \
+		-t p0m32kun/anchor-worker-base:latest \
+		--push .
 
 pull-worker-base:
 	docker pull p0m32kun/anchor-worker-base:latest
@@ -27,11 +30,13 @@ pull-worker-base:
 
 # --- Worker Builder Base Image ---
 build-worker-builder-base:
-	docker build --platform linux/amd64 -f Dockerfile.worker-builder-base -t anchor-worker-builder-base:latest .
+	docker build -f Dockerfile.worker-builder-base -t anchor-worker-builder-base:latest .
 
 push-worker-builder-base:
-	docker tag anchor-worker-builder-base:latest p0m32kun/anchor-worker-builder-base:latest
-	docker push p0m32kun/anchor-worker-builder-base:latest
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		-f Dockerfile.worker-builder-base \
+		-t p0m32kun/anchor-worker-builder-base:latest \
+		--push .
 
 pull-worker-builder-base:
 	docker pull p0m32kun/anchor-worker-builder-base:latest
@@ -39,12 +44,13 @@ pull-worker-builder-base:
 
 # --- Server Base Image ---
 build-server-base:
-	# 强制 linux/amd64 — 部署目标为 x64 服务器，本地 ARM Mac 通过 QEMU 自动模拟
-	docker build --platform linux/amd64 -f Dockerfile.server-base -t anchor-server-base:latest .
+	docker build -f Dockerfile.server-base -t anchor-server-base:latest .
 
 push-server-base:
-	docker tag anchor-server-base:latest p0m32kun/anchor-server-base:latest
-	docker push p0m32kun/anchor-server-base:latest
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		-f Dockerfile.server-base \
+		-t p0m32kun/anchor-server-base:latest \
+		--push .
 
 pull-server-base:
 	docker pull p0m32kun/anchor-server-base:latest
