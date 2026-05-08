@@ -297,13 +297,12 @@ func (s *Server) handleListServicePorts(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Sort by IP then port
-	for i := range result {
-		for j := i + 1; j < len(result); j++ {
-			if result[i].IP > result[j].IP || (result[i].IP == result[j].IP && result[i].Port > result[j].Port) {
-				result[i], result[j] = result[j], result[i]
-			}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].IP != result[j].IP {
+			return result[i].IP < result[j].IP
 		}
-	}
+		return result[i].Port < result[j].Port
+	})
 
 	writeJSON(w, http.StatusOK, result)
 }
