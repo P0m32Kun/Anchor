@@ -1,87 +1,53 @@
 import React from "react";
+import { cn } from "../lib/utils";
 
 type BadgeVariant =
   | "default"
-  | "primary"
+  | "secondary"
+  | "outline"
+  | "destructive"
   | "success"
   | "warning"
-  | "danger"
   | "info"
   | "critical";
 
-// CyberOS badge styles with enhanced glow effects
-const variantStyles: Record<
-  BadgeVariant,
-  { bg: string; text: string; border: string; glow?: string }
-> = {
-  default: {
-    bg: "bg-text-quaternary/10",
-    text: "text-text-quaternary",
-    border: "border-text-quaternary/20",
-  },
-  primary: {
-    bg: "bg-brand-primary/10",
-    text: "text-brand-primary",
-    border: "border-brand-primary/20",
-    glow: "shadow-[0_0_15px_rgba(56,189,248,0.25)]",
-  },
-  success: {
-    bg: "bg-brand-success/10",
-    text: "text-brand-success",
-    border: "border-brand-success/20",
-    glow: "shadow-[0_0_15px_rgba(74,222,128,0.25)]",
-  },
-  warning: {
-    bg: "bg-brand-warning/10",
-    text: "text-brand-warning",
-    border: "border-brand-warning/20",
-    glow: "shadow-[0_0_15px_rgba(250,204,21,0.2)]",
-  },
-  danger: {
-    bg: "bg-brand-danger/10",
-    text: "text-brand-danger",
-    border: "border-brand-danger/20",
-    glow: "shadow-[0_0_15px_rgba(248,113,113,0.25)]",
-  },
-  info: {
-    bg: "bg-brand-info/10",
-    text: "text-brand-info",
-    border: "border-brand-info/20",
-    glow: "shadow-[0_0_15px_rgba(6,182,212,0.25)]",
-  },
-  critical: {
-    bg: "bg-brand-danger/20",
-    text: "text-brand-danger",
-    border: "border-brand-danger/30",
-    glow: "shadow-[0_0_18px_rgba(255,71,87,0.3)]",
-  },
+const variantStyles: Record<BadgeVariant, string> = {
+  default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+  secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+  outline: "text-foreground border-border hover:bg-accent",
+  destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
+  success: "border-transparent bg-brand-success/15 text-brand-success",
+  warning: "border-transparent bg-brand-warning/15 text-brand-warning",
+  info: "border-transparent bg-brand-info/15 text-brand-info",
+  critical: "border-transparent bg-destructive text-destructive-foreground animate-pulse",
 };
 
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
-  size?: "sm" | "md";
   dot?: boolean;
 }
 
 export function Badge({
   variant = "default",
-  size = "sm",
   dot = false,
   children,
   className = "",
   ...props
-}: BadgeProps & { ref?: React.Ref<HTMLSpanElement> }) {
-  const styles = variantStyles[variant];
-  const sizeCls = size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs";
-
+}: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-md font-medium border backdrop-blur-sm ${styles.bg} ${styles.text} ${styles.border} ${styles.glow || ""} ${sizeCls} ${className}`}
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        variantStyles[variant],
+        className
+      )}
       {...props}
     >
       {dot && (
         <span
-          className={`inline-block w-1.5 h-1.5 rounded-full ${styles.text.replace("text-", "bg-")}`}
+          className={cn(
+            "mr-1.5 h-1.5 w-1.5 rounded-full bg-current"
+          )}
         />
       )}
       {children}
@@ -89,7 +55,6 @@ export function Badge({
   );
 }
 
-/** Severity badge — maps severity string to Badge variant */
 export function SeverityBadge({
   severity,
   className = "",
@@ -99,19 +64,18 @@ export function SeverityBadge({
 }) {
   const map: Record<string, BadgeVariant> = {
     critical: "critical",
-    high: "danger",
+    high: "destructive",
     medium: "warning",
     low: "info",
-    info: "default",
+    info: "outline",
   };
   return (
-    <Badge variant={map[severity] || "default"} className={className}>
-      {severity}
+    <Badge variant={map[severity] || "outline"} className={className}>
+      {severity.toUpperCase()}
     </Badge>
   );
 }
 
-/** Status badge */
 export function StatusBadge({
   status,
   className = "",
@@ -123,13 +87,13 @@ export function StatusBadge({
     confirmed: "success",
     accepted_risk: "info",
     pending_review: "warning",
-    false_positive: "default",
-    ignored: "default",
+    false_positive: "outline",
+    ignored: "outline",
     active: "success",
-    expired: "danger",
-    pending: "warning",
+    expired: "destructive",
+    pending: "secondary",
     running: "info",
-    failed: "danger",
+    failed: "destructive",
     completed: "success",
   };
   const label: Record<string, string> = {
@@ -146,7 +110,7 @@ export function StatusBadge({
     completed: "已完成",
   };
   return (
-    <Badge variant={map[status] || "default"} className={className}>
+    <Badge variant={map[status] || "outline"} className={className} dot={status === 'running'}>
       {label[status] || status}
     </Badge>
   );

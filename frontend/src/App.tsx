@@ -214,6 +214,7 @@ function AppContent() {
             <Route path="/projects/:id/reports" element={<ReportsPage />} />
           </Routes>
         </ErrorBoundary>
+        </div>
       </main>
     </div>
   );
