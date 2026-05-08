@@ -527,13 +527,13 @@ export const api = {
     fetchAPI<NucleiCustomFileEntry[]>(`/nuclei/custom/sources/${id}/files`, { signal }),
 
   readNucleiCustomFile: (id: string, path: string, signal?: AbortSignal) =>
-    fetchBlob(`/nuclei/custom/sources/${id}/files/${encodeURIComponent(path)}`, { signal }),
+    fetchBlob(`/nuclei/custom/sources/${id}/files/${path}`, { signal }),
 
   writeNucleiCustomFile: (id: string, path: string, content: string, signal?: AbortSignal) =>
-    fetchAPI<void>(`/nuclei/custom/sources/${id}/files/${encodeURIComponent(path)}`, { method: "PUT", body: content, signal }),
+    fetchAPI<void>(`/nuclei/custom/sources/${id}/files/${path}`, { method: "PUT", body: content, signal }),
 
   deleteNucleiCustomFile: (id: string, path: string, signal?: AbortSignal) =>
-    fetchAPI<void>(`/nuclei/custom/sources/${id}/files/${encodeURIComponent(path)}`, { method: "DELETE", signal }),
+    fetchAPI<void>(`/nuclei/custom/sources/${id}/files/${path}`, { method: "DELETE", signal }),
 
   validateNucleiCustomSource: (id: string, signal?: AbortSignal) =>
     fetchAPI<NucleiCustomValidationResult>(`/nuclei/custom/sources/${id}/validate`, { method: "POST", signal }),
