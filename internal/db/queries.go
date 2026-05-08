@@ -361,6 +361,11 @@ func (q *Queries) UpdateScanTaskStatus(id string, status models.TaskStatus, exit
 	return err
 }
 
+func (q *Queries) UpdateScanTaskErrorMessage(id string, errorMsg string) error {
+	_, err := q.db.Exec(`UPDATE scan_tasks SET error_message = ? WHERE id = ?`, errorMsg, id)
+	return err
+}
+
 func (q *Queries) SetScanTaskRunning(id string, startedAt time.Time) error {
 	_, err := q.db.Exec(`UPDATE scan_tasks SET status = ?, started_at = ? WHERE id = ?`, models.TaskRunning, startedAt, id)
 	return err
