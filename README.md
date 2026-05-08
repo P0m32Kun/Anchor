@@ -11,7 +11,7 @@
 | 阶段            | 工具                       | 输出                                       |
 | --------------- | -------------------------- | ------------------------------------------ |
 | **Scope Check** | 自研引擎                   | ScopeDecision (allow/deny)                 |
-| **资产发现**    | Subfinder → DNSx → CDNcheck → Naabu → nerva → httpx | Asset / WebEndpoint / Port / Service |
+| **资产发现**    | Subfinder → DNSx → CDNcheck → Naabu → nmap -sV → httpx | Asset / WebEndpoint / Port / Service |
 | **Web 初筛**    | Nuclei（指纹驱动模板筛选） | Finding / Evidence                         |
 | **人工验证**    | 前端队列                   | confirmed / false_positive / accepted_risk |
 | **报告导出**    | 自研生成器                 | Markdown / JSON                            |
