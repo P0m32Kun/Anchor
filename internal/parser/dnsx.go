@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"bufio"
 	"encoding/json"
 	"io"
 	"strings"
@@ -21,37 +20,16 @@ type DNSxResult struct {
 
 // ParseDNSx reads dnsx -json JSONL output and returns parsed DNS results.
 func ParseDNSx(r io.Reader) ([]DNSxResult, []ParseError) {
-	var results []DNSxResult
-	var errs []ParseError
-
-	scanner := bufio.NewScanner(r)
-	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-
+	return parseJSONLines(r, func(line []byte, lineNo int) (DNSxResult, ParseError) {
 		var rec DNSxResult
-		if err := json.Unmarshal([]byte(line), &rec); err != nil {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "invalid JSON: " + err.Error()})
-			continue
+		if err := json.Unmarshal(line, &rec); err != nil {
+			return rec, ParseError{Line: lineNo, Raw: string(line), Message: "invalid JSON: " + err.Error()}
 		}
-
 		if rec.Host == "" {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "missing host field"})
-			continue
+			return rec, ParseError{Line: lineNo, Raw: string(line), Message: "missing host field"}
 		}
-
-		results = append(results, rec)
-	}
-
-	if err := scanner.Err(); err != nil {
-		errs = append(errs, ParseError{Line: lineNo, Raw: "", Message: "scanner error: " + err.Error()})
-	}
-
-	return results, errs
+		return rec, ParseError{}
+	})
 }
 
 // ParseDNSxOutput parses dnsx JSONL output into DNS records.
