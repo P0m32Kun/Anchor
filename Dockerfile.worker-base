@@ -12,7 +12,7 @@
 # --- Stage 1: 构建工具 ---
 FROM golang:1.26-bookworm AS tools-builder
 
-RUN sed -i 's|http://deb.debian.org|https://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
     && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
     git gcc libpcap-dev \
@@ -34,7 +34,7 @@ RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && 
 # --- Stage 2: 精简运行时基础镜像 ---
 FROM debian:bookworm-slim
 
-RUN sed -i 's|http://deb.debian.org|https://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
     && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
     ca-certificates libpcap-dev git nmap wget unzip \
