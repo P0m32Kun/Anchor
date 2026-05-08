@@ -1,45 +1,29 @@
 package parser
 
 import (
-	"bufio"
 	"encoding/json"
 	"io"
 )
 
 // ParseSubfinder reads Subfinder JSONL output and returns discovered subdomains.
 func ParseSubfinder(r io.Reader) ([]SubfinderResult, []ParseError) {
-	var results []SubfinderResult
-	var errs []ParseError
-
-	scanner := bufio.NewScanner(r)
-	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-
+	return parseJSONLines(r, func(line []byte, lineNo int) (SubfinderResult, ParseError) {
 		var raw map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "invalid JSON: " + err.Error()})
-			continue
+		if err := json.Unmarshal(line, &raw); err != nil {
+			return SubfinderResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "invalid JSON: " + err.Error()}
 		}
 
 		hostBytes, ok := raw["host"]
 		if !ok {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "missing host field"})
-			continue
+			return SubfinderResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "missing host field"}
 		}
 
 		var host string
 		if err := json.Unmarshal(hostBytes, &host); err != nil {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "invalid host field: " + err.Error()})
-			continue
+			return SubfinderResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "invalid host field: " + err.Error()}
 		}
 		if host == "" {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "empty host field"})
-			continue
+			return SubfinderResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "empty host field"}
 		}
 
 		var input string
@@ -51,18 +35,12 @@ func ParseSubfinder(r io.Reader) ([]SubfinderResult, []ParseError) {
 			_ = json.Unmarshal(b, &source)
 		}
 
-		results = append(results, SubfinderResult{
+		return SubfinderResult{
 			Host:   host,
 			Input:  input,
 			Source: source,
-		})
-	}
-
-	if err := scanner.Err(); err != nil {
-		errs = append(errs, ParseError{Line: lineNo, Raw: "", Message: "scanner error: " + err.Error()})
-	}
-
-	return results, errs
+		}, ParseError{}
+	})
 }
 
 // ParseSubfinderOutput parses subfinder -oJ JSONL output into a list of subdomains.
