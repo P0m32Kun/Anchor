@@ -10,6 +10,7 @@ const buttonVariants = cva(
         primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50",
         ghost: "hover:bg-accent hover:text-accent-foreground",
+        outline: "border border-border bg-background hover:bg-accent hover:text-accent-foreground",
         danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
         purple: "bg-brand-purple text-white hover:opacity-90", // Kept brand-purple as hex for now
         success: "bg-brand-success text-white hover:opacity-90",
