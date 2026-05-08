@@ -67,7 +67,7 @@ test.describe.serial("High-risk port preset E2E", () => {
 		await portSelect.selectOption("high-risk");
 		await expect(portSelect).toHaveValue("high-risk");
 
-		// 关闭 FOFA / Subfinder / CDN，只跑端口扫描+Nerva+Nuclei，加速
+		// 关闭 FOFA / Subfinder / CDN，只跑端口扫描+nmap -sV+Nuclei，加速
 		await page.getByRole("switch", { name: /FOFA/ }).click();
 		await page.getByRole("switch", { name: /Subfinder/ }).click();
 		await page.getByRole("switch", { name: /CDN/ }).click();
