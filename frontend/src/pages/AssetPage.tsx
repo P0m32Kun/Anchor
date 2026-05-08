@@ -138,16 +138,18 @@ export default function AssetPage() {
     return () => ctrl.abort();
   }, [activeTab, projectId, servicePorts.length, loadServicePorts]);
 
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+
   const startDiscovery = async () => {
     if (!projectId) return;
-    setAssetsLoading(true);
+    setDiscoveryLoading(true);
     try {
       await api.startAssetDiscovery(projectId);
       toast("资产发现工作流已启动", "success");
     } catch (err) {
       toast("启动失败: " + String(err), "error");
     } finally {
-      setAssetsLoading(false);
+      setDiscoveryLoading(false);
     }
   };
 
