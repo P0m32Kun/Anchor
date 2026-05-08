@@ -464,6 +464,11 @@ export default function RunsPage() {
                   {task.status}
                 </span>
               </div>
+              {task.error_message && (
+                <div className="px-2 mt-1 text-xs text-brand-danger font-mono truncate">
+                  {task.error_message}
+                </div>
+              )}
             ))}
             {tasks.length === 0 && !tasksLoading && (
               <div className="py-8 text-center text-text-quaternary">暂无任务</div>
