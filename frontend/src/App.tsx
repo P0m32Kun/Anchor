@@ -182,7 +182,7 @@ function AppContent() {
   return (
     <div className="app-shell">
       <Navbar />
-      <main className="app-main lg:pl-[312px]">
+      <main className="app-main pl-[312px]">
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
