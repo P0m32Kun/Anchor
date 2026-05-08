@@ -152,6 +152,8 @@ export const useStore = create<AppState>()(
         set((state) => ({ ports: { ...state.ports, [assetId]: ports } })),
       setServices: (assetId, services) =>
         set((state) => ({ services: { ...state.services, [assetId]: services } })),
+      setServicePorts: (servicePorts) => set({ servicePorts }),
+      setServicePortsLoading: (servicePortsLoading) => set({ servicePortsLoading }),
 
       setFindings: (findings) =>
         set((state) => ({
