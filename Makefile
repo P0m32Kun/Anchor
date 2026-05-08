@@ -25,6 +25,21 @@ pull-worker-base:
 	docker pull p0m32kun/anchor-worker-base:latest
 	docker tag p0m32kun/anchor-worker-base:latest anchor-worker-base:latest
 
+# --- Server Base Image ---
+build-server-base:
+	# 强制 linux/amd64 — 部署目标为 x64 服务器，本地 ARM Mac 通过 QEMU 自动模拟
+	docker build --platform linux/amd64 -f Dockerfile.server-base -t anchor-server-base:latest .
+
+push-server-base:
+	docker tag anchor-server-base:latest p0m32kun/anchor-server-base:latest
+	docker push p0m32kun/anchor-server-base:latest
+
+pull-server-base:
+	docker pull p0m32kun/anchor-server-base:latest
+	docker tag p0m32kun/anchor-server-base:latest anchor-server-base:latest
+
+setup-server-base: build-server-base
+
 # 首次设置：构建并标记本地基础镜像
 setup-worker-base: build-worker-base
 
