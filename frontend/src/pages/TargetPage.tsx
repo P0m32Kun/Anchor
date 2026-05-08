@@ -1,13 +1,14 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { 
-  useProjectId, 
-  ConfirmDialog, 
-  useToast, 
-  EmptyState, 
-  Badge, 
+import { useResource } from "../hooks";
+import {
+  useProjectId,
+  ConfirmDialog,
+  useToast,
+  EmptyState,
+  Badge,
   SkeletonList,
   Card,
   CardHeader,
