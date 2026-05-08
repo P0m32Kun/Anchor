@@ -49,10 +49,7 @@ export default function FindingsPage() {
   const setFindings = useStore((state) => state.setFindings);
   const currentFinding = useStore((state) => state.currentFinding);
   const setCurrentFinding = useStore((state) => state.setCurrentFinding);
-  const loading = useStore((state) => state.findingsLoading);
-  const setFindingsLoading = useStore((state) => state.setFindingsLoading);
-  const setFindingsError = useStore((state) => state.setFindingsError);
-  
+
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [severityFilter, setSeverityFilter] = useState<string>("");
   const [keyword, setKeyword] = useState<string>("");
@@ -61,7 +58,7 @@ export default function FindingsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchStatus, setBatchStatus] = useState<string>("");
   const [batchUpdating, setBatchUpdating] = useState(false);
-  
+
   const findingStatusHistory = useStore((state) => state.findingStatusHistory);
   const recordStatusChange = useStore((state) => state.recordStatusChange);
   const toast = useToast();
@@ -71,20 +68,15 @@ export default function FindingsPage() {
     return () => clearTimeout(timer);
   }, [keyword]);
 
-  useEffect(() => {
-    if (!projectId) return;
-    const ctrl = new AbortController();
-    setFindingsLoading(true);
-    setFindingsError(null);
-    api.listFindings(projectId, undefined, PAGE_ALL, ctrl.signal)
-      .then((res) => setFindings(res.data ?? []))
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setFindingsError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => setFindingsLoading(false));
-    return () => ctrl.abort();
-  }, [projectId, setFindings, setFindingsLoading, setFindingsError]);
+  const { loading } = useResource(
+    async (signal) => {
+      if (!projectId) return;
+      const res = await api.listFindings(projectId, undefined, PAGE_ALL, signal);
+      setFindings(res.data ?? []);
+    },
+    [projectId],
+    undefined
+  );
 
   const openDetail = async (findingId: string) => {
     try {
