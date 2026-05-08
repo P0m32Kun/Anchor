@@ -242,8 +242,6 @@ func appendRateLimitArgs(args []string, tool string, rate int) []string {
 		return append(args, "-rate-limit", fmt.Sprintf("%d", rate))
 	case "dnsx":
 		return append(args, "-rl", fmt.Sprintf("%d", rate))
-	case "nerva":
-		return append(args, "-R", fmt.Sprintf("%d", rate))
 	default:
 		return args
 	}
