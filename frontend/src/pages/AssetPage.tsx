@@ -464,70 +464,117 @@ export default function AssetPage() {
       )}
 
       {activeTab === "ports" && (
-        <div className="space-y-4">
-          <section className="panel p-4">
-            <h3 className="font-semibold mb-2 text-sm text-text-tertiary">选择 IP 资产查看端口</h3>
-            <div className="flex flex-wrap gap-2">
-              {assets.filter((a) => a.type === "ip").map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => {
-                    setSelectedAsset(a.id);
-                    loadPorts(a.id);
-                  }}
-                  className={`px-3 py-1 rounded text-sm border ${
-                    selectedAsset === a.id
-                      ? "filter-pill-active"
-                      : "filter-pill"
-                  }`}
-                >
-                  {a.value}
-                </button>
-              ))}
-            </div>
-          </section>
+        <section className="panel p-4 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              placeholder="搜索 IP / 端口 / 服务..."
+              value={filterPort}
+              onChange={(e) => setFilterPort(e.target.value)}
+              className="input-dark w-56 !py-1.5"
+            />
+            <button
+              onClick={() => { setFilterPort(""); setPortPage(1); }}
+              className="text-text-quaternary text-sm hover:text-text-secondary px-2"
+            >
+              清除
+            </button>
+            <span className="text-text-quaternary text-xs ml-auto">
+              共 {filteredPortRows.length} 个端口
+              {filteredPortRows.length > PORT_PAGE_SIZE && (
+                <span className="ml-2">第 {portPage} / {totalPortPages} 页</span>
+              )}
+            </span>
+          </div>
 
-          {selectedAsset && ports[selectedAsset] && (
-            <section className="panel p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold">端口</h3>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="筛选端口..."
-                    value={filterPort}
-                    onChange={(e) => setFilterPort(e.target.value)}
-                    className="input-dark w-32 !py-1"
-                  />
+          {portsAllLoading ? (
+            <SkeletonList count={5} />
+          ) : portRows.length === 0 ? (
+            <EmptyState
+              title="暂无端口数据"
+              description="当前项目还没有发现任何端口，点击右上角「资产发现」开始扫描。"
+            />
+          ) : (
+            <>
+              <Table
+                columns={[
+                  { key: "ip", header: "IP 地址", width: "160px" },
+                  {
+                    key: "port",
+                    header: "端口",
+                    width: "80px",
+                    render: (row) => (
+                      <span className="font-mono font-semibold text-brand-primary">
+                        {String(row.port)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "state",
+                    header: "状态",
+                    width: "90px",
+                    render: (row) => {
+                      const state = String(row.state).toLowerCase();
+                      const color =
+                        state === "open"
+                          ? "bg-brand-success/15 text-brand-success"
+                          : state === "filtered"
+                          ? "bg-accent-yellow/15 text-accent-yellow"
+                          : "bg-white/[0.04] text-text-quaternary";
+                      return (
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>
+                          {String(row.state)}
+                        </span>
+                      );
+                    },
+                  },
+                  { key: "protocol", header: "协议", width: "70px" },
+                  {
+                    key: "serviceName",
+                    header: "服务",
+                    width: "140px",
+                    render: (row) => (
+                      <span className="font-medium text-accent-teal">{String(row.serviceName)}</span>
+                    ),
+                  },
+                  {
+                    key: "sourceTool",
+                    header: "来源工具",
+                    width: "120px",
+                    render: (row) => (
+                      <span className="text-text-quaternary text-xs">{String(row.sourceTool)}</span>
+                    ),
+                  },
+                ]}
+                data={paginatedPortRows as unknown as Record<string, unknown>[]}
+                emptyText="暂无匹配的端口"
+                maxHeight={480}
+              />
+
+              {totalPortPages > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-2">
                   <button
-                    onClick={() => setFilterPort("")}
-                    className="text-text-quaternary text-sm hover:text-text-secondary px-2"
+                    onClick={() => setPortPage((p) => Math.max(1, p - 1))}
+                    disabled={portPage <= 1}
+                    className="px-3 py-1 rounded text-sm border border-white/[0.08] text-text-secondary hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition"
                   >
-                    清除
+                    上一页
+                  </button>
+                  <span className="text-text-quaternary text-sm">
+                    {portPage} / {totalPortPages}
+                  </span>
+                  <button
+                    onClick={() => setPortPage((p) => Math.min(totalPortPages, p + 1))}
+                    disabled={portPage >= totalPortPages}
+                    className="px-3 py-1 rounded text-sm border border-white/[0.08] text-text-secondary hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  >
+                    下一页
                   </button>
                 </div>
-              </div>
-              <p className="text-text-quaternary text-xs mb-2">共 {filteredPorts.length} 个端口</p>
-              {filteredPorts.length > 0 ? (
-                <div className="grid grid-cols-4 gap-2">
-                  {filteredPorts.map((p) => (
-                    <div
-                      key={p.id}
-                      className="surface-item p-2 text-center text-sm"
-                    >
-                      <div className="font-mono font-semibold text-lg">{p.port}</div>
-                      <div className="text-text-quaternary text-xs">
-                        {p.protocol} / {p.state}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="暂无端口数据" description="当前 IP 资产还没有扫描到任何开放端口" />
               )}
-            </section>
+            </>
           )}
-        </div>
+        </section>
       )}
     </div>
   );
