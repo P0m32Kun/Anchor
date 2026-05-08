@@ -18,7 +18,6 @@ import {
   Badge
 } from "../components";
 import { Plus, Trash2, Folder, ExternalLink, Calendar, Users, Target } from "lucide-react";
-import { cn } from "../lib/utils";
 
 export default function ProjectPage() {
   const navigate = useNavigate();
