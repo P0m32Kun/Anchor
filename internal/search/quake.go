@@ -10,9 +10,9 @@ import (
 
 // QuakeClient is a client for the 360 Quake API.
 type QuakeClient struct {
+	baseClient
 	apiKey  string
 	baseURL string
-	client  *http.Client
 }
 
 // QuakeResult represents a single result from Quake.
