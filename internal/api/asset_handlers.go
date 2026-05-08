@@ -144,7 +144,7 @@ func (s *Server) handleListServicePorts(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// 2. Get service fingerprints (nerva results)
+	// 2. Get service fingerprints (nmap -sV results)
 	fingerprints, err := s.queries.ListServiceFingerprintsByProject(projectID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list fingerprints: %v", err))
