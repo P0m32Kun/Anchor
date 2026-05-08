@@ -280,7 +280,7 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 	return nil
 }
 
-// runIPFlow: CDN → Naabu → nerva → split → httpx → Nuclei.
+// runIPFlow: CDN → Naabu → nmap -sV → split → httpx → Nuclei.
 func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) error {
 	p.setStage(StageCDNFilter)
 
