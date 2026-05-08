@@ -389,6 +389,43 @@ Anchor/
 
 ---
 
+---
+
+## 阶段 6：上帝文件清理与重复消除 ✅ 已完成（2026-05-08）
+
+**目标**：消除项目中过度复杂的设计、重复逻辑和代码异味，防止项目变成屎山。
+
+**结果**：11 项清理全部完成，编译零错误，测试全绿。
+
+### 后端清理
+
+| 项 | 修改 | 代码变化 |
+|---|---|---|
+| parser 泛型提取 | `parseJSONLines[T]` + 5 个解析器重构 | -114 行 |
+| API 错误处理抽象 | `handleServiceError` helper | -77 行，11 处重复消除 |
+| asset handler 性能 | `ListPortsByProject` + `sort.Slice` | N+1 消除，O(n²)→O(n log n) |
+| 搜索引擎 HTTP 抽象 | `baseClient.doJSON()` | 3 个引擎共享 |
+| models.go 拆分 | 14 个 domain 文件 | 957 行 → 删除 |
+| queries.go 拆分 | 10 个 domain 文件 | 2065 行 → 58 行 |
+| db.go 拆分 | 15 个 migration 文件（v1~v13） | 1182 行 → db.go 173 行 |
+| pipeline.go 拆分 | 5 个职责文件 | 1183 行 → pipeline.go 200 行 |
+
+### 前端清理
+
+| 项 | 修改 |
+|---|---|
+| useResource hook | 通用数据加载 hook，封装 AbortController + loading + error |
+| 4 个页面重构 | TargetPage/AssetPage/RunsPage/FindingsPage 使用 useResource |
+| 编译错误修复 | navigate 导入、Users 图标、15 个连带编译问题 |
+
+### 验证
+
+- `go build ./...` ✅ 零错误
+- `go test ./internal/...` ✅ 全绿
+- `npm run build` ✅ 通过
+
+---
+
 ## 风险控制
 
 1. **每个阶段独立提交** — 出问题可回滚
