@@ -798,6 +798,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		NaabuThreads:       100,
 		NaabuTimeout:       600,
 		EnableNerva:        true,
+		NervaFastMode:      true,
 		NervaRateLimit:     100,
 		NervaWorkers:       50,
 		NervaTimeout:       10,
