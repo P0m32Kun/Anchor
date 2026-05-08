@@ -3,8 +3,27 @@ import { useEffect, useState, useRef } from "react";
 import type React from "react";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { EmptyState, StatusBadge, SeverityBadge } from "../components";
+import { 
+  EmptyState, 
+  StatusBadge, 
+  SeverityBadge, 
+  Button, 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription,
+  CardContent 
+} from "../components";
 import type { DashboardStats } from "../lib/api";
+import { 
+  Plus, 
+  Upload, 
+  ArrowRight, 
+  Activity, 
+  CheckCircle2, 
+  AlertCircle, 
+  Users 
+} from "lucide-react";
 
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -66,75 +85,78 @@ export default function DashboardPage() {
   const projectPath = (suffix: string) => currentProject ? `/projects/${currentProject.id}/${suffix}` : "/projects";
 
   return (
-    <div className="page-shell space-y-6">
-      <div className="page-header">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
         <div>
-          <div className="page-eyebrow">Command Center</div>
-          <h1 className="page-title">安全测试工作台</h1>
-          <p className="page-subtitle">
-            统一查看跨项目风险、扫描状态和待审核发现，并按目标到报告的路径推进交付。
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">安全测试工作台</h1>
+          <p className="text-muted-foreground mt-1">
+            统一查看跨项目风险、扫描状态和待审核发现。
           </p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => navigate("/projects")} className="btn-cyber-primary">
+        <div className="flex gap-3">
+          <Button onClick={() => navigate("/projects")} variant="primary" className="h-10">
+            <Plus className="mr-2 h-4 w-4" />
             新建项目
-          </button>
-          <button onClick={() => navigate(projectPath("targets"))} className="btn-cyber-secondary">
+          </Button>
+          <Button onClick={() => navigate(projectPath("targets"))} variant="secondary" className="h-10">
+            <Upload className="mr-2 h-4 w-4" />
             导入目标
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard title="项目" value={stats?.total_projects ?? 0} loading={loading} />
-        <StatCard title="运行中扫描" value={stats?.active_runs ?? 0} loading={loading} active={(stats?.active_runs ?? 0) > 0} />
-        <StatCard title="待审核发现" value={stats?.pending_findings ?? 0} loading={loading} active={(stats?.pending_findings ?? 0) > 0} />
-        <StatCard title="在线 Worker" value={stats?.online_workers ?? 0} loading={loading} active={(stats?.online_workers ?? 0) > 0} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="项目" value={stats?.total_projects ?? 0} loading={loading} icon={FilesIcon} />
+        <StatCard title="运行中扫描" value={stats?.active_runs ?? 0} loading={loading} active={(stats?.active_runs ?? 0) > 0} icon={Activity} />
+        <StatCard title="待审核发现" value={stats?.pending_findings ?? 0} loading={loading} active={(stats?.pending_findings ?? 0) > 0} icon={AlertCircle} />
+        <StatCard title="在线 Worker" value={stats?.online_workers ?? 0} loading={loading} active={(stats?.online_workers ?? 0) > 0} icon={Users} />
       </div>
 
       {error && (
-        <div className="rounded-lg bg-brand-danger/10 border border-brand-danger/20 text-brand-danger text-sm p-3 flex items-center justify-between">
+        <div className="rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm p-4 flex items-center justify-between">
           <span>加载数据失败：{error}</span>
-          <button onClick={() => fetchDashboard()} className="underline hover:no-underline font-medium">
+          <Button variant="ghost" size="sm" onClick={() => fetchDashboard()} className="text-destructive hover:text-destructive hover:bg-destructive/10">
             重试
-          </button>
+          </Button>
         </div>
       )}
 
       {isEmpty ? (
-        <div className="panel p-8">
+        <Card className="p-12 text-center border-dashed">
           <EmptyState
             title="还没有项目"
             description="先创建项目，再导入目标、运行扫描、审核发现并导出报告。"
             actionLabel="创建项目"
             onAction={() => navigate("/projects")}
           />
-        </div>
+        </Card>
       ) : (
-        <div className="grid grid-cols-[1fr_360px] gap-6">
-          <div className="space-y-6">
-            <ActivityPanel
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
+          <div className="space-y-8">
+            <ActivitySection
               title="最近扫描活动"
               description="快速定位运行中、失败和刚完成的扫描"
-              actionLabel="查看扫描"
+              actionLabel="查看全部"
               onAction={() => navigate(projectPath("runs"))}
             >
               {!stats || !stats.recent_runs || stats.recent_runs.length === 0 ? (
-                <div className="py-8">
+                <div className="py-12 border rounded-xl border-dashed bg-muted/30">
                   <EmptyState title="暂无扫描活动" description="启动扫描后，这里会显示阶段状态和最近运行记录" />
                 </div>
               ) : (
-                <div className="divide-y divide-white/[0.06]">
+                <div className="space-y-3">
                   {stats.recent_runs.map((run) => (
                     <button
                       key={run.id}
                       onClick={() => navigate(projectPath("runs"))}
-                      className="flex w-full items-center justify-between gap-4 py-3 text-left hover:bg-white/[0.03]"
+                      className="group flex w-full items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:bg-accent/50 hover:shadow-md"
                     >
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-text-primary truncate">{run.name}</div>
-                        <div className="text-xs text-text-tertiary mt-1">
-                          {run.project_name} · {run.started_at ? formatRelativeTime(run.started_at) : "未开始"}
+                        <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{run.name}</div>
+                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                          <span className="font-medium">{run.project_name}</span>
+                          <span className="text-border">|</span>
+                          <span>{run.started_at ? formatRelativeTime(run.started_at) : "未开始"}</span>
                         </div>
                       </div>
                       <StatusBadge status={run.status} />
@@ -142,68 +164,81 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
-            </ActivityPanel>
+            </ActivitySection>
 
-            <ActivityPanel
+            <ActivitySection
               title="待审核发现"
               description="先确认真实风险，再进入报告交付"
               actionLabel="进入队列"
               onAction={() => navigate(projectPath("findings"))}
             >
               {!stats || !stats.recent_findings || stats.recent_findings.length === 0 ? (
-                <div className="py-8">
+                <div className="py-12 border rounded-xl border-dashed bg-muted/30">
                   <EmptyState title="暂无待处理发现" description="扫描产生的 Finding 会进入审核队列" />
                 </div>
               ) : (
-                <div className="divide-y divide-white/[0.06]">
+                <div className="space-y-3">
                   {stats.recent_findings.map((finding) => (
                     <button
                       key={finding.id}
                       onClick={() => navigate(projectPath("findings"))}
-                      className="flex w-full items-center justify-between gap-4 py-3 text-left hover:bg-white/[0.03]"
+                      className="group flex w-full items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:bg-accent/50 hover:shadow-md"
                     >
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-text-primary truncate">{finding.title}</div>
-                        <div className="text-xs text-text-tertiary mt-1">{finding.project_name}</div>
+                        <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{finding.title}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{finding.project_name}</div>
                       </div>
                       <SeverityBadge severity={finding.severity} className="shrink-0" />
                     </button>
                   ))}
                 </div>
               )}
-            </ActivityPanel>
+            </ActivitySection>
           </div>
 
-          <aside className="panel h-fit">
-            <div className="panel-header">
-              <div>
-                <h2 className="panel-title">推荐操作路径</h2>
-                <p className="text-xs text-text-tertiary mt-1">按安全测试交付流程组织，而不是按数据表组织</p>
-              </div>
-            </div>
-            <div className="panel-body space-y-3">
-              {[
-                ["1", "确认项目授权", "配置 Scope、时间窗口和速率限制", projectPath("targets")],
-                ["2", "导入并归一化目标", "批量导入域名、URL、IP 或 CIDR", projectPath("targets")],
-                ["3", "发现资产与服务", "沉淀 Web 端点、端口与技术栈", projectPath("assets")],
-                ["4", "运行扫描并观察阶段", "关注失败阶段和 Worker 状态", projectPath("runs")],
-                ["5", "审核 Finding 并交付报告", "确认、标误报、接受风险并导出", projectPath("findings")],
-              ].map(([step, title, desc, path]) => (
-                <button
-                  key={step}
-                  onClick={() => navigate(path)}
-                  className="surface-item flex w-full gap-3 p-3 text-left"
-                >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-primary/12 text-xs font-semibold text-brand-primary ring-1 ring-brand-primary/25">
-                    {step}
-                  </span>
-                  <span>
-                    <span className="block text-sm font-medium text-text-primary">{title}</span>
-                    <span className="mt-1 block text-xs text-text-tertiary">{desc}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
+          <aside className="space-y-6">
+            <Card className="overflow-hidden border-border bg-muted/30">
+              <CardHeader className="bg-card/50 border-b border-border/50">
+                <CardTitle className="text-sm">推荐操作路径</CardTitle>
+                <CardDescription className="text-xs">按安全测试交付流程推进</CardDescription>
+              </CardHeader>
+              <CardContent className="p-2 pt-2">
+                <div className="space-y-1">
+                  {[
+                    ["1", "确认项目授权", projectPath("targets")],
+                    ["2", "导入并归一化目标", projectPath("targets")],
+                    ["3", "发现资产与服务", projectPath("assets")],
+                    ["4", "运行扫描并观察阶段", projectPath("runs")],
+                    ["5", "审核 Finding 并交付", projectPath("findings")],
+                  ].map(([step, title, path]) => (
+                    <button
+                      key={step}
+                      onClick={() => navigate(path)}
+                      className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent group"
+                    >
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-bold text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                        {step}
+                      </span>
+                      <span className="flex-1 font-medium text-foreground/80 group-hover:text-foreground">{title}</span>
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-primary/5 border-primary/20">
+               <CardContent className="p-4 flex gap-3">
+                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                 </div>
+                 <div>
+                    <div className="text-sm font-semibold">自动化建议</div>
+                    <div className="text-xs text-muted-foreground mt-1">您有 3 个已完成的扫描可以导出报告了。</div>
+                    <Button variant="link" className="p-0 h-auto text-xs mt-2 text-primary">立即导出</Button>
+                 </div>
+               </CardContent>
+            </Card>
           </aside>
         </div>
       )}
@@ -211,7 +246,7 @@ export default function DashboardPage() {
   );
 }
 
-function ActivityPanel({
+function ActivitySection({
   title,
   description,
   actionLabel,
@@ -225,50 +260,75 @@ function ActivityPanel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="panel">
-      <div className="panel-header">
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="panel-title">{title}</h2>
-          <p className="text-xs text-text-tertiary mt-1">{description}</p>
+          <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        <button onClick={onAction} className="text-xs link-cyber">
+        <Button variant="ghost" size="sm" onClick={onAction} className="text-primary hover:text-primary hover:bg-primary/10">
           {actionLabel}
-        </button>
+          <ArrowRight className="ml-1 h-3.5 w-3.5" />
+        </Button>
       </div>
-      <div className="panel-body">{children}</div>
+      <div>{children}</div>
     </section>
   );
 }
 
-const STAT_COLOR_MAP: Record<string, { active: string; text: string }> = {
-  "项目":     { active: "border-brand-purple/35 bg-brand-purple/5",        text: "metric-value-purple" },
-  "运行中扫描": { active: "border-brand-primary/35 bg-brand-primary/5",      text: "metric-value" },
-  "待审核发现": { active: "border-brand-warning/35 bg-brand-warning/5",      text: "metric-value-warning" },
-  "在线 Worker": { active: "border-brand-success/35 bg-brand-success/5",    text: "metric-value-success" },
-};
+function FilesIcon(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M2 15h10" />
+      <path d="m9 18 3-3-3-3" />
+    </svg>
+  );
+}
 
 function StatCard({
   title,
   value,
   loading,
   active,
+  icon: Icon,
 }: {
   title: string;
   value: number;
   loading: boolean;
   active?: boolean;
+  icon: React.ElementType;
 }) {
-  const colors = STAT_COLOR_MAP[title] ?? { active: "border-brand-primary/35 bg-brand-primary/5", text: "metric-value" };
   return (
-    <div className={`metric-card ${active ? colors.active : ""}`}>
-      <div className="metric-label">{title}</div>
-      {loading && value === 0 ? (
-        <div className="h-8 bg-white/[0.06] rounded-lg animate-pulse w-16 mt-3" />
-      ) : (
-        <div className={`metric-value ${active ? colors.text : "!text-text-primary"}`}>
-          {value}
+    <Card className={cn("relative overflow-hidden", active && "border-primary/50")}>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between space-y-0 pb-2">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
-      )}
-    </div>
+        {loading && value === 0 ? (
+          <div className="h-9 w-16 animate-pulse rounded bg-muted" />
+        ) : (
+          <div className="text-2xl font-bold">{value}</div>
+        )}
+        {active && (
+          <div className="absolute top-0 right-0 h-1 w-full bg-primary/20">
+            <div className="h-full bg-primary animate-in slide-in-from-left duration-1000" style={{ width: '40%' }} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
