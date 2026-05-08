@@ -7,11 +7,10 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
   Badge
 } from "../components";
-import { Key, ShieldCheck, Eye, EyeOff, Save, Trash2, Database, AlertCircle } from "lucide-react";
+import { ShieldCheck, Save, Trash2, Database, AlertCircle } from "lucide-react";
 import { cn } from "../lib/utils";
 
 interface EngineForm {
@@ -37,7 +36,6 @@ function maskKey(key: string): string {
 
 export default function EngineKeysPage() {
   const toast = useToast();
-  const [loading, setLoading] = useState(true);
   const [forms, setForms] = useState<Record<string, EngineForm>>(() => {
     const init: Record<string, EngineForm> = {};
     for (const def of ENGINE_DEFS) {
@@ -74,8 +72,7 @@ export default function EngineKeysPage() {
       })
       .catch((err) => {
         toast("加载凭证失败: " + (err?.message || String(err)), "error");
-      })
-      .finally(() => setLoading(false));
+      });
     return () => { mounted = false; };
   }, [toast]);
 

@@ -733,6 +733,8 @@ export interface EngineCredential {
 export interface SearchResult {
   engine: string;
   ip: string;
+  url?: string;
+  host?: string;
   port?: number;
   domain?: string;
   title?: string;

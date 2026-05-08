@@ -9,7 +9,6 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
   Badge,
   Table,
@@ -19,7 +18,7 @@ import {
   TableHead,
   TableCell
 } from "../components";
-import { Search, Key, Globe, Database, ArrowRight, ExternalLink, Filter, Info, ShieldCheck } from "lucide-react";
+import { Search, Key, Globe, Database, Info } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const ENGINES = [

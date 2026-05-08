@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api, Finding, API_BASE, PAGE_ALL } from "../lib/api";
 import { getApiToken } from "../lib/config";
 import { renderMarkdown } from "../lib/markdown";
@@ -14,7 +14,6 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
   Badge
 } from "../components";
@@ -25,7 +24,6 @@ import {
   Eye, 
   FileJson, 
   FileCode, 
-  Layout, 
   CheckCircle2, 
   ShieldCheck,
   AlertTriangle,
@@ -33,7 +31,6 @@ import {
   ListOrdered,
   BookOpen,
   ArrowRight,
-  ExternalLink,
   X
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -97,12 +94,10 @@ const SEVERITY_META: Record<string, { label: string; icon: any; color: string; b
 
 export default function ReportsPage() {
   const projectId = useProjectId();
-  const navigate = useNavigate();
   const toast = useToast();
 
   const [findings, setFindings] = useState<FindingDetail[]>([]);
   const loading = useStore((state) => state.reportsLoading);
-  const error = useStore((state) => state.reportsError);
   const setReportsLoading = useStore((state) => state.setReportsLoading);
   const setReportsError = useStore((state) => state.setReportsError);
   const [previewText, setPreviewText] = useState<string | null>(null);
@@ -207,9 +202,6 @@ export default function ReportsPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  const confirmedCount = findings.filter((f) => f.finding.status === "confirmed").length;
-  const acceptedCount = findings.filter((f) => f.finding.status === "accepted_risk").length;
-
   const severityCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const fd of findings) {
@@ -227,9 +219,12 @@ export default function ReportsPage() {
           </div>
           <h2 className="text-xl font-bold">评估报告</h2>
           <p className="text-muted-foreground mt-1 mb-6">请先从左侧菜单或总览选择一个项目</p>
-          <Link to="/">
-              <Button variant="primary">前往总览</Button>
-          </Link>
+          <button
+              onClick={() => window.location.href = "/"}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+          >
+              前往总览
+          </button>
         </div>
       );
   }

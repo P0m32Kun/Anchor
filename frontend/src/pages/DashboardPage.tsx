@@ -11,8 +11,7 @@ import {
   Card, 
   CardHeader, 
   CardTitle, 
-  CardContent,
-  CardDescription
+  CardContent
 } from "../components";
 import type { DashboardStats } from "../lib/api";
 import { 
@@ -21,7 +20,6 @@ import {
   ArrowRight, 
   Activity, 
   CheckCircle2, 
-  AlertCircle, 
   Users,
   Target,
   ShieldCheck,
@@ -192,9 +190,9 @@ export default function DashboardPage() {
                     >
                       <span className={cn(
                           "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-black transition-all",
-                          `bg-${color}-500/10 text-${color}-400 group-hover:bg-${color}-500 group-hover:text-white`
+                          `bg-${color as string}-500/10 text-${color as string}-400 group-hover:bg-${color as string}-500 group-hover:text-white`
                       )}>
-                        {step as string}
+                        <IconComponent className="h-3 w-3" />
                       </span>
                       <span className="flex-1 font-bold text-foreground/70 group-hover:text-foreground transition-colors">{title as string}</span>
                       <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
