@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"bufio"
 	"encoding/csv"
 	"encoding/json"
 	"io"
