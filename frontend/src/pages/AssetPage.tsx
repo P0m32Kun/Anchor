@@ -45,6 +45,8 @@ export default function AssetPage() {
   const setWebEndpoints = useStore((state) => state.setWebEndpoints);
   const ports = useStore((state) => state.ports);
   const setPorts = useStore((state) => state.setPorts);
+  const services = useStore((state) => state.services);
+  const setServices = useStore((state) => state.setServices);
 
   const [activeTab, setActiveTab] = useState<"assets" | "web" | "ports">("assets");
   const loading = useStore((state) => state.assetsLoading);
@@ -53,6 +55,9 @@ export default function AssetPage() {
   const setAssetsError = useStore((state) => state.setAssetsError);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const toast = useToast();
+  const [portsAllLoading, setPortsAllLoading] = useState(false);
+  const [portPage, setPortPage] = useState(1);
+  const PORT_PAGE_SIZE = 20;
 
   const loadAssets = useCallback(async (signal?: AbortSignal) => {
     if (!projectId) return;
