@@ -18,16 +18,14 @@ import {
   Button,
   Input
 } from "../components";
-import { 
-  Box, 
-  Globe, 
-  Network, 
-  Search, 
-  Zap, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Box,
+  Globe,
+  Network,
+  Search,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
-  Filter,
   RefreshCcw,
   Layers,
   Terminal
