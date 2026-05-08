@@ -610,11 +610,8 @@ export interface PipelineConfig {
   naabu_rate: number;
   naabu_threads: number;
   naabu_timeout: number;
-  enable_nerva: boolean;
-  nerva_fast_mode: boolean;
-  nerva_rate_limit: number;
-  nerva_workers: number;
-  nerva_timeout: number;
+  enable_nmap_service: boolean;
+  nmap_service_timeout: number;
   enable_httpx: boolean;
   httpx_rate_limit: number;
   httpx_threads: number;
