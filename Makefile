@@ -1,7 +1,7 @@
 .PHONY: build clean
 .PHONY: up down up-server down-server up-worker down-worker restart-worker
 .PHONY: logs logs-server logs-worker status shell-server shell-worker
-.PHONY: build-worker-base push-worker-base pull-worker-base setup-worker-base
+.PHONY: build-worker-base build-worker-builder-base push-worker-base pull-worker-base setup-worker-base
 .PHONY: build-server-base push-server-base pull-server-base setup-server-base
 .PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-full
 .PHONY: range-up range-down range-status range-logs
