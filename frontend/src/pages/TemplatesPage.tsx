@@ -499,7 +499,10 @@ export default function TemplatesPage() {
                                           variant="ghost"
                                           size="sm"
                                           className="h-7 w-7 p-0"
-                                          onClick={() => openFileEditor(src.id, f.path)}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openFileEditor(src.id, f.path);
+                                          }}
                                         >
                                           <Edit3 className="h-3 w-3" />
                                         </Button>
