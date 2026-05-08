@@ -51,6 +51,7 @@ import WorkersPage from "./pages/WorkersPage";
 import SettingsPage from "./pages/SettingsPage";
 import EnginesPage from "./pages/EnginesPage";
 import EngineKeysPage from "./pages/EngineKeysPage";
+import TemplatesPage from "./pages/TemplatesPage";
 
 function LegacyRouteGuard() {
   const location = useLocation();
