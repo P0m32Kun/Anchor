@@ -11,7 +11,8 @@ import {
   Card, 
   CardHeader, 
   CardTitle, 
-  CardContent
+  CardContent,
+  CardDescription
 } from "../components";
 import type { DashboardStats } from "../lib/api";
 import { 
@@ -19,13 +20,15 @@ import {
   Upload, 
   ArrowRight, 
   Activity, 
-  CheckCircle2,
+  CheckCircle2, 
+  AlertCircle, 
   Users,
+  Target,
+  ShieldCheck,
   Zap,
   LayoutDashboard,
   Box,
-  Flame,
-  ChevronRight
+  Flame
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -74,7 +77,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-700">
-      {/* 顶部欢迎区 - 增加背景光晕 */}
+      {/* 顶部欢迎区 */}
       <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
         <div className="relative z-10">
           <div className="flex items-center gap-2 text-primary font-black uppercase tracking-[0.2em] text-[10px] mb-2">
@@ -101,90 +104,39 @@ export default function DashboardPage() {
         <div className="absolute -top-24 -left-20 h-64 w-64 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
       </div>
 
-      {/* 核心指标统计 - 赋予颜色活力 */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard 
-            title="总览项目" 
-            value={stats?.total_projects ?? 0} 
-            loading={loading} 
-            icon={Box} 
-            color="blue"
-            description="Active engagements"
-        />
-        <StatCard 
-            title="运行中扫描" 
-            value={stats?.active_runs ?? 0} 
-            loading={loading} 
-            active={(stats?.active_runs ?? 0) > 0} 
-            icon={Zap} 
-            color="emerald"
-            description="Real-time execution"
-        />
-        <StatCard 
-            title="待审核漏洞" 
-            value={stats?.pending_findings ?? 0} 
-            loading={loading} 
-            active={(stats?.pending_findings ?? 0) > 0} 
-            icon={Flame} 
-            color="rose"
-            description="Requires attention"
-        />
-        <StatCard 
-            title="在线节点" 
-            value={stats?.online_workers ?? 0} 
-            loading={loading} 
-            active={(stats?.online_workers ?? 0) > 0} 
-            icon={Users} 
-            color="indigo"
-            description="Processing power"
-        />
+        <StatCard title="总览项目" value={stats?.total_projects ?? 0} loading={loading} icon={Box} color="blue" description="Active engagements" />
+        <StatCard title="运行中扫描" value={stats?.active_runs ?? 0} loading={loading} active={(stats?.active_runs ?? 0) > 0} icon={Zap} color="emerald" description="Real-time execution" />
+        <StatCard title="待审核漏洞" value={stats?.pending_findings ?? 0} loading={loading} active={(stats?.pending_findings ?? 0) > 0} icon={Flame} color="rose" description="Requires attention" />
+        <StatCard title="在线节点" value={stats?.online_workers ?? 0} loading={loading} active={(stats?.online_workers ?? 0) > 0} icon={Users} color="indigo" description="Processing power" />
       </div>
 
       {isEmpty ? (
         <Card className="p-20 text-center border-dashed border-white/10 bg-white/[0.02]">
-          <EmptyState
-            title="初始化工作空间"
-            description="当前没有任何项目数据。请先创建一个新项目以开始安全测试生命周期。"
-            actionLabel="创建第一个项目"
-            onAction={() => navigate("/projects")}
-          />
+          <EmptyState title="初始化工作空间" description="当前没有任何项目数据。请先创建一个新项目以开始安全测试生命周期。" actionLabel="创建第一个项目" onAction={() => navigate("/projects")} />
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10">
           <div className="space-y-10">
-            <ActivitySection
-              title="最近扫描活动"
-              description="流水线执行进度与实时状态反馈"
-              actionLabel="查看历史"
-              onAction={() => navigate(projectPath("runs"))}
-            >
+            <ActivitySection title="最近扫描活动" description="流水线执行进度与实时状态反馈" actionLabel="查看历史" onAction={() => navigate(projectPath("runs"))}>
               {!stats || !stats.recent_runs || stats.recent_runs.length === 0 ? (
                 <div className="py-16 border rounded-2xl border-dashed border-white/10 bg-white/[0.01] flex flex-col items-center justify-center text-center">
                    <Activity className="h-8 w-8 text-muted-foreground/30 mb-4" />
-                   <p className="text-sm text-muted-foreground font-medium text-balance max-w-xs">暂无活跃的扫描流水线，启动后将在此处实时同步状态。</p>
+                   <p className="text-sm text-muted-foreground font-medium">暂无活跃的扫描流水线。</p>
                 </div>
               ) : (
                 <div className="grid gap-3">
                   {stats.recent_runs.map((run) => (
-                    <Card
-                      key={run.id}
-                      hover
-                      onClick={() => navigate(projectPath("runs"))}
-                      className="group p-1 overflow-hidden"
-                    >
+                    <Card key={run.id} hover onClick={() => navigate(projectPath("runs"))} className="group p-1 overflow-hidden">
                       <div className="flex items-center justify-between p-4 bg-transparent">
                         <div className="flex items-center gap-4 min-w-0">
-                           <div className={cn(
-                               "h-10 w-10 rounded-xl flex items-center justify-center border transition-all",
-                               run.status === 'running' ? 'bg-primary/20 border-primary/30 text-primary animate-pulse' : 'bg-white/5 border-white/5 text-muted-foreground'
-                           )}>
+                           <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center border transition-all", run.status === 'running' ? 'bg-primary/20 border-primary/30 text-primary animate-pulse' : 'bg-white/5 border-white/5 text-muted-foreground')}>
                                <Activity className="h-5 w-5" />
                            </div>
                            <div className="min-w-0">
                              <div className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">{run.name}</div>
                              <div className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-2 font-medium">
                                <span className="px-1.5 py-0.5 rounded bg-white/5 uppercase text-[9px] tracking-wider">{run.project_name}</span>
-                               <span className="opacity-30">•</span>
                                <span>{run.started_at ? formatRelativeTime(run.started_at) : "未开始"}</span>
                              </div>
                            </div>
@@ -197,26 +149,16 @@ export default function DashboardPage() {
               )}
             </ActivitySection>
 
-            <ActivitySection
-              title="待处理 Finding"
-              description="新发现的高置信度漏洞风险审核"
-              actionLabel="进入审核队列"
-              onAction={() => navigate(projectPath("findings"))}
-            >
+            <ActivitySection title="待处理 Finding" description="新发现的高置信度漏洞风险审核" actionLabel="进入审核队列" onAction={() => navigate(projectPath("findings"))}>
               {!stats || !stats.recent_findings || stats.recent_findings.length === 0 ? (
                 <div className="py-16 border rounded-2xl border-dashed border-white/10 bg-white/[0.01] flex flex-col items-center justify-center text-center">
                    <CheckCircle2 className="h-8 w-8 text-emerald-500/30 mb-4" />
-                   <p className="text-sm text-muted-foreground font-medium text-balance max-w-xs">当前没有需要审核的新漏洞发现。所有风险已处理。</p>
+                   <p className="text-sm text-muted-foreground font-medium">当前没有需要审核的新漏洞发现。</p>
                 </div>
               ) : (
                 <div className="grid gap-3">
                   {stats.recent_findings.map((finding) => (
-                    <Card
-                      key={finding.id}
-                      hover
-                      onClick={() => navigate(projectPath("findings"))}
-                      className="group p-4 flex items-center justify-between gap-4"
-                    >
+                    <Card key={finding.id} hover onClick={() => navigate(projectPath("findings"))} className="group p-4 flex items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">{finding.title}</div>
                         <div className="text-[11px] text-muted-foreground mt-1.5 font-medium">{finding.project_name}</div>
@@ -237,14 +179,14 @@ export default function DashboardPage() {
               <CardContent className="p-2 pt-4">
                 <div className="space-y-1 px-2">
                   {[
-                    ["1", "项目授权", projectPath("targets"), "emerald"],
-                    ["2", "目标导入", projectPath("targets"), "cyan"],
-                    ["3", "资产枚举", projectPath("assets"), "blue"],
-                    ["4", "启动扫描", projectPath("runs"), "indigo"],
-                    ["5", "结果审计", projectPath("findings"), "rose"],
-                  ].map(([step, title, path, color]) => (
+                    ["1", "项目授权", projectPath("targets"), "emerald", Target],
+                    ["2", "目标导入", projectPath("targets"), "cyan", Upload],
+                    ["3", "资产枚举", projectPath("assets"), "blue", Box],
+                    ["4", "启动扫描", projectPath("runs"), "indigo", Zap],
+                    ["5", "结果审计", projectPath("findings"), "rose", ShieldCheck],
+                  ].map(([step, title, path, color, IconComponent]) => (
                     <button
-                      key={step}
+                      key={step as string}
                       onClick={() => navigate(path as string)}
                       className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-sm transition-all hover:bg-white/5 group"
                     >
@@ -252,10 +194,10 @@ export default function DashboardPage() {
                           "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-black transition-all",
                           `bg-${color}-500/10 text-${color}-400 group-hover:bg-${color}-500 group-hover:text-white`
                       )}>
-                        {step}
+                        {step as string}
                       </span>
                       <span className="flex-1 font-bold text-foreground/70 group-hover:text-foreground transition-colors">{title as string}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                      <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
                     </button>
                   ))}
                 </div>
@@ -270,9 +212,7 @@ export default function DashboardPage() {
                  </div>
                  <div>
                     <div className="text-lg font-bold tracking-tight">自动化建议</div>
-                    <div className="text-sm font-medium text-muted-foreground mt-2 leading-relaxed">
-                        您有 <span className="text-foreground font-black">3</span> 个已完成的扫描可以导出报告了。系统已为您自动排版。
-                    </div>
+                    <div className="text-sm font-medium text-muted-foreground mt-2 leading-relaxed">系统已为您自动排版最新的安全测试报告。</div>
                     <Button variant="primary" size="sm" className="mt-5 h-10 px-5 rounded-xl font-bold">
                         立即生成
                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -287,19 +227,7 @@ export default function DashboardPage() {
   );
 }
 
-function ActivitySection({
-  title,
-  description,
-  actionLabel,
-  onAction,
-  children,
-}: {
-  title: string;
-  description: string;
-  actionLabel: string;
-  onAction: () => void;
-  children: React.ReactNode;
-}) {
+function ActivitySection({ title, description, actionLabel, onAction, children }: { title: string; description: string; actionLabel: string; onAction: () => void; children: React.ReactNode }) {
   return (
     <section className="space-y-6">
       <div className="flex items-end justify-between px-1">
@@ -317,23 +245,7 @@ function ActivitySection({
   );
 }
 
-function StatCard({
-  title,
-  value,
-  loading,
-  active,
-  icon: Icon,
-  color = "blue",
-  description
-}: {
-  title: string;
-  value: number;
-  loading: boolean;
-  active?: boolean;
-  icon: React.ElementType;
-  color?: "blue" | "emerald" | "rose" | "indigo" | "amber";
-  description?: string;
-}) {
+function StatCard({ title, value, loading, active, icon: Icon, color = "blue", description }: { title: string; value: number; loading: boolean; active?: boolean; icon: React.ElementType; color?: "blue" | "emerald" | "rose" | "indigo" | "amber"; description?: string }) {
   const colorMap = {
     blue: "text-blue-400 bg-blue-500/10 border-blue-500/20",
     emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
@@ -341,40 +253,20 @@ function StatCard({
     indigo: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
     amber: "text-amber-400 bg-amber-500/10 border-amber-500/20",
   };
-
   return (
-    <Card className={cn(
-        "relative overflow-hidden group transition-all duration-500 border-white/[0.03]", 
-        active && "border-white/10 shadow-2xl shadow-black/20"
-    )}>
+    <Card className={cn("relative overflow-hidden group transition-all duration-500 border-white/[0.03]", active && "border-white/10 shadow-2xl shadow-black/20")}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{title}</p>
-            {loading && value === 0 ? (
-                <div className="h-10 w-20 animate-pulse rounded-lg bg-white/5 mt-2" />
-            ) : (
-                <div className="text-4xl font-black tracking-tighter tabular-nums mt-1">{value}</div>
-            )}
+            {loading && value === 0 ? <div className="h-10 w-20 animate-pulse rounded-lg bg-white/5 mt-2" /> : <div className="text-4xl font-black tracking-tighter tabular-nums mt-1">{value}</div>}
             <p className="text-[11px] font-medium text-muted-foreground/50 mt-1">{description}</p>
           </div>
           <div className={cn("p-3 rounded-2xl border transition-all duration-500 group-hover:scale-110", colorMap[color])}>
             <Icon className="h-5 w-5" strokeWidth={2.5} />
           </div>
         </div>
-        
-        {active && (
-          <div className="absolute bottom-0 left-0 h-1 w-full bg-white/5 overflow-hidden">
-            <div 
-                className={cn("h-full animate-pulse", 
-                    color === 'blue' ? 'bg-blue-500' : 
-                    color === 'emerald' ? 'bg-emerald-500' : 
-                    color === 'rose' ? 'bg-rose-500' : 'bg-primary'
-                )} 
-                style={{ width: '100%' }} 
-            />
-          </div>
-        )}
+        {active && <div className="absolute bottom-0 left-0 h-1 w-full bg-white/5 overflow-hidden"><div className={cn("h-full animate-pulse", color === 'blue' ? 'bg-blue-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'rose' ? 'bg-rose-500' : 'bg-primary')} style={{ width: '100%' }} /></div>}
       </CardContent>
     </Card>
   );

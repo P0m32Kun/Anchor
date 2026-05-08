@@ -25,7 +25,7 @@ import {
   Network,
   Search,
   ChevronLeft,
-  ChevronRight,
+  ArrowRight,
   ExternalLink,
   RefreshCcw,
   Layers,
@@ -432,7 +432,7 @@ export default function AssetPage() {
                         </Button>
                         <span>{portPage} / {totalPortPages}</span>
                         <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setPortPage(p => Math.min(totalPortPages, p+1))} disabled={portPage >= totalPortPages}>
-                            <ChevronRight className="h-4 w-4" />
+                            <ArrowRight className="h-4 w-4" />
                         </Button>
                     </div>
                 )}

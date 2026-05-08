@@ -24,7 +24,7 @@ import type { Finding, Evidence } from "../lib/api";
 import {
   Search,
   AlertCircle,
-  ChevronRight,
+  ArrowRight,
   FileText,
   Clock,
   History,
@@ -323,7 +323,7 @@ export default function FindingsPage() {
                                         ))}
                                     </Select>
                                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all">
-                                        <ChevronRight className="h-4 w-4" />
+                                        <ArrowRight className="h-4 w-4" />
                                     </Button>
                                 </div>
                             </CardContent>

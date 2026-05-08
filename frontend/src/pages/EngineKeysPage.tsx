@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { useToast, Button, Input } from "../components";
+import { 
+  useToast, 
+  Button, 
+  Input,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Badge
+} from "../components";
+import { Key, ShieldCheck, Eye, EyeOff, Save, Trash2, Database, AlertCircle } from "lucide-react";
+import { cn } from "../lib/utils";
 
 interface EngineForm {
   engine: string;
@@ -12,9 +24,9 @@ interface EngineForm {
 }
 
 const ENGINE_DEFS = [
-  { key: "fofa", label: "FOFA" },
-  { key: "hunter", label: "Hunter" },
-  { key: "quake", label: "Quake" },
+  { key: "fofa", label: "FOFA", color: "from-blue-500/20 to-blue-600/5", icon: Database },
+  { key: "hunter", label: "Hunter", color: "from-cyan-500/20 to-cyan-600/5", icon: Database },
+  { key: "quake", label: "Quake", color: "from-indigo-500/20 to-indigo-600/5", icon: Database },
 ];
 
 function maskKey(key: string): string {
@@ -43,18 +55,19 @@ export default function EngineKeysPage() {
 
   useEffect(() => {
     let mounted = true;
-    api
-      .listEngineCredentials()
+    api.listEngineCredentials()
       .then((creds) => {
         if (!mounted) return;
         setForms((prev) => {
           const next = { ...prev };
           for (const c of creds) {
-            next[c.engine] = {
-              ...next[c.engine],
-              apiKey: maskKey(c.api_key),
-              exists: true,
-            };
+            if (next[c.engine]) {
+                next[c.engine] = {
+                ...next[c.engine],
+                apiKey: maskKey(c.api_key),
+                exists: true,
+                };
+            }
           }
           return next;
         });
@@ -63,9 +76,7 @@ export default function EngineKeysPage() {
         toast("加载凭证失败: " + (err?.message || String(err)), "error");
       })
       .finally(() => setLoading(false));
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [toast]);
 
   function updateForm(engine: string, patch: Partial<EngineForm>) {
@@ -81,7 +92,6 @@ export default function EngineKeysPage() {
       toast("API Key 不能为空", "warning");
       return;
     }
-    // If user hasn't changed the masked key, skip
     if (form.exists && form.apiKey.includes("****")) {
       toast("API Key 未修改", "warning");
       return;
@@ -89,15 +99,8 @@ export default function EngineKeysPage() {
 
     updateForm(engine, { saving: true });
     try {
-      await api.saveEngineCredential({
-        engine,
-        api_key: form.apiKey.trim(),
-      });
-      updateForm(engine, {
-        exists: true,
-        apiKey: maskKey(form.apiKey.trim()),
-        showKey: false,
-      });
+      await api.saveEngineCredential({ engine, api_key: form.apiKey.trim() });
+      updateForm(engine, { exists: true, apiKey: maskKey(form.apiKey.trim()), showKey: false });
       toast("保存成功", "success");
     } catch (err: any) {
       toast("保存失败: " + (err?.message || String(err)), "error");
@@ -112,17 +115,11 @@ export default function EngineKeysPage() {
       updateForm(engine, { apiKey: "" });
       return;
     }
-    if (!window.confirm(`确认删除 ${ENGINE_DEFS.find((d) => d.key === engine)?.label} 的 API Key？`)) {
-      return;
-    }
+    if (!window.confirm(`确认删除 ${ENGINE_DEFS.find((d) => d.key === engine)?.label} 的 API Key？`)) return;
     updateForm(engine, { deleting: true });
     try {
       await api.deleteEngineCredential(engine);
-      updateForm(engine, {
-        apiKey: "",
-        exists: false,
-        showKey: false,
-      });
+      updateForm(engine, { apiKey: "", exists: false, showKey: false });
       toast("删除成功", "success");
     } catch (err: any) {
       toast("删除失败: " + (err?.message || String(err)), "error");
@@ -131,91 +128,103 @@ export default function EngineKeysPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="page-shell space-y-6">
-        <div className="page-header">
-          <div>
-          <div className="page-eyebrow">Discovery</div>
-          <h1 className="page-title">API Key 配置</h1>
-          <p className="page-subtitle">管理搜索引擎平台的 API 凭证</p>
-          </div>
-        </div>
-        <div className="panel p-5 animate-pulse">
-          <div className="h-4 w-32 bg-white/[0.06] rounded mb-4" />
-          <div className="h-10 bg-white/[0.06] rounded" />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="page-shell space-y-6">
-      <div className="page-header">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
         <div>
-        <div className="page-eyebrow">Discovery</div>
-        <h1 className="page-title">API Key 配置</h1>
-        <p className="page-subtitle">管理搜索引擎平台的 API 凭证</p>
+          <h1 className="text-3xl font-black tracking-tight text-foreground">API 凭证管理</h1>
+          <p className="text-muted-foreground mt-1">配置空间测绘引擎的访问密钥，这些密钥将安全地存储在后端。</p>
         </div>
       </div>
 
-      <div className="grid gap-5 grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3">
         {ENGINE_DEFS.map((def) => {
           const form = forms[def.key];
           return (
-            <div key={def.key} className="panel p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-text-primary">{def.label}</h3>
-                {form.exists && (
-                  <span className="text-[10px] font-medium text-brand-success bg-brand-success/10 ring-1 ring-brand-success/20 rounded-full px-2 py-0.5">
-                    已配置
-                  </span>
-                )}
-              </div>
+            <Card key={def.key} className={cn("relative overflow-hidden group border-white/[0.03]", form.exists && "border-emerald-500/20")}>
+              <div className={cn("absolute top-0 left-0 w-full h-1 bg-gradient-to-r", def.color)} />
+              
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/5">
+                        <def.icon className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <CardTitle className="text-xl">{def.label}</CardTitle>
+                   </div>
+                   {form.exists ? (
+                     <Badge variant="success" dot>Active</Badge>
+                   ) : (
+                     <Badge variant="secondary">Missing</Badge>
+                   )}
+                </div>
+              </CardHeader>
 
-              <div className="space-y-3">
-                <div className="flex gap-2 items-start">
-                  <div className="flex-1 space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">API Key</label>
-                    <Input
-                      type={form.showKey ? "text" : "password"}
-                      placeholder="请输入 API Key"
-                      value={form.apiKey}
-                      onChange={(e) => updateForm(def.key, { apiKey: e.target.value })}
-                      className="w-full"
-                    />
-                  </div>
-                  <button
-                    onClick={() => updateForm(def.key, { showKey: !form.showKey })}
-                    className="shrink-0 rounded-lg border border-white/[0.10] bg-white/[0.03] px-3 py-2 text-xs text-text-tertiary hover:bg-white/[0.06] transition-colors mt-7"
-                    title={form.showKey ? "隐藏" : "显示"}
-                  >
-                    {form.showKey ? "隐藏" : "显示"}
-                  </button>
+              <CardContent className="space-y-5">
+                <div className="space-y-2">
+                   <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Provider API Key</label>
+                      <button 
+                        onClick={() => updateForm(def.key, { showKey: !form.showKey })}
+                        className="text-[10px] font-bold text-primary hover:underline"
+                      >
+                        {form.showKey ? "HIDE" : "SHOW"}
+                      </button>
+                   </div>
+                   <div className="relative">
+                      <Input
+                        type={form.showKey ? "text" : "password"}
+                        placeholder="Paste your key here..."
+                        value={form.apiKey}
+                        onChange={(e) => updateForm(def.key, { apiKey: e.target.value })}
+                        className="font-mono bg-white/5 border-white/5 h-10 pr-10 focus-visible:ring-primary/30"
+                      />
+                      <div className="absolute right-3 top-2.5">
+                         {form.exists ? <ShieldCheck className="h-4 w-4 text-emerald-500" /> : <AlertCircle className="h-4 w-4 text-amber-500" />}
+                      </div>
+                   </div>
                 </div>
 
                 <div className="flex gap-2 pt-2">
                   <Button
                     onClick={() => handleSave(def.key)}
                     disabled={form.saving}
-                    className="flex-1"
+                    variant={form.exists ? "secondary" : "primary"}
+                    className="flex-1 h-10 font-bold"
                   >
-                    {form.saving ? "保存中..." : "保存"}
+                    <Save className="mr-2 h-4 w-4" />
+                    {form.saving ? "Saving..." : form.exists ? "Update" : "Save Key"}
                   </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleDelete(def.key)}
-                    disabled={form.deleting}
-                    className="flex-1"
-                  >
-                    {form.deleting ? "删除中..." : "删除"}
-                  </Button>
+                  {form.exists && (
+                    <Button
+                        variant="ghost"
+                        onClick={() => handleDelete(def.key)}
+                        disabled={form.deleting}
+                        className="w-10 h-10 p-0 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           );
         })}
       </div>
+
+      <Card className="bg-amber-500/5 border-amber-500/20">
+         <CardContent className="p-6 flex items-start gap-4">
+            <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                <AlertCircle className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+                <h4 className="text-sm font-bold text-amber-500">安全声明</h4>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    所有 API Key 均会通过加密通道传输并存储在您的私有数据库中。系统不会将这些密钥发送至任何第三方（搜索引擎官方 API 除外）。请确保您的环境授权合规。
+                </p>
+            </div>
+         </CardContent>
+      </Card>
     </div>
   );
 }

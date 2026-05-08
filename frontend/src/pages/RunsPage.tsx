@@ -31,7 +31,7 @@ import {
   History,
   Zap,
   Loader2,
-  ChevronRight
+  ArrowRight
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -344,7 +344,7 @@ export default function RunsPage() {
                                         <XCircle className="h-4 w-4" />
                                     </Button>
                                 )}
-                                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 transition-all" />
+                                <ArrowRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 transition-all" />
                             </div>
                         </CardContent>
                     </Card>

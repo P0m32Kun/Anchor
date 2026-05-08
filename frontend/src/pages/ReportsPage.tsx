@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, Finding, API_BASE, PAGE_ALL } from "../lib/api";
 import { getApiToken } from "../lib/config";
 import { renderMarkdown } from "../lib/markdown";
-import {
-  Button,
-  SeverityBadge,
-  StatusBadge,
-  EmptyState,
-  SkeletonList,
-  useProjectId,
+import { 
+  Button, 
+  SeverityBadge, 
+  StatusBadge, 
+  EmptyState, 
+  SkeletonList, 
+  useProjectId, 
   useToast,
   Card,
   CardHeader,
@@ -19,20 +19,21 @@ import {
   Badge
 } from "../components";
 import { useStore } from "../lib/store";
-import {
-  FileText,
-  Download,
-  Eye,
-  FileJson,
-  FileCode,
-  ChevronRight,
-  ArrowRight,
-  CheckCircle2,
+import { 
+  FileText, 
+  Download, 
+  Eye, 
+  FileJson, 
+  FileCode, 
+  Layout, 
+  CheckCircle2, 
   ShieldCheck,
   AlertTriangle,
   Info,
   ListOrdered,
   BookOpen,
+  ArrowRight,
+  ExternalLink,
   X
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -96,10 +97,12 @@ const SEVERITY_META: Record<string, { label: string; icon: any; color: string; b
 
 export default function ReportsPage() {
   const projectId = useProjectId();
+  const navigate = useNavigate();
   const toast = useToast();
 
   const [findings, setFindings] = useState<FindingDetail[]>([]);
   const loading = useStore((state) => state.reportsLoading);
+  const error = useStore((state) => state.reportsError);
   const setReportsLoading = useStore((state) => state.setReportsLoading);
   const setReportsError = useStore((state) => state.setReportsError);
   const [previewText, setPreviewText] = useState<string | null>(null);
@@ -204,6 +207,9 @@ export default function ReportsPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  const confirmedCount = findings.filter((f) => f.finding.status === "confirmed").length;
+  const acceptedCount = findings.filter((f) => f.finding.status === "accepted_risk").length;
+
   const severityCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const fd of findings) {
@@ -242,7 +248,7 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={handlePreviewMarkdown} disabled={loading || showPreview}>
+            <Button variant="outline" size="sm" onClick={handlePreviewMarkdown} disabled={loading || showPreview}>
                 <Eye className="mr-2 h-4 w-4" />
                 预览 Markdown
             </Button>
@@ -360,7 +366,7 @@ export default function ReportsPage() {
                                     fd.finding.severity === 'medium' ? 'bg-amber-500' : 'bg-muted-foreground'
                                 )} />
                                 <span className="text-xs text-muted-foreground group-hover:text-foreground truncate flex-1">{fd.finding.title}</span>
-                                <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
+                                <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
                             </button>
                         ))}
                         {findings.length === 0 && (
@@ -378,14 +384,14 @@ export default function ReportsPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                    <Button variant="secondary" className="w-full justify-between group" onClick={() => handleExport("md")} loading={exporting === 'md'}>
+                    <Button variant="outline" className="w-full justify-between group" onClick={() => handleExport("md")} loading={exporting === 'md'}>
                         <div className="flex items-center">
                             <FileCode className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary" />
                             <span>Markdown (.md)</span>
                         </div>
                         <ArrowRight className="h-3 w-3 opacity-50 group-hover:translate-x-1 transition-transform" />
                     </Button>
-                    <Button variant="secondary" className="w-full justify-between group" onClick={() => handleExport("json")} loading={exporting === 'json'}>
+                    <Button variant="outline" className="w-full justify-between group" onClick={() => handleExport("json")} loading={exporting === 'json'}>
                         <div className="flex items-center">
                             <FileJson className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary" />
                             <span>JSON Data (.json)</span>
