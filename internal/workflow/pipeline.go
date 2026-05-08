@@ -1089,6 +1089,8 @@ func (p *Pipeline) createAndRunTask(ctx context.Context, tool string, args []str
 	// Run task synchronously via worker
 	if err := p.runner.Run(ctx, task.ID); err != nil {
 		log.Printf("[pipeline] task %s (%s) run error: %v", task.ID, tool, err)
+		stdout, _ := p.readTaskStdout(task.ID)
+		return task, stdout, err
 	}
 
 	// Read stdout artifact
