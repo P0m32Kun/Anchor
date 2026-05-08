@@ -161,7 +161,7 @@ func BuildNucleiCustomCommand(targetFile, profile string, rateLimit int, tags []
 // targets should be in "host:port" format, comma-separated.
 // nerva flags reference: -R rate-limit, -W workers (concurrent), -w timeout (ms).
 func BuildNervaCommand(targets string, rateLimit, workers, timeout int) []string {
-	args := []string{"nerva", "--json", "-t", targets}
+	args := []string{"nerva", "--json", "-f", "-t", targets}
 	if rateLimit > 0 {
 		args = append(args, "-R", fmt.Sprintf("%d", rateLimit))
 	}
