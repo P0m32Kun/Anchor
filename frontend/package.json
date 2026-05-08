@@ -15,15 +15,21 @@
     "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.2.4",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-shell": "^2.0.0",
     "autoprefixer": "^10.4.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.14.0",
     "postcss": "^8.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
+    "tailwind-merge": "^3.5.0",
     "tailwindcss": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7",
     "zustand": "^4.5.0"
   },
   "devDependencies": {

@@ -396,10 +396,10 @@ export default function AssetPage() {
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="text"
-              placeholder="搜索 IP / 端口 / 服务..."
+              placeholder="搜索 IP / 端口 / 服务 / 标题 / 技术栈..."
               value={filterPort}
               onChange={(e) => setFilterPort(e.target.value)}
-              className="input-dark w-56 !py-1.5"
+              className="input-dark w-64 !py-1.5"
             />
             <button
               onClick={() => { setFilterPort(""); setPortPage(1); }}
@@ -415,9 +415,9 @@ export default function AssetPage() {
             </span>
           </div>
 
-          {portsAllLoading ? (
+          {servicePortsLoading ? (
             <SkeletonList count={5} />
-          ) : portRows.length === 0 ? (
+          ) : servicePorts.length === 0 ? (
             <EmptyState
               title="暂无端口数据"
               description="当前项目还没有发现任何端口，点击右上角「资产发现」开始扫描。"
@@ -426,11 +426,11 @@ export default function AssetPage() {
             <>
               <Table
                 columns={[
-                  { key: "ip", header: "IP 地址", width: "160px" },
+                  { key: "ip", header: "IP 地址", width: "140px" },
                   {
                     key: "port",
                     header: "端口",
-                    width: "80px",
+                    width: "70px",
                     render: (row) => (
                       <span className="font-mono font-semibold text-brand-primary">
                         {String(row.port)}
@@ -440,7 +440,7 @@ export default function AssetPage() {
                   {
                     key: "state",
                     header: "状态",
-                    width: "90px",
+                    width: "80px",
                     render: (row) => {
                       const state = String(row.state).toLowerCase();
                       const color =
@@ -456,22 +456,69 @@ export default function AssetPage() {
                       );
                     },
                   },
-                  { key: "protocol", header: "协议", width: "70px" },
+                  { key: "protocol", header: "协议", width: "60px" },
                   {
-                    key: "serviceName",
+                    key: "service_name",
                     header: "服务",
-                    width: "140px",
+                    width: "120px",
                     render: (row) => (
-                      <span className="font-medium text-accent-teal">{String(row.serviceName)}</span>
+                      <span className="font-medium text-accent-teal">{String(row.service_name)}</span>
                     ),
                   },
                   {
-                    key: "sourceTool",
-                    header: "来源工具",
-                    width: "120px",
-                    render: (row) => (
-                      <span className="text-text-quaternary text-xs">{String(row.sourceTool)}</span>
-                    ),
+                    key: "title",
+                    header: "标题 / 应用",
+                    render: (row) => {
+                      const title = String(row.title || "");
+                      const url = String(row.url || "");
+                      if (!title && !url) return <span className="text-text-quaternary">—</span>;
+                      return (
+                        <div className="flex flex-col gap-0.5">
+                          {title && <span className="text-text-secondary text-xs">{title}</span>}
+                          {url && (
+                            <a href={url} target="_blank" rel="noreferrer" className="link-cyber text-xs truncate max-w-[200px]">
+                              {url}
+                            </a>
+                          )}
+                        </div>
+                      );
+                    },
+                  },
+                  {
+                    key: "technologies",
+                    header: "技术栈",
+                    width: "160px",
+                    render: (row) => {
+                      const techs = row.technologies as string[] | undefined;
+                      if (!techs?.length) return <span className="text-text-quaternary">—</span>;
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {techs.map((t: string) => (
+                            <span key={t} className="px-1.5 py-0.5 bg-brand-primary/10 text-brand-primary rounded text-xs border border-brand-primary/20">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    },
+                  },
+                  {
+                    key: "source_tools",
+                    header: "来源",
+                    width: "100px",
+                    render: (row) => {
+                      const sources = row.source_tools as string[] | undefined;
+                      if (!sources?.length) return <span className="text-text-quaternary text-xs">—</span>;
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {sources.map((s: string) => (
+                            <span key={s} className="px-1.5 py-0.5 rounded text-xs bg-white/[0.04] text-text-quaternary border border-white/[0.06]">
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    },
                   },
                 ]}
                 data={paginatedPortRows as unknown as Record<string, unknown>[]}

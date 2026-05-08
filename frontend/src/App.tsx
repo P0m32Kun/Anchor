@@ -180,11 +180,12 @@ function AppContent() {
   }, [toast]);
 
   return (
-    <div className="app-shell">
+    <div className="min-h-screen bg-background text-foreground">
       <Navbar />
-      <main className="app-main pl-[312px]">
-        <ErrorBoundary>
-          <Routes>
+      <main className="pl-64 min-h-screen">
+        <div className="container py-8 max-w-6xl">
+          <ErrorBoundary>
+            <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/targets" element={<LegacyRouteGuard />} />
             <Route path="/assets" element={<LegacyRouteGuard />} />
