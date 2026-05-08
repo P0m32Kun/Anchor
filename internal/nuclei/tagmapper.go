@@ -201,7 +201,7 @@ var serviceToTag = map[string]string{
 	"rabbitmq":      "rabbitmq",
 }
 
-// MapServiceToTags maps a service name (from nerva) to Nuclei tags.
+// MapServiceToTags maps a service name (from nmap -sV) to Nuclei tags.
 func MapServiceToTags(service string) []string {
 	service = strings.ToLower(strings.TrimSpace(service))
 	if tag, ok := serviceToTag[service]; ok {
