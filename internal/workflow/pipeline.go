@@ -20,9 +20,10 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
-// DefaultWorkflowDir is the path where RBKD-SEC/templates workflows are installed
-// in the worker Docker image. Used when NucleiScanDepth is "workflow" or "both".
-const DefaultWorkflowDir = "/opt/rbkd-templates/workflows"
+// DefaultWorkflowDir is empty because custom templates/workflows are injected
+// at execution time by the worker (from the active custom bundle) rather than
+// hard-coded into the Docker image.
+const DefaultWorkflowDir = ""
 
 // Pipeline orchestrates the complete scan workflow.
 type Pipeline struct {
