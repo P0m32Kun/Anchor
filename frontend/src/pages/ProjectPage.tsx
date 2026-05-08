@@ -79,7 +79,7 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
+      <div className="grid gap-6 grid-cols-[380px_1fr]">
         <form onSubmit={handleCreate} className="panel h-fit">
           <div className="panel-header">
             <div>
