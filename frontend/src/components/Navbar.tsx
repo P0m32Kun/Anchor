@@ -147,34 +147,7 @@ export function Navbar() {
   };
 
   return (
-    <>
-    <div className="sticky top-0 z-50 border-b border-brand-primary/15 bg-surface-muted/95 px-4 py-3 backdrop-blur lg:hidden">
-      <div className="flex items-center justify-between gap-3">
-        <Link to="/" className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-primary/12 text-brand-primary ring-1 ring-brand-primary/30">
-            <Icon name="asset" />
-          </span>
-          Anchor
-        </Link>
-        <div className="flex gap-2 overflow-x-auto">
-          {[...globalNavItems, ...projectLinks.slice(0, 5)].map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs ${
-                isItemActive(location.pathname, item.path)
-                  ? "bg-brand-primary/12 text-text-primary"
-                  : "text-text-tertiary"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-    </div>
-
-    <aside className="app-sidebar fixed inset-y-0 left-0 z-50 hidden w-72 flex-col lg:flex">
+    <aside className="app-sidebar fixed inset-y-0 left-0 z-50 flex w-72 flex-col">
       <div className="flex h-16 items-center gap-3 border-b border-white/[0.08] px-5">
         <Link to="/" className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-primary/12 text-brand-primary ring-1 ring-brand-primary/30 shadow-[0_0_18px_rgba(0,212,255,0.16)]">
           <Icon name="asset" />
