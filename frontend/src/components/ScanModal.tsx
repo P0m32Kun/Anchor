@@ -80,12 +80,10 @@ const BASE_TOOL_FIELDS: { group: string; fields: ToolField[]; icon: any }[] = [
     ],
   },
   {
-    group: "Nerva",
+    group: "nmap -sV",
     icon: Cpu,
     fields: [
-      { key: "nerva_rate_limit", label: "速率限制", unit: "rps", min: 10, max: 1000, recommended: 100 },
-      { key: "nerva_workers", label: "工作进程", unit: "", min: 10, max: 200, recommended: 50 },
-      { key: "nerva_timeout", label: "超时", unit: "秒", min: 1, max: 60, recommended: 10 },
+      { key: "nmap_service_timeout", label: "超时", unit: "秒", min: 30, max: 3600, recommended: 600 },
     ],
   },
   {
