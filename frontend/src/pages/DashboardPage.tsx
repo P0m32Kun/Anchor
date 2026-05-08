@@ -236,7 +236,7 @@ export default function DashboardPage() {
                  <div>
                     <div className="text-sm font-semibold">自动化建议</div>
                     <div className="text-xs text-muted-foreground mt-1">您有 3 个已完成的扫描可以导出报告了。</div>
-                    <Button variant="link" className="p-0 h-auto text-xs mt-2 text-primary">立即导出</Button>
+                    <Button variant="ghost" className="p-0 h-auto text-xs mt-2 text-primary">立即导出</Button>
                  </div>
                </CardContent>
             </Card>
