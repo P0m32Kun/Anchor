@@ -233,6 +233,10 @@ func (s *Server) handleTaskResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Error != "" {
+		_ = s.queries.UpdateScanTaskErrorMessage(taskID, req.Error)
+	}
+
 	if task != nil && task.RunID != nil {
 		go s.checkRunCompletion(*task.RunID)
 	}
