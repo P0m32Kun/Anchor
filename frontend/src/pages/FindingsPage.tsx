@@ -564,7 +564,7 @@ function FindingDetail({
         </div>
 
         <div className="p-4 border-t bg-muted/30 flex justify-between items-center">
-            <Button variant="outline" size="sm" onClick={async () => {
+            <Button variant="secondary" size="sm" onClick={async () => {
                 try {
                     await api.retestFinding(finding.id);
                     toast("漏洞复测任务已下发至 Worker", "success");
@@ -572,7 +572,7 @@ function FindingDetail({
                     toast("复测启动失败", "error");
                 }
             }}>
-                <Retweet className="mr-2 h-4 w-4" />
+                <History className="mr-2 h-4 w-4" />
                 漏洞复测 (Retest)
             </Button>
             <Button variant="secondary" size="sm" onClick={onClose}>
