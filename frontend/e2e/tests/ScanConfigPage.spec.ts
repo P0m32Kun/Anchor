@@ -44,7 +44,7 @@ test.describe
 			await expect(page.getByText("FOFA 资产搜集")).toBeVisible();
 			await expect(page.getByText("Subfinder 子域名爆破")).toBeVisible();
 			await expect(page.getByText("CDN 过滤")).toBeVisible();
-			await expect(page.getByText("Nerva 服务指纹")).toBeVisible();
+			await expect(page.getByText("nmap -sV 服务指纹")).toBeVisible();
 			await expect(page.getByText("Nuclei 漏洞扫描")).toBeVisible();
 
 			// 默认端口范围应为 top1000
