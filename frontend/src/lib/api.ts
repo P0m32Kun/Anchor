@@ -405,6 +405,9 @@ export const api = {
 
   listServices: (assetId: string, signal?: AbortSignal) => fetchAPI<Service[]>(`/assets/${assetId}/services`, { signal }),
 
+  listServicePorts: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<ServicePort[]>(`/projects/${projectId}/service-ports`, { signal }),
+
   startWebScreening: (projectId: string, signal?: AbortSignal) =>
     fetchAPI<{ status: string }>(`/projects/${projectId}/workflows/web-screening`, { method: "POST", signal }),
 
