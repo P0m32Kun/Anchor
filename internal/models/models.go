@@ -125,6 +125,7 @@ type ScanTask struct {
 	StartedAt                 *time.Time `json:"started_at" db:"started_at"`
 	FinishedAt                *time.Time `json:"finished_at" db:"finished_at"`
 	ExitCode                  *int       `json:"exit_code" db:"exit_code"`
+	ErrorMessage              string     `json:"error_message,omitempty" db:"error_message"`
 	WorkerID                  *string    `json:"worker_id" db:"worker_id"`
 	NucleiCustomBundleVersion *string    `json:"nuclei_custom_bundle_version,omitempty" db:"nuclei_custom_bundle_version"`
 	CreatedAt                 time.Time  `json:"created_at" db:"created_at"`
