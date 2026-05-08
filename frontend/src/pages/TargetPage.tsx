@@ -358,7 +358,7 @@ export default function TargetPage() {
       header: "类型",
       width: "120px",
       render: (row) => (
-        <Badge variant="default" size="sm">
+        <Badge variant="default">
           {String(row.type)}
         </Badge>
       ),
