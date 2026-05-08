@@ -26,12 +26,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 	page := parsePagination(r)
 	result, err := s.projectSvc.ListPaginated(r.Context(), service.PaginationParams{Page: page.Page, PageSize: page.PageSize})
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list projects failed: %v", err))
+	if s.handleServiceError(w, err, "list projects failed") {
 		return
 	}
 	writePaginatedJSON(w, result.Data, result.Total, page)
