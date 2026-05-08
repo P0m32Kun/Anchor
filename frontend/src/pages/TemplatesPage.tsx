@@ -374,8 +374,8 @@ export default function TemplatesPage() {
               </TableHeader>
               <TableBody>
                 {sources.map((src) => (
-                  <>
-                    <TableRow key={src.id} className="group cursor-pointer" onClick={() => loadFiles(src.id)}>
+                  <Fragment key={src.id}>
+                    <TableRow className="group cursor-pointer" onClick={() => loadFiles(src.id)}>
                       <TableCell>
                         {expandedSource === src.id ? (
                           <ChevronDown className="h-4 w-4 text-muted-foreground" />
