@@ -262,7 +262,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 - [x] dnsx DNS 解析替代 Go resolver
 - [x] 互联网搜索引擎页面（FOFA/Hunter/Quake 统一搜索 + API Key 配置）
 - [x] FOFA 凭证全局化（engine_credentials 表）
-- [x] nerva 服务指纹识别 + cdncheck CDN 过滤集成
+- [x] nmap -sV 服务指纹识别 + cdncheck CDN 过滤集成
 - [x] 网络服务扫描（非 Web 端口：Redis/MySQL/PostgreSQL/Elasticsearch/MongoDB/Memcached/MSSQL/Oracle）
 - [x] CPE 指纹补充（404/302 页面 tech fallback）
 - [x] httpx `-follow-redirects`
