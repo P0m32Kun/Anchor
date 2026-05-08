@@ -7,7 +7,6 @@ import (
 	"context"
 	"net"
 	"os"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -45,9 +44,9 @@ func setupE2E(t *testing.T) (*db.Queries, *worker.Runner, *scope.Engine, string,
 }
 
 func TestPipelineE2E(t *testing.T) {
-	// Skip if nerva is not installed
-	if _, err := exec.LookPath("nerva"); err != nil {
-		t.Skip("nerva not installed")
+	// Skip if nmap is not installed
+	if _, err := exec.LookPath("nmap"); err != nil {
+		t.Skip("nmap not installed")
 	}
 
 	// Skip if rangefield is not running (check nginx on port 18080)
@@ -102,10 +101,11 @@ func TestPipelineE2E(t *testing.T) {
 	pipeline := NewPipeline(queries, runner, scopeEng, dataDir).
 		WithConfig(models.PipelineConfig{
 			EnableCDNFilter:     false, // local IP, no CDN filter needed
-			EnableNerva:         true,
+			EnableNmapService:   true,
 			EnableNuclei:        true,
-			PortScanConcurrency: 50,
-			NervaConcurrency:    50,
+			NaabuRate:           1000,
+			NaabuThreads:        50,
+			NaabuTimeout:        60,
 			NucleiRateLimit:     100,
 		}).
 		WithRunID(runID)
