@@ -702,6 +702,24 @@ func (q *Queries) ListPortsByAsset(assetID string) ([]*models.Port, error) {
 		return nil, err
 	}
 	defer rows.Close()
+	return scanPorts(rows)
+}
+
+func (q *Queries) ListPortsByProject(projectID string) ([]*models.Port, error) {
+	rows, err := q.db.Query(`
+		SELECT p.id, p.asset_id, p.port, p.protocol, p.state, p.source_tool, p.created_at
+		FROM ports p
+		JOIN assets a ON p.asset_id = a.id
+		WHERE a.project_id = ?
+		ORDER BY p.port`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanPorts(rows)
+}
+
+func scanPorts(rows *sql.Rows) ([]*models.Port, error) {
 	list := make([]*models.Port, 0)
 	for rows.Next() {
 		p := &models.Port{}
