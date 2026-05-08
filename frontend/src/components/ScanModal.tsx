@@ -311,6 +311,17 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
                   </div>
                 ))}
               </div>
+              {group.group === "Nerva" && (
+                <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={config.nerva_fast_mode}
+                    onChange={(e) => updateBoolConfig("nerva_fast_mode", e.target.checked)}
+                    className="w-4 h-4 rounded border-white/[0.2] bg-white/[0.05] text-brand-primary focus:ring-brand-primary/40"
+                  />
+                  <span className="text-xs text-text-secondary">快速模式（跳过无法识别的端口，避免卡住）</span>
+                </label>
+              )}
             </div>
           ))}
 
