@@ -404,7 +404,7 @@ export default function TargetPage() {
           <p className="text-muted-foreground mt-1">确认授权边界，导入需要测试的域名、URL、IP 或 CIDR。</p>
         </div>
         <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setDryRunConfirmOpen(true)} disabled={dryRunLoading}>
+            <Button variant="secondary" size="sm" onClick={() => setDryRunConfirmOpen(true)} disabled={dryRunLoading}>
                 <Zap className={cn("mr-2 h-4 w-4 text-brand-warning", dryRunLoading && "animate-pulse")} />
                 {dryRunLoading ? "正在评估..." : "授权 Dry Run"}
             </Button>
