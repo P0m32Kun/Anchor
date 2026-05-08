@@ -51,3 +51,35 @@ type PortInfo struct {
 	Port     int    `json:"port"`
 	Protocol string `json:"protocol"`
 }
+
+// parseJSONLines reads JSONL input line-by-line, skipping empty lines and
+// tracking line numbers. The decode callback receives each non-empty line and
+// its 1-based line number, returning a parsed value and an optional ParseError.
+// Scanner errors are appended as ParseError at the end.
+func parseJSONLines[T any](r io.Reader, decode func(line []byte, lineNo int) (T, ParseError)) ([]T, []ParseError) {
+	var results []T
+	var errs []ParseError
+
+	scanner := bufio.NewScanner(r)
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		res, perr := decode(line, lineNo)
+		if perr.Message != "" {
+			errs = append(errs, perr)
+			continue
+		}
+		results = append(results, res)
+	}
+
+	if err := scanner.Err(); err != nil {
+		errs = append(errs, ParseError{Line: lineNo, Raw: "", Message: "scanner error: " + err.Error()})
+	}
+
+	return results, errs
+}
