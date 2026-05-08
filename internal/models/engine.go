@@ -32,11 +32,8 @@ type PipelineConfig struct {
 	NaabuRate                int    `json:"naabu_rate"`
 	NaabuThreads             int    `json:"naabu_threads"`
 	NaabuTimeout             int    `json:"naabu_timeout"`
-	EnableNerva              bool   `json:"enable_nerva"`
-	NervaFastMode            bool   `json:"nerva_fast_mode"`
-	NervaRateLimit           int    `json:"nerva_rate_limit"`
-	NervaWorkers             int    `json:"nerva_workers"`
-	NervaTimeout             int    `json:"nerva_timeout"`
+	EnableNmapService        bool   `json:"enable_nmap_service"`
+	NmapServiceTimeout       int    `json:"nmap_service_timeout"`
 	EnableHttpx              bool   `json:"enable_httpx"`
 	HttpxRateLimit           int    `json:"httpx_rate_limit"`
 	HttpxThreads             int    `json:"httpx_threads"`
