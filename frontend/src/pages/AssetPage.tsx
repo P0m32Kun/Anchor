@@ -53,7 +53,6 @@ export default function AssetPage() {
   const error = useStore((state) => state.assetsError);
   const setAssetsLoading = useStore((state) => state.setAssetsLoading);
   const setAssetsError = useStore((state) => state.setAssetsError);
-  const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const toast = useToast();
   const [portsAllLoading, setPortsAllLoading] = useState(false);
   const [portPage, setPortPage] = useState(1);
