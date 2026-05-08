@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"bufio"
 	"encoding/json"
 	"io"
 	"strconv"
@@ -14,38 +13,23 @@ import (
 // ParseHTTPX reads httpx JSONL output and returns discovered web endpoints.
 // httpx uses hyphenated keys like "status-code".
 func ParseHTTPX(r io.Reader) ([]HTTPXResult, []ParseError) {
-	var results []HTTPXResult
-	var errs []ParseError
-
-	scanner := bufio.NewScanner(r)
-	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-
+	return parseJSONLines(r, func(line []byte, lineNo int) (HTTPXResult, ParseError) {
 		var raw map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "invalid JSON: " + err.Error()})
-			continue
+		if err := json.Unmarshal(line, &raw); err != nil {
+			return HTTPXResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "invalid JSON: " + err.Error()}
 		}
 
 		urlBytes, ok := raw["url"]
 		if !ok {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "missing url field"})
-			continue
+			return HTTPXResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "missing url field"}
 		}
 
 		var u string
 		if err := json.Unmarshal(urlBytes, &u); err != nil {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "invalid url field: " + err.Error()})
-			continue
+			return HTTPXResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "invalid url field: " + err.Error()}
 		}
 		if u == "" {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "empty url field"})
-			continue
+			return HTTPXResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "empty url field"}
 		}
 
 		res := HTTPXResult{URL: u}
@@ -116,14 +100,8 @@ func ParseHTTPX(r io.Reader) ([]HTTPXResult, []ParseError) {
 			}
 		}
 
-		results = append(results, res)
-	}
-
-	if err := scanner.Err(); err != nil {
-		errs = append(errs, ParseError{Line: lineNo, Raw: "", Message: "scanner error: " + err.Error()})
-	}
-
-	return results, errs
+		return res, ParseError{}
+	})
 }
 
 // ParseHttpxOutput parses httpx -json JSONL output into WebEndpoint models.
