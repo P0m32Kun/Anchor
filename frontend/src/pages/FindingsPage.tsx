@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { 
-  EmptyState, 
-  Input, 
-  Select, 
-  SkeletonList, 
-  useProjectId, 
+import {
+  EmptyState,
+  Input,
+  Select,
+  SkeletonList,
+  useProjectId,
   useToast,
   Card,
   CardHeader,
@@ -26,23 +26,18 @@ import {
   TableCell
 } from "../components";
 import type { Finding, Evidence } from "../lib/api";
-import { 
-  Search, 
-  Filter, 
-  AlertCircle, 
-  CheckCircle2, 
-  Retweet, 
-  MoreVertical, 
-  ChevronRight, 
+import {
+  Search,
+  AlertCircle,
+  ChevronRight,
   FileText,
   Clock,
   History,
   ShieldAlert,
   MessageSquare,
-  ArrowRight,
-  X
+  X,
+  Plus
 } from "lucide-react";
-import { cn } from "../lib/utils";
 
 const statusLabels: Record<string, string> = {
   pending_review: "待审核",
