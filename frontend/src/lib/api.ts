@@ -689,3 +689,40 @@ export interface SearchEngineResponse {
   data: SearchResult[];
 }
 
+// --- Nuclei Custom Templates ---
+
+export interface NucleiCustomSource {
+  id: string;
+  name: string;
+  type: "git" | "upload" | "file";
+  uri?: string;
+  branch?: string;
+  enabled: boolean;
+  routing_policy: string;
+  status: "draft" | "ready" | "error";
+  last_sync_at?: string;
+  last_validate_at?: string;
+  last_error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NucleiCustomFileEntry {
+  path: string;
+  is_dir: boolean;
+  size: number;
+  mod_time: string;
+}
+
+export interface NucleiCustomValidationResult {
+  source_id: string;
+  ok: boolean;
+  errors?: string[];
+}
+
+export interface NucleiCustomManifest {
+  version: string;
+  sources: { id: string; name: string; files: string[]; checksum: string }[];
+  created_at: string;
+}
+
