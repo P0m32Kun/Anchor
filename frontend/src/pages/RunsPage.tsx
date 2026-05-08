@@ -35,13 +35,6 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
-const modeLabels: Record<string, string> = {
-  quick: "快速",
-  standard: "标准",
-  deep: "深度",
-  custom: "自定义",
-};
-
 const modeVariants: Record<string, any> = {
   quick: "warning",
   standard: "info",
