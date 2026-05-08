@@ -8,6 +8,7 @@ import (
 
 	"github.com/P0m32Kun/Anchor/internal/fingerprint"
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/parser"
 	"github.com/P0m32Kun/Anchor/internal/resolve"
 	"github.com/P0m32Kun/Anchor/internal/search"
 	"github.com/P0m32Kun/Anchor/internal/util"
