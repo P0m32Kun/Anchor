@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { api, Finding, API_BASE, PAGE_ALL } from "../lib/api";
 import { getApiToken } from "../lib/config";
 import { renderMarkdown } from "../lib/markdown";
@@ -15,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
+  CardDescription,
   Badge
 } from "../components";
 import { useStore } from "../lib/store";

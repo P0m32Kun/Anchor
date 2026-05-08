@@ -230,7 +230,7 @@ export default function TemplatesPage() {
     setFileModalOpen(true);
     try {
       const blob = await api.readNucleiCustomFile(sourceId, path);
-      const text = await blob.text();
+      const text = await new Response(blob).text();
       setEditFileContent(text);
     } catch (err: any) {
       toast("读取文件失败: " + (err.message || String(err)), "error");
