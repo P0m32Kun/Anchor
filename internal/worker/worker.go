@@ -235,6 +235,11 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 	}
 
 	if status == models.TaskFailed {
+		stderr := string(stderrBuf.Bytes())
+		if len(stderr) > 500 {
+			stderr = stderr[:500] + "..."
+		}
+		_ = r.queries.UpdateScanTaskErrorMessage(task.ID, stderr)
 		return fmt.Errorf("command exited with code %d", exitCode)
 	}
 	return nil
