@@ -226,6 +226,7 @@ function StatItem({ label, value, color = "text-muted-foreground" }: { label: st
 }
 
 export default function TargetPage() {
+  const navigate = useNavigate();
   const projectId = useProjectId();
   const targets = useStore((state) => state.targets) ?? [];
   const setTargets = useStore((state) => state.setTargets);
