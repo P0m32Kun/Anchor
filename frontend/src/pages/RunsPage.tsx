@@ -1,11 +1,12 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { 
-  EmptyState, 
-  useProjectId, 
-  ConfirmDialog, 
-  Button, 
+import { useResource, useSSE, usePolling } from "../hooks";
+import {
+  EmptyState,
+  useProjectId,
+  ConfirmDialog,
+  Button,
   ScanModal,
   Card,
   CardHeader,
@@ -16,7 +17,6 @@ import {
   SkeletonList
 } from "../components";
 import { useToast } from "../components/Toast";
-import { useSSE, usePolling } from "../hooks";
 import { getApiBase } from "../lib/config";
 import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
