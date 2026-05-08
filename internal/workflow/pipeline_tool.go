@@ -251,11 +251,11 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 	return nil
 }
 
-func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.NervaResult) error {
+func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.NmapServiceResult) error {
 	// Group by service tag
 	groups := make(map[string][]string)
 	for _, r := range results {
-		tags := nuclei.MapServiceToTags(r.Protocol)
+		tags := nuclei.MapServiceToTags(r.Service)
 		for _, tag := range tags {
 			target := fmt.Sprintf("%s:%d", r.IP, r.Port)
 			groups[tag] = append(groups[tag], target)
