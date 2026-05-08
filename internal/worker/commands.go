@@ -157,24 +157,21 @@ func BuildNucleiCustomCommand(targetFile, profile string, rateLimit int, tags []
 	return args
 }
 
-// BuildNervaCommand builds a nerva command for service fingerprinting.
-// targets should be in "host:port" format, comma-separated.
-// nerva flags reference: -f fast-mode, -R rate-limit, -W workers (concurrent), -w timeout (ms).
-func BuildNervaCommand(targets string, fastMode bool, rateLimit, workers, timeout int) []string {
-	args := []string{"nerva", "--json", "-t", targets}
-	if fastMode {
-		args = append(args, "-f")
+// BuildNmapServiceScanCommand builds an nmap -sV command for service fingerprinting.
+// hostFile should contain one host per line; ports is the list of ports to scan.
+// Output is XML to stdout for reliable parsing.
+func BuildNmapServiceScanCommand(hostFile string, ports []int) []string {
+	portStrs := make([]string, len(ports))
+	for i, p := range ports {
+		portStrs[i] = fmt.Sprintf("%d", p)
 	}
-	if rateLimit > 0 {
-		args = append(args, "-R", fmt.Sprintf("%d", rateLimit))
+	return []string{
+		"nmap", "-sV",
+		"-p", strings.Join(portStrs, ","),
+		"-iL", hostFile,
+		"-oX", "-",
+		"-T4", "-n", "--open",
 	}
-	if workers > 0 {
-		args = append(args, "-W", fmt.Sprintf("%d", workers))
-	}
-	if timeout > 0 {
-		args = append(args, "-w", fmt.Sprintf("%d", timeout*1000))
-	}
-	return args
 }
 
 // BuildDNSxCommand builds a dnsx command for DNS resolution.
