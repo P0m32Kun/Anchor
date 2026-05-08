@@ -114,25 +114,15 @@ func (c *FofaClient) search(ctx context.Context, query string, size int) ([]Fofa
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fofa API returned status %d", resp.StatusCode)
-	}
-
 	var result struct {
-		Error   bool     `json:"error"`
-		ErrMsg  string   `json:"errmsg"`
-		Size    int      `json:"size"`
-		Results [][]string `json:"results"`
+		Error   bool         `json:"error"`
+		ErrMsg  string       `json:"errmsg"`
+		Size    int          `json:"size"`
+		Results [][]string   `json:"results"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+	if err := c.doJSON(req, &result); err != nil {
+		return nil, err
 	}
 
 	if result.Error {
