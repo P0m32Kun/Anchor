@@ -1,5 +1,5 @@
 export { Button } from "./Button";
-export { Card, CardHeader, CardTitle, CardDescription } from "./Card";
+export { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./Card";
 export { Badge, SeverityBadge, StatusBadge } from "./Badge";
 export { ToastProvider, useToast } from "./Toast";
 export { Navbar } from "./Navbar";
