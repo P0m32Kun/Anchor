@@ -642,25 +642,6 @@ type ServiceFingerprint struct {
 	CreatedAt time.Time              `json:"created_at"`
 }
 
-// --- ServicePort (aggregated view) ---
-
-type ServicePort struct {
-	ID           string    `json:"id"`
-	ProjectID    string    `json:"project_id"`
-	AssetID      string    `json:"asset_id"`
-	IP           string    `json:"ip"`
-	Port         int       `json:"port"`
-	Protocol     string    `json:"protocol"`
-	State        string    `json:"state"`
-	ServiceName  string    `json:"service_name"`
-	Title        string    `json:"title"`
-	Technologies []string  `json:"technologies"`
-	URL          string    `json:"url"`
-	SourceTools  []string  `json:"source_tools"`
-	IsWeb        bool      `json:"is_web"`
-	CreatedAt    time.Time `json:"created_at"`
-}
-
 // --- Pipeline Run ---
 
 type PipelineRun struct {
