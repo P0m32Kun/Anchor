@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import type React from "react";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
+import { cn } from "../lib/utils";
 import { 
   EmptyState, 
   StatusBadge, 
