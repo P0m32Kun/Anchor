@@ -52,8 +52,8 @@ pull-server-base:
 
 setup-server-base: build-server-base
 
-# 首次设置：构建并标记本地基础镜像
-setup-worker-base: build-worker-base
+# 首次设置：构建 worker 的两个基础镜像
+setup-worker-base: build-worker-base build-worker-builder-base
 
 # ============================================================
 #  Development Environment (Docker only)
