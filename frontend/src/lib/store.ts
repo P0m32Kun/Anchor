@@ -23,6 +23,8 @@ interface AppState {
   webEndpoints: WebEndpoint[];
   ports: Record<string, Port[]>;
   services: Record<string, Service[]>;
+  servicePorts: ServicePort[];
+  servicePortsLoading: boolean;
   findings: Finding[];
   findingsLoading: boolean;
   findingsError: string | null;
