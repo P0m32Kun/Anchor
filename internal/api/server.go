@@ -178,6 +178,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /projects/{id}/workflows/asset-discovery", auth(http.HandlerFunc(s.handleStartAssetDiscovery)))
 	mux.Handle("GET /projects/{id}/assets", auth(http.HandlerFunc(s.handleListAssetsFiltered)))
 	mux.Handle("GET /projects/{id}/web-endpoints", auth(http.HandlerFunc(s.handleListWebEndpointsByProject)))
+	mux.Handle("GET /projects/{id}/service-ports", auth(http.HandlerFunc(s.handleListServicePorts)))
 	mux.Handle("GET /assets/{id}/ports", auth(http.HandlerFunc(s.handleListPorts)))
 	mux.Handle("GET /assets/{id}/services", auth(http.HandlerFunc(s.handleListServices)))
 	mux.Handle("POST /projects/{id}/workflows/web-screening", auth(http.HandlerFunc(s.handleStartWebScreening)))
