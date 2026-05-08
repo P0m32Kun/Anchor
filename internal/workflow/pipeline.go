@@ -219,18 +219,6 @@ func dedupStrings(s []string) []string {
 	return result
 }
 
-func makeHTTPTargets(results []fingerprint.NervaResult) []string {
-	var targets []string
-	for _, r := range results {
-		host := r.IP
-		if host == "" {
-			host = r.Host
-		}
-		if r.Port == 443 {
-			targets = append(targets, fmt.Sprintf("https://%s", host))
-		} else {
-			targets = append(targets, fmt.Sprintf("http://%s:%d", host, r.Port))
-		}
-	}
-	return targets
+func makeHTTPTargets(results []fingerprint.NmapServiceResult) []string {
+	return fingerprint.MakeHTTPTargets(results)
 }
