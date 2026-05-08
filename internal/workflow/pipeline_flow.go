@@ -336,13 +336,13 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 		p.completeStage(StagePortScan)
 	}
 
-	// Service fingerprint
+	// Service fingerprint (nmap -sV)
 	p.setStage(StageFingerprint)
-	var fpResults []fingerprint.NervaResult
-	if p.config.EnableNerva && len(ports) > 0 {
-		fpResults, err = p.runNerva(ctx, ports)
+	var fpResults []fingerprint.NmapServiceResult
+	if p.config.EnableNmapService && len(ports) > 0 {
+		fpResults, err = p.runNmapServiceScan(ctx, ports)
 		if err != nil {
-			log.Printf("nerva: %v", err)
+			log.Printf("nmap -sV: %v", err)
 			p.failStage(StageFingerprint, err.Error())
 		} else {
 			p.completeStage(StageFingerprint)
@@ -353,7 +353,7 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 
 	p.saveFingerprints(fpResults)
 
-	// Fallback: if nerva produced no results, feed naabu ports directly to httpx.
+	// Fallback: if nmap produced no results, feed naabu ports directly to httpx.
 	var extraHTTPXTargets []string
 	if len(fpResults) == 0 && len(ports) > 0 {
 		for _, port := range ports {
@@ -366,7 +366,7 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 	return nil
 }
 
-// runCIDRFlow: nmap-alive → Naabu → nerva → split → httpx → Nuclei.
+// runCIDRFlow: nmap-alive → Naabu → nmap -sV → split → httpx → Nuclei.
 func (p *Pipeline) runCIDRFlow(ctx context.Context, targets []*models.Target) error {
 	cidrs := extractTargetValues(targets)
 
