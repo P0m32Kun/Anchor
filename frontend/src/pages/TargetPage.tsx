@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
 import { 
