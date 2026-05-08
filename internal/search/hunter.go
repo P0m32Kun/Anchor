@@ -36,9 +36,9 @@ type HunterResult struct {
 // NewHunterClient creates a new Hunter client.
 func NewHunterClient(apiKey string) *HunterClient {
 	return &HunterClient{
-		apiKey:  apiKey,
-		baseURL: "https://hunter.qianxin.com",
-		client:  defaultHTTPClient,
+		baseClient: baseClient{client: defaultHTTPClient},
+		apiKey:     apiKey,
+		baseURL:    "https://hunter.qianxin.com",
 	}
 }
 
