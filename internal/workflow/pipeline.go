@@ -17,7 +17,6 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/resolve"
 	"github.com/P0m32Kun/Anchor/internal/scope"
 	"github.com/P0m32Kun/Anchor/internal/search"
-	"github.com/P0m32Kun/Anchor/internal/util"
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
