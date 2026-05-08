@@ -11,7 +11,8 @@ import {
   Card, 
   CardHeader, 
   CardTitle, 
-  CardContent 
+  CardContent,
+  CardDescription
 } from "../components";
 import type { DashboardStats } from "../lib/api";
 import { 
@@ -20,7 +21,10 @@ import {
   ArrowRight, 
   Activity, 
   CheckCircle2, 
+  AlertCircle, 
   Users,
+  Target,
+  ShieldCheck,
   Zap,
   LayoutDashboard,
   Box,
@@ -89,11 +93,11 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-3 z-10">
-          <Button onClick={() => navigate("/projects")} variant="primary" className="h-11 px-6 shadow-lg shadow-primary/20">
+          <Button onClick={() => navigate("/projects")} variant="primary" className="h-11 px-6 shadow-lg shadow-primary/20 font-bold">
             <Plus className="mr-2 h-4 w-4 stroke-[3px]" />
             新建项目
           </Button>
-          <Button onClick={() => navigate(projectPath("targets"))} variant="secondary" className="h-11 px-6 glass-panel">
+          <Button onClick={() => navigate(projectPath("targets"))} variant="secondary" className="h-11 px-6 glass-panel font-bold">
             <Upload className="mr-2 h-4 w-4" />
             快速导入
           </Button>
@@ -245,7 +249,7 @@ export default function DashboardPage() {
                   ].map(([step, title, path, color]) => (
                     <button
                       key={step}
-                      onClick={() => navigate(path)}
+                      onClick={() => navigate(path as string)}
                       className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-sm transition-all hover:bg-white/5 group"
                     >
                       <span className={cn(
@@ -254,7 +258,7 @@ export default function DashboardPage() {
                       )}>
                         {step}
                       </span>
-                      <span className="flex-1 font-bold text-foreground/70 group-hover:text-foreground transition-colors">{title}</span>
+                      <span className="flex-1 font-bold text-foreground/70 group-hover:text-foreground transition-colors">{title as string}</span>
                       <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
                     </button>
                   ))}
@@ -366,7 +370,7 @@ function StatCard({
         {active && (
           <div className="absolute bottom-0 left-0 h-1 w-full bg-white/5 overflow-hidden">
             <div 
-                className={cn("h-full animate-progress-glow", 
+                className={cn("h-full animate-pulse", 
                     color === 'blue' ? 'bg-blue-500' : 
                     color === 'emerald' ? 'bg-emerald-500' : 
                     color === 'rose' ? 'bg-rose-500' : 'bg-primary'
