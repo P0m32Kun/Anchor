@@ -100,7 +100,6 @@ export default function ReportsPage() {
 
   const [findings, setFindings] = useState<FindingDetail[]>([]);
   const loading = useStore((state) => state.reportsLoading);
-  const error = useStore((state) => state.reportsError);
   const setReportsLoading = useStore((state) => state.setReportsLoading);
   const setReportsError = useStore((state) => state.setReportsError);
   const [previewText, setPreviewText] = useState<string | null>(null);
