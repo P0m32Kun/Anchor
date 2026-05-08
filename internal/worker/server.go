@@ -218,11 +218,20 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 	}
 
 	status := "completed"
+	errorMsg := ""
 	if err != nil && exitCode != 0 {
 		status = "failed"
+		if stderrData, readErr := os.ReadFile(filepath.Join(workdir, "stderr.txt")); readErr == nil && len(stderrData) > 0 {
+			errorMsg = string(stderrData)
+			if len(errorMsg) > 500 {
+				errorMsg = errorMsg[:500] + "..."
+			}
+		} else if err != nil {
+			errorMsg = err.Error()
+		}
 	}
 
-	ws.reportResult(taskID, status, artifacts, "")
+	ws.reportResult(taskID, status, artifacts, errorMsg)
 }
 
 func (ws *WorkerServer) reportResult(taskID, status string, artifacts []map[string]interface{}, errorMsg string) {
