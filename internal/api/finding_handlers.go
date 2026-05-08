@@ -56,12 +56,7 @@ func (s *Server) handleAddEvidence(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ev, err := s.findingSvc.AddEvidence(r.Context(), findingID, req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "create evidence failed: %v", err))
+	if s.handleServiceError(w, err, "create evidence failed") {
 		return
 	}
 	writeJSON(w, http.StatusCreated, ev)
