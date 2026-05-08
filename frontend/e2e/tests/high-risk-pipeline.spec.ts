@@ -26,7 +26,7 @@ test.describe.serial("High-risk port preset E2E", () => {
 		await cleanupTestData();
 	});
 
-	test("通过 UI 设置 high-risk 并运行 pipeline，验证 Redis/Nerva findings", async ({ page }) => {
+	test("通过 UI 设置 high-risk 并运行 pipeline，验证 Redis findings", async ({ page }) => {
 		// --- 1. 创建项目、Scope Rule、目标（rf-redis 172.30.0.13）---
 		const projectRes = await fetch(`${API_BASE}/projects`, {
 			method: "POST",
