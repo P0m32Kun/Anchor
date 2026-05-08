@@ -435,7 +435,7 @@ export default function TargetPage() {
                 <div className="py-20 text-center">
                     <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-4 opacity-50" />
                     <p className="text-destructive font-medium mb-4">加载失败: {error}</p>
-                    <Button variant="outline" size="sm" onClick={() => loadTargets()}>
+                    <Button variant="secondary" size="sm" onClick={() => loadTargets()}>
                         重试
                     </Button>
                 </div>
