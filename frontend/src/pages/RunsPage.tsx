@@ -359,6 +359,7 @@ export default function RunsPage() {
                                     </Button>
                                 )}
                                 <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 transition-all" />
+import { ChevronRight } from "lucide-react";
                             </div>
                         </CardContent>
                     </Card>
