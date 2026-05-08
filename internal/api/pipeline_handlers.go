@@ -277,7 +277,7 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 		cfg.EnableSubfinder = true
 		cfg.EnableDNSx = true
 		cfg.EnableCDNFilter = true
-		cfg.EnableNerva = true
+		cfg.EnableNmapService = true
 		cfg.EnableHttpx = true
 		cfg.EnableNuclei = true
 	case "internal":
@@ -285,7 +285,7 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 		cfg.EnableSubfinder = false
 		cfg.EnableDNSx = false
 		cfg.EnableCDNFilter = false
-		cfg.EnableNerva = true
+		cfg.EnableNmapService = true
 		cfg.EnableHttpx = true
 		cfg.EnableNuclei = true
 	}
