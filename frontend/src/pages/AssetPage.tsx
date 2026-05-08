@@ -2,10 +2,11 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { 
-  useProjectId, 
-  useToast, 
-  EmptyState, 
+import { useResource } from "../hooks";
+import {
+  useProjectId,
+  useToast,
+  EmptyState,
   Table,
   TableHeader,
   TableBody,
