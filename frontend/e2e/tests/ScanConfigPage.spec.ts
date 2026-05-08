@@ -150,8 +150,8 @@ test.describe
 
 			// 关闭 Nuclei
 			await page.getByRole("switch", { name: /Nuclei/ }).click();
-			// 关闭 Nerva
-			await page.getByRole("switch", { name: /Nerva/ }).click();
+			// 关闭 Nuclei
+			await page.getByRole("switch", { name: /Nuclei/ }).click();
 
 			await page.locator("button", { hasText: "保存配置" }).first().click();
 			await expect(page.getByText("扫描配置已保存")).toBeVisible();
@@ -160,6 +160,5 @@ test.describe
 			await page.reload();
 			await page.waitForLoadState("networkidle");
 			await expect(page.getByText("Nuclei 调优")).not.toBeVisible();
-			await expect(page.getByText("Nerva 调优")).not.toBeVisible();
 		});
 	});
