@@ -85,7 +85,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <StatCard title="项目" value={stats?.total_projects ?? 0} loading={loading} />
         <StatCard title="运行中扫描" value={stats?.active_runs ?? 0} loading={loading} active={(stats?.active_runs ?? 0) > 0} />
         <StatCard title="待审核发现" value={stats?.pending_findings ?? 0} loading={loading} active={(stats?.pending_findings ?? 0) > 0} />
