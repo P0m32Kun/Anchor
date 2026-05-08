@@ -92,12 +92,7 @@ func (s *Server) handleImportTargets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := s.targetSvc.Import(r.Context(), projectID, targets)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "import targets failed: %v", err))
+	if s.handleServiceError(w, err, "import targets failed") {
 		return
 	}
 
