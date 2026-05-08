@@ -250,13 +250,13 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 		p.completeStage(StagePortScan)
 	}
 
-	// S6: Service fingerprinting
+	// S6: Service fingerprinting (nmap -sV)
 	p.setStage(StageFingerprint)
-	var fpResults []fingerprint.NervaResult
-	if p.config.EnableNerva && len(ports) > 0 {
-		fpResults, err = p.runNerva(ctx, ports)
+	var fpResults []fingerprint.NmapServiceResult
+	if p.config.EnableNmapService && len(ports) > 0 {
+		fpResults, err = p.runNmapServiceScan(ctx, ports)
 		if err != nil {
-			log.Printf("nerva: %v", err)
+			log.Printf("nmap -sV: %v", err)
 			p.failStage(StageFingerprint, err.Error())
 		} else {
 			p.completeStage(StageFingerprint)
@@ -269,7 +269,7 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 
 	extraTargets := append([]string{}, cdnDomains...)
 	extraTargets = append(extraTargets, allDomains...)
-	// Fallback: if nerva produced no results, also feed naabu ports directly to httpx.
+	// Fallback: if nmap produced no results, also feed naabu ports directly to httpx.
 	if len(fpResults) == 0 && len(ports) > 0 {
 		for _, port := range ports {
 			extraTargets = append(extraTargets, fmt.Sprintf("%s:%d", port.IP, port.Port))
