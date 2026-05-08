@@ -392,7 +392,7 @@ export default function ReportsPage() {
                         </div>
                         <ArrowRight className="h-3 w-3 opacity-50 group-hover:translate-x-1 transition-transform" />
                     </Button>
-                    <Button variant="outline" className="w-full justify-between group" onClick={() => handleExport("json")} loading={exporting === 'json'}>
+                    <Button variant="secondary" className="w-full justify-between group" onClick={() => handleExport("json")} loading={exporting === 'json'}>
                         <div className="flex items-center">
                             <FileJson className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary" />
                             <span>JSON Data (.json)</span>
