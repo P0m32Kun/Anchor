@@ -1408,7 +1408,7 @@ func (q *Queries) ListRetestRunsByFinding(findingID string) ([]*models.RetestRun
 
 func (q *Queries) ListScanTasksByRun(runID string) ([]*models.ScanTask, error) {
 	rows, err := q.db.Query(`
-		SELECT id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, worker_id, nuclei_custom_bundle_version, created_at
+		SELECT id, project_id, plan_id, run_id, depends_on_task_id, target_id, tool, command_template, arguments_redacted, status, started_at, finished_at, exit_code, error_message, worker_id, nuclei_custom_bundle_version, created_at
 		FROM scan_tasks WHERE run_id = ? ORDER BY created_at`, runID)
 	if err != nil {
 		return nil, err
@@ -1420,8 +1420,9 @@ func (q *Queries) ListScanTasksByRun(runID string) ([]*models.ScanTask, error) {
 		var rid, pid, dep, tid, wid, cv sql.NullString
 		var sa, fa sql.NullTime
 		var ec sql.NullInt64
+		var errorMsg sql.NullString
 		if err := rows.Scan(
-			&t.ID, &t.ProjectID, &pid, &rid, &dep, &tid, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &sa, &fa, &ec, &wid, &cv, &t.CreatedAt); err != nil {
+			&t.ID, &t.ProjectID, &pid, &rid, &dep, &tid, &t.Tool, &t.CommandTemplate, &t.ArgumentsRedacted, &t.Status, &sa, &fa, &ec, &errorMsg, &wid, &cv, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		if pid.Valid {
@@ -1435,6 +1436,9 @@ func (q *Queries) ListScanTasksByRun(runID string) ([]*models.ScanTask, error) {
 		}
 		if tid.Valid {
 			t.TargetID = &tid.String
+		}
+		if errorMsg.Valid {
+			t.ErrorMessage = errorMsg.String
 		}
 		if cv.Valid {
 			t.NucleiCustomBundleVersion = &cv.String
