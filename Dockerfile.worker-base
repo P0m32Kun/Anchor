@@ -12,7 +12,8 @@
 # --- Stage 1: 构建工具 ---
 FROM golang:1.26-bookworm AS tools-builder
 
-RUN apt-get update \
+RUN sed -i 's|http://deb.debian.org|https://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
     git gcc libpcap-dev \
     && rm -rf /var/lib/apt/lists/*
