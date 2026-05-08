@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
 	"io"
 )
@@ -32,29 +30,10 @@ type NucleiResult struct {
 
 // ParseNuclei reads Nuclei JSONL output and returns parsed results.
 func ParseNuclei(r io.Reader) ([]NucleiResult, []ParseError) {
-	var results []NucleiResult
-	var errs []ParseError
-
-	reader := bufio.NewReader(r)
-	lineNo := 0
-	for {
-		lineNo++
-		lineBytes, readErr := reader.ReadBytes('\n')
-		line := string(bytes.TrimSpace(lineBytes))
-		if line == "" {
-			if readErr == io.EOF {
-				break
-			}
-			continue
-		}
-
+	return parseJSONLines(r, func(line []byte, lineNo int) (NucleiResult, ParseError) {
 		var raw map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
-			errs = append(errs, ParseError{Line: lineNo, Raw: line, Message: "invalid JSON: " + err.Error()})
-			if readErr == io.EOF {
-				break
-			}
-			continue
+		if err := json.Unmarshal(line, &raw); err != nil {
+			return NucleiResult{}, ParseError{Line: lineNo, Raw: string(line), Message: "invalid JSON: " + err.Error()}
 		}
 
 		var res NucleiResult
@@ -96,12 +75,6 @@ func ParseNuclei(r io.Reader) ([]NucleiResult, []ParseError) {
 			}
 		}
 
-		results = append(results, res)
-
-		if readErr == io.EOF {
-			break
-		}
-	}
-
-	return results, errs
+		return res, ParseError{}
+	})
 }
