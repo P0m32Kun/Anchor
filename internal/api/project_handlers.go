@@ -44,12 +44,9 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := s.projectSvc.Delete(r.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			writeError(w, appErr.StatusCode(), appErr)
+		if s.handleServiceError(w, err, "delete project failed") {
 			return
 		}
-		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "delete project failed: %v", err))
-		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
