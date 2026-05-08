@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api, Finding, API_BASE, PAGE_ALL } from "../lib/api";
 import { getApiToken } from "../lib/config";
 import { renderMarkdown } from "../lib/markdown";
-import { 
-  Button, 
-  SeverityBadge, 
-  StatusBadge, 
-  EmptyState, 
-  SkeletonList, 
-  useProjectId, 
+import {
+  Button,
+  SeverityBadge,
+  StatusBadge,
+  EmptyState,
+  SkeletonList,
+  useProjectId,
   useToast,
   Card,
   CardHeader,
@@ -19,22 +19,19 @@ import {
   Badge
 } from "../components";
 import { useStore } from "../lib/store";
-import { 
-  FileText, 
-  Download, 
-  Eye, 
-  FileJson, 
-  FileCode, 
-  ChevronRight, 
-  Layout, 
-  CheckCircle2, 
+import {
+  FileText,
+  Download,
+  Eye,
+  FileJson,
+  FileCode,
+  ChevronRight,
+  CheckCircle2,
   ShieldCheck,
   AlertTriangle,
   Info,
   ListOrdered,
   BookOpen,
-  ArrowRight,
-  ExternalLink,
   X
 } from "lucide-react";
 import { cn } from "../lib/utils";
