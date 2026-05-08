@@ -1,27 +1,20 @@
 # Anchor Core Server Dockerfile
 # Usage: docker build -f Dockerfile.server -t anchor-server .
 #        docker run -p 17421:17421 -v anchor-data:/data anchor-server
+#
+# 首次构建前请先构建基础镜像：
+#   docker build -f Dockerfile.server-base -t anchor-server-base:latest .
 
-FROM golang:1.26-alpine AS builder
-
-# 使用国内镜像源加速构建
-RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
-
-RUN apk add --no-cache git gcc musl-dev sqlite-dev
+FROM anchor-server-base:latest AS builder
 
 WORKDIR /build
-COPY go.mod go.sum ./
-
-# 使用国内 Go 模块代理
-ENV GOPROXY=https://goproxy.cn,direct
-RUN go mod download
-
 COPY . .
 RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor .
 
 # --- Runtime ---
 FROM alpine:latest
 
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
 RUN apk add --no-cache ca-certificates sqlite-libs wget git
 
 WORKDIR /app
