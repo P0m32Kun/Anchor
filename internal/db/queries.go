@@ -354,6 +354,9 @@ func (q *Queries) GetScanTask(id string) (*models.ScanTask, error) {
 		ec := int(exitCode.Int64)
 		t.ExitCode = &ec
 	}
+	if errorMsg.Valid {
+		t.ErrorMessage = errorMsg.String
+	}
 	return t, nil
 }
 
