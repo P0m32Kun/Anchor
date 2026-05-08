@@ -281,6 +281,23 @@ export interface Service {
   created_at: string;
 }
 
+export interface ServicePort {
+  id: string;
+  project_id: string;
+  asset_id: string;
+  ip: string;
+  port: number;
+  protocol: string;
+  state: string;
+  service_name: string;
+  title: string;
+  technologies: string[];
+  url: string;
+  source_tools: string[];
+  is_web: boolean;
+  created_at: string;
+}
+
 export interface ToolHealth {
   tool: string;
   binary_path?: string;
