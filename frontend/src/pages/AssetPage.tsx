@@ -155,48 +155,17 @@ export default function AssetPage() {
     });
   }, [webEndpoints, filterTitle, filterTech]);
 
-  const portRows = useMemo(() => {
-    const ipAssets = assets.filter((a) => a.type === "ip");
-    const rows: {
-      id: string;
-      assetId: string;
-      ip: string;
-      port: number;
-      protocol: string;
-      state: string;
-      serviceName: string;
-      sourceTool: string;
-    }[] = [];
-    for (const asset of ipAssets) {
-      const assetPorts = ports[asset.id] || [];
-      const assetServices = services[asset.id] || [];
-      const serviceMap = new Map(assetServices.map((s) => [s.port_id, s]));
-      for (const p of assetPorts) {
-        const svc = p.id ? serviceMap.get(p.id) : undefined;
-        rows.push({
-          id: p.id,
-          assetId: asset.id,
-          ip: asset.value,
-          port: p.port,
-          protocol: p.protocol,
-          state: p.state,
-          serviceName: svc?.name || "未知服务",
-          sourceTool: p.source_tool || "—",
-        });
-      }
-    }
-    return rows;
-  }, [assets, ports, services]);
-
   const filteredPortRows = useMemo(() => {
-    if (!filterPort) return portRows;
+    if (!filterPort) return servicePorts;
     const q = filterPort.toLowerCase();
-    return portRows.filter((row) =>
+    return servicePorts.filter((row) =>
       String(row.port).includes(q) ||
       row.ip.toLowerCase().includes(q) ||
-      row.serviceName.toLowerCase().includes(q)
+      row.service_name.toLowerCase().includes(q) ||
+      row.title.toLowerCase().includes(q) ||
+      (row.technologies || []).join(" ").toLowerCase().includes(q)
     );
-  }, [portRows, filterPort]);
+  }, [servicePorts, filterPort]);
 
   const totalPortPages = Math.max(1, Math.ceil(filteredPortRows.length / PORT_PAGE_SIZE));
   const paginatedPortRows = useMemo(() => {
