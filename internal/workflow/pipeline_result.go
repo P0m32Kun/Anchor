@@ -13,7 +13,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
-func (p *Pipeline) saveFingerprints(fpResults []fingerprint.NervaResult) {
+func (p *Pipeline) saveFingerprints(fpResults []fingerprint.NmapServiceResult) {
 	if len(fpResults) == 0 {
 		return
 	}
@@ -28,7 +28,7 @@ func (p *Pipeline) saveFingerprints(fpResults []fingerprint.NervaResult) {
 	}
 }
 
-func (p *Pipeline) runHTTPXAndNuclei(ctx context.Context, fpResults []fingerprint.NervaResult, extraHTTPXTargets []string) error {
+func (p *Pipeline) runHTTPXAndNuclei(ctx context.Context, fpResults []fingerprint.NmapServiceResult, extraHTTPXTargets []string) error {
 	webResults, nonWebResults := fingerprint.SplitByServiceType(fpResults)
 
 	httpxTargets := makeHTTPTargets(webResults)
