@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Project, Target, ScanTask, Asset, WebEndpoint, Port, Service, Finding, Evidence, PipelineRun } from "./api";
+import type { Project, Target, ScanTask, Asset, WebEndpoint, Port, Service, ServicePort, Finding, Evidence, PipelineRun } from "./api";
 
 interface FindingStatusRecord {
   status: string;
