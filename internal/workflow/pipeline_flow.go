@@ -135,7 +135,7 @@ func (p *Pipeline) runCompanyFlow(ctx context.Context, targets []*models.Target)
 	return flowErr
 }
 
-// runDomainFlow: Subfinder → DNS → CDN → Naabu → nerva → split Web/nonWeb → httpx → Nuclei.
+// runDomainFlow: Subfinder → DNS → CDN → Naabu → nmap -sV → split Web/nonWeb → httpx → Nuclei.
 func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) error {
 	p.setStage(StageSubdomain)
 
