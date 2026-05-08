@@ -25,13 +25,13 @@ import {
   TableCell
 } from "../components";
 import { 
-  Info, 
-  Upload, 
-  Target as TargetIcon, 
-  ShieldCheck, 
-  Plus, 
-  Play, 
-  FileText, 
+  Info,
+  Upload,
+  Target as TargetIcon,
+  ShieldCheck,
+  Plus,
+  Play,
+  FileText,
   Search,
   CheckCircle2,
   AlertCircle,
@@ -39,7 +39,8 @@ import {
   Zap,
   ChevronRight,
   FileUp,
-  X
+  X,
+  Users
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
