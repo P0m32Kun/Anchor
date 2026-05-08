@@ -226,8 +226,8 @@ export default function AssetPage() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">资产清单</h1>
           <p className="text-muted-foreground mt-1">汇总管理域名、IP、Web 端点及开放端口。</p>
         </div>
-        <Button variant="primary" onClick={startDiscovery} loading={loading}>
-          <RefreshCcw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+        <Button variant="primary" onClick={startDiscovery} loading={discoveryLoading}>
+          <RefreshCcw className={cn("mr-2 h-4 w-4", discoveryLoading && "animate-spin")} />
           资产发现
         </Button>
       </div>
