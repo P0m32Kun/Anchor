@@ -17,13 +17,7 @@ import {
   Button,
   Badge,
   SeverityBadge,
-  StatusBadge,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell
+  StatusBadge
 } from "../components";
 import type { Finding, Evidence } from "../lib/api";
 import {
