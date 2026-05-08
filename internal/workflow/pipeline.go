@@ -305,17 +305,37 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 
 	if p.runID != "" {
 		now := time.Now().UTC()
+
+		// Check if any stage failed.
+		stages, _ := p.queries.ListPipelineRunStages(p.runID)
+		hasFailedStage := false
+		for _, s := range stages {
+			if s.Status == models.StageStatusFailed {
+				hasFailedStage = true
+				break
+			}
+		}
+
+		var errMsg string
 		if flowErr != nil {
-			p.queries.UpdatePipelineRunError(p.runID, flowErr.Error())
+			errMsg = flowErr.Error()
+		} else if hasFailedStage {
+			errMsg = "one or more stages failed"
+		}
+
+		if flowErr != nil || hasFailedStage {
+			if errMsg != "" {
+				p.queries.UpdatePipelineRunError(p.runID, errMsg)
+			}
 			p.queries.UpdatePipelineRunStatus(p.runID, "failed")
 		} else {
 			p.queries.UpdatePipelineRunCompleted(p.runID, now)
 		}
+
 		// Mark any still-running stages as completed (or failed if overall failed).
-		stages, _ := p.queries.ListPipelineRunStages(p.runID)
 		for _, s := range stages {
 			if s.Status == models.StageStatusRunning {
-				if flowErr != nil {
+				if flowErr != nil || hasFailedStage {
 					p.queries.UpdatePipelineRunStageRecord(s.ID, models.StageStatusFailed, "pipeline aborted", &now)
 				} else {
 					p.queries.UpdatePipelineRunStageRecord(s.ID, models.StageStatusCompleted, "", &now)

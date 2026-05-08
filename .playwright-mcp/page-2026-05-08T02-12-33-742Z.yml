@@ -1,0 +1,12 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]: ⚓
+    - heading "欢迎使用 Anchor" [level=1] [ref=e5]
+    - paragraph [ref=e6]: 请配置 Anchor Server 地址以继续。
+    - generic [ref=e7]:
+      - textbox "http://localhost:17421" [ref=e8]
+      - generic [ref=e9]:
+        - textbox "请输入 Server 管理员提供的 API Token" [ref=e10]
+        - button "👁️" [ref=e11] [cursor=pointer]
+      - button "保存并进入" [ref=e12] [cursor=pointer]
+  - alert
