@@ -124,23 +124,12 @@ func (s *Server) handleSearchEngine(w http.ResponseWriter, r *http.Request) {
 	switch engine {
 	case "fofa":
 		client := search.NewFofaClient(cred.APIKey)
-		fofaResults, err := client.SearchDomain(r.Context(), query)
+		fofaResults, err := client.Search(r.Context(), query, page, size)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "fofa search: %v", err))
 			return
 		}
-		results = make([]search.SearchResult, 0, len(fofaResults))
-		for _, fr := range fofaResults {
-			results = append(results, search.SearchResult{
-				Engine:   "fofa",
-				IP:       fr.IP,
-				Port:     fr.Port,
-				Domain:   fr.Host,
-				Title:    fr.Title,
-				Protocol: fr.Protocol,
-				Service:  fr.Server,
-			})
-		}
+		results = fofaResults
 	case "hunter":
 		client := search.NewHunterClient(cred.APIKey)
 		hunterResults, err := client.Search(r.Context(), query, page, size)
