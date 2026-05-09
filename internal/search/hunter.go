@@ -16,21 +16,32 @@ type HunterClient struct {
 	baseURL string
 }
 
+// HunterComponent represents a detected component in a Hunter result.
+type HunterComponent struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 // HunterResult represents a single result from Hunter.
 type HunterResult struct {
-	IP         string `json:"ip"`
-	Port       int    `json:"port"`
-	Domain     string `json:"domain"`
-	WebTitle   string `json:"web_title"`
-	WebServer  string `json:"web_server"`
-	StatusCode int    `json:"status_code"`
-	Protocol   string `json:"protocol"`
-	Component  string `json:"component"`
-	OS         string `json:"os"`
-	Company    string `json:"company"`
-	ICP        string `json:"icp"`
-	Banner     string `json:"banner"`
-	IsRisk     string `json:"is_risk"`
+	IP           string            `json:"ip"`
+	Port         int               `json:"port"`
+	Domain       string            `json:"domain"`
+	WebTitle     string            `json:"web_title"`
+	HeaderServer string            `json:"header_server"`
+	StatusCode   int               `json:"status_code"`
+	Protocol     string            `json:"protocol"`
+	Components   []HunterComponent `json:"component"`
+	OS           string            `json:"os"`
+	Company      string            `json:"company"`
+	Number       string            `json:"number"`
+	Banner       string            `json:"banner"`
+	IsRisk       string            `json:"is_risk"`
+	Country      string            `json:"country"`
+	Province     string            `json:"province"`
+	City         string            `json:"city"`
+	ISP          string            `json:"isp"`
+	URL          string            `json:"url"`
 }
 
 // NewHunterClient creates a new Hunter client.
