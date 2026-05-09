@@ -42,14 +42,14 @@ export default function EnginesPage() {
   const [quotas, setQuotas] = useState<Record<string, QuotaData>>({});
   const toast = useToast();
   const abortRef = useRef<AbortController | null>(null);
-  const quotaAbortRef = useRef<AbortController | null>(null);
+  const quotaAbortRefs = useRef<Record<string, AbortController>>({});
 
   const activeMeta = ENGINES.find((e) => e.key === activeEngine)!;
 
   async function fetchQuota(engine: string) {
-    quotaAbortRef.current?.abort();
+    quotaAbortRefs.current[engine]?.abort();
     const ctrl = new AbortController();
-    quotaAbortRef.current = ctrl;
+    quotaAbortRefs.current[engine] = ctrl;
 
     try {
       const res = await api.getEngineQuota(engine, ctrl.signal);
@@ -73,7 +73,7 @@ export default function EnginesPage() {
     return () => {
       clearTimeout(timer);
       abortRef.current?.abort();
-      quotaAbortRef.current?.abort();
+      Object.values(quotaAbortRefs.current).forEach(c => c.abort());
     };
   }, []);
 
