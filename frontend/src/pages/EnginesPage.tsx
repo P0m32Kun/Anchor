@@ -143,6 +143,35 @@ export default function EnginesPage() {
                  </div>
              </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Coins className="h-3.5 w-3.5" />
+                额度状态
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-2 space-y-1">
+              {ENGINES.map((e) => {
+                const quota = quotas[e.key];
+                return (
+                  <div key={e.key} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <e.icon className={cn("h-3.5 w-3.5", e.color)} />
+                      <span className="text-muted-foreground">{e.label}</span>
+                    </div>
+                    {quota ? (
+                      <Badge variant="outline" className="font-mono text-[11px] bg-primary/5 border-primary/20 text-primary">
+                        {quota.remain.toLocaleString()} {quota.unit}
+                      </Badge>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground/50">--</span>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
         </aside>
 
         <section className="space-y-6">
