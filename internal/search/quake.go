@@ -15,38 +15,47 @@ type QuakeClient struct {
 	baseURL string
 }
 
+// QuakeComponent represents a detected component in a Quake result.
+type QuakeComponent struct {
+	ProductNameCN string   `json:"product_name_cn"`
+	ProductNameEN string   `json:"product_name_en"`
+	Version       string   `json:"version"`
+	ProductType   []string `json:"product_type"`
+}
+
 // QuakeHTTP represents HTTP-specific info within a Quake service result.
 type QuakeHTTP struct {
-	Title      string `json:"title"`
-	Server     string `json:"server"`
-	Host       string `json:"host"`
-	StatusCode int    `json:"status_code"`
+	Title        string `json:"title"`
+	Server       string `json:"server"`
+	Host         string `json:"host"`
+	StatusCode   int    `json:"status_code"`
+	ResponseHeaders string `json:"response_headers"`
 }
 
 // QuakeResult represents a single result from Quake.
 type QuakeResult struct {
-	IP       string `json:"ip"`
-	Port     int    `json:"port"`
-	Service  struct {
-		Name    string    `json:"name"`
-		Version string    `json:"version"`
-		Banner  string    `json:"banner"`
-		HTTP    QuakeHTTP `json:"http"`
+	IP         string `json:"ip"`
+	Port       int    `json:"port"`
+	Service    struct {
+		Name     string    `json:"name"`
+		Version  string    `json:"version"`
+		Response string    `json:"response"`
+		HTTP     QuakeHTTP `json:"http"`
 	} `json:"service"`
-	Location struct {
-		Country string `json:"country_cn"`
-		City    string `json:"city_cn"`
-		Lat     string `json:"lat"`
-		Lon     string `json:"lon"`
+	Location   struct {
+		Country  string `json:"country_cn"`
+		City     string `json:"city_cn"`
+		Province string `json:"province_cn"`
+		ISP      string `json:"isp"`
 	} `json:"location"`
-	ASN      struct {
-		Number       string `json:"number"`
-		Organization string `json:"organization"`
-	} `json:"asn"`
-	Org      string `json:"org"`
-	Hostname string `json:"hostname"`
-	Domain   string `json:"domain"`
-	OS       string `json:"os_name"`
+	ASN        int    `json:"asn"`
+	Org        string `json:"org"`
+	Hostname   string `json:"hostname"`
+	Domain     string `json:"domain"`
+	OS         string `json:"os_name"`
+	Transport  string `json:"transport"`
+	Time       string `json:"time"`
+	Components []QuakeComponent `json:"components"`
 }
 
 // NewQuakeClient creates a new Quake client.

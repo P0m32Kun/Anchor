@@ -34,11 +34,12 @@
 
 import { Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ToastProvider, Navbar, useToast, ErrorBoundary, Button } from "./components";
+import { ToastProvider, Navbar, Header, useToast, ErrorBoundary, Button } from "./components";
 import { setGlobalErrorHandler, setConsecutiveErrorCallback, api, API_BASE } from "./lib/api";
 import { resetApiBase, needsApiBaseConfig, getApiToken, resetApiToken, needsApiToken } from "./lib/config";
 import ApiBaseSetup from "./components/ApiBaseSetup";
 import { useStore } from "./lib/store";
+import { cn } from "./lib/utils";
 import ProjectLayout from "./components/ProjectLayout";
 import DashboardPage from "./pages/DashboardPage";
 import ProjectPage from "./pages/ProjectPage";
@@ -154,6 +155,7 @@ function AppHealthCheck({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   const toast = useToast();
+  const collapsed = useStore((s) => s.sidebarCollapsed);
 
   useEffect(() => {
     setGlobalErrorHandler((err) => {
@@ -181,9 +183,13 @@ function AppContent() {
   }, [toast]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen min-w-fit bg-background text-foreground">
       <Navbar />
-      <main className="pl-64 min-h-screen">
+      <main className={cn(
+        "min-h-screen transition-all duration-300",
+        collapsed ? "pl-20" : "pl-64"
+      )}>
+        <Header />
         <div className="container py-8 max-w-6xl">
           <ErrorBoundary>
             <Routes>

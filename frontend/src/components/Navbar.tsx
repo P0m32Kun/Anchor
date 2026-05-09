@@ -15,7 +15,10 @@ import {
   FileText,
   ChevronDown,
   Sparkles,
-  Layers
+  Layers,
+  ChevronLeft,
+  PanelLeftClose,
+  PanelLeftOpen
 } from "lucide-react";
 
 type NavItem = {
@@ -41,24 +44,29 @@ function isItemActive(locationPathname: string, itemPath: string): boolean {
   return locationPathname.startsWith(itemPath);
 }
 
-function NavLinkItem({ item, active }: { item: NavItem; active: boolean }) {
+function NavLinkItem({ item, active, collapsed }: { item: NavItem; active: boolean; collapsed: boolean }) {
   return (
     <Link
       to={item.path}
+      title={collapsed ? item.label : undefined}
       className={cn(
         "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
         active
           ? "bg-primary/10 text-primary shadow-[inset_0_0_12px_rgba(0,212,255,0.1)] border border-primary/20"
-          : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+        collapsed && "justify-center px-2"
       )}
     >
       <item.icon className={cn(
-        "h-4 w-4 transition-transform duration-300 group-hover:scale-110",
+        "h-4 w-4 transition-transform duration-300 group-hover:scale-110 shrink-0",
         active ? "text-primary" : item.color
       )} strokeWidth={2.5} />
-      <span>{item.label}</span>
+      {!collapsed && <span className="truncate">{item.label}</span>}
       {active && (
-         <div className="absolute left-[-12px] top-1/4 h-1/2 w-1 rounded-r-full bg-primary shadow-[0_0_10px_rgba(0,212,255,0.8)]" />
+         <div className={cn(
+           "absolute left-[-12px] top-1/4 h-1/2 w-1 rounded-r-full bg-primary shadow-[0_0_10px_rgba(0,212,255,0.8)]",
+           collapsed && "left-0"
+         )} />
       )}
     </Link>
   );
@@ -70,6 +78,8 @@ export function Navbar() {
   const currentProjectId = useStore((s) => s.currentProjectId);
   const projects = useStore((s) => s.projects);
   const setCurrentProjectId = useStore((s) => s.setCurrentProjectId);
+  const collapsed = useStore((s) => s.sidebarCollapsed);
+  const toggleCollapsed = useStore((s) => s.toggleSidebarCollapsed);
 
   const projectLinks: NavItem[] = currentProjectId
     ? [
@@ -90,27 +100,60 @@ export function Navbar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col glass-panel border-r border-white/5 shadow-2xl">
-      <div className="flex h-16 items-center gap-3 px-6 border-b border-white/5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-violet-600 shadow-lg shadow-primary/20">
-           <Box className="h-5 w-5 text-white" />
+    <aside className={cn(
+      "fixed inset-y-0 left-0 z-50 flex flex-col glass-panel border-r border-white/5 shadow-2xl transition-all duration-300",
+      collapsed ? "w-20" : "w-64"
+    )}>
+      <div className={cn(
+        "flex h-16 items-center border-b border-white/5 px-4",
+        collapsed ? "justify-center" : "justify-between gap-3 px-6"
+      )}>
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-violet-600 shadow-lg shadow-primary/20">
+             <Box className="h-5 w-5 text-white" />
+          </div>
+          {!collapsed && (
+            <span className="font-black text-lg tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60 truncate">
+                ANCHOR
+            </span>
+          )}
         </div>
-        <span className="font-black text-lg tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
-            ANCHOR
-        </span>
+        
+        {!collapsed && (
+          <button 
+            onClick={toggleCollapsed}
+            className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground transition-colors"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto px-4 py-6 custom-scrollbar">
+      <div className="flex-1 space-y-6 overflow-y-auto px-3 py-6 custom-scrollbar">
+        {collapsed && (
+          <div className="flex justify-center mb-4">
+            <button 
+              onClick={toggleCollapsed}
+              className="p-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all border border-primary/20 shadow-[0_0_15px_rgba(0,212,255,0.1)]"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
         <div>
-          <h2 className="mb-3 px-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
-            Workspace
-          </h2>
+          {!collapsed && (
+            <h2 className="mb-3 px-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
+              Workspace
+            </h2>
+          )}
           <div className="space-y-1.5">
             {globalNavItems.map((item) => (
               <NavLinkItem
                 key={item.path}
                 item={item}
                 active={isItemActive(location.pathname, item.path)}
+                collapsed={collapsed}
               />
             ))}
           </div>
@@ -118,24 +161,29 @@ export function Navbar() {
 
         {currentProjectId && (
           <div className="animate-in slide-in-from-left-4 duration-500">
-             <h2 className="mb-3 px-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 flex items-center gap-2">
-              <Sparkles className="h-3 w-3" />
-              Active Project
-            </h2>
-            <div className="px-1 mb-4">
+             {!collapsed && (
+               <h2 className="mb-3 px-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 flex items-center gap-2">
+                <Sparkles className="h-3 w-3" />
+                Active Project
+              </h2>
+             )}
+            <div className={cn("mb-4", collapsed ? "px-0" : "px-1")}>
               <div className="relative group">
                 <select
                   value={currentProjectId ?? ""}
                   onChange={handleProjectSwitch}
-                  className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all hover:bg-white/10"
+                  className={cn(
+                    "w-full appearance-none rounded-xl border border-white/10 bg-white/5 text-sm font-semibold ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all hover:bg-white/10",
+                    collapsed ? "px-2 py-2" : "px-4 py-2"
+                  )}
                 >
                   {projects.map((project) => (
                     <option key={project.id} value={project.id} className="bg-slate-900">
-                      {project.name}
+                      {collapsed ? project.name.substring(0, 2) : project.name}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 group-hover:text-primary transition-colors pointer-events-none" />
+                {!collapsed && <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 group-hover:text-primary transition-colors pointer-events-none" />}
               </div>
             </div>
             
@@ -145,6 +193,7 @@ export function Navbar() {
                   key={item.path}
                   item={item}
                   active={isItemActive(location.pathname, item.path)}
+                  collapsed={collapsed}
                 />
               ))}
             </div>
@@ -152,25 +201,27 @@ export function Navbar() {
         )}
       </div>
 
-      <div className="mt-auto p-4">
-        <div className="rounded-2xl border border-white/5 bg-white/5 p-4 shadow-inner">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-3 flex justify-between items-center">
-            Nodes Online
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          </div>
-          <div className="flex gap-1.5">
-             {[1,2,3,4,5,6].map(i => (
-               <div key={i} className={cn(
-                 "h-1.5 flex-1 rounded-full",
-                 currentProjectId ? "bg-primary/30" : "bg-white/5"
-               )} />
-             ))}
-          </div>
-          <div className="mt-3 text-[11px] font-semibold text-muted-foreground">
-            System status nominal
+      {!collapsed && (
+        <div className="mt-auto p-4">
+          <div className="rounded-2xl border border-white/5 bg-white/5 p-4 shadow-inner">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-3 flex justify-between items-center">
+              Nodes Online
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <div className="flex gap-1.5">
+               {[1,2,3,4,5,6].map(i => (
+                 <div key={i} className={cn(
+                   "h-1.5 flex-1 rounded-full",
+                   currentProjectId ? "bg-primary/30" : "bg-white/5"
+                 )} />
+               ))}
+            </div>
+            <div className="mt-3 text-[11px] font-semibold text-muted-foreground">
+              System status nominal
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

@@ -37,7 +37,9 @@ interface AppState {
   workersError: string | null;
   reportsLoading: boolean;
   reportsError: string | null;
+  sidebarCollapsed: boolean;
   setProjects: (p: Project[]) => void;
+  toggleSidebarCollapsed: () => void;
   setProjectsLoading: (loading: boolean) => void;
   setProjectsError: (error: string | null) => void;
   setCurrentProjectId: (id: string | null) => void;
@@ -101,8 +103,10 @@ export const useStore = create<AppState>()(
       workersError: null,
       reportsLoading: false,
       reportsError: null,
+      sidebarCollapsed: false,
 
       setProjects: (projects) => set({ projects }),
+      toggleSidebarCollapsed: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setProjectsLoading: (projectsLoading) => set({ projectsLoading }),
       setProjectsError: (projectsError) => set({ projectsError }),
 
@@ -183,7 +187,10 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "app-store",
-      partialize: (state) => ({ currentProjectId: state.currentProjectId }),
+      partialize: (state) => ({ 
+        currentProjectId: state.currentProjectId,
+        sidebarCollapsed: state.sidebarCollapsed 
+      }),
     }
   )
 );

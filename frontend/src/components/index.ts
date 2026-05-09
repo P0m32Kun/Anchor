@@ -3,6 +3,7 @@ export { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./Car
 export { Badge, SeverityBadge, StatusBadge } from "./Badge";
 export { ToastProvider, useToast } from "./Toast";
 export { Navbar } from "./Navbar";
+export { Header } from "./Header";
 export { EmptyState } from "./EmptyState";
 export { Skeleton, SkeletonCard, SkeletonList } from "./Skeleton";
 export { Input } from "./Input";
