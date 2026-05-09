@@ -549,53 +549,82 @@ export default function TemplatesPage() {
                               {(filesMap[src.id] || []).length === 0 ? (
                                 <div className="text-sm text-muted-foreground py-4 text-center">暂无文件</div>
                               ) : (
-                                <div className="grid gap-1">
-                                  {(filesMap[src.id] || []).map((f) => (
-                                    <div
-                                      key={f.path}
-                                      className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-white/5 transition-colors group/file"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        {f.path.endsWith("/") ? (
-                                          <Folder className="h-3.5 w-3.5 text-amber-400" />
-                                        ) : (
-                                          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                                <div className="grid gap-0.5">
+                                  {flattenTree(
+                                    buildFileTree(filesMap[src.id] || []),
+                                    expandedFolders[src.id] || new Set()
+                                  ).map(({ node, depth }) => {
+                                    const isExpanded = (expandedFolders[src.id] || new Set()).has(node.path);
+                                    const editable =
+                                      !node.isDir &&
+                                      (node.path.endsWith(".yaml") ||
+                                        node.path.endsWith(".yml") ||
+                                        node.path.startsWith("payloads/"));
+                                    return (
+                                      <div
+                                        key={node.path}
+                                        className={cn(
+                                          "flex items-center justify-between rounded-lg pr-3 py-1.5 transition-colors group/file",
+                                          node.isDir ? "cursor-pointer hover:bg-white/5" : "hover:bg-white/5"
                                         )}
-                                        <span className="text-sm font-mono">{f.path}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                          {(f.size / 1024).toFixed(1)} KB
-                                        </span>
-                                      </div>
-                                      <div className="flex gap-1 opacity-0 group-hover/file:opacity-100 transition-opacity">
-                                        {(f.path.endsWith(".yaml") || f.path.endsWith(".yml") || f.path.startsWith("payloads/")) && (
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-7 w-7 p-0"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              openFileEditor(src.id, f.path);
-                                            }}
-                                            title="编辑"
-                                          >
-                                            <Edit3 className="h-3 w-3" />
-                                          </Button>
+                                        style={{ paddingLeft: `${12 + depth * 16}px` }}
+                                        onClick={() => node.isDir && toggleFolder(src.id, node.path)}
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {node.isDir ? (
+                                            <>
+                                              {isExpanded ? (
+                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                              ) : (
+                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                              )}
+                                              <Folder className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                                              <span className="text-sm font-mono truncate">{node.name}</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span className="w-3.5 shrink-0" />
+                                              <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                              <span className="text-sm font-mono truncate">{node.name}</span>
+                                              <span className="text-xs text-muted-foreground shrink-0">
+                                                {(node.size / 1024).toFixed(1)} KB
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                        {!node.isDir && (
+                                          <div className="flex gap-1 opacity-0 group-hover/file:opacity-100 transition-opacity shrink-0">
+                                            {editable && (
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 w-7 p-0"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  openFileEditor(src.id, node.path);
+                                                }}
+                                                title="编辑"
+                                              >
+                                                <Edit3 className="h-3 w-3" />
+                                              </Button>
+                                            )}
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-7 w-7 p-0 text-rose-400"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteFile(src.id, node.path);
+                                              }}
+                                              title="删除"
+                                            >
+                                              <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                          </div>
                                         )}
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-7 w-7 p-0 text-rose-400"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteFile(src.id, f.path);
-                                          }}
-                                          title="删除"
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
