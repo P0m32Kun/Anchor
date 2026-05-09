@@ -160,6 +160,65 @@ func (s *Server) handleSearchEngine(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type engineQuotaResponse struct {
+	Engine string         `json:"engine"`
+	Quota  *search.QuotaInfo `json:"quota"`
+}
+
+func (s *Server) handleGetEngineQuota(w http.ResponseWriter, r *http.Request) {
+	engine := r.URL.Query().Get("engine")
+	if engine == "" {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "engine is required"))
+		return
+	}
+
+	cred, err := s.queries.GetEngineCredential(engine)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get credential: %v", err))
+		return
+	}
+	if cred == nil {
+		writeError(w, http.StatusBadRequest, errors.Newf(errors.ErrBadRequest, "no API key configured for %s", engine))
+		return
+	}
+
+	var quota *search.QuotaInfo
+	switch engine {
+	case "fofa":
+		client := search.NewFofaClient(cred.APIKey)
+		q, err := client.GetQuota(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "fofa quota: %v", err))
+			return
+		}
+		quota = q
+	case "hunter":
+		client := search.NewHunterClient(cred.APIKey)
+		q, err := client.GetQuota(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "hunter quota: %v", err))
+			return
+		}
+		quota = q
+	case "quake":
+		client := search.NewQuakeClient(cred.APIKey)
+		q, err := client.GetQuota(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "quake quota: %v", err))
+			return
+		}
+		quota = q
+	default:
+		writeError(w, http.StatusBadRequest, errors.Newf(errors.ErrBadRequest, "unsupported engine: %s", engine))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, engineQuotaResponse{
+		Engine: engine,
+		Quota:  quota,
+	})
+}
+
 func parseIntQuery(r *http.Request, key string, defaultVal int) int {
 	v := r.URL.Query().Get(key)
 	if v == "" {
