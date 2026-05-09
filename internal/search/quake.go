@@ -15,14 +15,23 @@ type QuakeClient struct {
 	baseURL string
 }
 
+// QuakeHTTP represents HTTP-specific info within a Quake service result.
+type QuakeHTTP struct {
+	Title      string `json:"title"`
+	Server     string `json:"server"`
+	Host       string `json:"host"`
+	StatusCode int    `json:"status_code"`
+}
+
 // QuakeResult represents a single result from Quake.
 type QuakeResult struct {
 	IP       string `json:"ip"`
 	Port     int    `json:"port"`
 	Service  struct {
-		Name    string `json:"name"`
-		Version string `json:"version"`
-		Banner  string `json:"banner"`
+		Name    string    `json:"name"`
+		Version string    `json:"version"`
+		Banner  string    `json:"banner"`
+		HTTP    QuakeHTTP `json:"http"`
 	} `json:"service"`
 	Location struct {
 		Country string `json:"country_cn"`
