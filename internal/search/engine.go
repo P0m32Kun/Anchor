@@ -60,14 +60,19 @@ type QuotaInfo struct {
 
 // SearchResult is a unified result format across all engines.
 type SearchResult struct {
-	Engine   string `json:"engine"`
-	IP       string `json:"ip"`
-	Port     int    `json:"port,omitempty"`
-	Domain   string `json:"domain,omitempty"`
-	Title    string `json:"title,omitempty"`
-	Service  string `json:"service,omitempty"`
-	Protocol string `json:"protocol,omitempty"`
-	Location string `json:"location,omitempty"`
-	OS       string `json:"os,omitempty"`
-	Raw      any    `json:"raw,omitempty"`
+	Engine       string `json:"engine"`
+	IP           string `json:"ip"`
+	Port         int    `json:"port,omitempty"`
+	Domain       string `json:"domain,omitempty"`
+	Title        string `json:"title,omitempty"`
+	Service      string `json:"service,omitempty"`
+	Protocol     string `json:"protocol,omitempty"`
+	Location     string `json:"location,omitempty"`
+	OS           string `json:"os,omitempty"`
+	StatusCode   int    `json:"status_code,omitempty"`
+	Country      string `json:"country,omitempty"`
+	City         string `json:"city,omitempty"`
+	Organization string `json:"organization,omitempty"`
+	ICP          string `json:"icp,omitempty"`
+	Raw          any    `json:"raw,omitempty"`
 }
