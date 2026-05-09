@@ -191,6 +191,23 @@ func parseFofaResults(raw [][]string) []FofaResult {
 		if len(row) > 5 {
 			r.Server = row[5]
 		}
+		if len(row) > 6 && row[6] != "" {
+			if code, err := strconv.Atoi(row[6]); err == nil {
+				r.StatusCode = code
+			}
+		}
+		if len(row) > 7 {
+			r.Country = row[7]
+		}
+		if len(row) > 8 {
+			r.City = row[8]
+		}
+		if len(row) > 9 {
+			r.ASOrganization = row[9]
+		}
+		if len(row) > 10 {
+			r.ICP = row[10]
+		}
 		results = append(results, r)
 	}
 	return results
