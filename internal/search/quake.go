@@ -156,9 +156,26 @@ func convertQuakeResults(raw []*QuakeResult) []SearchResult {
 		if r == nil {
 			continue
 		}
+
+		// Location: 国家 + 省/市 + 运营商
 		location := r.Location.Country
-		if r.Location.City != "" {
-			location = location + " " + r.Location.City
+		if r.Location.Province != "" && r.Location.Province != r.Location.Country {
+			if location != "" {
+				location += " "
+			}
+			location += r.Location.Province
+		}
+		if r.Location.City != "" && r.Location.City != r.Location.Province {
+			if location != "" {
+				location += " "
+			}
+			location += r.Location.City
+		}
+		if r.Location.ISP != "" {
+			if location != "" {
+				location += " | "
+			}
+			location += r.Location.ISP
 		}
 
 		// Title: 优先取 HTTP title，回退到 hostname
@@ -167,16 +184,31 @@ func convertQuakeResults(raw []*QuakeResult) []SearchResult {
 			title = r.Hostname
 		}
 
-		// 服务指纹：优先 HTTP server，其次 service.name + version，最后 banner
+		// 服务指纹：优先 HTTP server，其次 components 产品名，最后 service.name + version
 		service := r.Service.HTTP.Server
+		if service == "" && len(r.Components) > 0 {
+			parts := make([]string, 0, len(r.Components))
+			for _, c := range r.Components {
+				name := c.ProductNameCN
+				if name == "" {
+					name = c.ProductNameEN
+				}
+				if c.Version != "" {
+					name += " " + c.Version
+				}
+				if name != "" {
+					parts = append(parts, name)
+				}
+			}
+			if len(parts) > 0 {
+				service = joinParts(parts, " / ")
+			}
+		}
 		if service == "" {
 			service = r.Service.Name
 			if r.Service.Version != "" {
 				service += " " + r.Service.Version
 			}
-		}
-		if service == "" && r.Service.Banner != "" {
-			service = r.Service.Banner
 		}
 
 		results = append(results, SearchResult{
@@ -195,4 +227,15 @@ func convertQuakeResults(raw []*QuakeResult) []SearchResult {
 		})
 	}
 	return results
+}
+
+func joinParts(parts []string, sep string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	result := parts[0]
+	for i := 1; i < len(parts); i++ {
+		result += sep + parts[i]
+	}
+	return result
 }
