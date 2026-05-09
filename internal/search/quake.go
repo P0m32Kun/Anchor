@@ -95,6 +95,42 @@ func (c *QuakeClient) Search(ctx context.Context, query string, start, size int)
 	return convertQuakeResults(result.Data), nil
 }
 
+// GetQuota returns the remaining Quake quota.
+func (c *QuakeClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("Quake API key not configured")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/v3/user/info", nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("X-QuakeToken", c.apiKey)
+
+	var result struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			MonthRemainingCredit int `json:"month_remaining_credit"`
+			TotalRemainingCredit int `json:"total_remaining_credit"`
+		} `json:"data"`
+	}
+
+	if err := c.doJSON(req, &result); err != nil {
+		return nil, err
+	}
+
+	if result.Code != 0 {
+		return nil, fmt.Errorf("Quake API error: %s", result.Message)
+	}
+
+	return &QuotaInfo{
+		Remain: result.Data.MonthRemainingCredit,
+		Total:  result.Data.TotalRemainingCredit,
+		Unit:   "条",
+	}, nil
+}
+
 func convertQuakeResults(raw []*QuakeResult) []SearchResult {
 	results := make([]SearchResult, 0, len(raw))
 	for _, r := range raw {
