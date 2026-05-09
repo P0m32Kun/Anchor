@@ -143,16 +143,33 @@ func convertHunterResults(raw []*HunterResult) []SearchResult {
 		if r == nil {
 			continue
 		}
+
+		// 服务指纹：优先 web_server，如有 component 则拼接
+		service := r.WebServer
+		if r.Component != "" {
+			if service != "" {
+				service += " / " + r.Component
+			} else {
+				service = r.Component
+			}
+		}
+		if r.Banner != "" && service == "" {
+			service = r.Banner
+		}
+
 		results = append(results, SearchResult{
-			Engine:   "hunter",
-			IP:       r.IP,
-			Port:     r.Port,
-			Domain:   r.Domain,
-			Title:    r.WebTitle,
-			Service:  r.WebServer,
-			Protocol: r.Protocol,
-			OS:       r.OS,
-			Raw:      r,
+			Engine:       "hunter",
+			IP:           r.IP,
+			Port:         r.Port,
+			Domain:       r.Domain,
+			Title:        r.WebTitle,
+			Service:      service,
+			Protocol:     r.Protocol,
+			OS:           r.OS,
+			StatusCode:   r.StatusCode,
+			Organization: r.Company,
+			ICP:          r.ICP,
+			Raw:          r,
 		})
 	}
 	return results
