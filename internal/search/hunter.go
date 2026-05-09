@@ -97,14 +97,9 @@ func (c *HunterClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 		return nil, fmt.Errorf("Hunter API key not configured")
 	}
 
-	searchQuery := base64.StdEncoding.EncodeToString([]byte(`ip="0.0.0.0"`))
-	u, _ := url.Parse(c.baseURL + "/openApi/search")
+	u, _ := url.Parse(c.baseURL + "/openApi/userInfo")
 	q := u.Query()
-	q.Set("search", searchQuery)
-	q.Set("page", "1")
-	q.Set("page_size", "1")
 	q.Set("api-key", c.apiKey)
-	q.Set("is_web", "3")
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -116,9 +111,8 @@ func (c *HunterClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 		Data    struct {
-			Rest      string `json:"rest"`
-			RestFree  string `json:"rest_free"`
-			RestVIP   string `json:"rest_vip"`
+			RestFreePoint  int `json:"rest_free_point"`
+			RestEquityPoint int `json:"rest_equity_point"`
 		} `json:"data"`
 	}
 
@@ -130,19 +124,12 @@ func (c *HunterClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 		return nil, fmt.Errorf("Hunter API error: %s", result.Message)
 	}
 
-	rest, _ := strconv.Atoi(result.Data.Rest)
-	restFree, _ := strconv.Atoi(result.Data.RestFree)
-	restVIP, _ := strconv.Atoi(result.Data.RestVIP)
-
 	points := []QuotaPoint{}
-	if restFree > 0 {
-		points = append(points, QuotaPoint{Name: "免费积分", Value: restFree, Unit: ""})
+	if result.Data.RestFreePoint > 0 {
+		points = append(points, QuotaPoint{Name: "免费积分", Value: result.Data.RestFreePoint, Unit: ""})
 	}
-	if restVIP > 0 {
-		points = append(points, QuotaPoint{Name: "权益积分", Value: restVIP, Unit: ""})
-	}
-	if len(points) == 0 && rest > 0 {
-		points = append(points, QuotaPoint{Name: "剩余积分", Value: rest, Unit: ""})
+	if result.Data.RestEquityPoint > 0 {
+		points = append(points, QuotaPoint{Name: "权益积分", Value: result.Data.RestEquityPoint, Unit: ""})
 	}
 
 	return &QuotaInfo{
