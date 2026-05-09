@@ -121,13 +121,18 @@ func (c *FofaClient) Search(ctx context.Context, query string, page, size int) (
 	results := make([]SearchResult, 0, len(fofaResults))
 	for _, fr := range fofaResults {
 		results = append(results, SearchResult{
-			Engine:   "fofa",
-			IP:       fr.IP,
-			Port:     fr.Port,
-			Domain:   fr.Host,
-			Title:    fr.Title,
-			Protocol: fr.Protocol,
-			Service:  fr.Server,
+			Engine:       "fofa",
+			IP:           fr.IP,
+			Port:         fr.Port,
+			Domain:       fr.Host,
+			Title:        fr.Title,
+			Protocol:     fr.Protocol,
+			Service:      fr.Server,
+			StatusCode:   fr.StatusCode,
+			Country:      fr.Country,
+			City:         fr.City,
+			Organization: fr.ASOrganization,
+			ICP:          fr.ICP,
 		})
 	}
 	return results, nil
