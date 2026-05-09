@@ -42,6 +42,68 @@ import {
 
 type TabMode = "sources" | "manifest";
 
+type TreeNode = {
+  name: string;
+  path: string;
+  isDir: boolean;
+  size: number;
+  children: TreeNode[];
+};
+
+function buildFileTree(entries: NucleiCustomFileEntry[]): TreeNode[] {
+  const root: TreeNode = { name: "", path: "", isDir: true, size: 0, children: [] };
+  const cache = new Map<string, TreeNode>();
+  cache.set("", root);
+  for (const entry of entries) {
+    const clean = entry.path.replace(/\/+$/, "");
+    if (!clean) continue;
+    const parts = clean.split("/");
+    let parent = root;
+    let cum = "";
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i];
+      cum = cum ? `${cum}/${name}` : name;
+      const isLast = i === parts.length - 1;
+      let node = cache.get(cum);
+      if (!node) {
+        node = {
+          name,
+          path: cum,
+          isDir: !isLast || entry.is_dir,
+          size: isLast ? entry.size : 0,
+          children: [],
+        };
+        cache.set(cum, node);
+        parent.children.push(node);
+      }
+      parent = node;
+    }
+  }
+  const sortFn = (n: TreeNode) => {
+    n.children.sort((a, b) =>
+      a.isDir !== b.isDir ? (a.isDir ? -1 : 1) : a.name.localeCompare(b.name)
+    );
+    n.children.forEach(sortFn);
+  };
+  sortFn(root);
+  return root.children;
+}
+
+function flattenTree(
+  nodes: TreeNode[],
+  expanded: Set<string>,
+  depth = 0
+): Array<{ node: TreeNode; depth: number }> {
+  const out: Array<{ node: TreeNode; depth: number }> = [];
+  for (const n of nodes) {
+    out.push({ node: n, depth });
+    if (n.isDir && expanded.has(n.path)) {
+      out.push(...flattenTree(n.children, expanded, depth + 1));
+    }
+  }
+  return out;
+}
+
 export default function TemplatesPage() {
   const toast = useToast();
   const [sources, setSources] = useState<NucleiCustomSource[]>([]);
