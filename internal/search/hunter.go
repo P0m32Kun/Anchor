@@ -57,9 +57,12 @@ func (c *HunterClient) Search(ctx context.Context, query string, page, pageSize 
 		pageSize = 100
 	}
 
+	// Hunter search 参数需要 URL-safe base64 编码
+	encodedQuery := base64.URLEncoding.EncodeToString([]byte(query))
+
 	u, _ := url.Parse(c.baseURL + "/openApi/search")
 	q := u.Query()
-	q.Set("search", query)
+	q.Set("search", encodedQuery)
 	q.Set("page", strconv.Itoa(page))
 	q.Set("page_size", strconv.Itoa(pageSize))
 	q.Set("api-key", c.apiKey)
