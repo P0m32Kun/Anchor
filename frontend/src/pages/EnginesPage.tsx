@@ -18,7 +18,7 @@ import {
   TableHead,
   TableCell
 } from "../components";
-import { Search, Key, Globe, Database, Info } from "lucide-react";
+import { Search, Key, Globe, Database, Info, Coins } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const ENGINES = [
