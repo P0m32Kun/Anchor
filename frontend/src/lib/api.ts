@@ -499,7 +499,7 @@ export const api = {
   searchEngine: (params: { engine: string; query: string; page?: number; size?: number }, signal?: AbortSignal) =>
     fetchAPI<SearchEngineResponse>(buildQueryString("/engines/search", params), { signal }),
   getEngineQuota: (engine: string, signal?: AbortSignal) =>
-    fetchAPI<{ engine: string; quota: { points: { name: string; value: number; unit: string }[] } }>(`/engines/quota?engine=${engine}`, { signal }),
+    fetchAPI<{ engine: string; quota: { points: { name: string; value: number; unit: string }[] } }>(`/engines/quota?engine=${engine}`, { signal, skipGlobalError: true }),
 
   // --- Nuclei Custom Templates ---
   listNucleiCustomSources: (signal?: AbortSignal) =>
