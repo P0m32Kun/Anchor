@@ -151,17 +151,38 @@ func convertQuakeResults(raw []*QuakeResult) []SearchResult {
 		if r.Location.City != "" {
 			location = location + " " + r.Location.City
 		}
+
+		// Title: 优先取 HTTP title，回退到 hostname
+		title := r.Service.HTTP.Title
+		if title == "" {
+			title = r.Hostname
+		}
+
+		// 服务指纹：优先 HTTP server，其次 service.name + version，最后 banner
+		service := r.Service.HTTP.Server
+		if service == "" {
+			service = r.Service.Name
+			if r.Service.Version != "" {
+				service += " " + r.Service.Version
+			}
+		}
+		if service == "" && r.Service.Banner != "" {
+			service = r.Service.Banner
+		}
+
 		results = append(results, SearchResult{
-			Engine:   "quake",
-			IP:       r.IP,
-			Port:     r.Port,
-			Domain:   r.Domain,
-			Title:    r.Hostname,
-			Service:  r.Service.Name,
-			Protocol: r.Service.Name,
-			Location: location,
-			OS:       r.OS,
-			Raw:      r,
+			Engine:       "quake",
+			IP:           r.IP,
+			Port:         r.Port,
+			Domain:       r.Domain,
+			Title:        title,
+			Service:      service,
+			Protocol:     r.Service.Name,
+			Location:     location,
+			OS:           r.OS,
+			StatusCode:   r.Service.HTTP.StatusCode,
+			Organization: r.Org,
+			Raw:          r,
 		})
 	}
 	return results
