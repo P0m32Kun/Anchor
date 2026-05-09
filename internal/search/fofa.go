@@ -191,6 +191,44 @@ func parseFofaResults(raw [][]string) []FofaResult {
 	return results
 }
 
+// GetQuota returns the remaining FOFA quota (F-points and API query count).
+func (c *FofaClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("FOFA credentials not configured")
+	}
+
+	u, _ := url.Parse(c.baseURL + "/api/v1/info")
+	q := u.Query()
+	q.Set("key", c.apiKey)
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	var result struct {
+		Error        bool   `json:"error"`
+		ErrMsg       string `json:"errmsg"`
+		Fcoin        int    `json:"fcoin"`
+		RemainQuery  int    `json:"remain_api_query"`
+	}
+
+	if err := c.doJSON(req, &result); err != nil {
+		return nil, err
+	}
+
+	if result.Error {
+		return nil, fmt.Errorf("fofa API error: %s", result.ErrMsg)
+	}
+
+	return &QuotaInfo{
+		Remain: result.Fcoin,
+		Total:  result.RemainQuery,
+		Unit:   "F点",
+	}, nil
+}
+
 // IsDomain checks if a host string looks like a domain.
 func IsDomain(host string) bool {
 	host = strings.TrimSpace(host)
