@@ -40,6 +40,7 @@ func TestLiveHunterSearch(t *testing.T) {
 		fmt.Printf("  ICP:          %s\n", r.ICP)
 		fmt.Printf("  StatusCode:   %d\n", r.StatusCode)
 		fmt.Printf("  OS:           %s\n", r.OS)
+		fmt.Printf("  Location:     %s\n", r.Location)
 		fmt.Println()
 	}
 
