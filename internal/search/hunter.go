@@ -112,9 +112,9 @@ func (c *HunterClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 	}
 
 	var result struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
 			Rest string `json:"rest"`
 		} `json:"data"`
 	}
@@ -124,7 +124,7 @@ func (c *HunterClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 	}
 
 	if result.Code != 200 {
-		return nil, fmt.Errorf("Hunter API error: %s", result.Msg)
+		return nil, fmt.Errorf("Hunter API error: %s", result.Message)
 	}
 
 	rest, _ := strconv.Atoi(result.Data.Rest)
