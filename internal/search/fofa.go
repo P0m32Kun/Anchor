@@ -197,7 +197,7 @@ func (c *FofaClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 		return nil, fmt.Errorf("FOFA credentials not configured")
 	}
 
-	u, _ := url.Parse(c.baseURL + "/api/v1/info")
+	u, _ := url.Parse(c.baseURL + "/api/v1/info/my")
 	q := u.Query()
 	q.Set("key", c.apiKey)
 	u.RawQuery = q.Encode()
