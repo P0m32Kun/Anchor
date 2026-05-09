@@ -498,6 +498,8 @@ export const api = {
     fetchAPI<void>(`/engines/credentials/${engine}`, { method: "DELETE", signal }),
   searchEngine: (params: { engine: string; query: string; page?: number; size?: number }, signal?: AbortSignal) =>
     fetchAPI<SearchEngineResponse>(buildQueryString("/engines/search", params), { signal }),
+  getEngineQuota: (engine: string, signal?: AbortSignal) =>
+    fetchAPI<{ engine: string; quota: { remain: number; total: number; unit: string } }>(`/engines/quota?engine=${engine}`, { signal }),
 
   // --- Nuclei Custom Templates ---
   listNucleiCustomSources: (signal?: AbortSignal) =>
