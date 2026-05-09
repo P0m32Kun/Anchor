@@ -98,9 +98,10 @@ func (c *HunterClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 		return nil, fmt.Errorf("Hunter API key not configured")
 	}
 
+	searchQuery := base64.StdEncoding.EncodeToString([]byte(`ip="0.0.0.0"`))
 	u, _ := url.Parse(c.baseURL + "/openApi/search")
 	q := u.Query()
-	q.Set("search", `ip="0.0.0.0"`)
+	q.Set("search", searchQuery)
 	q.Set("page", "1")
 	q.Set("page_size", "1")
 	q.Set("api-key", c.apiKey)
