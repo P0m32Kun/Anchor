@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { api, SearchResult } from "../lib/api";
-import { 
-  useToast, 
-  EmptyState, 
-  Button, 
+import {
+  useToast,
+  EmptyState,
+  Button,
   Input,
   Card,
   CardHeader,
@@ -18,7 +18,7 @@ import {
   TableHead,
   TableCell
 } from "../components";
-import { Search, Key, Globe, Database, Info, Coins } from "lucide-react";
+import { Search, Key, Globe, Database, Info, Coins, WifiOff } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const ENGINES = [
@@ -29,6 +29,8 @@ const ENGINES = [
 
 const PAGE_SIZE = 20;
 
+type QuotaData = { points: { name: string; value: number; unit: string }[] } | null | "offline";
+
 export default function EnginesPage() {
   const [activeEngine, setActiveEngine] = useState("fofa");
   const [query, setQuery] = useState("");
@@ -37,24 +39,42 @@ export default function EnginesPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [quotas, setQuotas] = useState<Record<string, { remain: number; unit: string } | null>>({});
+  const [quotas, setQuotas] = useState<Record<string, QuotaData>>({});
   const toast = useToast();
   const abortRef = useRef<AbortController | null>(null);
+  const quotaAbortRef = useRef<AbortController | null>(null);
 
   const activeMeta = ENGINES.find((e) => e.key === activeEngine)!;
 
   async function fetchQuota(engine: string) {
+    quotaAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    quotaAbortRef.current = ctrl;
+
     try {
-      const res = await api.getEngineQuota(engine);
+      const res = await api.getEngineQuota(engine, ctrl.signal);
       setQuotas(prev => ({ ...prev, [engine]: res.quota }));
-    } catch {
-      setQuotas(prev => ({ ...prev, [engine]: null }));
+    } catch (err: any) {
+      if (err.name === "AbortError") return;
+      // Network/offline error
+      if (!err.status || err.message?.includes("fetch") || err.message?.includes("network")) {
+        setQuotas(prev => ({ ...prev, [engine]: "offline" }));
+      } else {
+        setQuotas(prev => ({ ...prev, [engine]: null }));
+      }
     }
   }
 
+  // Initial load: fetch all quotas once
   useEffect(() => {
-    ENGINES.forEach(e => fetchQuota(e.key));
-    return () => abortRef.current?.abort();
+    const timer = setTimeout(() => {
+      ENGINES.forEach(e => fetchQuota(e.key));
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      abortRef.current?.abort();
+      quotaAbortRef.current?.abort();
+    };
   }, []);
 
   async function handleSearch(resetPage = true, explicitPage?: number) {
@@ -75,12 +95,43 @@ export default function EnginesPage() {
       const res = await api.searchEngine({ engine: activeEngine, query, page: currentPage, size: PAGE_SIZE }, ctrl.signal);
       setResults(res.data || []);
       setTotal(res.total || 0);
+      // Refresh quota for the active engine after search
+      fetchQuota(activeEngine);
     } catch (err: any) {
       if (err.name === "AbortError") return;
       toast("搜索失败: " + (err.message || String(err)), "error");
     } finally {
       setLoading(false);
     }
+  }
+
+  function renderQuota(engine: string) {
+    const quota = quotas[engine];
+    if (quota === "offline") {
+      return (
+        <span className="text-[11px] text-muted-foreground/50 flex items-center gap-1">
+          <WifiOff className="h-3 w-3" />
+          未联网
+        </span>
+      );
+    }
+    if (!quota || quota.points.length === 0) {
+      return <span className="text-[11px] text-muted-foreground/50">--</span>;
+    }
+    return (
+      <div className="flex items-center gap-1.5">
+        {quota.points.map((p, i) => (
+          <Badge
+            key={i}
+            variant="outline"
+            className="font-mono text-[10px] bg-primary/5 border-primary/20 text-primary px-1.5 py-0"
+            title={p.name}
+          >
+            {p.value.toLocaleString()}{p.unit}
+          </Badge>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -115,8 +166,8 @@ export default function EnginesPage() {
                   onClick={() => { setActiveEngine(e.key); setResults([]); setHasSearched(false); }}
                   className={cn(
                     "flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-bold transition-all",
-                    activeEngine === e.key 
-                        ? "bg-primary/10 text-primary border border-primary/20 shadow-[inset_0_0_12px_rgba(0,212,255,0.05)]" 
+                    activeEngine === e.key
+                        ? "bg-primary/10 text-primary border border-primary/20 shadow-[inset_0_0_12px_rgba(0,212,255,0.05)]"
                         : "text-muted-foreground hover:bg-white/5"
                   )}
                 >
@@ -152,24 +203,15 @@ export default function EnginesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-2 space-y-1">
-              {ENGINES.map((e) => {
-                const quota = quotas[e.key];
-                return (
-                  <div key={e.key} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <e.icon className={cn("h-3.5 w-3.5", e.color)} />
-                      <span className="text-muted-foreground">{e.label}</span>
-                    </div>
-                    {quota ? (
-                      <Badge variant="outline" className="font-mono text-[11px] bg-primary/5 border-primary/20 text-primary">
-                        {quota.remain.toLocaleString()} {quota.unit}
-                      </Badge>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground/50">--</span>
-                    )}
+              {ENGINES.map((e) => (
+                <div key={e.key} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <e.icon className={cn("h-3.5 w-3.5", e.color)} />
+                    <span className="text-muted-foreground">{e.label}</span>
                   </div>
-                );
-              })}
+                  {renderQuota(e.key)}
+                </div>
+              ))}
             </CardContent>
           </Card>
         </aside>
