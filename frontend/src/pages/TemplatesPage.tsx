@@ -112,6 +112,7 @@ export default function TemplatesPage() {
   const [expandedSource, setExpandedSource] = useState<string | null>(null);
   const [filesMap, setFilesMap] = useState<Record<string, NucleiCustomFileEntry[]>>({});
   const [filesLoading, setFilesLoading] = useState<Record<string, boolean>>({});
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, Set<string>>>({});
 
   // Modals
   const [gitModalOpen, setGitModalOpen] = useState(false);
