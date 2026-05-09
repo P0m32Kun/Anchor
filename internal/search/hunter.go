@@ -91,6 +91,50 @@ func (c *HunterClient) Search(ctx context.Context, query string, page, pageSize 
 	return convertHunterResults(result.Data.Arr), nil
 }
 
+// GetQuota returns the remaining Hunter quota (rest points from a minimal search).
+func (c *HunterClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("Hunter API key not configured")
+	}
+
+	u, _ := url.Parse(c.baseURL + "/openApi/search")
+	q := u.Query()
+	q.Set("search", "ip=0.0.0.0")
+	q.Set("page", "1")
+	q.Set("page_size", "1")
+	q.Set("api-key", c.apiKey)
+	q.Set("is_web", "3")
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	var result struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data struct {
+			Rest string `json:"rest"`
+		} `json:"data"`
+	}
+
+	if err := c.doJSON(req, &result); err != nil {
+		return nil, err
+	}
+
+	if result.Code != 200 {
+		return nil, fmt.Errorf("Hunter API error: %s", result.Msg)
+	}
+
+	rest, _ := strconv.Atoi(result.Data.Rest)
+
+	return &QuotaInfo{
+		Remain: rest,
+		Unit:   "积分",
+	}, nil
+}
+
 func convertHunterResults(raw []*HunterResult) []SearchResult {
 	results := make([]SearchResult, 0, len(raw))
 	for _, r := range raw {
