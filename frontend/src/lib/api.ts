@@ -124,7 +124,7 @@ export async function request(
   }
 }
 
-async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number }): Promise<T> {
+async function fetchAPI<T>(path: string, opts?: RequestInit & { timeout?: number; skipGlobalError?: boolean }): Promise<T> {
   const isFormData = opts?.body instanceof FormData;
   const headers: Record<string, string> = {
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
