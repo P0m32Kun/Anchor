@@ -174,6 +174,15 @@ export default function TemplatesPage() {
     }
   }
 
+  function toggleFolder(sid: string, folderPath: string) {
+    setExpandedFolders((prev) => {
+      const cur = new Set(prev[sid] || []);
+      if (cur.has(folderPath)) cur.delete(folderPath);
+      else cur.add(folderPath);
+      return { ...prev, [sid]: cur };
+    });
+  }
+
   async function handleCreateGit() {
     if (!gitForm.name.trim() || !gitForm.uri.trim()) {
       toast("名称和仓库地址不能为空", "warning");
