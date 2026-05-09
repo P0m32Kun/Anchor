@@ -125,9 +125,10 @@ func (c *QuakeClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 	}
 
 	return &QuotaInfo{
-		Remain: result.Data.MonthRemainingCredit,
-		Total:  result.Data.TotalRemainingCredit,
-		Unit:   "条",
+		Points: []QuotaPoint{
+			{Name: "月度积分", Value: result.Data.MonthRemainingCredit, Unit: ""},
+			{Name: "长效积分", Value: result.Data.TotalRemainingCredit, Unit: ""},
+		},
 	}, nil
 }
 
