@@ -191,7 +191,7 @@ func parseFofaResults(raw [][]string) []FofaResult {
 	return results
 }
 
-// GetQuota returns the remaining FOFA quota (F-points and API query count).
+// GetQuota returns the remaining FOFA quota (F-points and F-coins).
 func (c *FofaClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 	if c.apiKey == "" {
 		return nil, fmt.Errorf("FOFA credentials not configured")
@@ -208,10 +208,10 @@ func (c *FofaClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 	}
 
 	var result struct {
-		Error        bool   `json:"error"`
-		ErrMsg       string `json:"errmsg"`
-		Fcoin        int    `json:"fcoin"`
-		RemainQuery  int    `json:"remain_api_query"`
+		Error       bool   `json:"error"`
+		ErrMsg      string `json:"errmsg"`
+		Fcoin       int    `json:"fcoin"`
+		RemainQuery int    `json:"remain_api_query"`
 	}
 
 	if err := c.doJSON(req, &result); err != nil {
@@ -223,9 +223,10 @@ func (c *FofaClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 	}
 
 	return &QuotaInfo{
-		Remain: result.Fcoin,
-		Total:  result.RemainQuery,
-		Unit:   "F点",
+		Points: []QuotaPoint{
+			{Name: "F点", Value: result.Fcoin, Unit: ""},
+			{Name: "F币", Value: result.RemainQuery, Unit: ""},
+		},
 	}, nil
 }
 
