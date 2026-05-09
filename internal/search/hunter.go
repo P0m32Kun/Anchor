@@ -71,9 +71,9 @@ func (c *HunterClient) Search(ctx context.Context, query string, page, pageSize 
 	}
 
 	var result struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
 			Total int             `json:"total"`
 			Arr   []*HunterResult `json:"arr"`
 			Rest  string          `json:"rest"`
@@ -85,7 +85,7 @@ func (c *HunterClient) Search(ctx context.Context, query string, page, pageSize 
 	}
 
 	if result.Code != 200 {
-		return nil, fmt.Errorf("Hunter API error: %s", result.Msg)
+		return nil, fmt.Errorf("Hunter API error: %s", result.Message)
 	}
 
 	return convertHunterResults(result.Data.Arr), nil
