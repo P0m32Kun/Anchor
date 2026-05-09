@@ -141,7 +141,7 @@ func (c *FofaClient) search(ctx context.Context, query string, size int) ([]Fofa
 	q.Set("key", c.apiKey)
 	q.Set("qbase64", qbase64)
 	q.Set("size", strconv.Itoa(size))
-	q.Set("fields", "host,ip,port,title,protocol,server")
+	q.Set("fields", "host,ip,port,title,protocol,server,status_code,country,city,as_organization,icp")
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
