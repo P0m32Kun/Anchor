@@ -17,7 +17,7 @@ func TestLiveHunterSearch(t *testing.T) {
 	}
 
 	client := NewHunterClient(apiKey)
-	results, err := client.Search(context.Background(), "domain=\"baidu.com\"", 1, 5)
+	results, err := client.Search(context.Background(), "domain=\"baidu.com\"", 1, 10)
 	if err != nil {
 		t.Fatalf("Hunter search failed: %v", err)
 	}
