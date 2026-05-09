@@ -118,9 +118,13 @@ export default function EnginesPage() {
     if (!quota || quota.points.length === 0) {
       return <span className="text-[11px] text-muted-foreground/50">--</span>;
     }
+    const validPoints = quota.points.filter(p => p.value > 0);
+    if (validPoints.length === 0) {
+      return <span className="text-[11px] text-muted-foreground/50">--</span>;
+    }
     return (
       <div className="flex items-center gap-1.5">
-        {quota.points.map((p, i) => (
+        {validPoints.map((p, i) => (
           <Badge
             key={i}
             variant="outline"
