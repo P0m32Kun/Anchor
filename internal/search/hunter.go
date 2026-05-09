@@ -117,7 +117,9 @@ func (c *HunterClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 		Data    struct {
-			Rest string `json:"rest"`
+			Rest      string `json:"rest"`
+			RestFree  string `json:"rest_free"`
+			RestVIP   string `json:"rest_vip"`
 		} `json:"data"`
 	}
 
@@ -130,10 +132,22 @@ func (c *HunterClient) GetQuota(ctx context.Context) (*QuotaInfo, error) {
 	}
 
 	rest, _ := strconv.Atoi(result.Data.Rest)
+	restFree, _ := strconv.Atoi(result.Data.RestFree)
+	restVIP, _ := strconv.Atoi(result.Data.RestVIP)
+
+	points := []QuotaPoint{}
+	if restFree > 0 {
+		points = append(points, QuotaPoint{Name: "免费积分", Value: restFree, Unit: ""})
+	}
+	if restVIP > 0 {
+		points = append(points, QuotaPoint{Name: "权益积分", Value: restVIP, Unit: ""})
+	}
+	if len(points) == 0 && rest > 0 {
+		points = append(points, QuotaPoint{Name: "剩余积分", Value: rest, Unit: ""})
+	}
 
 	return &QuotaInfo{
-		Remain: rest,
-		Unit:   "积分",
+		Points: points,
 	}, nil
 }
 
