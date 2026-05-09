@@ -115,6 +115,9 @@ export default function EnginesPage() {
         </span>
       );
     }
+    if (quota === null) {
+      return <span className="text-[11px] text-amber-500/70">未配置</span>;
+    }
     if (!quota || quota.points.length === 0) {
       return <span className="text-[11px] text-muted-foreground/50">--</span>;
     }
