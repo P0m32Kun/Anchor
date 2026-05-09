@@ -159,17 +159,46 @@ func convertHunterResults(raw []*HunterResult) []SearchResult {
 			continue
 		}
 
-		// 服务指纹：优先 web_server，如有 component 则拼接
-		service := r.WebServer
-		if r.Component != "" {
-			if service != "" {
-				service += " / " + r.Component
-			} else {
-				service = r.Component
+		// 服务指纹：优先 header_server，其次 components，最后 banner
+		service := r.HeaderServer
+		if service == "" && len(r.Components) > 0 {
+			parts := make([]string, 0, len(r.Components))
+			for _, c := range r.Components {
+				name := c.Name
+				if c.Version != "" {
+					name += " " + c.Version
+				}
+				if name != "" {
+					parts = append(parts, name)
+				}
+			}
+			if len(parts) > 0 {
+				service = joinParts(parts, " / ")
 			}
 		}
-		if r.Banner != "" && service == "" {
+		if service == "" && r.Banner != "" {
 			service = r.Banner
+		}
+
+		// 地理位置
+		location := r.Country
+		if r.Province != "" && r.Province != r.Country {
+			if location != "" {
+				location += " "
+			}
+			location += r.Province
+		}
+		if r.City != "" && r.City != r.Province {
+			if location != "" {
+				location += " "
+			}
+			location += r.City
+		}
+		if r.ISP != "" {
+			if location != "" {
+				location += " | "
+			}
+			location += r.ISP
 		}
 
 		results = append(results, SearchResult{
@@ -183,7 +212,8 @@ func convertHunterResults(raw []*HunterResult) []SearchResult {
 			OS:           r.OS,
 			StatusCode:   r.StatusCode,
 			Organization: r.Company,
-			ICP:          r.ICP,
+			ICP:          r.Number,
+			Location:     location,
 			Raw:          r,
 		})
 	}
