@@ -738,6 +738,11 @@ export interface SearchResult {
   protocol?: string;
   location?: string;
   os?: string;
+  status_code?: number;
+  country?: string;
+  city?: string;
+  organization?: string;
+  icp?: string;
   raw?: unknown;
   [key: string]: unknown;
 }
