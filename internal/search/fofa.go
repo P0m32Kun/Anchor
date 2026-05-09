@@ -97,6 +97,37 @@ func (c *FofaClient) SearchIP(ctx context.Context, ip string) ([]FofaResult, err
 	return c.search(ctx, q, 500)
 }
 
+// Search performs a direct FOFA search with the given raw query.
+// The query is passed directly to FOFA without any wrapping.
+func (c *FofaClient) Search(ctx context.Context, query string, page, size int) ([]SearchResult, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("FOFA credentials not configured")
+	}
+	if size < 1 {
+		size = 20
+	}
+	if size > 500 {
+		size = 500
+	}
+	fofaResults, err := c.search(ctx, query, size)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]SearchResult, 0, len(fofaResults))
+	for _, fr := range fofaResults {
+		results = append(results, SearchResult{
+			Engine:   "fofa",
+			IP:       fr.IP,
+			Port:     fr.Port,
+			Domain:   fr.Host,
+			Title:    fr.Title,
+			Protocol: fr.Protocol,
+			Service:  fr.Server,
+		})
+	}
+	return results, nil
+}
+
 func (c *FofaClient) search(ctx context.Context, query string, size int) ([]FofaResult, error) {
 	qbase64 := base64.StdEncoding.EncodeToString([]byte(query))
 
