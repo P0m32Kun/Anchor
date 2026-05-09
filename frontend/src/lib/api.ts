@@ -111,7 +111,7 @@ export async function request(
     }
     const apiErr = classifyError(err);
 
-    if (globalErrorHandler) globalErrorHandler(apiErr);
+    if (globalErrorHandler && !opts?.skipGlobalError) globalErrorHandler(apiErr);
 
     consecutiveErrors++;
     if (consecutiveErrors >= 3 && consecutiveErrorCallback) {
