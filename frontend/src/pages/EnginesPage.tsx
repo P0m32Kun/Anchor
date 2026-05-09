@@ -269,40 +269,67 @@ export default function EnginesPage() {
             </Card>
           ) : (
             <Card className="overflow-hidden">
+                <div className="overflow-x-auto">
                 <Table>
                     <TableHeader className="bg-white/5">
                         <TableRow>
-                            <TableHead>资产目标</TableHead>
-                            <TableHead className="w-32">端口</TableHead>
-                            <TableHead>服务协议</TableHead>
-                            <TableHead className="text-right">地理位置</TableHead>
+                            <TableHead className="min-w-[200px]">资产目标</TableHead>
+                            <TableHead className="w-28">端口 / 状态</TableHead>
+                            <TableHead className="min-w-[140px]">服务类型</TableHead>
+                            <TableHead className="min-w-[120px]">位置</TableHead>
+                            <TableHead className="min-w-[140px] text-right">企业 / 备案</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {results.map((r, i) => (
                         <TableRow key={i} className="group">
                             <TableCell>
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="font-mono text-sm font-bold text-foreground group-hover:text-primary transition-colors">{r.url || r.host}</span>
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                    <span className="font-mono text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">{r.domain || r.host || r.url}</span>
                                     {r.ip && <span className="text-[10px] text-muted-foreground font-mono">{r.ip}</span>}
+                                    {r.title && <span className="text-[11px] text-muted-foreground truncate" title={r.title}>{r.title}</span>}
                                 </div>
                             </TableCell>
                             <TableCell>
-                                <Badge variant="outline" className="font-mono text-primary bg-primary/5 border-primary/20">{r.port}</Badge>
+                                <div className="flex items-center gap-1.5">
+                                    <Badge variant="outline" className="font-mono text-primary bg-primary/5 border-primary/20 text-[11px]">{r.port}</Badge>
+                                    {r.status_code ? (
+                                        <Badge variant="outline" className={`font-mono text-[10px] px-1 ${r.status_code >= 200 && r.status_code < 300 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : r.status_code >= 300 && r.status_code < 400 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                                            {r.status_code}
+                                        </Badge>
+                                    ) : null}
+                                </div>
                             </TableCell>
                             <TableCell>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium capitalize">{r.protocol || r.service || "unknown"}</span>
-                                    {r.title && <span className="text-xs text-muted-foreground truncate max-w-[200px]">({r.title})</span>}
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-sm font-medium">{r.protocol || "unknown"}</span>
+                                    {r.service && <span className="text-[10px] text-muted-foreground truncate" title={r.service}>{r.service}</span>}
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                <div className="flex flex-col gap-0.5">
+                                    {(r.country || r.city) ? (
+                                        <span className="text-xs text-muted-foreground">
+                                            {r.country}{r.country && r.city ? ' · ' : ''}{r.city}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground/50">--</span>
+                                    )}
+                                    {r.location && !r.country && <span className="text-xs text-muted-foreground">{r.location}</span>}
                                 </div>
                             </TableCell>
                             <TableCell className="text-right">
-                                <span className="text-xs text-muted-foreground">{r.location || "Global"}</span>
+                                <div className="flex flex-col gap-0.5 items-end">
+                                    {r.organization && <span className="text-[11px] text-muted-foreground truncate max-w-[160px]" title={r.organization}>{r.organization}</span>}
+                                    {r.icp && <span className="text-[10px] text-muted-foreground/60 truncate max-w-[160px]" title={r.icp}>{r.icp}</span>}
+                                    {!r.organization && !r.icp && <span className="text-[11px] text-muted-foreground/50">--</span>}
+                                </div>
                             </TableCell>
                         </TableRow>
                         ))}
                     </TableBody>
                 </Table>
+                </div>
             </Card>
           )}
         </section>
