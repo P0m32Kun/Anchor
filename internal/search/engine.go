@@ -46,11 +46,16 @@ func (b *baseClient) doJSON(req *http.Request, v any) error {
 	return nil
 }
 
-// QuotaInfo holds quota/credit information for a search engine.
+// QuotaPoint represents a single quota/credit metric.
+type QuotaPoint struct {
+	Name  string `json:"name"`
+	Value int    `json:"value"`
+	Unit  string `json:"unit"`
+}
+
+// QuotaInfo holds all quota/credit metrics for a search engine.
 type QuotaInfo struct {
-	Remain int    `json:"remain"`
-	Total  int    `json:"total"`
-	Unit   string `json:"unit"`
+	Points []QuotaPoint `json:"points"`
 }
 
 // SearchResult is a unified result format across all engines.
