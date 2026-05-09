@@ -21,13 +21,18 @@ type FofaClient struct {
 
 // FofaResult represents a single result from FOFA.
 type FofaResult struct {
-	Host     string `json:"host"`
-	IP       string `json:"ip"`
-	Port     int    `json:"port"`
-	Title    string `json:"title"`
-	Protocol string `json:"protocol"`
-	Server   string `json:"server"`
-	CName    string `json:"cname"`
+	Host           string `json:"host"`
+	IP             string `json:"ip"`
+	Port           int    `json:"port"`
+	Title          string `json:"title"`
+	Protocol       string `json:"protocol"`
+	Server         string `json:"server"`
+	StatusCode     int    `json:"status_code"`
+	Country        string `json:"country"`
+	City           string `json:"city"`
+	ASOrganization string `json:"as_organization"`
+	ICP            string `json:"icp"`
+	CName          string `json:"cname"`
 }
 
 // NewFofaClient creates a new FOFA client.
