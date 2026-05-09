@@ -37,12 +37,23 @@ export default function EnginesPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [quotas, setQuotas] = useState<Record<string, { remain: number; unit: string } | null>>({});
   const toast = useToast();
   const abortRef = useRef<AbortController | null>(null);
 
   const activeMeta = ENGINES.find((e) => e.key === activeEngine)!;
 
+  async function fetchQuota(engine: string) {
+    try {
+      const res = await api.getEngineQuota(engine);
+      setQuotas(prev => ({ ...prev, [engine]: res.quota }));
+    } catch {
+      setQuotas(prev => ({ ...prev, [engine]: null }));
+    }
+  }
+
   useEffect(() => {
+    ENGINES.forEach(e => fetchQuota(e.key));
     return () => abortRef.current?.abort();
   }, []);
 
