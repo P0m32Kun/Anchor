@@ -67,7 +67,7 @@ function classifyError(err: unknown): APIError {
 
 export async function request(
   path: string,
-  opts?: RequestInit & { timeout?: number }
+  opts?: RequestInit & { timeout?: number; skipGlobalError?: boolean }
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), opts?.timeout ?? 30000);
