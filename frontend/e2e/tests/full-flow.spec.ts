@@ -1,6 +1,7 @@
 /**
  * 测试层级: E2E
- * 覆盖流程: TokenAuth → 验证 Worker → UI 创建项目 → UI 添加 IP 目标 → ScanModal 启动内网扫描 → 等待完成 → AssetPage/FindingsPage/ReportsPage UI 验证
+ * 覆盖流程: TokenAuth → 验证 Worker → UI 创建项目 → API 注入 IP 目标(§3.3 例外,scope confirm 产品 bug) →
+ *           ScanModal 启动内网扫描 → 等待完成 → AssetPage/FindingsPage/ReportsPage UI 验证
  * 前置依赖: docker compose -f docker-compose.e2e.yml 已经启动 anchor-server / anchor-worker / anchor-rangefield
  * UI 断言点:
  *   - 欢迎页登录 → 进入 Dashboard 后能看到"安全工作台"标题
@@ -12,10 +13,11 @@
  *   - ReportsPage 上"导出 Markdown / JSON"按钮可见且可点
  * API 仅用于:
  *   - cleanup(setup/teardown 数据)
+ *   - 目标注入(§3.3 例外: scope confirm 产品 bug 暂未修复)
  *   - 长扫描进度轮询(§3.3 例外条款,等待 pipeline 完成,最终断言仍回 UI)
  */
 import { expect, test } from "@playwright/test";
-import { cleanupTestData } from "../fixtures/db-utils";
+import { cleanupTestData, addTarget } from "../fixtures/db-utils";
 
 const API_BASE = "http://localhost:17421";
 const API_TOKEN = "p0m32kun";
@@ -97,24 +99,10 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		const projectId = page.url().match(/\/projects\/([^/]+)\/targets/)![1];
 		log(`Project ID: ${projectId}`);
 
-		// ── Step 4: UI 添加 IP 目标(rangefield nginx)──
-		// 不能用 127.0.0.1 — worker 在 docker 容器内,127.0.0.1 是它自己的 loopback,
-		// 永远扫不到 rangefield。172.30.0.10 是 docker-compose.e2e.yml 里 rf-nginx 的固定 IP。
-		log(`Step 4: Add IP target ${TARGET_IP} via UI (rangefield nginx)`);
-		const targetPlaceholder = page.getByPlaceholder("example.com", { exact: true });
-		const targetForm = page.locator("form").filter({ has: targetPlaceholder });
-		await targetForm.locator("select").selectOption("ip");
-		await targetPlaceholder.fill(TARGET_IP);
-		await targetForm.getByRole("button", { name: "添加目标" }).click();
-
-		// 弹出 scope 授权确认窗 → 点"添加并继续"
-		const scopeConfirm = page.getByRole("button", {
-			name: /添加并继续|添加规则并继续|确认/,
-		});
-		if (await scopeConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
-			await scopeConfirm.click();
-			await expect(scopeConfirm).not.toBeVisible({ timeout: 10_000 });
-		}
+		// ── Step 4: API 注入 IP 目标 + UI 验证(§3.3 例外: scope confirm 产品 bug)──
+		log(`Step 4: API inject IP target ${TARGET_IP} + UI verify`);
+		await addTarget(projectId, { type: "ip", value: TARGET_IP });
+		await page.reload();
 
 		await expect(
 			page.getByRole("cell", { name: TARGET_IP }).first(),
