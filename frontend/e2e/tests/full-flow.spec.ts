@@ -83,8 +83,8 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 			.fill("UI-driven full flow 验收");
 		await page.getByRole("button", { name: "创建项目", exact: true }).click();
 
-		// 项目卡片可见即视为创建成功
-		const projectCard = page.locator("button", { hasText: projectName }).first();
+		// 项目卡片标题渲染为 <h3>,匹配 heading role 而非 button
+		const projectCard = page.getByRole("heading", { name: projectName });
 		await expect(projectCard).toBeVisible({ timeout: 10_000 });
 
 		await projectCard.click();
