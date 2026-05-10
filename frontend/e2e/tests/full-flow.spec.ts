@@ -17,7 +17,7 @@
  *   - 长扫描进度轮询(§3.3 例外条款,等待 pipeline 完成,最终断言仍回 UI)
  */
 import { expect, test } from "@playwright/test";
-import { cleanupTestData, addTarget } from "../fixtures/db-utils";
+import { cleanupTestData, addTarget, createProject } from "../fixtures/db-utils";
 
 const API_BASE = "http://localhost:17421";
 const API_TOKEN = "p0m32kun";
