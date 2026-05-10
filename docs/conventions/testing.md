@@ -154,7 +154,26 @@ review integration PR 时:
 2. 把"假 e2e"批量打标(grep `fetch.*API_BASE` 或 `page.request` 在 `test()` body 内的出现),逐 PR 重写或降级为 integration
 3. 引入 Vitest + RTL 补足前端 unit 层(独立任务,见 `tasks/pending/`)
 
-## 9. 不讨论范围
+## 9. 跑 E2E 前的环境清理
+
+`docker-compose.e2e.yml` 与主 `docker-compose.yml` 共用 subnet `172.30.0.0/24` 和容器名(`rf-redis`、`rf-tomcat` 等固定 `container_name`)。先后跑过两套会留下孤儿,导致 `Pool overlaps` 或 `container name already in use`。每次跑 e2e 前确认:
+
+```bash
+# 1) 检查并清理孤儿网络
+docker network ls | grep anchor-net
+# 若存在 inspect 看 Containers 是否为空,空则删除:
+docker network rm anchor-net
+
+# 2) 清理孤儿容器(rf-* 来自 rangefield,exited 即可删)
+docker ps -a --format "{{.Names}}" | grep -E "^rf-|^anchor-" | xargs -r docker rm -f
+
+# 3) 检查端口 17421(server)和 1420(vite dev)未被占用
+lsof -i :17421 -i :1420
+```
+
+任何长期占用 17421 / 1420 的本地进程都需要先停掉。`global-setup.ts` / `global-teardown.ts` 只清自己 compose project 的容器,**不会**清这些孤儿,因此清理是手动义务。
+
+## 10. 不讨论范围
 
 - Tauri 桌面端的自动化测试(参见 `docs/tauri-testability.md`,目前只能浏览器跑)
 - 性能/压测/安全渗透——这些不属于本约定的金字塔
