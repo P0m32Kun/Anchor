@@ -163,6 +163,10 @@ test-e2e-full:
 test-e2e-up:
 	docker compose -f docker-compose.e2e.yml up -d --build
 
+# 前端单元测试(Vitest)
+test-unit-frontend:
+	@cd frontend && npm run test:unit
+
 # E2E 环境停止
 test-e2e-down:
 	docker compose -f docker-compose.e2e.yml down --remove-orphans
