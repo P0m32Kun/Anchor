@@ -66,11 +66,10 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 
 		// ── Step 2: UI 添加 IP 目标 ──
 		log("Step 2: Add IP target via UI (rangefield redis)");
-		const targetForm = page.locator("form").filter({
-			has: page.getByPlaceholder("example.com"),
-		});
+		const targetPlaceholder = page.getByPlaceholder("example.com", { exact: true });
+		const targetForm = page.locator("form").filter({ has: targetPlaceholder });
 		await targetForm.locator("select").selectOption("ip");
-		await targetForm.getByPlaceholder("example.com").fill(REDIS_IP);
+		await targetPlaceholder.fill(REDIS_IP);
 		await targetForm.getByRole("button", { name: "添加目标" }).click();
 
 		const scopeConfirm = page.getByRole("button", {
