@@ -56,7 +56,8 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 			.fill("高危端口 preset UI 验收");
 		await page.getByRole("button", { name: "创建项目", exact: true }).click();
 
-		const projectCard = page.locator("button", { hasText: projectName }).first();
+		// 项目卡片标题渲染为 <h3>,匹配 heading role
+		const projectCard = page.getByRole("heading", { name: projectName });
 		await expect(projectCard).toBeVisible({ timeout: 10_000 });
 		await projectCard.click();
 		await expect(page).toHaveURL(/\/projects\/[^/]+\/targets/);
