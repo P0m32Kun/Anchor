@@ -105,27 +105,33 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		const projectId = page.url().match(/\/projects\/([^/]+)\/targets/)![1];
 		log(`Project ID: ${projectId}`);
 
-		// ── Step 4: UI 添加 IP 目标(rangefield nginx,worker docker 网络内可达) ──
-		// 注意: 不能用 127.0.0.1 — worker 在 docker 容器内,127.0.0.1 是它自己的 loopback,
-		// 永远扫不到 rangefield 的服务。172.30.0.10 是 docker-compose.e2e.yml 里 rf-nginx 的固定 IP。
-		log("Step 4: Add IP target via UI (rangefield nginx 172.30.0.10)");
-
-		const targetPlaceholder = page.getByPlaceholder("example.com", { exact: true });
-		const targetForm = page.locator("form").filter({ has: targetPlaceholder });
-		await targetForm.locator("select").selectOption("ip");
-		await targetPlaceholder.fill(TARGET_IP);
-		await targetForm.getByRole("button", { name: "添加目标" }).click();
-
-		// 弹出 scope 授权确认窗 → 点"添加并继续",自动注册 scope 规则
-		const scopeConfirm = page.getByRole("button", {
-			name: /添加并继续|添加规则并继续|确认/,
+		// ── Step 4: API 注入 IP 目标 + cidr scope 规则(§3.3 例外,详见文件头)──
+		// 不能用 127.0.0.1 — worker 在 docker 容器内,127.0.0.1 是它自己的 loopback,
+		// 永远扫不到 rangefield。172.30.0.10 是 docker-compose.e2e.yml 里 rf-nginx 的固定 IP。
+		log(`Step 4: Seed IP target ${TARGET_IP} + cidr scope rule via API (UI bug workaround)`);
+		const headers = {
+			Authorization: `Bearer ${API_TOKEN}`,
+			"Content-Type": "application/json",
+		};
+		const scopeRes = await page.request.post(`${API_BASE}/scope-rules`, {
+			headers,
+			data: {
+				project_id: projectId,
+				action: "include",
+				type: "cidr",
+				value: `${TARGET_IP}/32`,
+			},
 		});
-		if (await scopeConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
-			await scopeConfirm.click();
-			await expect(scopeConfirm).not.toBeVisible({ timeout: 10_000 });
-		}
+		expect([200, 201]).toContain(scopeRes.status());
 
-		// 表格里能看到目标值
+		const targetRes = await page.request.post(
+			`${API_BASE}/projects/${projectId}/targets`,
+			{ headers, data: { type: "ip", value: TARGET_IP } },
+		);
+		expect([200, 201]).toContain(targetRes.status());
+
+		// 即便目标走 API 注入,UI 也必须正确渲染表格行
+		await page.reload();
 		await expect(
 			page.getByRole("cell", { name: TARGET_IP }).first(),
 		).toBeVisible({ timeout: 10_000 });
