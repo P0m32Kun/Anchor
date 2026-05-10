@@ -46,7 +46,7 @@ test.describe
 			// 选择目标类型为域名（使用更精确的选择器）
 			await page.locator("select").first().selectOption("domain");
 			await page
-				.getByPlaceholder(/example\.com 或 192\.168/)
+				.getByPlaceholder("example.com")
 				.first()
 				.fill("smoke-test.example.com");
 			await page.getByRole("button", { name: "添加" }).first().click();
