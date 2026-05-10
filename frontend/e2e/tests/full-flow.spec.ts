@@ -117,7 +117,7 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 
 		// 可能弹出 scope 授权确认窗;若有则点确认
 		const scopeConfirm = page.getByRole("button", {
-			name: /添加规则并继续|确认/,
+			name: /添加并继续|添加规则并继续|确认/,
 		});
 		if (await scopeConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
 			await scopeConfirm.click();
