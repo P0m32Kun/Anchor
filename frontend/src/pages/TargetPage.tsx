@@ -302,6 +302,8 @@ export default function TargetPage() {
         type: suggested.type,
         value: suggested.value,
       });
+      // 等待后端 SQLite WAL 刷新，确保新规则对后续查询可见
+      await new Promise((r) => setTimeout(r, 500));
       const t = await api.createTarget(projectId, { type: pendingType, value: pendingValue });
       if ("needs_scope_confirmation" in t && t.needs_scope_confirmation) {
         toast("Scope 规则已添加，但目标仍需要确认，请手动检查。", "warning");
