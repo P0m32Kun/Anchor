@@ -109,11 +109,10 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		});
 
 		// 添加 IP target
-		const targetForm = page.locator("form").filter({
-			has: page.getByPlaceholder("example.com"),
-		});
+		const targetPlaceholder = page.getByPlaceholder("example.com", { exact: true });
+		const targetForm = page.locator("form").filter({ has: targetPlaceholder });
 		await targetForm.locator("select").selectOption("ip");
-		await targetForm.getByPlaceholder("example.com").fill("127.0.0.1");
+		await targetPlaceholder.fill("127.0.0.1");
 		await targetForm.getByRole("button", { name: "添加目标" }).click();
 
 		// 可能弹出 scope 授权确认窗;若有则点确认
