@@ -121,7 +121,7 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		// ── Step 4: 等待 pipeline 完成(API 轮询,例外条款) ──
 		log("Step 4: Poll until pipeline completes");
 		const runs = await page.request
-			.get(`${API_BASE}/projects/${projectId}/runs`, {
+			.get(`${API_BASE}/projects/${projectId}/pipeline/runs`, {
 				headers: { Authorization: `Bearer ${API_TOKEN}` },
 			})
 			.then((r) => r.json() as Promise<{ data: Array<{ id: string }> }>);
