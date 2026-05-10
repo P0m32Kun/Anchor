@@ -27,6 +27,16 @@ async function apiFetch(
 	return res;
 }
 
+// 后端 list 端点统一返回 { data, total, page, page_size }(见 internal/api/pagination.go),
+// 兼容历史"直接返回数组"的 mock,统一在此 unwrap 一次,避免每个 helper 重复判断。
+async function fetchList<T>(path: string): Promise<T[]> {
+	const res = await apiFetch(path);
+	const body = await res.json();
+	if (Array.isArray(body)) return body as T[];
+	if (body && Array.isArray(body.data)) return body.data as T[];
+	return [];
+}
+
 // --- Types ---
 
 export interface Project {
