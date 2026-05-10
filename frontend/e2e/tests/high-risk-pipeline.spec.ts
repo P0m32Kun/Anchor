@@ -1,6 +1,8 @@
 /**
  * 测试层级: E2E
- * 覆盖流程: UI 创建项目 → UI 添加 IP 目标 → ScanModal 选"高危端口"preset → 等待 pipeline 完成 → AssetPage 看到 6379 端口 → FindingsPage 看到 critical/high finding 行
+ * 覆盖流程: UI 创建项目 → API 注入 IP 目标(§3.3 例外,scope confirm 产品 bug) →
+ *           ScanModal 选"高危端口"preset → 等待 pipeline 完成 →
+ *           AssetPage 看到 6379 端口 → FindingsPage 看到 critical/high finding 行
  * 前置依赖: anchor-server / anchor-worker / anchor-rangefield(rf-redis 监听 172.30.0.13:6379)已经启动
  * UI 断言点:
  *   - 项目卡片可见 → 跳转 /targets
@@ -11,10 +13,11 @@
  *   - FindingsPage 至少有一条 critical/high 行(可见 severity 标签)
  * API 仅用于:
  *   - cleanup
+ *   - 目标注入(§3.3 例外: scope confirm 产品 bug 暂未修复)
  *   - 长扫描进度轮询(§3.3 例外条款)
  */
 import { expect, test } from "@playwright/test";
-import { cleanupTestData } from "../fixtures/db-utils";
+import { cleanupTestData, addTarget } from "../fixtures/db-utils";
 
 const API_BASE = "http://localhost:17421";
 const API_TOKEN = "p0m32kun";
