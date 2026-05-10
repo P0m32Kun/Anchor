@@ -26,22 +26,19 @@ test.describe
 		test("TC-1: 首次访问 Dashboard（空状态）", async ({ page }) => {
 			await page.goto("/");
 
-			const statsGrid = page.locator(".grid-cols-2");
-			await expect(statsGrid.getByText("总项目数").first()).toBeVisible();
-			await expect(statsGrid.getByText("活跃扫描").first()).toBeVisible();
+			const statsGrid = page.locator(".grid-cols-4, .lg\\:grid-cols-4").first();
+			await expect(statsGrid.getByText("总览项目").first()).toBeVisible();
+			await expect(statsGrid.getByText("运行中扫描").first()).toBeVisible();
 			await expect(
-				statsGrid.getByText("待处理 Findings").first(),
+				statsGrid.getByText("待审核漏洞").first(),
 			).toBeVisible();
-			await expect(statsGrid.getByText("在线 Worker").first()).toBeVisible();
+			await expect(statsGrid.getByText("在线节点").first()).toBeVisible();
 
 			await expect(statsGrid.getByText("0")).toHaveCount(4);
 
-			await expect(page.getByText("欢迎使用 Dashboard")).toBeVisible();
-			await expect(
-				page.getByText("创建项目并开始扫描，以查看跨项目统计和最近活动"),
-			).toBeVisible();
+			await expect(page.getByText("安全工作台")).toBeVisible();
 
-			await page.getByRole("button", { name: "创建项目" }).last().click();
+			await page.getByRole("button", { name: "新建项目" }).click();
 			await expect(page).toHaveURL(/\/projects/);
 		});
 
