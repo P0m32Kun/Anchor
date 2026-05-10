@@ -188,7 +188,7 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 			timeout: 10_000,
 		});
 		// 等待轮询/loading 完成
-		await expect(page.locator("text=127.0.0.1").first()).toBeVisible({
+		await expect(page.locator(`text=${TARGET_IP}`).first()).toBeVisible({
 			timeout: 30_000,
 		});
 
