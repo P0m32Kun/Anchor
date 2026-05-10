@@ -102,7 +102,6 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		// 永远扫不到 rangefield 的服务。172.30.0.10 是 docker-compose.e2e.yml 里 rf-nginx 的固定 IP。
 		log("Step 4: Add IP target via UI (rangefield nginx 172.30.0.10)");
 
-		const TARGET_IP = "172.30.0.10";
 		const targetPlaceholder = page.getByPlaceholder("example.com", { exact: true });
 		const targetForm = page.locator("form").filter({ has: targetPlaceholder });
 		await targetForm.locator("select").selectOption("ip");
