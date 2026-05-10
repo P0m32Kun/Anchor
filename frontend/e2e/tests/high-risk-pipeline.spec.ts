@@ -73,7 +73,7 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		await targetForm.getByRole("button", { name: "添加目标" }).click();
 
 		const scopeConfirm = page.getByRole("button", {
-			name: /添加规则并继续|确认/,
+			name: /添加并继续|添加规则并继续|确认/,
 		});
 		if (await scopeConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
 			await scopeConfirm.click();
