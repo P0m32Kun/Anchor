@@ -648,7 +648,7 @@ func (q *Queries) CountActiveRuns() (int, error) {
 
 func (q *Queries) CountPendingFindings() (int, error) {
 	var count int
-	row := q.db.QueryRow(`SELECT COUNT(*) FROM findings WHERE status = 'pending_review'`)
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM findings f JOIN projects p ON f.project_id = p.id WHERE f.status = 'pending_review'`)
 	if err := row.Scan(&count); err != nil {
 		return 0, err
 	}
