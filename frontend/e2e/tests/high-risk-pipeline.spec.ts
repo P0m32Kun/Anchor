@@ -47,10 +47,12 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 			page.getByRole("heading", { name: /项目与授权边界|项目管理/ }),
 		).toBeVisible({ timeout: 10_000 });
 
-		await page.getByPlaceholder("项目名称 *").fill(projectName);
-		await page.getByPlaceholder("组织/客户").fill("E2E HighRisk");
 		await page
-			.getByPlaceholder("目的/描述")
+			.getByPlaceholder("例如：2024 Q2 外部红队评估")
+			.fill(projectName);
+		await page.getByPlaceholder("客户名称或部门").fill("E2E HighRisk");
+		await page
+			.getByPlaceholder("测试目的或项目背景")
 			.fill("高危端口 preset UI 验收");
 		await page.getByRole("button", { name: "创建项目", exact: true }).click();
 
