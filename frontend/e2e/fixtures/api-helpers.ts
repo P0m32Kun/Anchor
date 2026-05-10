@@ -115,7 +115,11 @@ export async function getProject(id: string): Promise<Project> {
 
 export async function listProjects(): Promise<Project[]> {
 	const res = await apiFetch("/projects");
-	return res.json();
+	const body = await res.json();
+	// 兼容两种返回格式: 直接数组 或 { data: [...], total, page, page_size }
+	if (Array.isArray(body)) return body as Project[];
+	if (body && Array.isArray(body.data)) return body.data as Project[];
+	return [];
 }
 
 export async function updateProject(
