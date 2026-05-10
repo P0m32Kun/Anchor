@@ -28,6 +28,7 @@ export default defineConfig({
 				...devices["Desktop Chrome"],
 				storageState: path.join(__dirname, "e2e/storage-state.json"),
 			},
+			testIgnore: /full-flow\.spec\.ts$/,
 		},
 		{
 			name: "chromium-auth",
