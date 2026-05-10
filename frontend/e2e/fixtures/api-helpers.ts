@@ -217,8 +217,7 @@ export async function updateFindingStatus(
 // --- Workers ---
 
 export async function listWorkers(): Promise<Worker[]> {
-	const res = await apiFetch("/workers");
-	return res.json();
+	return fetchList<Worker>("/workers");
 }
 
 // --- Tool Templates ---
