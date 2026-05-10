@@ -40,14 +40,33 @@ func (s *Server) handleListWorkers(w http.ResponseWriter, r *http.Request) {
 
 	dbWorkers, err := s.queries.ListWorkerNodes()
 	if err == nil {
+		// Sort: online/busy first, offline last
+		sort.Slice(dbWorkers, func(i, j int) bool {
+			order := func(status models.WorkerStatus) int {
+				switch status {
+				case models.WorkerStatusOnline, models.WorkerStatusBusy:
+					return 0
+				default:
+					return 1
+				}
+			}
+			return order(dbWorkers[i].Status) < order(dbWorkers[j].Status)
+		})
+
 		for _, w := range dbWorkers {
-			workers = append(workers, map[string]interface{}{
-				"id":       w.ID,
-				"name":     w.Name,
-				"mode":     w.Mode,
-				"status":   w.Status,
-				"endpoint": w.Endpoint,
-			})
+			entry := map[string]interface{}{
+				"id":         w.ID,
+				"name":       w.Name,
+				"mode":       w.Mode,
+				"status":     w.Status,
+				"endpoint":   w.Endpoint,
+				"busy":       w.Status == models.WorkerStatusBusy,
+				"created_at": w.CreatedAt,
+			}
+			if w.LastSeen != nil {
+				entry["last_seen"] = w.LastSeen
+			}
+			workers = append(workers, entry)
 		}
 	}
 
