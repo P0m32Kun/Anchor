@@ -160,8 +160,9 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 
 		// ── Step 6: 等待 Pipeline 完成(API 轮询,例外条款) ──
 		log("Step 6: Poll pipeline status via API while UI shows Run card");
+		// ScanModal 启动的是 pipeline run,走 /pipeline/runs(/runs 是手动 Run,与此处无关)
 		const runs = await page.request
-			.get(`${API_BASE}/projects/${projectId}/runs`, {
+			.get(`${API_BASE}/projects/${projectId}/pipeline/runs`, {
 				headers: { Authorization: `Bearer ${API_TOKEN}` },
 			})
 			.then((r) => r.json() as Promise<{ data: Array<{ id: string }> }>);
