@@ -107,13 +107,13 @@ test.describe
 		test("TC-5: 快速操作按钮", async ({ page }) => {
 			await page.goto("/");
 
-			await page.getByRole("button", { name: "+ 创建项目" }).click();
+			await page.getByRole("button", { name: "新建项目" }).click();
 			await expect(page).toHaveURL(/\/projects/);
 
 			await page.goto("/");
 
 			// 无 currentProject 时，LegacyRouteGuard 会将 /targets 重定向到 /projects
-			await page.getByRole("button", { name: "导入目标" }).click();
+			await page.getByRole("button", { name: "快速导入" }).click();
 			await expect(page).toHaveURL(/\/projects/);
 		});
 
