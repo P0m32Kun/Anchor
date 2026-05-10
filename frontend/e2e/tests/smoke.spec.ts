@@ -23,9 +23,9 @@ test.describe
 			await expect(page).toHaveURL(/\/projects/);
 
 			// ── Step 2: 创建项目 ──
-			await page.getByPlaceholder("项目名称 *").fill("Smoke Test Project");
-			await page.getByPlaceholder("组织/客户").fill("Smoke Test Org");
-			await page.getByPlaceholder("目的/描述").fill("End-to-end smoke test");
+			await page.getByPlaceholder("例如：2024 Q2 外部红队评估").fill("Smoke Test Project");
+			await page.getByPlaceholder("客户名称或部门").fill("Smoke Test Org");
+			await page.getByPlaceholder("测试目的或项目背景").fill("End-to-end smoke test");
 
 			await page.getByRole("button", { name: "创建项目", exact: true }).click();
 
