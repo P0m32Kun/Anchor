@@ -94,40 +94,30 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		const projectId = page.url().match(/\/projects\/([^/]+)\/targets/)![1];
 		log(`Project ID: ${projectId}`);
 
-		// ── Step 4: UI 添加 scope rule + IP 目标 ──
-		log("Step 4: Add scope rule (domain) + IP target via UI");
+		// ── Step 4: UI 添加 IP 目标(rangefield nginx,worker docker 网络内可达) ──
+		// 注意: 不能用 127.0.0.1 — worker 在 docker 容器内,127.0.0.1 是它自己的 loopback,
+		// 永远扫不到 rangefield 的服务。172.30.0.10 是 docker-compose.e2e.yml 里 rf-nginx 的固定 IP。
+		log("Step 4: Add IP target via UI (rangefield nginx 172.30.0.10)");
 
-		// Scope 规则 form 当前 UI 仅支持 domain 类型(见 TargetPage.tsx),
-		// 这里用一个不影响 IP 校验的占位 domain 规则,真正的 127.0.0.1 走 IP target +
-		// scope 自动确认弹窗。
-		await page
-			.getByPlaceholder("例如 *.example.com")
-			.fill("loopback.invalid");
-		await page.getByRole("button", { name: "添加规则" }).click();
-		await expect(page.getByText(/规则已添加|添加规则失败/)).toBeVisible({
-			timeout: 5_000,
-		});
-
-		// 添加 IP target
+		const TARGET_IP = "172.30.0.10";
 		const targetPlaceholder = page.getByPlaceholder("example.com", { exact: true });
 		const targetForm = page.locator("form").filter({ has: targetPlaceholder });
 		await targetForm.locator("select").selectOption("ip");
-		await targetPlaceholder.fill("127.0.0.1");
+		await targetPlaceholder.fill(TARGET_IP);
 		await targetForm.getByRole("button", { name: "添加目标" }).click();
 
-		// 可能弹出 scope 授权确认窗;若有则点确认
+		// 弹出 scope 授权确认窗 → 点"添加并继续",自动注册 scope 规则
 		const scopeConfirm = page.getByRole("button", {
 			name: /添加并继续|添加规则并继续|确认/,
 		});
 		if (await scopeConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
 			await scopeConfirm.click();
-			// 等待 dialog 关闭再断言表格
 			await expect(scopeConfirm).not.toBeVisible({ timeout: 10_000 });
 		}
 
 		// 表格里能看到目标值
 		await expect(
-			page.getByRole("cell", { name: "127.0.0.1" }).first(),
+			page.getByRole("cell", { name: TARGET_IP }).first(),
 		).toBeVisible({ timeout: 10_000 });
 
 		// ── Step 5: ScanModal 启动内网扫描 ──
