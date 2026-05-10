@@ -116,11 +116,19 @@ export default function WorkersPage() {
 
                       {/* 详细信息 */}
                       <div className="flex-1 p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                         <InfoItem label="内网 IP" value={worker.ip || 'Unknown'} icon={Network} />
-                         <InfoItem label="操作系统" value={worker.os || 'Linux'} icon={HardDrive} />
-                         <InfoItem label="负载状态" value={worker.busy ? "BUSY (1/1)" : "IDLE (0/1)"} icon={Zap} highlight={worker.busy} />
-                         <InfoItem label="最后心跳" value={new Date(worker.last_seen).toLocaleTimeString()} icon={Activity} />
+                         <InfoItem label="内网 IP" value={worker.endpoint || 'Unknown'} icon={Network} />
+                         <InfoItem label="节点名称" value={worker.name || worker.id.slice(0, 8)} icon={HardDrive} />
+                         <InfoItem label="负载状态" value={worker.busy ? "BUSY" : worker.status === 'online' ? "IDLE" : "OFFLINE"} icon={Zap} highlight={worker.busy} />
+                         <InfoItem label="最后心跳" value={worker.last_seen ? new Date(worker.last_seen).toLocaleTimeString() : '--'} icon={Activity} />
                       </div>
+                      {worker.status === 'offline' && (
+                        <div className="flex items-center justify-end p-4 border-t border-white/5">
+                          <Button variant="ghost" size="sm" className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10" onClick={() => deleteWorker(worker.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            清理节点
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
