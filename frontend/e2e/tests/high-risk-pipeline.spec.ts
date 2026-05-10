@@ -77,6 +77,8 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		});
 		if (await scopeConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
 			await scopeConfirm.click();
+			// 等待 dialog 关闭(handleConfirmScope 异步完成会 setScopeConfirmOpen(false))
+			await expect(scopeConfirm).not.toBeVisible({ timeout: 10_000 });
 		}
 
 		await expect(
