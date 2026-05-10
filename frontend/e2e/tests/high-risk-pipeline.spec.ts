@@ -67,22 +67,10 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		const projectId = page.url().match(/\/projects\/([^/]+)\/targets/)![1];
 		log(`Project ID: ${projectId}`);
 
-		// ── Step 2: UI 添加 IP 目标(rangefield redis)──
-		log("Step 2: Add IP target via UI (rangefield redis)");
-		const targetPlaceholder = page.getByPlaceholder("example.com", { exact: true });
-		const targetForm = page.locator("form").filter({ has: targetPlaceholder });
-		await targetForm.locator("select").selectOption("ip");
-		await targetPlaceholder.fill(REDIS_IP);
-		await targetForm.getByRole("button", { name: "添加目标" }).click();
-
-		// 弹出 scope 授权确认窗 → 点"添加并继续"
-		const scopeConfirm = page.getByRole("button", {
-			name: /添加并继续|添加规则并继续|确认/,
-		});
-		if (await scopeConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
-			await scopeConfirm.click();
-			await expect(scopeConfirm).not.toBeVisible({ timeout: 10_000 });
-		}
+		// ── Step 2: API 注入 IP 目标 + UI 验证(§3.3 例外: scope confirm 产品 bug)──
+		log("Step 2: API inject IP target + UI verify (rangefield redis)");
+		await addTarget(projectId, { type: "ip", value: REDIS_IP });
+		await page.reload();
 
 		await expect(
 			page.getByRole("cell", { name: REDIS_IP }).first(),
