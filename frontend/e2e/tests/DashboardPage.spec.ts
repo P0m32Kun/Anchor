@@ -77,15 +77,12 @@ test.describe
 			await setCurrentProject(page, project.id);
 
 			await expect(
-				page.locator("h3").filter({ hasText: "最近活动" }).first(),
+				page.getByText("最近扫描活动").first(),
 			).toBeVisible();
 
-			await expect(page.getByText("暂无扫描活动")).toBeVisible();
-			await expect(
-				page.getByText("开始扫描后，这里将显示最近的活动"),
-			).toBeVisible();
+			await expect(page.getByText("暂无活跃的扫描流水线")).toBeVisible();
 
-			await page.getByRole("button", { name: "查看全部 →" }).first().click();
+			await page.getByRole("button", { name: "查看历史" }).first().click();
 			await expect(page).toHaveURL(/\/projects\/.*\/runs/);
 		});
 
