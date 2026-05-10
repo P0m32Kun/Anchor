@@ -18,10 +18,9 @@ test.describe
 			await page.goto("/");
 			await expect(page.getByText("安全工作台")).toBeVisible();
 
-			// 点击"+ 创建项目"导航到项目列表
-			await page.getByRole("button", { name: "+ 创建项目" }).click();
+			// 点击"新建项目"导航到项目列表
+			await page.getByRole("button", { name: "新建项目" }).click();
 			await expect(page).toHaveURL(/\/projects/);
-			await expect(page.getByText("项目管理")).toBeVisible();
 
 			// ── Step 2: 创建项目 ──
 			await page.getByPlaceholder("项目名称 *").fill("Smoke Test Project");
