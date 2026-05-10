@@ -41,6 +41,7 @@ export default function ProjectLayout() {
         setError(err.message || "项目不存在");
         setLoading(false);
         setCurrentProject(null);
+        setCurrentProjectId(null);
         toast("项目不存在或已被删除", "error");
         timerRef.current = setTimeout(() => navigate("/projects"), 2000);
       });
