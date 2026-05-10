@@ -1,26 +1,18 @@
 /**
  * 测试层级: E2E
- * 覆盖流程: TokenAuth → 验证 Worker → UI 创建项目 → API 注入 IP 目标 + cidr scope 规则(§3.3 例外) → ScanModal 启动内网扫描 → 等待完成 → AssetPage/FindingsPage/ReportsPage UI 验证
+ * 覆盖流程: TokenAuth → 验证 Worker → UI 创建项目 → UI 添加 IP 目标 → ScanModal 启动内网扫描 → 等待完成 → AssetPage/FindingsPage/ReportsPage UI 验证
  * 前置依赖: docker compose -f docker-compose.e2e.yml 已经启动 anchor-server / anchor-worker / anchor-rangefield
- *
- * 为何 IP target 走 API(§3.3 例外):
- *   产品当前 scope confirm dialog 对 IP 目标建议 type=ip 的规则,但后端 scope check 对 IP 目标
- *   要求 type=cidr,导致点击"添加并继续"后 target 仍 needs_scope_confirmation,UI 路径走不通。
- *   详见 tasks/pending/task_fix_scope_confirm_ip_suggestion/prd.md。
- *   产品修好后,把 Step 4 改回 UI 操作,删除本节例外说明。
- *
  * UI 断言点:
  *   - 欢迎页登录 → 进入 Dashboard 后能看到"安全工作台"标题
  *   - WorkersPage 看到至少一个"在线"标签
  *   - 项目卡片在 ProjectPage 上可见,点击后跳转 /projects/:id/targets
- *   - TargetPage 表格中能看到目标 IP 行(API 注入后 UI 仍要能渲染)
+ *   - TargetPage 表格中能看到目标 IP 行
  *   - RunsPage 上 ScanModal 两步完整走通,提交后看到"扫描任务已启动" toast
  *   - Pipeline 完成后 AssetPage 列表中能看到目标资产行
  *   - ReportsPage 上"导出 Markdown / JSON"按钮可见且可点
  * API 仅用于:
  *   - cleanup(setup/teardown 数据)
  *   - 长扫描进度轮询(§3.3 例外条款,等待 pipeline 完成,最终断言仍回 UI)
- *   - IP target + cidr scope 规则注入(已知 bug 例外)
  */
 import { expect, test } from "@playwright/test";
 import { cleanupTestData } from "../fixtures/db-utils";
