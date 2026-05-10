@@ -67,8 +67,22 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		const projectId = page.url().match(/\/projects\/([^/]+)\/targets/)![1];
 		log(`Project ID: ${projectId}`);
 
-		// ── Step 2: API 注入 IP 目标 + UI 验证(§3.3 例外: scope confirm 产品 bug)──
-		log("Step 2: API inject IP target + UI verify (rangefield redis)");
+		// ── Step 2: API 注入 scope rule + IP 目标 + UI 验证(§3.3 例外: scope confirm 产品 bug)──
+		log("Step 2: API inject scope + target (rangefield redis)");
+		const scopeRes = await page.request.post(`${API_BASE}/scope-rules`, {
+			headers: {
+				Authorization: `Bearer ${API_TOKEN}`,
+				"Content-Type": "application/json",
+			},
+			data: {
+				project_id: projectId,
+				action: "include",
+				type: "cidr",
+				value: `${REDIS_IP}/32`,
+				reason: "E2E scope",
+			},
+		});
+		expect([200, 201]).toContain(scopeRes.status());
 		await addTarget(projectId, { type: "ip", value: REDIS_IP });
 		await page.reload();
 
