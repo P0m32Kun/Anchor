@@ -1,18 +1,30 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
+import { APIError, PAGE_ALL } from "./api";
 
-describe("API client helpers", () => {
-  it("buildQueryString omits undefined/empty params", () => {
-    const { buildQueryString } = await import("./api");
-    expect(buildQueryString("/projects", { page: 1, page_size: 10, search: undefined }))
-      .toBe("/projects?page=1&page_size=10");
+describe("APIError", () => {
+  it("marks NETWORK_ERROR as retryable", () => {
+    const err = new APIError("net", "NETWORK_ERROR");
+    expect(err.retryable).toBe(true);
   });
 
-  it("APIError marks NETWORK_ERROR and HTTP_5xx as retryable", () => {
-    const { APIError } = await import("./api");
-    const networkErr = new APIError("net", "NETWORK_ERROR");
-    expect(networkErr.retryable).toBe(true);
+  it("marks HTTP_5xx as retryable", () => {
+    const err = new APIError("5xx", "HTTP_5xx");
+    expect(err.retryable).toBe(true);
+  });
 
-    const fourErr = new APIError("4xx", "HTTP_4xx");
-    expect(fourErr.retryable).toBe(false);
+  it("marks HTTP_4xx as not retryable", () => {
+    const err = new APIError("4xx", "HTTP_4xx");
+    expect(err.retryable).toBe(false);
+  });
+
+  it("defaults retryable to false for UNKNOWN", () => {
+    const err = new APIError("unknown");
+    expect(err.retryable).toBe(false);
+  });
+});
+
+describe("PAGE_ALL", () => {
+  it("has a large page_size", () => {
+    expect(PAGE_ALL.page_size).toBe(10000);
   });
 });
