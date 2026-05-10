@@ -52,7 +52,9 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		await page.locator('input[type="password"]').fill(API_TOKEN);
 		await page.getByRole("button", { name: "保存并进入" }).click();
 
-		await expect(page.getByText("总览项目")).toBeVisible({ timeout: 15_000 });
+		await expect(
+			page.getByRole("heading", { name: "安全工作台" }),
+		).toBeVisible({ timeout: 15_000 });
 
 		// ── Step 2: Worker 在线(UI 断言) ──
 		log("Step 2: Verify worker online via UI");
