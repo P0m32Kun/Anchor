@@ -1,5 +1,7 @@
 import { execSync } from "child_process";
-import { deleteProject, listProjects } from "./api-helpers";
+import { deleteProject, listProjects, createProject, addTarget } from "./api-helpers";
+
+export { createProject, addTarget };
 
 /**
  * Delete all projects via API, which cascades to associated data.
