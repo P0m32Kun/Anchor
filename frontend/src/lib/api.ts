@@ -352,6 +352,8 @@ export const api = {
   // ... rest of api object
   listWorkers: (signal?: AbortSignal) =>
     fetchAPI<WorkerNode[]>("/workers", { signal }),
+  deleteWorker: (id: string, signal?: AbortSignal) =>
+    fetchAPI<void>(`/workers/${id}`, { method: "DELETE", signal }),
   createProject: (data: { name: string; organization?: string; purpose?: string; start_time?: string; end_time?: string; rate_limit?: number }, signal?: AbortSignal) =>
     fetchAPI<Project>("/projects", { method: "POST", body: JSON.stringify(data), signal }),
 
