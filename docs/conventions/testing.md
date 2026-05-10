@@ -73,6 +73,24 @@
 - 但 **最终结果断言** 必须回到 UI——比如"资产 127.0.0.1 在 AssetPage 上可见"、"Findings 列表非空"、"报告导出按钮可点"
 - 不要写"通过 API 拿到资产计数 ≥1"——这等于绕过了"资产页是否真的渲染"的验证
 
+#### 例外条款:已知产品 bug
+
+如果某个 UI 操作因产品 bug 无法完成(如 scope confirm dialog 建议错误的 rule type 导致 target 仍被拦截),允许在 `test()` body 中用 API 绕过此步骤,但**必须满足**:
+
+- 文件头注释中用单独段落说明 bug 现象、 workaround 路径、对应的 pending 任务或 issue ID
+- workaround 只限于被 bug 卡住的步骤,其他 UI 路径仍用 UI 操作
+- 产品 bug 修复后,spec 按 §3.3 重写,删除例外段落
+
+模板:
+
+```ts
+// 为何此处走 API(§3.3 例外):
+//   产品当前 scope confirm dialog 对 IP 目标建议 type=ip 的规则,但后端 scope check 对 IP
+//   目标要求 type=cidr,导致点击"添加并继续"后 target 仍 needs_scope_confirmation,UI 路径走不通。
+//   详见 tasks/pending/task_fix_scope_confirm_ip_suggestion/prd.md。
+//   产品修好后,把本段改回 UI 操作,删除本节例外说明。
+```
+
 #### E2E 必须做的额外断言
 
 - **加载态**: 至少一条用例显式断言 loading skeleton/spinner 出现并消失(防止"永远转圈"的回归)
