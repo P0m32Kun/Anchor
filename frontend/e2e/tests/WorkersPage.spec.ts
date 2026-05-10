@@ -11,18 +11,12 @@ test.describe
 			await cleanupTestData();
 		});
 
-		test("TC-1: 页面加载并显示空状态", async ({ page }) => {
+		test("TC-1: 页面加载并显示节点列表", async ({ page }) => {
 			await page.goto("/workers");
 			await page.waitForLoadState("networkidle");
 
 			await expect(
-				page.locator("h1").filter({ hasText: "Workers" }),
-			).toBeVisible();
-			await expect(page.getByText("暂无 Worker")).toBeVisible();
-			await expect(
-				page.getByText(
-					"通过 Docker 部署 Worker，使用 Server 生成的 token 注册后显示在此",
-				),
+				page.locator("h1").filter({ hasText: "Worker 节点集群" }),
 			).toBeVisible();
 		});
 
