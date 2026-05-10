@@ -72,9 +72,13 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 			page.getByRole("heading", { name: /项目与授权边界|项目管理/ }),
 		).toBeVisible({ timeout: 10_000 });
 
-		await page.getByPlaceholder("项目名称 *").fill(projectName);
-		await page.getByPlaceholder("组织/客户").fill("E2E Full Flow");
-		await page.getByPlaceholder("目的/描述").fill("UI-driven full flow 验收");
+		await page
+			.getByPlaceholder("例如：2024 Q2 外部红队评估")
+			.fill(projectName);
+		await page.getByPlaceholder("客户名称或部门").fill("E2E Full Flow");
+		await page
+			.getByPlaceholder("测试目的或项目背景")
+			.fill("UI-driven full flow 验收");
 		await page.getByRole("button", { name: "创建项目", exact: true }).click();
 
 		// 项目卡片可见即视为创建成功
