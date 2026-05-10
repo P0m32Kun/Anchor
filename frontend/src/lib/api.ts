@@ -339,12 +339,12 @@ export interface Evidence {
 
 export interface WorkerNode {
   id: string;
-  ip: string;
-  hostname: string;
-  os: string;
+  name: string;
+  endpoint: string;
+  mode: string;
   status: string;
   busy: boolean;
-  last_seen: string;
+  last_seen?: string;
   created_at: string;
 }
 
