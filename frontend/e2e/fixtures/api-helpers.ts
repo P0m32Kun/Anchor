@@ -156,8 +156,7 @@ export async function addTarget(
 }
 
 export async function listTargets(projectId: string): Promise<Target[]> {
-	const res = await apiFetch(`/projects/${projectId}/targets`);
-	return res.json();
+	return fetchList<Target>(`/projects/${projectId}/targets`);
 }
 
 // --- Runs ---
