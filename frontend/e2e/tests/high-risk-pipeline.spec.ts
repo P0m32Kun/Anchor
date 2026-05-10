@@ -64,31 +64,23 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		const projectId = page.url().match(/\/projects\/([^/]+)\/targets/)![1];
 		log(`Project ID: ${projectId}`);
 
-		// ── Step 2: API 注入 IP 目标 + cidr scope 规则(§3.3 例外,详见文件头)──
-		log("Step 2: Seed IP target + cidr scope rule via API (UI bug workaround)");
-		const headers = {
-			Authorization: `Bearer ${API_TOKEN}`,
-			"Content-Type": "application/json",
-		};
-		const scopeRes = await page.request.post(`${API_BASE}/scope-rules`, {
-			headers,
-			data: {
-				project_id: projectId,
-				action: "include",
-				type: "cidr",
-				value: `${REDIS_IP}/32`,
-			},
+		// ── Step 2: UI 添加 IP 目标(rangefield redis)──
+		log("Step 2: Add IP target via UI (rangefield redis)");
+		const targetPlaceholder = page.getByPlaceholder("example.com", { exact: true });
+		const targetForm = page.locator("form").filter({ has: targetPlaceholder });
+		await targetForm.locator("select").selectOption("ip");
+		await targetPlaceholder.fill(REDIS_IP);
+		await targetForm.getByRole("button", { name: "添加目标" }).click();
+
+		// 弹出 scope 授权确认窗 → 点"添加并继续"
+		const scopeConfirm = page.getByRole("button", {
+			name: /添加并继续|添加规则并继续|确认/,
 		});
-		expect([200, 201]).toContain(scopeRes.status());
+		if (await scopeConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
+			await scopeConfirm.click();
+			await expect(scopeConfirm).not.toBeVisible({ timeout: 10_000 });
+		}
 
-		const targetRes = await page.request.post(
-			`${API_BASE}/projects/${projectId}/targets`,
-			{ headers, data: { type: "ip", value: REDIS_IP } },
-		);
-		expect([200, 201]).toContain(targetRes.status());
-
-		// 即便目标走 API 注入,UI 也必须正确渲染表格行
-		await page.reload();
 		await expect(
 			page.getByRole("cell", { name: REDIS_IP }).first(),
 		).toBeVisible({ timeout: 10_000 });
