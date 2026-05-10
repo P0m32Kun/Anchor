@@ -39,13 +39,20 @@ func (s *targetService) Create(ctx context.Context, projectID string, req Create
 	}
 
 	if len(rules) == 0 {
+		suggestedType := resolvedType
+		suggestedValue := req.Value
+		// 对 IP 目标建议使用 CIDR /32 规则，确保 scope check 能精确覆盖
+		if resolvedType == string(models.TargetTypeIP) {
+			suggestedType = string(models.TargetTypeCIDR)
+			suggestedValue = req.Value + "/32"
+		}
 		return &TargetResponse{
 			NeedsScopeConfirmation: true,
 			Message:                "当前项目未设置授权范围，是否将此目标自动加入授权范围？",
 			SuggestedRule: &ScopeRuleSuggestion{
 				Action: "include",
-				Type:   resolvedType,
-				Value:  req.Value,
+				Type:   suggestedType,
+				Value:  suggestedValue,
 			},
 		}, nil
 	}
