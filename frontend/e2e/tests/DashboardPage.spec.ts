@@ -86,7 +86,7 @@ test.describe
 			await expect(page).toHaveURL(/\/projects\/.*\/runs/);
 		});
 
-		test("TC-4: 待处理 Findings 区域 — 无 findings 时", async ({ page }) => {
+		test("TC-4: 待处理 Finding 区域 — 无 findings 时", async ({ page }) => {
 			const project = await createProject({
 				name: "No Findings Project",
 				organization: "Test Org",
@@ -95,15 +95,12 @@ test.describe
 			await setCurrentProject(page, project.id);
 
 			await expect(
-				page.locator("h3").filter({ hasText: "待处理 Findings" }).first(),
+				page.getByText("待处理 Finding").first(),
 			).toBeVisible();
 
-			await expect(page.getByText("暂无待处理 Findings")).toBeVisible();
-			await expect(
-				page.getByText("扫描发现的安全问题将在这里显示"),
-			).toBeVisible();
+			await expect(page.getByText("当前没有需要审核的新漏洞发现")).toBeVisible();
 
-			await page.getByRole("button", { name: "查看全部 →" }).nth(1).click();
+			await page.getByRole("button", { name: "进入审核队列" }).click();
 			await expect(page).toHaveURL(/\/projects\/.*\/findings/);
 		});
 
