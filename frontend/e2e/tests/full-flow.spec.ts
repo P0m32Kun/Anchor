@@ -210,7 +210,7 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		log("Step 8: Verify FindingsPage renders (finding content soft-checked)");
 		await page.goto(`/projects/${projectId}/findings`);
 		await expect(
-			page.locator("h1").filter({ hasText: /Finding/i }),
+			page.locator("h1").filter({ hasText: /发现审核|漏洞发现|Finding/i }),
 		).toBeVisible({ timeout: 10_000 });
 		// finding 在 e2e docker 环境下可能因 scan pipeline 限制未产出,
 		// 页面加载正确即视为通过;如有 finding 则额外验证
