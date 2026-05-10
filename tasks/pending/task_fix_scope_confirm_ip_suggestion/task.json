@@ -1,0 +1,19 @@
+{
+  "id": "task_fix_scope_confirm_ip_suggestion",
+  "title": "Fix scope confirm dialog 对 IP 目标建议错误的 scope rule type",
+  "description": "TargetPage 自动 scope 修正对话框对 IP 目标建议 type=ip,但后端 scope check 对 IP 目标可能需要 type=cidr,导致点击\"添加并继续\"后目标仍 needs_scope_confirmation,死循环。详见 prd.md。",
+  "type": "bug",
+  "status": "pending",
+  "params": {
+    "discovered_in": "e2e e2e/tests/full-flow.spec.ts + high-risk-pipeline.spec.ts 重写过程",
+    "blocks": [
+      "frontend/e2e/tests/full-flow.spec.ts",
+      "frontend/e2e/tests/high-risk-pipeline.spec.ts"
+    ],
+    "owner_hint": "frontend(handleConfirmScope) 或 backend(scope check)"
+  },
+  "result": {},
+  "started_at": "",
+  "completed_at": "",
+  "error": null
+}
