@@ -1,17 +1,10 @@
 /**
  * 测试层级: E2E
- * 覆盖流程: UI 创建项目 → API 注入 IP 目标 + cidr scope 规则(§3.3 例外) → ScanModal 选"高危端口"preset → 等待 pipeline 完成 → AssetPage 看到 6379 端口 → FindingsPage 看到 critical/high finding 行
+ * 覆盖流程: UI 创建项目 → UI 添加 IP 目标 → ScanModal 选"高危端口"preset → 等待 pipeline 完成 → AssetPage 看到 6379 端口 → FindingsPage 看到 critical/high finding 行
  * 前置依赖: anchor-server / anchor-worker / anchor-rangefield(rf-redis 监听 172.30.0.13:6379)已经启动
- *
- * 为何 IP target 走 API(§3.3 例外):
- *   产品当前 scope confirm dialog 对 IP 目标建议 type=ip 的规则,但后端 scope check 对 IP 目标
- *   要求 type=cidr,导致点击"添加并继续"后 target 仍 needs_scope_confirmation,UI 路径走不通。
- *   详见 tasks/pending/task_fix_scope_confirm_ip_suggestion/prd.md。
- *   产品修好后,把 Step 2 改回 UI 操作,删除本节例外说明。
- *
  * UI 断言点:
  *   - 项目卡片可见 → 跳转 /targets
- *   - TargetPage 表格中能看到 172.30.0.13 行(API 注入后 UI 仍要能渲染)
+ *   - TargetPage 表格中能看到 172.30.0.13 行
  *   - ScanModal 选"高危端口(推荐)" 后能看到选中态
  *   - RunsPage 上扫描启动后能看到 run 卡片
  *   - 完成后 AssetPage 看到 172.30.0.13、Asset 详情/端口区域包含 6379
@@ -19,7 +12,6 @@
  * API 仅用于:
  *   - cleanup
  *   - 长扫描进度轮询(§3.3 例外条款)
- *   - IP target + cidr scope 规则注入(已知 bug 例外)
  */
 import { expect, test } from "@playwright/test";
 import { cleanupTestData } from "../fixtures/db-utils";
