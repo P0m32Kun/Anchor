@@ -193,8 +193,7 @@ export async function listFindings(
 	status?: string,
 ): Promise<Finding[]> {
 	const query = status ? `?status=${encodeURIComponent(status)}` : "";
-	const res = await apiFetch(`/projects/${projectId}/findings${query}`);
-	return res.json();
+	return fetchList<Finding>(`/projects/${projectId}/findings${query}`);
 }
 
 export async function getFinding(
