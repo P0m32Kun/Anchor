@@ -142,9 +142,9 @@ review integration PR 时:
 
 | 模式 | 文件 | 关键技巧 |
 |------|------|----------|
-| 短 e2e(单页面单流程) | `frontend/e2e/tests/v0.4-company-flow.spec.ts`(重写后) | UI 添加目标 + UI 验证 FOFA 展开行 |
-| 长 e2e(完整 pipeline) | `frontend/e2e/tests/full-flow.spec.ts`(重写后) | API 轮询进度 + UI 验证最终结果 |
-| 高风险负样本 | `frontend/e2e/tests/high-risk-pipeline.spec.ts`(重写后) | UI 上能看到拦截/错误提示 |
+| 完整流程(认证 → 项目 → 扫描 → 报告) | `frontend/e2e/tests/full-flow.spec.ts` | UI 走 ScanModal,API 仅做长扫描进度轮询;最终结果回 UI 断言 |
+| 端口策略验证 | `frontend/e2e/tests/high-risk-pipeline.spec.ts` | UI 选 ScanModal "高危端口" preset → UI 看到 6379 → UI 看到 critical/high finding |
+| FIXME 范例(产品下线 UI) | `frontend/e2e/tests/v0.4-company-flow.spec.ts` | `test.fixme` 跳过,文件头说明 A/B/C 处置选项 |
 | 后端 integration | `internal/api/handlers_test.go` | in-mem sqlite + httptest |
 | 后端 unit | `internal/scope/scope_test.go` | table-driven |
 
