@@ -160,14 +160,15 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 
 		// ── Step 6: 等待 Pipeline 完成(API 轮询,例外条款) ──
 		log("Step 6: Poll pipeline status via API while UI shows Run card");
-		// ScanModal 启动的是 pipeline run,走 /pipeline/runs(/runs 是手动 Run,与此处无关)
+		// ScanModal 调 POST /projects/:id/scan,run 列表在 /scan/runs;
+		// 单次状态查询走 /pipeline/runs/:id(后端 model 统一,详见 internal/api/server.go)
 		const runs = await page.request
-			.get(`${API_BASE}/projects/${projectId}/pipeline/runs`, {
+			.get(`${API_BASE}/projects/${projectId}/scan/runs`, {
 				headers: { Authorization: `Bearer ${API_TOKEN}` },
 			})
 			.then((r) => r.json() as Promise<{ data: Array<{ id: string }> }>);
 		const runId = runs.data?.[0]?.id;
-		expect(runId, "未找到任何 pipeline run").toBeDefined();
+		expect(runId, "未找到任何 scan run").toBeDefined();
 
 		const start = Date.now();
 		const maxWait = 20 * 60 * 1000;
