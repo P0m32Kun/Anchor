@@ -1,6 +1,5 @@
 import { useLocation, Link } from "react-router-dom";
 import { useStore } from "../lib/store";
-import { cn } from "../lib/utils";
 import { ChevronRight, Home, Layout } from "lucide-react";
 
 export function Header() {
