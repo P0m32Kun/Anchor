@@ -162,8 +162,7 @@ export async function listTargets(projectId: string): Promise<Target[]> {
 // --- Runs ---
 
 export async function listRuns(projectId: string): Promise<Run[]> {
-	const res = await apiFetch(`/projects/${projectId}/runs`);
-	return res.json();
+	return fetchList<Run>(`/projects/${projectId}/runs`);
 }
 
 export async function createRun(
