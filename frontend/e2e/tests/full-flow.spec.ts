@@ -99,8 +99,23 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		const projectId = page.url().match(/\/projects\/([^/]+)\/targets/)![1];
 		log(`Project ID: ${projectId}`);
 
-		// ── Step 4: API 注入 IP 目标 + UI 验证(§3.3 例外: scope confirm 产品 bug)──
-		log(`Step 4: API inject IP target ${TARGET_IP} + UI verify`);
+		// ── Step 4: API 注入 scope rule + IP 目标 + UI 验证(§3.3 例外: scope confirm 产品 bug)──
+		log(`Step 4: API inject scope + target ${TARGET_IP}`);
+		// 先注入 scope rule,否则 addTarget 会返回 needsScopeConfirmation
+		const scopeRes = await page.request.post(`${API_BASE}/scope-rules`, {
+			headers: {
+				Authorization: `Bearer ${API_TOKEN}`,
+				"Content-Type": "application/json",
+			},
+			data: {
+				project_id: projectId,
+				action: "include",
+				type: "cidr",
+				value: `${TARGET_IP}/32`,
+				reason: "E2E scope",
+			},
+		});
+		expect([200, 201]).toContain(scopeRes.status());
 		await addTarget(projectId, { type: "ip", value: TARGET_IP });
 		await page.reload();
 
