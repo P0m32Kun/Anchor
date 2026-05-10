@@ -81,7 +81,7 @@ test.describe.serial("内网扫描 E2E — UI 主导", () => {
 		log("Step 1: UI 验证 TargetPage 表格");
 		await page.goto(`/projects/${projectId}/targets`);
 		await expect(
-			page.getByRole("heading", { name: /目标管理|Target/ }),
+			page.getByRole("heading", { name: /目标与 Scope|目标管理/ }),
 		).toBeVisible({ timeout: 10_000 });
 
 		for (const ip of RANGEFIELD_IPS) {
