@@ -9,7 +9,7 @@ import {
   SkeletonList,
   EmptyState
 } from "../components";
-import { Cpu, Zap, Activity, HardDrive, Shield, RefreshCcw, Server, Network } from "lucide-react";
+import { Cpu, Zap, Activity, HardDrive, Shield, RefreshCcw, Server, Network, Trash2 } from "lucide-react";
 import { cn } from "../lib/utils";
 
 export default function WorkersPage() {
