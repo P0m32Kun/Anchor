@@ -16,7 +16,6 @@ import {
   ChevronDown,
   Sparkles,
   Layers,
-  ChevronLeft,
   PanelLeftClose,
   PanelLeftOpen
 } from "lucide-react";
