@@ -223,8 +223,7 @@ export async function listWorkers(): Promise<Worker[]> {
 // --- Tool Templates ---
 
 export async function listToolTemplates(): Promise<ToolTemplate[]> {
-	const res = await apiFetch("/tool-templates");
-	return res.json();
+	return fetchList<ToolTemplate>("/tool-templates");
 }
 
 // --- Health ---
