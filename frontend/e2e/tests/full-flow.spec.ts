@@ -19,6 +19,9 @@ import { cleanupTestData } from "../fixtures/db-utils";
 
 const API_BASE = "http://localhost:17421";
 const API_TOKEN = "p0m32kun";
+// 目标 IP: rangefield nginx,worker 在 docker 网络内可达。不要用 127.0.0.1
+// (那是 worker 容器自身 loopback,扫不到 rangefield)
+const TARGET_IP = "172.30.0.10";
 
 test.setTimeout(30 * 60 * 1000);
 
