@@ -16,7 +16,7 @@ test.describe
 		}) => {
 			// ── Step 1: Dashboard ──
 			await page.goto("/");
-			await expect(page.getByText("欢迎使用 Dashboard")).toBeVisible();
+			await expect(page.getByText("安全工作台")).toBeVisible();
 
 			// 点击"+ 创建项目"导航到项目列表
 			await page.getByRole("button", { name: "+ 创建项目" }).click();
