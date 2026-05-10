@@ -639,7 +639,7 @@ func (q *Queries) ListPipelineRunStages(runID string) ([]*models.PipelineRunStag
 
 func (q *Queries) CountActiveRuns() (int, error) {
 	var count int
-	row := q.db.QueryRow(`SELECT COUNT(*) FROM runs WHERE status = 'running'`)
+	row := q.db.QueryRow(`SELECT COUNT(*) FROM runs r JOIN projects p ON r.project_id = p.id WHERE r.status = 'running'`)
 	if err := row.Scan(&count); err != nil {
 		return 0, err
 	}
