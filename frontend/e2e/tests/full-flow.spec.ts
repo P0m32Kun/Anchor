@@ -121,6 +121,8 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		});
 		if (await scopeConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
 			await scopeConfirm.click();
+			// 等待 dialog 关闭再断言表格
+			await expect(scopeConfirm).not.toBeVisible({ timeout: 10_000 });
 		}
 
 		// 表格里能看到目标值
