@@ -98,7 +98,7 @@ test.describe.serial("内网扫描 E2E — UI 主导", () => {
 			page.getByRole("heading", { name: "扫描执行" }),
 		).toBeVisible({ timeout: 10_000 });
 
-		await page.getByRole("button", { name: "新建扫描" }).first().click();
+		await page.getByRole("button", { name: /启动扫描/ }).first().click();
 		await expect(
 			page.getByRole("heading", { name: /新建扫描流水线/ }),
 		).toBeVisible();
