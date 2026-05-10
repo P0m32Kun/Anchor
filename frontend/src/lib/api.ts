@@ -113,9 +113,11 @@ export async function request(
 
     if (globalErrorHandler && !opts?.skipGlobalError) globalErrorHandler(apiErr);
 
-    consecutiveErrors++;
-    if (consecutiveErrors >= 3 && consecutiveErrorCallback) {
-      consecutiveErrorCallback();
+    if (!opts?.skipGlobalError) {
+      consecutiveErrors++;
+      if (consecutiveErrors >= 3 && consecutiveErrorCallback) {
+        consecutiveErrorCallback();
+      }
     }
 
     throw apiErr;
