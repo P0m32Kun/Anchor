@@ -191,7 +191,7 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		log("Step 6: Verify FindingsPage renders (critical/high soft-checked)");
 		await page.goto(`/projects/${projectId}/findings`);
 		await expect(
-			page.locator("h1").filter({ hasText: /Finding/i }),
+			page.locator("h1").filter({ hasText: /发现审核|漏洞发现|Finding/i }),
 		).toBeVisible({ timeout: 10_000 });
 
 		// finding 在 e2e docker 环境下可能因 scan pipeline 限制未产出,
