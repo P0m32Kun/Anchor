@@ -51,17 +51,17 @@ test.describe
 
 			await page.goto("/");
 
-			const statsGrid = page.locator(".grid-cols-2");
-			await expect(statsGrid.getByText("总项目数").first()).toBeVisible();
-			await expect(statsGrid.getByText("活跃扫描").first()).toBeVisible();
+			const statsGrid = page.locator(".grid-cols-4, .lg\\:grid-cols-4").first();
+			await expect(statsGrid.getByText("总览项目").first()).toBeVisible();
+			await expect(statsGrid.getByText("运行中扫描").first()).toBeVisible();
 			await expect(
-				statsGrid.getByText("待处理 Findings").first(),
+				statsGrid.getByText("待审核漏洞").first(),
 			).toBeVisible();
-			await expect(statsGrid.getByText("在线 Worker").first()).toBeVisible();
+			await expect(statsGrid.getByText("在线节点").first()).toBeVisible();
 
 			await expect(
 				statsGrid
-					.locator("div", { hasText: "总项目数" })
+					.locator("div", { hasText: "总览项目" })
 					.first()
 					.locator("xpath=..")
 					.getByText("1"),
