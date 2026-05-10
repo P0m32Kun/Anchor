@@ -30,12 +30,12 @@ test.describe
 			await page.getByRole("button", { name: "创建项目", exact: true }).click();
 
 			// 验证新项目出现在列表中
-			await expect(page.getByText("Smoke Test Project")).toBeVisible();
+			await expect(page.getByRole("heading", { name: "Smoke Test Project" })).toBeVisible();
 			await expect(page.getByText("Smoke Test Org")).toBeVisible();
 
 			// ── Step 3: 进入目标管理 ──
 			// 点击项目卡片进入项目详情（会自动设置 currentProject）
-			await page.getByText("Smoke Test Project").click();
+			await page.getByRole("heading", { name: "Smoke Test Project" }).click();
 
 			// 导航到目标管理页（LegacyRouteGuard 会重定向到 /projects/:id/targets）
 			await page.goto("/targets");
