@@ -166,7 +166,6 @@ export default function ReportsPage() {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to generate preview";
       setReportsError(msg);
-      toast("预览生成失败：" + msg, "error");
     }
   }, [projectId, toast]);
 
