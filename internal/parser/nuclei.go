@@ -26,6 +26,7 @@ type NucleiResult struct {
 	Request          string   `json:"request"`
 	Response         string   `json:"response"`
 	Timestamp        string   `json:"timestamp"`
+	RawLine          string   `json:"-"` // Original JSON line, populated by parser
 }
 
 // ParseNuclei reads Nuclei JSONL output and returns parsed results.
