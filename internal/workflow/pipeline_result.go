@@ -3,8 +3,11 @@ package workflow
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/fingerprint"
