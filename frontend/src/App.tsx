@@ -35,7 +35,7 @@
 import { Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { ToastProvider, Navbar, Header, useToast, ErrorBoundary, Button } from "./components";
-import { setGlobalErrorHandler, setConsecutiveErrorCallback, api, API_BASE } from "./lib/api";
+import { setGlobalErrorHandler, setConsecutiveErrorCallback, api, API_BASE, friendlyMessage } from "./lib/api";
 import { resetApiBase, needsApiBaseConfig, getApiToken, resetApiToken, needsApiToken } from "./lib/config";
 import ApiBaseSetup from "./components/ApiBaseSetup";
 import { useStore } from "./lib/store";
