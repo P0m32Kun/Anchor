@@ -77,7 +77,6 @@ export default function ProjectPage() {
       setPurpose("");
       toast("项目创建成功", "success");
     } catch (err) {
-      toast("创建失败: " + (err instanceof Error ? err.message : String(err)), "error");
     } finally {
       setCreating(false);
     }
