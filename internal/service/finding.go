@@ -120,3 +120,14 @@ func (s *findingService) AddEvidence(ctx context.Context, findingID string, req 
 	}
 	return ev, nil
 }
+
+func (s *findingService) ListEvidence(ctx context.Context, findingID string) ([]*models.Evidence, error) {
+	evidence, err := s.repo.ListEvidenceByFinding(findingID)
+	if err != nil {
+		return nil, errors.Newf(errors.ErrInternal, "list evidence failed: %v", err)
+	}
+	if evidence == nil {
+		evidence = []*models.Evidence{}
+	}
+	return evidence, nil
+}
