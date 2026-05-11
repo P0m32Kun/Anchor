@@ -23,7 +23,6 @@ export default function WorkersPage() {
       setWorkers(data);
     } catch (err: any) {
       if (err.name === "AbortError") return;
-      toast("加载 Worker 列表失败: " + (err.message || String(err)), "error");
     } finally {
       setLoading(false);
     }
