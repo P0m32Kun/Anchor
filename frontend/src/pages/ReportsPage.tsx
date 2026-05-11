@@ -368,7 +368,7 @@ export default function ReportsPage() {
                             </button>
                         ))}
                         {findings.length === 0 && (
-                            <div className="p-4 text-center text-xs text-muted-foreground italic">列表为空</div>
+                            <EmptyState title="暂无漏洞导航" description="报告中包含的漏洞将显示在这里" />
                         )}
                     </div>
                 </CardContent>
