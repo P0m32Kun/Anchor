@@ -198,7 +198,6 @@ export default function TemplatesPage() {
       setGitForm({ name: "", uri: "", branch: "", routing_policy: "manual" });
       loadSources();
     } catch (err: any) {
-      toast("创建失败: " + (err.message || String(err)), "error");
     }
   }
 
