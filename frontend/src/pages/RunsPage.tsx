@@ -214,6 +214,22 @@ export default function RunsPage() {
     }
   );
 
+  const currentRun = selectedRun ? runs.find((r) => r.id === selectedRun) : null;
+  const isCurrentRunActive =
+    currentRun?.status === "running" || currentRun?.status === "pending";
+
+  usePolling(
+    async () => {
+      if (!selectedRun) return;
+      await refreshRunDetails(selectedRun);
+    },
+    {
+      interval: 3000,
+      enabled: !!selectedRun && isCurrentRunActive,
+      pauseOnHidden: true,
+    }
+  );
+
   const handleStartScan = async (mode: ScanMode, config: PipelineConfig) => {
     if (!projectId || creating) return;
     setCreating(true);
