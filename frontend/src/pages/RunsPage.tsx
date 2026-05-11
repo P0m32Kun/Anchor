@@ -469,7 +469,7 @@ export default function RunsPage() {
                             <CardDescription className="text-xs">Pipeline Execution Stages</CardDescription>
                         </CardHeader>
                         <CardContent className="p-0">
-                            {stagesLoading ? (
+                            {stagesLoading || tasksLoading ? (
                                 <div className="p-8 text-center flex flex-col items-center gap-2">
                                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
                                     <span className="text-xs text-muted-foreground font-mono">Loading pipeline stages...</span>
@@ -480,83 +480,77 @@ export default function RunsPage() {
                                 </div>
                             ) : (
                                 <div className="divide-y border-t">
-                                    {stages.map((s, idx) => (
-                                        <div key={s.id} className="group relative flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
-                                            <div className="flex flex-col items-center relative h-full">
-                                                <div className={cn(
-                                                    "z-10 h-6 w-6 rounded-full border-2 bg-background flex items-center justify-center shrink-0",
-                                                    s.status === 'completed' ? 'border-brand-success text-brand-success' :
-                                                    s.status === 'running' ? 'border-primary text-primary animate-pulse' :
-                                                    s.status === 'failed' ? 'border-destructive text-destructive' :
-                                                    'border-border text-muted-foreground'
-                                                )}>
-                                                    {s.status === 'completed' ? <CheckCircle2 className="h-3 w-3" /> :
-                                                     s.status === 'failed' ? <AlertCircle className="h-3 w-3" /> :
-                                                     <span className="text-[9px] font-bold">{idx + 1}</span>
-                                                    }
-                                                </div>
-                                                {idx < stages.length - 1 && (
-                                                    <div className="absolute top-6 bottom-[-16px] w-[1px] bg-border group-hover:bg-primary/20 transition-colors" />
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm font-semibold uppercase tracking-tight truncate pr-2">
-                                                        {STAGE_LABELS[s.stage] || s.stage}
-                                                    </span>
-                                                    {s.started_at && (
-                                                        <span className="text-[10px] font-mono text-muted-foreground">
-                                                            {new Date(s.started_at).toLocaleTimeString()}
-                                                        </span>
+                                    {stages.map((s, idx) => {
+                                        const stageTasks = tasksInStage(s, tasks);
+                                        return (
+                                        <div key={s.id} className="group">
+                                            <div className="relative flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
+                                                <div className="flex flex-col items-center relative h-full">
+                                                    <div className={cn(
+                                                        "z-10 h-6 w-6 rounded-full border-2 bg-background flex items-center justify-center shrink-0",
+                                                        s.status === 'completed' ? 'border-brand-success text-brand-success' :
+                                                        s.status === 'running' ? 'border-primary text-primary animate-pulse' :
+                                                        s.status === 'failed' ? 'border-destructive text-destructive' :
+                                                        'border-border text-muted-foreground'
+                                                    )}>
+                                                        {s.status === 'completed' ? <CheckCircle2 className="h-3 w-3" /> :
+                                                         s.status === 'failed' ? <AlertCircle className="h-3 w-3" /> :
+                                                         <span className="text-[9px] font-bold">{idx + 1}</span>
+                                                        }
+                                                    </div>
+                                                    {idx < stages.length - 1 && (
+                                                        <div className="absolute top-6 bottom-[-16px] w-[1px] bg-border group-hover:bg-primary/20 transition-colors" />
                                                     )}
                                                 </div>
-                                                <div className={cn(
-                                                    "text-[10px] mt-0.5 font-medium truncate",
-                                                    s.status === 'completed' ? 'text-brand-success' :
-                                                    s.status === 'running' ? 'text-primary' :
-                                                    s.status === 'failed' ? 'text-destructive' :
-                                                    'text-muted-foreground'
-                                                )}>
-                                                    {s.status.toUpperCase()}
-                                                    {s.error && <span className="ml-2 font-mono text-destructive opacity-80">— {s.error}</span>}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-semibold uppercase tracking-tight truncate pr-2">
+                                                            {STAGE_LABELS[s.stage] || s.stage}
+                                                        </span>
+                                                        <span className="text-[10px] font-mono text-muted-foreground">
+                                                            {formatStageDuration(s)}
+                                                        </span>
+                                                    </div>
+                                                    <div className={cn(
+                                                        "text-[10px] mt-0.5 font-medium truncate",
+                                                        s.status === 'completed' ? 'text-brand-success' :
+                                                        s.status === 'running' ? 'text-primary' :
+                                                        s.status === 'failed' ? 'text-destructive' :
+                                                        'text-muted-foreground'
+                                                    )}>
+                                                        {s.status.toUpperCase()}
+                                                        {s.error && <span className="ml-2 font-mono text-destructive opacity-80">— {s.error}</span>}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm">原子任务明细</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0 border-t">
-                            {tasksLoading ? (
-                                <div className="p-8"><SkeletonList count={3} /></div>
-                            ) : tasks.length === 0 ? (
-                                <div className="p-8 text-center text-xs text-muted-foreground italic">No atom tasks found</div>
-                            ) : (
-                                <div className="divide-y">
-                                    {tasks.map((task) => (
-                                        <div key={task.id} className="p-3 flex items-start justify-between gap-3 text-xs">
-                                            <div className="flex items-center gap-3">
-                                                <div className="px-2 py-0.5 rounded bg-muted font-mono font-bold text-muted-foreground">
-                                                    {task.tool}
+                                            {stageTasks.length > 0 && (
+                                                <div className="pl-14 pr-4 pb-3 -mt-1 space-y-1.5">
+                                                    {stageTasks.map((task) => (
+                                                        <div key={task.id} className="flex items-center justify-between gap-3 text-[11px] py-1 border-l border-border/40 pl-3">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <span className="px-1.5 py-0.5 rounded bg-muted font-mono font-bold text-muted-foreground text-[10px]">
+                                                                    {task.tool}
+                                                                </span>
+                                                                <span className="font-mono text-muted-foreground opacity-50 truncate">#{task.id.slice(-6)}</span>
+                                                                <span className="font-mono text-muted-foreground/70 text-[10px]">
+                                                                    {formatTaskDuration(task)}
+                                                                </span>
+                                                            </div>
+                                                            <Badge variant={
+                                                                task.status === 'completed' ? 'success' :
+                                                                task.status === 'failed' ? 'destructive' :
+                                                                task.status === 'running' ? 'info' :
+                                                                'secondary'
+                                                            } className="h-4 px-1 text-[9px] shrink-0">
+                                                                {task.status}
+                                                            </Badge>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                <span className="font-mono text-muted-foreground opacity-50">#{task.id.slice(-6)}</span>
-                                            </div>
-                                            <Badge variant={
-                                                task.status === 'completed' ? 'success' :
-                                                task.status === 'failed' ? 'destructive' :
-                                                task.status === 'running' ? 'info' :
-                                                'secondary'
-                                            } className="h-5 px-1 text-[9px]">
-                                                {task.status}
-                                            </Badge>
+                                            )}
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </CardContent>
