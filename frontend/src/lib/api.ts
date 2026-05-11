@@ -261,6 +261,9 @@ export interface ScanTask {
   tool: string;
   status: string;
   error_message?: string;
+  started_at?: string;
+  finished_at?: string;
+  exit_code?: number;
   created_at: string;
 }
 
