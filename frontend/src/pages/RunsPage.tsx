@@ -153,6 +153,20 @@ export default function RunsPage() {
           loadRunDetails(selectedRun);
         }
       }
+      if (msg.event === "report_progress") {
+        const reportMsg = msg as { report_id: string; run_id: string; status: string; title?: string };
+        if (reportMsg.status === "complete" || reportMsg.status === "failed") {
+          setGeneratingReports((prev) => { const next = new Set(prev); next.delete(reportMsg.run_id); return next; });
+          api.getReport(reportMsg.report_id).then((r) => {
+            setReports((prev) => new Map(prev).set(reportMsg.run_id, r));
+          }).catch(() => {});
+          if (reportMsg.status === "complete") {
+            toast("报告生成完成", "success");
+          } else {
+            toast("报告生成失败", "error");
+          }
+        }
+      }
     },
   });
 
