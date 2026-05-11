@@ -307,7 +307,6 @@ export default function TemplatesPage() {
       toast("文件保存成功", "success");
       setFileModalOpen(false);
     } catch (err: any) {
-      toast("保存失败: " + (err.message || String(err)), "error");
     }
   }
 
