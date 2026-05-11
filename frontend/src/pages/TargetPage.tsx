@@ -336,7 +336,6 @@ export default function TargetPage() {
       setScopeValue("");
       toast("规则已添加", "success");
     } catch (err) {
-      toast("添加规则失败: " + (err instanceof Error ? err.message : String(err)), "error");
     } finally {
       setAddingScope(false);
     }
