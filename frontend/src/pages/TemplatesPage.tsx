@@ -146,7 +146,6 @@ export default function TemplatesPage() {
       setSources(list || []);
     } catch (err: any) {
       if (err.name === "AbortError") return;
-      toast("加载模板源失败: " + (err.message || String(err)), "error");
     } finally {
       setLoading(false);
     }
