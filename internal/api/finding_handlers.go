@@ -26,7 +26,14 @@ func (s *Server) handleGetFinding(w http.ResponseWriter, r *http.Request) {
 	if s.handleServiceError(w, err, "get finding failed") {
 		return
 	}
-	writeJSON(w, http.StatusOK, finding)
+	evidence, err := s.findingSvc.ListEvidence(r.Context(), id)
+	if err != nil {
+		evidence = nil
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"finding":  finding,
+		"evidence": evidence,
+	})
 }
 
 func (s *Server) handlePatchFindingStatus(w http.ResponseWriter, r *http.Request) {
