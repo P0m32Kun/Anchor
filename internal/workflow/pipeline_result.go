@@ -121,6 +121,105 @@ func (p *Pipeline) saveNucleiFindings(stdout []byte, urlToEndpoint map[string]*m
 		}
 		if err := p.queries.CreateFinding(f); err != nil {
 			log.Printf("[pipeline] create finding %s: %v", nr.Name, err)
+			continue
+		}
+
+		// Collect evidence inline
+		p.collectNucleiEvidence(f.ID, nr)
+	}
+}
+
+func (p *Pipeline) collectNucleiEvidence(findingID string, nr parser.NucleiResult) {
+	// Save nuclei raw output as artifact
+	if nr.RawLine != "" {
+		artifactID := p.saveEvidenceFile(findingID, "nuclei_output.json", []byte(nr.RawLine))
+		if artifactID != "" {
+			p.queries.CreateEvidence(&models.Evidence{
+				ID:         util.GenerateID(),
+				FindingID:  findingID,
+				Type:       models.EvidenceRawOutput,
+				ArtifactID: &artifactID,
+				Excerpt:    truncate(nr.RawLine, 500),
+				CreatedBy:  "nuclei",
+				CreatedAt:  time.Now().UTC(),
+			})
 		}
 	}
+
+	// Save request if available
+	if nr.Request != "" {
+		artifactID := p.saveEvidenceFile(findingID, "request.txt", []byte(nr.Request))
+		if artifactID != "" {
+			p.queries.CreateEvidence(&models.Evidence{
+				ID:         util.GenerateID(),
+				FindingID:  findingID,
+				Type:       models.EvidenceRequest,
+				ArtifactID: &artifactID,
+				Excerpt:    truncate(nr.Request, 500),
+				CreatedBy:  "nuclei",
+				CreatedAt:  time.Now().UTC(),
+			})
+		}
+	}
+
+	// Save response if available
+	if nr.Response != "" {
+		artifactID := p.saveEvidenceFile(findingID, "response.txt", []byte(nr.Response))
+		if artifactID != "" {
+			p.queries.CreateEvidence(&models.Evidence{
+				ID:         util.GenerateID(),
+				FindingID:  findingID,
+				Type:       models.EvidenceResponse,
+				ArtifactID: &artifactID,
+				Excerpt:    truncate(nr.Response, 500),
+				CreatedBy:  "nuclei",
+				CreatedAt:  time.Now().UTC(),
+			})
+		}
+	}
+}
+
+func (p *Pipeline) saveEvidenceFile(findingID, filename string, data []byte) string {
+	// Truncate to 1MB max
+	if len(data) > 1024*1024 {
+		data = data[:1024*1024]
+	}
+
+	evidenceDir := filepath.Join(p.dataDir, "evidence")
+	if err := os.MkdirAll(evidenceDir, 0750); err != nil {
+		log.Printf("[pipeline] create evidence dir: %v", err)
+		return ""
+	}
+
+	artifactID := util.GenerateID()
+	filePath := filepath.Join(evidenceDir, artifactID+"_"+filename)
+
+	if err := os.WriteFile(filePath, data, 0640); err != nil {
+		log.Printf("[pipeline] write evidence file: %v", err)
+		return ""
+	}
+
+	hash := sha256.Sum256(data)
+	artifact := &models.RawArtifact{
+		ID:              artifactID,
+		ProjectID:       p.projectID,
+		Type:            models.ArtifactFile,
+		Path:            filePath,
+		SHA256:          fmt.Sprintf("%x", hash),
+		Size:            int64(len(data)),
+		RedactionStatus: "none",
+		CreatedAt:       time.Now().UTC(),
+	}
+	if err := p.queries.CreateRawArtifact(artifact); err != nil {
+		log.Printf("[pipeline] create raw artifact: %v", err)
+		return ""
+	}
+	return artifactID
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
