@@ -150,12 +150,13 @@ func scanFinding(row interface {
 	return f, nil
 }
 
-// ListFindingsForReport returns findings with status IN ('confirmed', 'accepted_risk') for a project.
-// Used by report aggregation to select only report-eligible findings.
+// ListFindingsForReport returns all findings for a project, ordered for report rendering.
+// Status filtering is deferred to the report templates so that pending_review and
+// false_positive findings are visible to the auditor before they make a decision.
 func (q *Queries) ListFindingsForReport(projectID string) ([]*models.Finding, error) {
 	rows, err := q.db.Query(`
 		SELECT id, project_id, asset_id, service_id, web_endpoint_id, source_tool, source_rule_id, dedup_key, title, severity, confidence, priority, status, summary, remediation, created_at, updated_at
-		FROM findings WHERE project_id = ? AND status IN ('confirmed', 'accepted_risk') ORDER BY priority DESC, created_at DESC`, projectID)
+		FROM findings WHERE project_id = ? ORDER BY priority DESC, created_at DESC`, projectID)
 	if err != nil {
 		return nil, err
 	}
