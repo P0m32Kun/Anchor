@@ -319,9 +319,10 @@ func (s *Server) handleListReports(w http.ResponseWriter, r *http.Request) {
 }
 
 // checkDiskSpace returns true if the data directory has at least 500MB free.
+// Uses syscall.Statfs on darwin/linux; always returns true on unsupported platforms.
 func checkDiskSpace(dataDir string) (bool, int64) {
-	var stat syscallStatfs
-	if err := statfs(dataDir, &stat); err != nil {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(dataDir, &stat); err != nil {
 		return true, 0 // Can't check, allow.
 	}
 	avail := int64(stat.Bavail) * int64(stat.Bsize)
