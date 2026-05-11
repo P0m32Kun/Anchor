@@ -84,7 +84,6 @@ export default function FindingsPage() {
       setCurrentFinding(data);
       setDetailOpen(true);
     } catch (err) {
-      toast("加载详情失败: " + (err instanceof Error ? err.message : String(err)), "error");
     }
   };
 
