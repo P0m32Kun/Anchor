@@ -136,7 +136,6 @@ export default function FindingsPage() {
         setFindings(updated.data ?? []);
       }
     } catch (err) {
-      toast("批量更新失败: " + (err instanceof Error ? err.message : String(err)), "error");
     } finally {
       setBatchUpdating(false);
     }
