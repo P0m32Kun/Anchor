@@ -103,7 +103,6 @@ export default function FindingsPage() {
       if (previousStatus !== undefined) {
         setFindings((prev) => prev.map((f) => (f.id === findingId ? { ...f, status: previousStatus } : f)));
       }
-      toast("更新失败: " + String(err), "error");
     }
   };
 
