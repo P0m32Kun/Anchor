@@ -78,6 +78,23 @@ func severityLabel(sev models.FindingSeverity) string {
 	}
 }
 
+func statusLabelHTML(st models.FindingStatus) string {
+	switch st {
+	case models.FindingPendingReview:
+		return "待审核"
+	case models.FindingConfirmed:
+		return "已确认"
+	case models.FindingFalsePositive:
+		return "误报"
+	case models.FindingAcceptedRisk:
+		return "已接受风险"
+	case models.FindingIgnored:
+		return "已忽略"
+	default:
+		return string(st)
+	}
+}
+
 const htmlReportTmpl = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
