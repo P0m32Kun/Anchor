@@ -558,6 +558,136 @@ export default function RunsPage() {
   );
 }
 
+// --- Report Button Component ---
+
+function ReportButton({
+  runId,
+  report,
+  generating,
+  onGenerate,
+  onDownload,
+  onDelete,
+}: {
+  runId: string;
+  report?: Report;
+  generating: boolean;
+  onGenerate: () => void;
+  onDownload: (reportId: string) => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  if (generating) {
+    return (
+      <Button variant="ghost" size="sm" disabled className="h-8 gap-1.5 text-xs">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        生成中
+      </Button>
+    );
+  }
+
+  if (report && report.status === "complete") {
+    return (
+      <div className="relative" ref={menuRef}>
+        <div className="flex">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 text-xs rounded-r-none border-r border-border"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownload(report.id);
+            }}
+          >
+            <Download className="h-3.5 w-3.5" />
+            下载
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-7 rounded-l-none px-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen(!menuOpen);
+            }}
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        {menuOpen && (
+          <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-md border border-border bg-popover shadow-md">
+            <button
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload(report.id);
+                setMenuOpen(false);
+              }}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              HTML 报告
+            </button>
+            <button
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+                setMenuOpen(false);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              删除报告
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (report && report.status === "failed") {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-8 gap-1.5 text-xs text-destructive hover:bg-destructive/10"
+        onClick={(e) => {
+          e.stopPropagation();
+          onGenerate();
+        }}
+      >
+        <AlertCircle className="h-3.5 w-3.5" />
+        重试
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-8 gap-1.5 text-xs"
+      onClick={(e) => {
+        e.stopPropagation();
+        onGenerate();
+      }}
+    >
+      <FileText className="h-3.5 w-3.5" />
+      生成报告
+    </Button>
+  );
+}
+
 const STAGE_LABELS: Record<string, string> = {
   classify: "目标分类",
   search: "FOFA 搜索",
