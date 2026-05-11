@@ -3,12 +3,41 @@ export const API_BASE = getApiBase();
 
 export class APIError extends Error {
   code: "TIMEOUT" | "NETWORK_ERROR" | "HTTP_5xx" | "HTTP_4xx" | "NON_JSON_RESPONSE" | "UNKNOWN";
+  httpStatus?: number;
   retryable: boolean;
-  constructor(message: string, code: APIError["code"] = "UNKNOWN") {
+  constructor(message: string, code: APIError["code"] = "UNKNOWN", httpStatus?: number) {
     super(message);
     this.code = code;
+    this.httpStatus = httpStatus;
     this.retryable = code === "TIMEOUT" || code === "NETWORK_ERROR" || code === "HTTP_5xx";
   }
+}
+
+const HTTP_MESSAGES: Record<number, string> = {
+  400: "请求参数有误",
+  401: "登录已过期，请重新输入 API Token",
+  403: "没有权限执行此操作",
+  404: "请求的资源不存在",
+  409: "操作冲突，请刷新后重试",
+  422: "输入数据有误，请检查",
+  429: "请求过于频繁，请稍后重试",
+  500: "服务器内部错误，请稍后重试",
+  502: "服务暂时不可用，请稍后重试",
+  503: "服务正在维护中，请稍后重试",
+  504: "服务响应超时，请稍后重试",
+};
+
+export function friendlyMessage(err: APIError): string {
+  if (err.code === "TIMEOUT") return "请求超时，请检查网络后重试";
+  if (err.code === "NETWORK_ERROR") return "网络连接失败，请检查后端服务是否运行";
+  if (err.code === "NON_JSON_RESPONSE") return "服务器响应异常，请检查后端服务";
+  if (err.code === "HTTP_4xx" && err.httpStatus) {
+    return HTTP_MESSAGES[err.httpStatus] || `请求失败（${err.httpStatus}）`;
+  }
+  if (err.code === "HTTP_5xx" && err.httpStatus) {
+    return HTTP_MESSAGES[err.httpStatus] || "服务器错误，请稍后重试";
+  }
+  return err.message || "操作失败，请稍后重试";
 }
 
 export interface PaginatedResponse<T> {
