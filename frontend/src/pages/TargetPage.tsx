@@ -311,7 +311,6 @@ export default function TargetPage() {
         toast("目标已添加", "success");
       }
     } catch (err) {
-      toast("添加 Scope 规则失败: " + (err instanceof Error ? err.message : String(err)), "error");
     } finally {
       setScopeConfirmLoading(false);
       setScopeConfirmOpen(false);
