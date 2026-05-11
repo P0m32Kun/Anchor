@@ -116,7 +116,6 @@ export default function EngineKeysPage() {
       updateForm(engine, { apiKey: "", exists: false, showKey: false });
       toast("删除成功", "success");
     } catch (err: any) {
-      toast("删除失败: " + (err?.message || String(err)), "error");
     } finally {
       updateForm(engine, { deleting: false });
     }
