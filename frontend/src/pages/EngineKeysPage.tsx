@@ -70,9 +70,7 @@ export default function EngineKeysPage() {
           return next;
         });
       })
-      .catch((err) => {
-        toast("加载凭证失败: " + (err?.message || String(err)), "error");
-      });
+      .catch(() => {});
     return () => { mounted = false; };
   }, [toast]);
 
