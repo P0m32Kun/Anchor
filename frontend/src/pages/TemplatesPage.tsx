@@ -235,7 +235,6 @@ export default function TemplatesPage() {
       toast(src.enabled ? "已禁用" : "已启用", "success");
       loadSources();
     } catch (err: any) {
-      toast("操作失败: " + (err.message || String(err)), "error");
     }
   }
 
