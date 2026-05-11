@@ -322,7 +322,6 @@ export default function TemplatesPage() {
           const files = await api.listNucleiCustomFiles(sourceId);
           setFilesMap((p) => ({ ...p, [sourceId]: files || [] }));
         } catch (err: any) {
-          toast("删除失败: " + (err.message || String(err)), "error");
         }
       },
     });
