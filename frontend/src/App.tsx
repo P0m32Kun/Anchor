@@ -40,6 +40,7 @@ import { resetApiBase, needsApiBaseConfig, getApiToken, resetApiToken, needsApiT
 import ApiBaseSetup from "./components/ApiBaseSetup";
 import { useStore } from "./lib/store";
 import { cn } from "./lib/utils";
+import { PlugZap, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import ProjectLayout from "./components/ProjectLayout";
 import DashboardPage from "./pages/DashboardPage";
 import ProjectPage from "./pages/ProjectPage";
