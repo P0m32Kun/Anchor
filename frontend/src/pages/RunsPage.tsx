@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
 import { useResource, useSSE, usePolling } from "../hooks";
@@ -18,7 +18,7 @@ import {
 } from "../components";
 import { useToast } from "../components/Toast";
 import { getApiBase } from "../lib/config";
-import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig } from "../lib/api";
+import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig, Report } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
 import {
   Play,
@@ -31,7 +31,11 @@ import {
   History,
   Zap,
   Loader2,
-  ArrowRight
+  ArrowRight,
+  FileText,
+  Download,
+  ChevronDown,
+  Trash2
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
