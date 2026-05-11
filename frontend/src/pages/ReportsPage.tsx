@@ -105,6 +105,7 @@ export default function ReportsPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewMode, setPreviewMode] = useState<"rendered" | "raw">("rendered");
   const [exporting, setExporting] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     if (!projectId) return;
