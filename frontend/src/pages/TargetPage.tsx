@@ -349,7 +349,6 @@ export default function TargetPage() {
       setDryRunResult(res);
       toast("授权检测完成", "success");
     } catch (err) {
-      toast("授权检测失败: " + (err instanceof Error ? err.message : String(err)), "error");
     } finally {
       setDryRunLoading(false);
       setDryRunConfirmOpen(false);
