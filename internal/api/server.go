@@ -214,6 +214,12 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /projects/{id}/events", auth(http.HandlerFunc(s.handleProjectSSE)))
 	mux.Handle("GET /projects/{id}/reports/export.md", auth(http.HandlerFunc(s.handleExportReportMD)))
 	mux.Handle("GET /projects/{id}/reports/export.json", auth(http.HandlerFunc(s.handleExportReportJSON)))
+	// Report engine
+	mux.Handle("POST /runs/{runId}/report", auth(http.HandlerFunc(s.handleCreateReport)))
+	mux.Handle("GET /reports/{reportId}", auth(http.HandlerFunc(s.handleGetReport)))
+	mux.Handle("GET /reports/{reportId}/download", auth(http.HandlerFunc(s.handleDownloadReport)))
+	mux.Handle("DELETE /reports/{reportId}", auth(http.HandlerFunc(s.handleDeleteReport)))
+	mux.Handle("GET /reports", auth(http.HandlerFunc(s.handleListReports)))
 	mux.Handle("POST /projects/{id}/archive", auth(http.HandlerFunc(s.handleCreateArchive)))
 	mux.Handle("GET /projects/{id}/archive/download", auth(http.HandlerFunc(s.handleDownloadArchive)))
 	mux.Handle("GET /tool-templates", auth(http.HandlerFunc(s.handleListToolTemplates)))
