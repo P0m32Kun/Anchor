@@ -18,6 +18,7 @@ func GenerateHTML(data *ReportData) (string, error) {
 	tmpl, err := template.New("report").Funcs(template.FuncMap{
 		"severityColor": severityColor,
 		"severityLabel": severityLabel,
+		"statusLabel":   statusLabelHTML,
 		"formatTime":    func(t time.Time) string { return t.Format("2006-01-02 15:04") },
 		"countSeverity": func(findings []*ReportFinding, sev models.FindingSeverity) int {
 			n := 0
