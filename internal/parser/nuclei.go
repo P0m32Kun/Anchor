@@ -76,6 +76,7 @@ func ParseNuclei(r io.Reader) ([]NucleiResult, []ParseError) {
 			}
 		}
 
+		res.RawLine = string(line)
 		return res, ParseError{}
 	})
 }
