@@ -98,7 +98,6 @@ export default function EngineKeysPage() {
       updateForm(engine, { exists: true, apiKey: maskKey(form.apiKey.trim()), showKey: false });
       toast("保存成功", "success");
     } catch (err: any) {
-      toast("保存失败: " + (err?.message || String(err)), "error");
     } finally {
       updateForm(engine, { saving: false });
     }
