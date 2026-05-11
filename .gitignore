@@ -73,3 +73,4 @@ tmp-tag-test/
 # Tauri generated
 src-tauri/gen/
 .gitnexus
+.gstack/
