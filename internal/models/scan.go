@@ -178,6 +178,31 @@ type PipelineRun struct {
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 }
 
+// --- Report ---
+
+type ReportStatus string
+
+const (
+	ReportGenerating ReportStatus = "generating"
+	ReportPartial    ReportStatus = "partial"
+	ReportComplete   ReportStatus = "complete"
+	ReportFailed     ReportStatus = "failed"
+)
+
+type Report struct {
+	ID            string       `json:"id" db:"id"`
+	RunID         string       `json:"run_id" db:"run_id"`
+	Status        ReportStatus `json:"status" db:"status"`
+	Title         string       `json:"title,omitempty" db:"title"`
+	FindingCount  int          `json:"finding_count" db:"finding_count"`
+	EvidenceCount int          `json:"evidence_count" db:"evidence_count"`
+	FilePath      string       `json:"file_path,omitempty" db:"file_path"`
+	FileSizeBytes int64        `json:"file_size_bytes" db:"file_size_bytes"`
+	ErrorMessage  string       `json:"error_message,omitempty" db:"error_message"`
+	CreatedAt     time.Time    `json:"created_at" db:"created_at"`
+	CompletedAt   *time.Time   `json:"completed_at,omitempty" db:"completed_at"`
+}
+
 // --- Pipeline Run Stage ---
 
 type PipelineRunStageStatus string
