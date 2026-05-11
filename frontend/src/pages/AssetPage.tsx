@@ -147,7 +147,6 @@ export default function AssetPage() {
       await api.startAssetDiscovery(projectId);
       toast("资产发现工作流已启动", "success");
     } catch (err) {
-      toast("启动失败: " + String(err), "error");
     } finally {
       setDiscoveryLoading(false);
     }
