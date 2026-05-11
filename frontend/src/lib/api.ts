@@ -136,7 +136,7 @@ export async function request(
     return res;
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
-      throw err;
+      throw new APIError("请求超时，请检查网络后重试", "TIMEOUT");
     }
     const apiErr = classifyError(err);
 
