@@ -34,7 +34,6 @@ export default function WorkersPage() {
       setWorkers((prev) => prev.filter((w) => w.id !== id));
       toast("Worker 已清理", "success");
     } catch (err: any) {
-      toast("清理失败: " + (err.message || String(err)), "error");
     }
   };
 
