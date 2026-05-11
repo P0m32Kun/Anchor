@@ -385,10 +385,20 @@ export default function RunsPage() {
                                         {run.status}
                                     </div>
                                 </div>
+                                {(run.status === 'completed' || run.status === 'failed') && (
+                                    <ReportButton
+                                        runId={run.id}
+                                        report={reports.get(run.id)}
+                                        generating={generatingReports.has(run.id)}
+                                        onGenerate={() => handleGenerateReport(run.id)}
+                                        onDownload={(reportId) => api.downloadReport(reportId)}
+                                        onDelete={() => handleDeleteReport(run.id)}
+                                    />
+                                )}
                                 {canCancel(run.status) && (
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
                                         className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                         onClick={(e) => {
                                             e.stopPropagation();
