@@ -99,7 +99,6 @@ export default function EnginesPage() {
       fetchQuota(activeEngine);
     } catch (err: any) {
       if (err.name === "AbortError") return;
-      toast("搜索失败: " + (err.message || String(err)), "error");
     } finally {
       setLoading(false);
     }
