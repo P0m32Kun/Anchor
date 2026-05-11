@@ -561,6 +561,7 @@ export default function RunsPage() {
 // --- Report Button Component ---
 
 function ReportButton({
+  runId: _runId,
   report,
   generating,
   onGenerate,
