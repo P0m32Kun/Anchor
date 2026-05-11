@@ -584,6 +584,24 @@ export const api = {
 
   getNucleiCustomManifest: (signal?: AbortSignal) =>
     fetchAPI<NucleiCustomManifest>("/nuclei/custom/manifest", { signal }),
+
+  // --- Reports ---
+  createReport: (runId: string, title?: string, signal?: AbortSignal) =>
+    fetchAPI<Report>(`/runs/${runId}/report`, { method: "POST", body: title ? JSON.stringify({ title }) : undefined, signal }),
+
+  getReport: (reportId: string, signal?: AbortSignal) =>
+    fetchAPI<Report>(`/reports/${reportId}`, { signal }),
+
+  deleteReport: (reportId: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/reports/${reportId}`, { method: "DELETE", signal }),
+
+  listReports: (cursor?: string, signal?: AbortSignal) =>
+    fetchAPI<{ items: Report[]; has_more: boolean }>(`/reports${cursor ? `?cursor=${cursor}` : ""}`, { signal }),
+
+  downloadReport: (reportId: string) => {
+    const base = getApiBase();
+    window.open(`${base}/reports/${reportId}/download`, "_blank");
+  },
 };
 
 export interface Run {
