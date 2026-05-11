@@ -50,6 +50,7 @@ type FindingService interface {
 	Get(ctx context.Context, id string) (*models.Finding, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	AddEvidence(ctx context.Context, findingID string, req AddEvidenceRequest) (*models.Evidence, error)
+	ListEvidence(ctx context.Context, findingID string) ([]*models.Evidence, error)
 }
 
 // Request/Response types
