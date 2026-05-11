@@ -248,7 +248,6 @@ export default function TemplatesPage() {
           setConfirmOpen(false);
           loadSources();
         } catch (err: any) {
-          toast("删除失败: " + (err.message || String(err)), "error");
         }
       },
     });
