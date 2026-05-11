@@ -205,6 +205,44 @@ func (q *Queries) ListEvidenceByFinding(findingID string) ([]*models.Evidence, e
 	return list, rows.Err()
 }
 
+// ListEvidenceByFindingIDs returns evidence for multiple findings in one query (avoids N+1).
+func (q *Queries) ListEvidenceByFindingIDs(findingIDs []string) (map[string][]*models.Evidence, error) {
+	if len(findingIDs) == 0 {
+		return nil, nil
+	}
+	// Build placeholders: ?,?,?
+	placeholders := ""
+	args := make([]interface{}, 0, len(findingIDs))
+	for i, id := range findingIDs {
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "?"
+		args = append(args, id)
+	}
+	rows, err := q.db.Query(`
+		SELECT id, finding_id, type, artifact_id, excerpt, created_by, created_at
+		FROM evidence WHERE finding_id IN (`+placeholders+`) ORDER BY created_at`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string][]*models.Evidence)
+	for rows.Next() {
+		e := &models.Evidence{}
+		var artifactID, createdBy sql.NullString
+		if err := rows.Scan(&e.ID, &e.FindingID, &e.Type, &artifactID, &e.Excerpt, &createdBy, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		e.ArtifactID = nullableString(artifactID)
+		if createdBy.Valid {
+			e.CreatedBy = createdBy.String
+		}
+		result[e.FindingID] = append(result[e.FindingID], e)
+	}
+	return result, rows.Err()
+}
+
 // --- RetestRun ---
 
 func (q *Queries) CreateRetestRun(r *models.RetestRun) error {
