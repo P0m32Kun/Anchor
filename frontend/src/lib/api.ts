@@ -129,7 +129,7 @@ export async function request(
       if (res.status === 401) {
         message = "认证失败，请检查 API Token";
       }
-      throw new APIError(message, res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx");
+      throw new APIError(message, res.status >= 500 ? "HTTP_5xx" : "HTTP_4xx", res.status);
     }
 
     resetConsecutiveErrors();
