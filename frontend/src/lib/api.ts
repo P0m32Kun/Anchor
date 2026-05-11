@@ -136,6 +136,9 @@ export async function request(
     return res;
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
+      // Caller's own signal abort — rethrow as-is (not an error)
+      if (opts?.signal?.aborted) throw err;
+      // Our timeout fired
       throw new APIError("请求超时，请检查网络后重试", "TIMEOUT");
     }
     const apiErr = classifyError(err);
