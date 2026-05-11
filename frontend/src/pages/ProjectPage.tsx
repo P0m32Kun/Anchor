@@ -255,7 +255,6 @@ export default function ProjectPage() {
             setDeleteTarget(null);
             toast("项目已删除", "success");
           } catch (err) {
-            toast("删除失败: " + (err instanceof Error ? err.message : String(err)), "error");
           } finally {
             setDeletingId(null);
           }
