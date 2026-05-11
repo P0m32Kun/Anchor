@@ -716,6 +716,40 @@ function ReportButton({
   );
 }
 
+function tasksInStage(stage: PipelineRunStage, allTasks: ScanTask[]): ScanTask[] {
+  if (!stage.started_at) return [];
+  const stageStart = new Date(stage.started_at).getTime();
+  const stageEnd = stage.completed_at ? new Date(stage.completed_at).getTime() : Infinity;
+  return allTasks.filter((t) => {
+    if (!t.started_at) return false;
+    const ts = new Date(t.started_at).getTime();
+    return ts >= stageStart && ts <= stageEnd;
+  });
+}
+
+function formatDurationMs(ms: number): string {
+  if (ms < 0) return "";
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  const m = Math.floor(s / 60);
+  const rs = Math.round(s % 60);
+  return `${m}m${rs}s`;
+}
+
+function formatStageDuration(s: PipelineRunStage): string {
+  if (!s.started_at) return "";
+  const start = new Date(s.started_at).getTime();
+  const end = s.completed_at ? new Date(s.completed_at).getTime() : Date.now();
+  return formatDurationMs(end - start);
+}
+
+function formatTaskDuration(t: ScanTask): string {
+  if (!t.started_at) return "";
+  const start = new Date(t.started_at).getTime();
+  const end = t.finished_at ? new Date(t.finished_at).getTime() : Date.now();
+  return formatDurationMs(end - start);
+}
+
 const STAGE_LABELS: Record<string, string> = {
   classify: "目标分类",
   search: "FOFA 搜索",
