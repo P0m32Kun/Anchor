@@ -616,6 +616,20 @@ export interface Run {
   created_at: string;
 }
 
+export interface Report {
+  id: string;
+  run_id: string;
+  status: "generating" | "partial" | "complete" | "failed";
+  title?: string;
+  finding_count: number;
+  evidence_count: number;
+  file_path?: string;
+  file_size_bytes: number;
+  error_message?: string;
+  created_at: string;
+  completed_at?: string;
+}
+
 export interface ToolTemplate {
   id: string;
   name: string;
