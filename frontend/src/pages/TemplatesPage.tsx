@@ -296,7 +296,6 @@ export default function TemplatesPage() {
       const text = await new Response(blob).text();
       setEditFileContent(text);
     } catch (err: any) {
-      toast("读取文件失败: " + (err.message || String(err)), "error");
     } finally {
       setEditFileLoading(false);
     }
