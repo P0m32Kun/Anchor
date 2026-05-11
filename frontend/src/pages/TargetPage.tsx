@@ -109,7 +109,6 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
         onImported();
         toast(`导入完成: 成功 ${res.imported} 个`, "success");
       } catch (err) {
-        toast("导入失败: " + (err instanceof Error ? err.message : String(err)), "error");
       } finally {
         setImporting(false);
         setDragOver(false);
