@@ -405,7 +405,6 @@ function FindingDetail({
       const data = await api.getFinding(finding.id);
       useStore.getState().setCurrentFinding(data);
     } catch (err) {
-      toast("保存备注失败: " + String(err), "error");
     } finally {
       setAdding(false);
     }
