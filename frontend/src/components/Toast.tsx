@@ -18,9 +18,17 @@ export function useToast() {
   return ctx.toast;
 }
 
+const MAX_TOASTS = 3;
+
+const DURATION: Record<ToastItem["type"], number> = {
+  success: 3000,
+  warning: 4000,
+  error: 5000,
+};
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const timersRef = useRef<Set<number>>(new Set());
+  const timersRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     return () => {
@@ -28,20 +36,42 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const scheduleRemove = useCallback((id: string, type: ToastItem["type"]) => {
+    const timer = window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+      timersRef.current.delete(id);
+    }, DURATION[type]);
+    timersRef.current.set(id, timer);
+  }, []);
+
   const toast = useCallback(
     (message: string, type: ToastItem["type"] = "success") => {
       const id = crypto.randomUUID();
-      setToasts((prev) => [...prev, { id, message, type }]);
-      const timer = window.setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-        timersRef.current.delete(timer);
-      }, 3500);
-      timersRef.current.add(timer);
+      setToasts((prev) => {
+        const next = [...prev, { id, message, type }];
+        // Evict oldest if over limit
+        if (next.length > MAX_TOASTS) {
+          const evicted = next[0];
+          const timer = timersRef.current.get(evicted.id);
+          if (timer) {
+            clearTimeout(timer);
+            timersRef.current.delete(evicted.id);
+          }
+          return next.slice(1);
+        }
+        return next;
+      });
+      scheduleRemove(id, type);
     },
-    []
+    [scheduleRemove]
   );
 
   const remove = useCallback((id: string) => {
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
@@ -63,10 +93,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     ),
   };
 
-  const bgMap = {
-    success: "bg-accent-green/10 border-accent-green/20",
-    warning: "bg-accent-yellow/10 border-accent-yellow/20",
-    error: "bg-accent-red/10 border-accent-red/20",
+  const borderMap = {
+    success: "border-l-accent-green",
+    warning: "border-l-accent-yellow",
+    error: "border-l-accent-red",
   };
 
   return (
@@ -80,7 +110,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-lg border ${bgMap[t.type]} animate-slide-down`}
+            className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-l-[3px] ${borderMap[t.type]} animate-slide-down`}
             style={{
               background: "linear-gradient(180deg, rgba(18,35,62,0.94), rgba(10,22,40,0.96))",
               backdropFilter: "saturate(180%) blur(28px)",
