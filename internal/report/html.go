@@ -208,15 +208,15 @@ const htmlReportTmpl = `<!DOCTYPE html>
 {{else}}<p style="color: var(--fg2)">无资产数据</p>{{end}}
 
 <h2>漏洞详情</h2>
-{{$confirmed := filterStatus .Findings "confirmed"}}
-{{if $confirmed}}
-{{range $i, $rf := $confirmed}}
+{{if .Findings}}
+{{range $i, $rf := .Findings}}
 <div class="finding-card">
   <div class="finding-header">
     <span class="badge" style="background: {{severityColor $rf.Finding.Severity}}">
       {{severityLabel $rf.Finding.Severity}}
     </span>
     <span class="finding-title">{{$rf.Finding.Title}}</span>
+    <span style="margin-left: auto; font-size: 12px; color: var(--fg2);">状态：{{statusLabel $rf.Finding.Status}}</span>
   </div>
   <div class="meta-row">
     {{if $rf.Asset}}<span>资产：{{$rf.Asset.Value}}</span>{{end}}
@@ -240,7 +240,7 @@ const htmlReportTmpl = `<!DOCTYPE html>
   {{end}}
 </div>
 {{end}}
-{{else}}<p style="color: var(--fg2)">无已确认漏洞</p>{{end}}
+{{else}}<p style="color: var(--fg2)">本次扫描未发现任何漏洞</p>{{end}}
 
 <h2>已接受风险</h2>
 {{$accepted := filterStatus .Findings "accepted_risk"}}
