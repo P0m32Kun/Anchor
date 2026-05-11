@@ -159,16 +159,7 @@ function AppContent() {
 
   useEffect(() => {
     setGlobalErrorHandler((err) => {
-      let title = "错误";
-      if (err.code === "TIMEOUT") title = "请求超时";
-      else if (err.code === "NETWORK_ERROR") title = "网络错误";
-      else if (err.code === "HTTP_5xx") title = "服务器错误";
-      else if (err.code === "HTTP_4xx") title = "请求错误";
-      else if (err.code === "NON_JSON_RESPONSE") title = "响应格式错误";
-      if (err.message?.includes("认证失败")) {
-        title = "认证失败";
-      }
-      toast(`${title}：${err.message}`, "error");
+      toast(friendlyMessage(err), "error");
     });
     return () => {
       setGlobalErrorHandler(() => {});
