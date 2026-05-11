@@ -349,6 +349,25 @@ func (r *RunStatus) Scan(value interface{}) error {
 	}
 }
 
+// --- JSON helpers for ReportStatus ---
+
+func (r ReportStatus) Value() (driver.Value, error) { return string(r), nil }
+func (r *ReportStatus) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	switch v := value.(type) {
+	case string:
+		*r = ReportStatus(v)
+		return nil
+	case []byte:
+		*r = ReportStatus(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot scan %T into ReportStatus", value)
+	}
+}
+
 // --- JSON helpers for PipelineRunStageStatus ---
 
 func (s PipelineRunStageStatus) Value() (driver.Value, error) { return string(s), nil }
