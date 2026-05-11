@@ -264,7 +264,6 @@ export default function TemplatesPage() {
       }
       loadSources();
     } catch (err: any) {
-      toast("验证失败: " + (err.message || String(err)), "error");
     }
   }
 
