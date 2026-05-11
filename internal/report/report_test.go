@@ -127,14 +127,12 @@ func TestGenerateMarkdown_Normal(t *testing.T) {
 
 	// Verify key sections are present.
 	sections := []string{
-		"# Security Assessment Report",
-		"## Executive Summary",
-		"## Scope",
-		"## Methodology",
-		"## Risk Statistics",
-		"## Vulnerability Details",
-		"## Accepted Risks",
-		"## Appendix",
+		"# 安全评估报告",
+		"## 执行摘要",
+		"## 扫描范围",
+		"## 检测方法",
+		"## 漏洞清单",
+		"## 附录",
 		"Test Project",
 		"TestOrg",
 		"Exposed .git Repository",
@@ -157,12 +155,12 @@ func TestGenerateMarkdown_NoFindings(t *testing.T) {
 	data.Findings = nil
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "No vulnerabilities confirmed") {
-		t.Error("expected 'No vulnerabilities confirmed' message when there are no findings")
+	if !strings.Contains(md, "本次扫描未发现任何漏洞") {
+		t.Error("expected '本次扫描未发现任何漏洞' message when there are no findings")
 	}
 
 	// Severity table should still be present with all-zero counts.
-	for _, sev := range []string{"critical", "high", "medium", "low", "info"} {
+	for _, sev := range []string{"严重", "高危", "中危", "低危", "信息"} {
 		if !strings.Contains(md, "| "+sev+" | 0 |") {
 			t.Errorf("expected severity table row for %s with count 0", sev)
 		}
@@ -174,8 +172,8 @@ func TestGenerateMarkdown_NoToolInvocations(t *testing.T) {
 	data.ToolVersions = nil
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "No tool invocations recorded") {
-		t.Error("expected 'No tool invocations recorded' message")
+	if !strings.Contains(md, "无工具调用记录") {
+		t.Error("expected '无工具调用记录' message")
 	}
 }
 
@@ -185,10 +183,10 @@ func TestGenerateMarkdown_NilAssetAndEndpoint(t *testing.T) {
 	data.Findings[0].WebEndpoint = nil
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "**Asset** | N/A") {
+	if !strings.Contains(md, "**资产** | N/A") {
 		t.Error("expected 'N/A' for nil asset")
 	}
-	if !strings.Contains(md, "**Endpoint** | N/A") {
+	if !strings.Contains(md, "**端点** | N/A") {
 		t.Error("expected 'N/A' for nil endpoint")
 	}
 }
@@ -198,14 +196,14 @@ func TestGenerateMarkdown_NoEvidence(t *testing.T) {
 	data.Findings[0].EvidenceList = nil
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "No evidence recorded") {
-		t.Error("expected 'No evidence recorded' message")
+	if !strings.Contains(md, "暂无原始证据记录") {
+		t.Error("expected '暂无原始证据记录' message")
 	}
 }
 
 func TestGenerateMarkdown_NilData(t *testing.T) {
 	md := GenerateMarkdown(nil)
-	if !strings.Contains(md, "incomplete") {
+	if !strings.Contains(md, "报告数据不完整") {
 		t.Errorf("expected error message for nil data, got: %s", md)
 	}
 }
@@ -215,8 +213,8 @@ func TestGenerateMarkdown_NoRemediation(t *testing.T) {
 	data.Findings[0].Finding.Remediation = ""
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "No remediation guidance") {
-		t.Error("expected 'No remediation guidance' for empty remediation")
+	if !strings.Contains(md, "暂无修复建议") {
+		t.Error("expected '暂无修复建议' for empty remediation")
 	}
 }
 
@@ -225,8 +223,8 @@ func TestGenerateMarkdown_NoSummary(t *testing.T) {
 	data.Findings[0].Finding.Summary = ""
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "No description provided") {
-		t.Error("expected 'No description provided' for empty summary")
+	if !strings.Contains(md, "未提供描述") {
+		t.Error("expected '未提供描述' for empty summary")
 	}
 }
 
