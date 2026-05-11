@@ -80,6 +80,7 @@ function AppHealthCheck({ children }: { children: React.ReactNode }) {
   const [healthy, setHealthy] = useState<boolean | null>(null);
   const [errorInfo, setErrorInfo] = useState<{ message: string; url: string } | null>(null);
   const [diagResult, setDiagResult] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
   const navigate = useNavigate();
 
   const healthUrl = `${API_BASE}/health`;
@@ -88,8 +89,7 @@ function AppHealthCheck({ children }: { children: React.ReactNode }) {
     api.healthCheck()
       .then(() => setHealthy(true))
       .catch((err: any) => {
-        const is401 = err?.code === "HTTP_4xx" && err?.message?.includes("认证失败");
-        const message = is401 ? "Token 无效，请检查输入的 API Token" : (err?.message || String(err));
+        const message = friendlyMessage(err);
         setErrorInfo({ message, url: healthUrl });
         setHealthy(false);
       });
@@ -104,16 +104,16 @@ function AppHealthCheck({ children }: { children: React.ReactNode }) {
       const text = await res.text();
       setDiagResult(`HTTP ${res.status}: ${text}`);
     } catch (e: any) {
-      setDiagResult(`Fetch 失败: ${e?.message || String(e)}`);
+      setDiagResult(`连接失败: ${e?.message || String(e)}`);
     }
   };
 
   if (healthy === null) {
     return (
       <div className="flex items-center justify-center h-screen bg-surface text-text-primary">
-        <div className="text-center">
-          <div className="animate-pulse text-2xl mb-4">🔄</div>
-          <p className="text-text-secondary">检查服务状态中...</p>
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 text-primary animate-spin mx-auto" />
+          <p className="text-text-secondary text-sm">检查服务状态中...</p>
         </div>
       </div>
     );
@@ -122,26 +122,40 @@ function AppHealthCheck({ children }: { children: React.ReactNode }) {
   if (!healthy) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-surface text-text-primary px-4">
-        <div className="text-4xl mb-4">🔌</div>
+        <div className="w-16 h-16 rounded-full bg-accent-red/10 flex items-center justify-center mb-4">
+          <PlugZap className="h-8 w-8 text-accent-red" />
+        </div>
         <h1 className="text-xl font-semibold mb-2">后端服务未启动</h1>
-        <p className="text-text-secondary mb-2">请确认 Anchor 服务正在运行</p>
-        {errorInfo && (
-          <div className="bg-surface-elevated border border-white/10 rounded-lg p-4 mb-4 max-w-md text-left text-sm">
-            <p className="text-text-secondary mb-1"><strong>请求 URL:</strong> {errorInfo.url}</p>
-            <p className="text-text-secondary"><strong>错误信息:</strong> {errorInfo.message}</p>
-          </div>
-        )}
+        <p className="text-muted-foreground mb-6">请确认 Anchor 服务正在运行</p>
         <div className="flex gap-3 mb-4">
           <Button onClick={() => navigate(0)}>重试</Button>
           <Button variant="secondary" onClick={runDiag}>网络诊断</Button>
         </div>
+        {errorInfo && (
+          <div className="max-w-md w-full mt-4">
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto"
+              type="button"
+            >
+              {showDetails ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              {showDetails ? "收起详情" : "查看详情"}
+            </button>
+            {showDetails && (
+              <div className="mt-2 bg-muted/50 border rounded-lg p-3 text-left text-xs text-muted-foreground space-y-1">
+                <p><span className="font-medium">请求 URL:</span> {errorInfo.url}</p>
+                <p><span className="font-medium">错误信息:</span> {errorInfo.message}</p>
+              </div>
+            )}
+          </div>
+        )}
         {diagResult && (
-          <div className="bg-surface-elevated border border-white/10 rounded-lg p-3 max-w-md text-left text-sm text-text-secondary">
-            <strong>诊断结果:</strong> {diagResult}
+          <div className="mt-2 bg-muted/50 border rounded-lg p-3 max-w-md text-left text-xs text-muted-foreground">
+            <span className="font-medium">诊断结果:</span> {diagResult}
           </div>
         )}
         <button
-          className="text-xs text-text-secondary underline mt-4"
+          className="text-xs text-muted-foreground underline mt-6 hover:text-foreground transition-colors"
           onClick={() => { resetApiBase(); resetApiToken(); navigate(0); }}
         >
           重置 API 设置并刷新
