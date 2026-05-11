@@ -151,6 +151,7 @@ export default function ReportsPage() {
   const handlePreviewMarkdown = useCallback(async () => {
     if (!projectId) return;
     try {
+      setPreviewing(true);
       setPreviewRawText(null);
       const token = getApiToken();
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
@@ -165,10 +166,12 @@ export default function ReportsPage() {
       setShowPreview(true);
       setPreviewMode("rendered");
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to generate preview";
+      const msg = e instanceof Error ? e.message : "预览生成失败";
       setReportsError(msg);
+    } finally {
+      setPreviewing(false);
     }
-  }, [projectId, toast]);
+  }, [projectId]);
 
   const handleExport = async (format: "md" | "json") => {
     if (!projectId) return;
