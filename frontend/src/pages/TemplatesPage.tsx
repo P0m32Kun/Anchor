@@ -167,7 +167,6 @@ export default function TemplatesPage() {
       setFilesMap((p) => ({ ...p, [sourceId]: files || [] }));
       setExpandedSource(sourceId);
     } catch (err: any) {
-      toast("加载文件列表失败: " + (err.message || String(err)), "error");
     } finally {
       setFilesLoading((p) => ({ ...p, [sourceId]: false }));
     }
