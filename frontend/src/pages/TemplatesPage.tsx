@@ -273,7 +273,6 @@ export default function TemplatesPage() {
       toast(`Bundle 发布成功: ${res.version.slice(0, 16)}...`, "success");
       loadManifest();
     } catch (err: any) {
-      toast("发布失败: " + (err.message || String(err)), "error");
     }
   }
 
