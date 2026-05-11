@@ -140,9 +140,10 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) generateReport(rpt *models.Report, runID string) {
 	now := time.Now().UTC()
+	ctx := context.Background()
 
 	// Aggregate data with batch evidence.
-	data, _, err := report.AggregateByRunWithBatchEvidence(nil, s.queries, runID)
+	data, _, err := report.AggregateByRunWithBatchEvidence(ctx, s.queries, runID)
 	if err != nil {
 		rpt.Status = models.ReportFailed
 		rpt.ErrorMessage = fmt.Sprintf("数据聚合失败: %v", err)
