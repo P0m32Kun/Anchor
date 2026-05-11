@@ -65,6 +65,8 @@ export default function RunsPage() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTargetRun, setCancelTargetRun] = useState<PipelineRun | null>(null);
+  const [reports, setReports] = useState<Map<string, Report>>(new Map());
+  const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
 
   const lastToastErrorRef = useRef<string | null>(null);
 
