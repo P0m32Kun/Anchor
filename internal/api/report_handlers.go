@@ -210,6 +210,12 @@ func (s *Server) generateReport(rpt *models.Report, runID string) {
 }
 
 func (s *Server) broadcastReportProgress(rpt *models.Report) {
+	// Get run to find project ID for SSE routing.
+	run, err := s.queries.GetRun(rpt.RunID)
+	if err != nil || run == nil {
+		return
+	}
+
 	data, _ := json.Marshal(map[string]interface{}{
 		"event":     "report_progress",
 		"report_id": rpt.ID,
@@ -219,7 +225,7 @@ func (s *Server) broadcastReportProgress(rpt *models.Report) {
 	})
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if clients, ok := s.sseClients[rpt.RunID]; ok {
+	if clients, ok := s.sseClients[run.ProjectID]; ok {
 		for _, ch := range clients {
 			select {
 			case ch <- data:
