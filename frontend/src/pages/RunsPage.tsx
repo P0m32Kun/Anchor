@@ -122,6 +122,24 @@ export default function RunsPage() {
     }
   };
 
+  const refreshRunDetails = useCallback(
+    async (runId: string, signal?: AbortSignal) => {
+      try {
+        const [taskData, stageData] = await Promise.all([
+          api.getRunTasks(runId, signal).catch(() => null),
+          projectId
+            ? api.listPipelineRunStages(projectId, runId, signal).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        if (taskData) setTasks(taskData);
+        if (stageData) setStages(stageData.stages ?? []);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+    },
+    [projectId]
+  );
+
   // SSE for real-time updates
   const sseUrl = projectId ? `${getApiBase()}/projects/${projectId}/events` : `${getApiBase()}/events`;
   const { status: sseStatus } = useSSE(sseUrl, {
