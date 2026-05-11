@@ -217,7 +217,6 @@ export default function TemplatesPage() {
       setUploadForm({ name: "", routing_policy: "manual", file: null });
       loadSources();
     } catch (err: any) {
-      toast("上传失败: " + (err.message || String(err)), "error");
     }
   }
 
