@@ -237,6 +237,40 @@ export default function RunsPage() {
     }
   };
 
+  const handleGenerateReport = async (runId: string) => {
+    if (generatingReports.has(runId)) return;
+    setGeneratingReports((prev) => new Set(prev).add(runId));
+    try {
+      const rpt = await api.createReport(runId);
+      if (rpt.status === "complete") {
+        setReports((prev) => new Map(prev).set(runId, rpt));
+        setGeneratingReports((prev) => { const next = new Set(prev); next.delete(runId); return next; });
+        toast("报告已生成", "success");
+      } else if (rpt.status === "failed") {
+        setGeneratingReports((prev) => { const next = new Set(prev); next.delete(runId); return next; });
+        toast(rpt.error_message || "报告生成失败", "error");
+      }
+      // If "generating", wait for SSE callback.
+    } catch (err) {
+      setGeneratingReports((prev) => { const next = new Set(prev); next.delete(runId); return next; });
+      const msg = err instanceof Error ? err.message : "请求生成报告失败";
+      toast(msg, "error");
+    }
+  };
+
+  const handleDeleteReport = async (runId: string) => {
+    const rpt = reports.get(runId);
+    if (!rpt) return;
+    try {
+      await api.deleteReport(rpt.id);
+      setReports((prev) => { const next = new Map(prev); next.delete(runId); return next; });
+      toast("报告已删除", "success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "删除报告失败";
+      toast(msg, "error");
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex items-start justify-between">
