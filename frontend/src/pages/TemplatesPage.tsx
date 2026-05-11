@@ -226,7 +226,6 @@ export default function TemplatesPage() {
       toast("刷新成功", "success");
       loadSources();
     } catch (err: any) {
-      toast("刷新失败: " + (err.message || String(err)), "error");
     }
   }
 
