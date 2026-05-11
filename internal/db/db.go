@@ -165,6 +165,16 @@ func migrate(db *sql.DB) error {
 		version = 13
 	}
 
+	if version < 14 {
+		if err := migrateV14(db); err != nil {
+			return fmt.Errorf("migrate v14 (reports table): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 14"); err != nil {
+			return fmt.Errorf("set user_version 14: %w", err)
+		}
+		version = 14
+	}
+
 	if err := ensureProjectsColumns(db); err != nil {
 		return fmt.Errorf("ensure projects columns: %w", err)
 	}
