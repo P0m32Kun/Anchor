@@ -282,4 +282,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("DELETE /httpx/fingerprints/{id}", auth(http.HandlerFunc(s.handleDeleteHttpxFingerprint)))
 	mux.Handle("GET /httpx/fingerprints/{id}/content", auth(http.HandlerFunc(s.handleReadHttpxFingerprintContent)))
 	mux.Handle("PUT /httpx/fingerprints/{id}/content", auth(http.HandlerFunc(s.handleWriteHttpxFingerprintContent)))
+	// Slow scan tasks
+	mux.Handle("GET /projects/{id}/slow-scans", auth(http.HandlerFunc(s.handleListSlowScans)))
+	mux.Handle("GET /slow-scans/{id}", auth(http.HandlerFunc(s.handleGetSlowScan)))
+	mux.Handle("POST /slow-scans/{id}/cancel", auth(http.HandlerFunc(s.handleCancelSlowScan)))
 }

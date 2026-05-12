@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import { Button } from "./Button";
 import { Input } from "./Input";
-import { PipelineConfig, DEFAULT_PIPELINE_CONFIG, PORT_RANGE_PRESETS } from "../lib/api";
+import { PipelineConfig, DEFAULT_PIPELINE_CONFIG, PORT_RANGE_PRESETS, Dictionary, api } from "../lib/api";
 import { cn } from "../lib/utils";
 import { Zap, Globe, Shield, Gauge, Cpu, CheckCircle2, RotateCcw, ChevronRight, Search } from "lucide-react";
 
@@ -193,6 +193,13 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
 
   const toolFields = mode === "external" ? EXTERNAL_TOOL_FIELDS : INTERNAL_TOOL_FIELDS;
 
+  const [dictionaries, setDictionaries] = useState<Dictionary[]>([]);
+  useEffect(() => {
+    if (config.enable_ffuf) {
+      api.listDictionaries("dirscan").then(setDictionaries).catch(() => {});
+    }
+  }, [config.enable_ffuf]);
+
   return (
     <Modal open={open} onClose={handleClose} title="新建扫描流水线" size="lg">
       {/* 步骤指示器 */}
@@ -318,6 +325,147 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
                     ))}
                  </div>
               </div>
+          </div>
+
+          {/* 后台慢速扫描 */}
+          <div className="space-y-4">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
+              <Search className="h-3 w-3" />
+              后台慢速扫描
+            </label>
+
+            {/* Toggle buttons */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* UrlFinder toggle */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => setConfig((prev) => ({ ...prev, enable_urlfinder: !prev.enable_urlfinder }))}
+                  className={cn(
+                    "w-full text-left p-3 rounded-xl border text-xs transition-all duration-200",
+                    config.enable_urlfinder
+                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"
+                  )}
+                >
+                  <div className="font-bold text-foreground">UrlFinder</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">URL 发现与收集</div>
+                </button>
+
+                {config.enable_urlfinder && (
+                  <div className="p-4 rounded-2xl border border-white/5 bg-white/[0.01] space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-medium text-muted-foreground">速率限制</label>
+                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 6rpm</span>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={60}
+                          value={config.urlfinder_rate_limit}
+                          onChange={(e) => updateConfig("urlfinder_rate_limit", e.target.value)}
+                          className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
+                        />
+                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">rpm</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-medium text-muted-foreground">超时</label>
+                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 30秒</span>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={10}
+                          max={300}
+                          value={config.urlfinder_timeout}
+                          onChange={(e) => updateConfig("urlfinder_timeout", e.target.value)}
+                          className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
+                        />
+                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">秒</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Ffuf toggle */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => setConfig((prev) => ({ ...prev, enable_ffuf: !prev.enable_ffuf }))}
+                  className={cn(
+                    "w-full text-left p-3 rounded-xl border text-xs transition-all duration-200",
+                    config.enable_ffuf
+                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"
+                  )}
+                >
+                  <div className="font-bold text-foreground">Ffuf</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">目录与文件爆破</div>
+                </button>
+
+                {config.enable_ffuf && (
+                  <div className="p-4 rounded-2xl border border-white/5 bg-white/[0.01] space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-medium text-muted-foreground">速率限制</label>
+                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 6rps</span>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={60}
+                          value={config.ffuf_rate_limit}
+                          onChange={(e) => updateConfig("ffuf_rate_limit", e.target.value)}
+                          className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
+                        />
+                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">rps</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-medium text-muted-foreground">超时</label>
+                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 30秒</span>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={10}
+                          max={300}
+                          value={config.ffuf_timeout}
+                          onChange={(e) => updateConfig("ffuf_timeout", e.target.value)}
+                          className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
+                        />
+                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">秒</span>
+                      </div>
+                    </div>
+                    {/* Dictionary selector */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-medium text-muted-foreground">字典</label>
+                      {dictionaries.length > 0 ? (
+                        <select
+                          value={config.ffuf_dictionary_id}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, ffuf_dictionary_id: e.target.value }))}
+                          className="w-full h-8 px-2 rounded-md bg-white/5 border border-white/5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                        >
+                          <option value="" className="bg-slate-900">请选择字典</option>
+                          {dictionaries.map((d) => (
+                            <option key={d.id} value={d.id} className="bg-slate-900">
+                              {d.name} ({d.line_count} 行)
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-[10px] text-muted-foreground/50 py-1.5">请先上传字典</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* 性能调优 */}

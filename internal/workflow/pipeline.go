@@ -216,6 +216,16 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 		}
 	}
 
+	// Trigger background slow scans after successful pipeline completion.
+	if flowErr == nil {
+		slowScan := NewSlowScanOrchestrator(p.queries, p.runner, p.dataDir).WithConfig(p.config)
+		go func() {
+			if err := slowScan.Run(context.Background(), p.projectID, p.runID); err != nil {
+				log.Printf("[pipeline] slow scan orchestrator: %v", err)
+			}
+		}()
+	}
+
 	return flowErr
 }
 

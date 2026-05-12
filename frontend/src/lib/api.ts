@@ -749,6 +749,13 @@ export interface PipelineConfig {
   nuclei_rate_limit_per_min: number; // -rlm: requests per minute (sensitive targets)
   nuclei_concurrency: number; // -c: parallel templates/hosts
   nuclei_scan_depth: string; // "workflow" | "tags" | "both"
+  enable_urlfinder: boolean;
+  urlfinder_rate_limit: number;
+  urlfinder_timeout: number;
+  enable_ffuf: boolean;
+  ffuf_rate_limit: number;
+  ffuf_timeout: number;
+  ffuf_dictionary_id: string;
 }
 
 export interface Dictionary {
@@ -829,6 +836,13 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   nuclei_rate_limit_per_min: 0,
   nuclei_concurrency: 25,
   nuclei_scan_depth: "tags",
+  enable_urlfinder: true,
+  urlfinder_rate_limit: 6,
+  urlfinder_timeout: 30,
+  enable_ffuf: true,
+  ffuf_rate_limit: 6,
+  ffuf_timeout: 30,
+  ffuf_dictionary_id: "",
 };
 
 export interface PortRangePreset {

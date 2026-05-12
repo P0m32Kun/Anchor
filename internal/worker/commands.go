@@ -164,6 +164,36 @@ func BuildNucleiCustomCommand(targetFile, profile string, rateLimit int, tags []
 	return args
 }
 
+// BuildUrlfinderCommand builds a urlfinder command.
+// targetFile should contain one target (domain or URL) per line.
+// rateLimit is requests per minute (low for background scanning).
+func BuildUrlfinderCommand(targetFile string, rateLimit, timeout int) []string {
+	args := []string{"urlfinder", "-list", targetFile, "-json"}
+	if rateLimit > 0 {
+		args = append(args, "-rate-limit", fmt.Sprintf("%d", rateLimit))
+	}
+	if timeout > 0 {
+		args = append(args, "-timeout", fmt.Sprintf("%d", timeout))
+	}
+	return args
+}
+
+// BuildFfufCommand builds an ffuf directory brute-force command.
+// target is a single base URL with FUZZ placeholder (e.g., https://example.com/FUZZ).
+// wordlist is the absolute path to the dictionary file.
+// rateLimit is requests per second.
+func BuildFfufCommand(target, wordlist string, rateLimit, timeout int) []string {
+	args := []string{"ffuf", "-u", target, "-w", wordlist, "-json", "-mc", "200,301,302,401,403,405,500"}
+	if rateLimit > 0 {
+		args = append(args, "-rate", fmt.Sprintf("%d", rateLimit))
+	}
+	if timeout > 0 {
+		args = append(args, "-timeout", fmt.Sprintf("%d", timeout))
+	}
+	args = append(args, "-s")
+	return args
+}
+
 // BuildNmapServiceScanCommand builds an nmap -sV command for service fingerprinting.
 // hostFile should contain one host per line; ports is the list of ports to scan.
 // Output is XML to stdout for reliable parsing.
@@ -256,6 +286,10 @@ func appendRateLimitArgs(args []string, tool string, rate int) []string {
 		return append(args, "-rate-limit", fmt.Sprintf("%d", rate))
 	case "dnsx":
 		return append(args, "-rl", fmt.Sprintf("%d", rate))
+	case "urlfinder":
+		return append(args, "-rate-limit", fmt.Sprintf("%d", rate))
+	case "ffuf":
+		return append(args, "-rate", fmt.Sprintf("%d", rate))
 	default:
 		return args
 	}
