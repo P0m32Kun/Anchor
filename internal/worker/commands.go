@@ -172,13 +172,17 @@ func BuildNmapServiceScanCommand(hostFile string, ports []int, hostTimeout int) 
 	for i, p := range ports {
 		portStrs[i] = fmt.Sprintf("%d", p)
 	}
-	return []string{
+	cmd := []string{
 		"nmap", "-sV",
 		"-p", strings.Join(portStrs, ","),
 		"-iL", hostFile,
 		"-oX", "-",
 		"-T4", "-n", "--open",
 	}
+	if hostTimeout > 0 {
+		cmd = append(cmd, "--host-timeout", fmt.Sprintf("%ds", hostTimeout))
+	}
+	return cmd
 }
 
 // BuildDNSxCommand builds a dnsx command for DNS resolution.
