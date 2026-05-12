@@ -113,11 +113,15 @@ func (s *Server) handlePatchFindingTemplate(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
 		return
 	}
+	contentChanged := false
 	if req.SourceTool != nil {
 		v := strings.TrimSpace(*req.SourceTool)
 		if v == "" {
 			writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "source_tool cannot be empty"))
 			return
+		}
+		if v != t.SourceTool {
+			contentChanged = true
 		}
 		t.SourceTool = v
 	}
@@ -127,10 +131,17 @@ func (s *Server) handlePatchFindingTemplate(w http.ResponseWriter, r *http.Reque
 			writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "match_key cannot be empty"))
 			return
 		}
+		if v != t.MatchKey {
+			contentChanged = true
+		}
 		t.MatchKey = v
 	}
 	if req.Title != nil {
-		t.Title = strings.TrimSpace(*req.Title)
+		v := strings.TrimSpace(*req.Title)
+		if v != t.Title {
+			contentChanged = true
+		}
+		t.Title = v
 	}
 	if req.Severity != nil {
 		v := strings.TrimSpace(*req.Severity)
@@ -138,16 +149,32 @@ func (s *Server) handlePatchFindingTemplate(w http.ResponseWriter, r *http.Reque
 			writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "severity must be info/low/medium/high/critical or empty"))
 			return
 		}
+		if v != t.Severity {
+			contentChanged = true
+		}
 		t.Severity = v
 	}
 	if req.Summary != nil {
+		if *req.Summary != t.Summary {
+			contentChanged = true
+		}
 		t.Summary = *req.Summary
 	}
 	if req.Remediation != nil {
+		if *req.Remediation != t.Remediation {
+			contentChanged = true
+		}
 		t.Remediation = *req.Remediation
 	}
 	if req.Enabled != nil {
+		if *req.Enabled != t.Enabled {
+			contentChanged = true
+		}
 		t.Enabled = *req.Enabled
+	}
+	// Builtin rows are locked from auto-overwrite as soon as a user edits them.
+	if t.IsBuiltin && contentChanged {
+		t.UserModified = true
 	}
 	t.UpdatedAt = time.Now().UTC()
 
@@ -165,6 +192,80 @@ func (s *Server) handleDeleteFindingTemplate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// handleAcceptFindingTemplateUpstream overlays the row's builtin_payload onto
+// its content fields and clears user_modified. Used when a user wants to drop
+// their local edits and adopt the upstream (repo) version.
+func (s *Server) handleAcceptFindingTemplateUpstream(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	t, err := s.queries.GetFindingTemplate(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get finding template: %v", err))
+		return
+	}
+	if t == nil {
+		writeError(w, http.StatusNotFound, errors.Newf(errors.ErrNotFound, "finding template %s not found", id))
+		return
+	}
+	if !t.IsBuiltin || strings.TrimSpace(t.BuiltinPayload) == "" {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "this template has no upstream version to accept"))
+		return
+	}
+
+	var seed db.SeedFindingTemplate
+	if err := json.Unmarshal([]byte(t.BuiltinPayload), &seed); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "decode builtin payload: %v", err))
+		return
+	}
+	t.SourceTool = strings.TrimSpace(seed.SourceTool)
+	t.MatchKey = strings.TrimSpace(seed.MatchKey)
+	t.Title = strings.TrimSpace(seed.Title)
+	t.Severity = strings.TrimSpace(seed.Severity)
+	t.Summary = seed.Summary
+	t.Remediation = seed.Remediation
+	if seed.Enabled != nil {
+		t.Enabled = *seed.Enabled
+	} else {
+		t.Enabled = true
+	}
+	t.UserModified = false
+	t.UpdatedAt = time.Now().UTC()
+	if err := s.queries.UpdateFindingTemplate(t); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "apply upstream: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, t)
+}
+
+// handleExportFindingTemplates returns every template in the repo seed JSON
+// shape, so team members can copy the array straight into
+// docs/templates/vuln-templates.json.
+func (s *Server) handleExportFindingTemplates(w http.ResponseWriter, r *http.Request) {
+	list, err := s.queries.ListFindingTemplates("")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list finding templates: %v", err))
+		return
+	}
+	seeds := make([]db.SeedFindingTemplate, 0, len(list))
+	for _, t := range list {
+		enabled := t.Enabled
+		seeds = append(seeds, db.SeedFindingTemplate{
+			SourceTool:  t.SourceTool,
+			MatchKey:    t.MatchKey,
+			Title:       t.Title,
+			Severity:    t.Severity,
+			Summary:     t.Summary,
+			Remediation: t.Remediation,
+			Enabled:     &enabled,
+		})
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="vuln-templates.json"`)
+	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	enc.Encode(seeds)
 }
 
 func deref(p *string) string {
