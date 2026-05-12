@@ -289,7 +289,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	// Finding templates (vulnerability knowledge base)
 	mux.Handle("GET /finding-templates", auth(http.HandlerFunc(s.handleListFindingTemplates)))
 	mux.Handle("POST /finding-templates", auth(http.HandlerFunc(s.handleCreateFindingTemplate)))
+	mux.Handle("GET /finding-templates/export", auth(http.HandlerFunc(s.handleExportFindingTemplates)))
 	mux.Handle("GET /finding-templates/{id}", auth(http.HandlerFunc(s.handleGetFindingTemplate)))
 	mux.Handle("PATCH /finding-templates/{id}", auth(http.HandlerFunc(s.handlePatchFindingTemplate)))
 	mux.Handle("DELETE /finding-templates/{id}", auth(http.HandlerFunc(s.handleDeleteFindingTemplate)))
+	mux.Handle("POST /finding-templates/{id}/accept-upstream", auth(http.HandlerFunc(s.handleAcceptFindingTemplateUpstream)))
 }
