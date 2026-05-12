@@ -112,7 +112,7 @@ const EXTERNAL_TOOL_FIELDS: { group: string; fields: ToolField[]; icon: any }[] 
     fields: [
       { key: "subfinder_rate_limit", label: "速率限制", unit: "rps", min: 10, max: 500, recommended: 50 },
       { key: "subfinder_threads", label: "并发线程", unit: "", min: 5, max: 100, recommended: 10 },
-      { key: "subfinder_timeout", label: "超时", unit: "秒", min: 60, max: 1800, recommended: 300 },
+      { key: "subfinder_timeout", label: "超时", unit: "秒", min: 10, max: 600, recommended: 30 },
     ],
   },
   {
