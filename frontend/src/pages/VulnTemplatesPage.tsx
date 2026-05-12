@@ -242,10 +242,16 @@ export default function VulnTemplatesPage() {
             为高频漏洞维护中文标题、描述与修复建议;生成报告时按「检测工具 + 匹配键」精确套用,非空字段覆盖 finding 原值。
           </p>
         </div>
-        <Button variant="secondary" onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          新增模板
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportAll}>
+            <Download className="mr-2 h-4 w-4" />
+            导出 JSON
+          </Button>
+          <Button variant="secondary" onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            新增模板
+          </Button>
+        </div>
       </div>
 
       <Card className="overflow-hidden">
