@@ -494,10 +494,10 @@ type TaskTimeoutConfig struct {
 }
 
 // resolveTimeoutConfig returns timeout settings tailored to the tool and scan strategy.
-func resolveTimeoutConfig(tool string, command []string) TaskTimeoutConfig {
+func resolveTimeoutConfig(tool string, command []string, workdir string) TaskTimeoutConfig {
 	base := TaskTimeoutConfig{
 		StartupTimeout:  30 * time.Second,
-		RunningTimeout:  defaultToolTimeout(tool),
+		RunningTimeout:  dynamicRunningTimeout(tool, command, workdir),
 		IdleTimeout:     90 * time.Second,
 		CPUCheckEnabled: true,
 	}
