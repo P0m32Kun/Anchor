@@ -135,7 +135,7 @@ func (p *Pipeline) runNmapServiceScan(ctx context.Context, ports []parser.PortIn
 		hostFile = abs
 	}
 
-	cmd := worker.BuildNmapServiceScanCommand(hostFile, portList)
+	cmd := worker.BuildNmapServiceScanCommand(hostFile, portList, p.config.NmapServiceTimeout)
 	task, stdout, err := p.createAndRunTask(ctx, "nmap", cmd)
 	if err != nil {
 		return nil, err
