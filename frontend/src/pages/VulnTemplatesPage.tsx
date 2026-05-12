@@ -193,6 +193,42 @@ export default function VulnTemplatesPage() {
     }
   }
 
+  async function acceptUpstream(t: FindingTemplate) {
+    try {
+      await api.acceptFindingTemplateUpstream(t.id);
+      toast("已应用上游版本", "success");
+      load();
+    } catch (err: any) {
+    }
+  }
+
+  function handleExportAll() {
+    const token = getApiToken();
+    const url = `${API_BASE}/finding-templates/export`;
+    if (!token) {
+      window.open(url, "_blank");
+      return;
+    }
+    // 鉴权下载,用 fetch + blob 触发浏览器下载
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => {
+        if (!r.ok) throw new Error(`导出失败:${r.status}`);
+        return r.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement("a");
+        const u = URL.createObjectURL(blob);
+        a.href = u;
+        a.download = "vuln-templates.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(u);
+        toast("已下载 JSON", "success");
+      })
+      .catch((e) => toast(e.message || "导出失败", "error"));
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex items-start justify-between">
