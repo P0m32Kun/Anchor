@@ -82,8 +82,9 @@ func BuildNaabuCommand(hostFile, portRange string, rate, threads, timeout int) [
 	if threads > 0 {
 		args = append(args, "-c", fmt.Sprintf("%d", threads))
 	}
+	// Naabu expects timeout in milliseconds; config stores it in seconds.
 	if timeout > 0 {
-		args = append(args, "-timeout", fmt.Sprintf("%d", timeout))
+		args = append(args, "-timeout", fmt.Sprintf("%d", timeout*1000))
 	}
 
 	return args
