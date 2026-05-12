@@ -133,6 +133,36 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 		return fmt.Errorf("list targets: %w", err)
 	}
 
+	// Scope filter: single enforcement point.
+	//   * CIDR targets are expanded to atomic IP targets (with a /16 cap to
+	//     prevent OOM on absurdly wide inputs like 0.0.0.0/0).
+	//   * Every IP/Domain/URL target is evaluated against the project's
+	//     scope rules; denied targets are dropped here so downstream tools
+	//     (nmap / naabu / httpx / nuclei) can stay scope-unaware.
+	//   * Company targets pass through — FOFA expansion runs scope per
+	//     derived target later in runCompanyFlow.
+	filtered, scopeErr := p.scope.FilterTargets(ctx, projectID, targets)
+	if scopeErr != nil {
+		if p.runID != "" {
+			p.queries.UpdatePipelineRunError(p.runID, scopeErr.Error())
+			p.queries.UpdatePipelineRunStatus(p.runID, "failed")
+		}
+		return fmt.Errorf("scope filter: %w", scopeErr)
+	}
+	if len(filtered) == 0 && len(targets) > 0 {
+		// Every configured target was rejected — surface this explicitly so
+		// the user sees the cause in the UI instead of a quiet 0-finding run.
+		msg := fmt.Sprintf("all %d targets denied by scope rules (no work to do)", len(targets))
+		log.Printf("[pipeline] %s", msg)
+		if p.runID != "" {
+			p.queries.UpdatePipelineRunError(p.runID, msg)
+			p.queries.UpdatePipelineRunStatus(p.runID, "failed")
+		}
+		return fmt.Errorf("%s", msg)
+	}
+	log.Printf("[pipeline] scope filter: %d targets in, %d after filter (project %s)", len(targets), len(filtered), projectID)
+	targets = filtered
+
 	// Group by type
 	groups := groupTargetsByType(targets)
 
