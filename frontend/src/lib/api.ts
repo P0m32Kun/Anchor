@@ -739,7 +739,7 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   port_range: "top1000",
   naabu_rate: 1000,
   naabu_threads: 100,
-  naabu_timeout: 600,
+  naabu_timeout: 5000,
   enable_nmap_service: true,
   nmap_service_timeout: 600,
   enable_httpx: true,
