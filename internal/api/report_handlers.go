@@ -105,7 +105,7 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch run to validate.
-	run, err := s.queries.GetRun(runID)
+	run, err := s.queries.GetPipelineRun(runID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get run: %v", err))
 		return
@@ -119,7 +119,7 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	title := body.Title
 	if title == "" {
-		title = fmt.Sprintf("%s 安全评估报告", run.Name)
+		title = fmt.Sprintf("%s 扫描安全评估报告", run.Mode)
 	}
 	rpt := &models.Report{
 		ID:        util.GenerateID(),
