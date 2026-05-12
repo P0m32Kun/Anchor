@@ -6,6 +6,14 @@ import (
 	"io"
 )
 
+// maxJSONLineBytes caps a single JSONL line at 16 MiB. Anything longer is a
+// runaway tool (or hostile input) and is skipped with a logged error rather
+// than being allowed to OOM the server. The previous implementation used
+// bufio.Scanner whose default 64 KiB buffer silently truncated finding rows
+// that carried large HTTP request/response bodies (e.g. nuclei output for
+// templates that capture the full response).
+const maxJSONLineBytes = 16 * 1024 * 1024
+
 // ParseError records a single line parse failure.
 type ParseError struct {
 	Line    int    `json:"line"`
@@ -55,30 +63,60 @@ type PortInfo struct {
 // parseJSONLines reads JSONL input line-by-line, skipping empty lines and
 // tracking line numbers. The decode callback receives each non-empty line and
 // its 1-based line number, returning a parsed value and an optional ParseError.
-// Scanner errors are appended as ParseError at the end.
+//
+// Implementation note: uses bufio.Reader.ReadBytes('\n') rather than
+// bufio.Scanner so that single lines may exceed 64 KiB. A hard ceiling of
+// maxJSONLineBytes protects against runaway tools / hostile input. Lines that
+// exceed the ceiling are reported as ParseError and skipped, the reader then
+// resumes at the next newline.
 func parseJSONLines[T any](r io.Reader, decode func(line []byte, lineNo int) (T, ParseError)) ([]T, []ParseError) {
 	var results []T
 	var errs []ParseError
 
-	scanner := bufio.NewScanner(r)
+	br := bufio.NewReaderSize(r, 64*1024)
 	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
+	for {
+		line, err := br.ReadBytes('\n')
+		// Handle the line content first, then decide whether to continue
+		// based on err. ReadBytes may return non-empty content plus io.EOF
+		// for the last unterminated line.
+		if len(line) > 0 {
+			lineNo++
+			// Strip trailing \n (and \r if present).
+			trim := line
+			if trim[len(trim)-1] == '\n' {
+				trim = trim[:len(trim)-1]
+			}
+			if len(trim) > 0 && trim[len(trim)-1] == '\r' {
+				trim = trim[:len(trim)-1]
+			}
+			if len(trim) > maxJSONLineBytes {
+				errs = append(errs, ParseError{
+					Line:    lineNo,
+					Raw:     "",
+					Message: fmt.Sprintf("line exceeds %d byte hard limit (got %d bytes), skipped", maxJSONLineBytes, len(trim)),
+				})
+			} else if len(trim) > 0 {
+				res, perr := decode(trim, lineNo)
+				if perr.Message != "" {
+					errs = append(errs, perr)
+				} else {
+					results = append(results, res)
+				}
+			}
 		}
 
-		res, perr := decode(line, lineNo)
-		if perr.Message != "" {
-			errs = append(errs, perr)
-			continue
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			errs = append(errs, ParseError{
+				Line:    lineNo,
+				Raw:     "",
+				Message: "reader error: " + err.Error(),
+			})
+			break
 		}
-		results = append(results, res)
-	}
-
-	if err := scanner.Err(); err != nil {
-		errs = append(errs, ParseError{Line: lineNo, Raw: "", Message: "scanner error: " + err.Error()})
 	}
 
 	return results, errs
