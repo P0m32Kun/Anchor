@@ -133,9 +133,10 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 	cmd.Dir = workdir
 	cmd.Env = os.Environ()
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
+	stdout := &idleWatchedWriter{}
+	stderr := &idleWatchedWriter{}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	ws.mu.Lock()
 	ws.procs[taskID] = cmd
@@ -143,7 +144,51 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 
 	log.Printf("[worker] task %s exec: %s %v", taskID, binary, command[1:])
 
+	startTime := time.Now()
+	stopWatchdog := make(chan struct{})
+	idleKilled := make(chan struct{}, 1)
+	idleThreshold := idleOutputTimeout(tool)
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopWatchdog:
+				return
+			case <-ticker.C:
+				last := stdout.Last()
+				if l2 := stderr.Last(); l2.After(last) {
+					last = l2
+				}
+				if last.IsZero() {
+					last = startTime
+				}
+				since := time.Since(last)
+				if since > idleThreshold {
+					log.Printf("[worker] task %s idle for %v (threshold %v), killing process", taskID, since.Round(time.Second), idleThreshold)
+					select {
+					case idleKilled <- struct{}{}:
+					default:
+					}
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+
 	err := cmd.Run()
+	close(stopWatchdog)
+
+	wasIdleKilled := false
+	select {
+	case <-idleKilled:
+		wasIdleKilled = true
+	default:
+	}
+
+	stdoutBuf := stdout.Bytes()
+	stderrBuf := stderr.Bytes()
 
 	ws.mu.Lock()
 	delete(ws.procs, taskID)
@@ -162,7 +207,7 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 		log.Printf("[worker] task %s exited cleanly", taskID)
 	}
 
-	log.Printf("[worker] task %s stdout=%dB stderr=%dB", taskID, stdoutBuf.Len(), stderrBuf.Len())
+	log.Printf("[worker] task %s stdout=%dB stderr=%dB", taskID, len(stdoutBuf), len(stderrBuf))
 
 	// Collect artifacts
 	artifacts := []map[string]interface{}{}
