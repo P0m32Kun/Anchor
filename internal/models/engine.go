@@ -63,7 +63,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		NaabuThreads:             100,
 		NaabuTimeout:             5, // seconds; converted to ms when passed to naabu CLI
 		EnableNmapService:        true,
-		NmapServiceTimeout:       600,
+		NmapServiceTimeout:       180, // seconds; per-host --host-timeout for -sV scan
 		EnableHttpx:              true,
 		HttpxRateLimit:           150,
 		HttpxThreads:             50,
