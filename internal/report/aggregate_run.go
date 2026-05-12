@@ -41,13 +41,13 @@ func AggregateByRun(ctx context.Context, q *db.Queries, runID string) (*ReportDa
 
 // AggregateByRunWithBatchEvidence is like AggregateByRun but uses batch evidence
 // queries to avoid N+1 when there are many findings.
-func AggregateByRunWithBatchEvidence(ctx context.Context, q *db.Queries, runID string) (*ReportData, *models.Run, error) {
-	run, err := q.GetRun(runID)
+func AggregateByRunWithBatchEvidence(ctx context.Context, q *db.Queries, runID string) (*ReportData, *models.PipelineRun, error) {
+	run, err := q.GetPipelineRun(runID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("get run: %w", err)
+		return nil, nil, fmt.Errorf("get pipeline run: %w", err)
 	}
 	if run == nil {
-		return nil, nil, fmt.Errorf("run %s not found", runID)
+		return nil, nil, fmt.Errorf("pipeline run %s not found", runID)
 	}
 
 	project, err := q.GetProject(run.ProjectID)
