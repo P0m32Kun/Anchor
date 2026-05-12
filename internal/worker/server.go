@@ -211,20 +211,20 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 
 	// Collect artifacts
 	artifacts := []map[string]interface{}{}
-	
+
 	// stdout artifact
-	if stdoutBuf.Len() > 0 {
+	if len(stdoutBuf) > 0 {
 		artifacts = append(artifacts, map[string]interface{}{
 			"type": "stdout",
-			"data": stdoutBuf.Bytes(),
+			"data": stdoutBuf,
 		})
 	}
 
 	// stderr artifact
-	if stderrBuf.Len() > 0 {
+	if len(stderrBuf) > 0 {
 		artifacts = append(artifacts, map[string]interface{}{
-			"type": "stderr", 
-			"data": stderrBuf.Bytes(),
+			"type": "stderr",
+			"data": stderrBuf,
 		})
 	}
 
@@ -255,16 +255,19 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 	}
 
 	// Write stdout/stderr to workdir so Server can parse tool output.
-	if stdoutBuf.Len() > 0 {
-		os.WriteFile(filepath.Join(workdir, "stdout.txt"), stdoutBuf.Bytes(), 0640)
+	if len(stdoutBuf) > 0 {
+		os.WriteFile(filepath.Join(workdir, "stdout.txt"), stdoutBuf, 0640)
 	}
-	if stderrBuf.Len() > 0 {
-		os.WriteFile(filepath.Join(workdir, "stderr.txt"), stderrBuf.Bytes(), 0640)
+	if len(stderrBuf) > 0 {
+		os.WriteFile(filepath.Join(workdir, "stderr.txt"), stderrBuf, 0640)
 	}
 
 	status := "completed"
 	errorMsg := ""
-	if err != nil && exitCode != 0 {
+	if wasIdleKilled {
+		status = "failed"
+		errorMsg = fmt.Sprintf("idle-timeout: no output for %v, process killed", idleThreshold)
+	} else if err != nil && exitCode != 0 {
 		status = "failed"
 		if stderrData, readErr := os.ReadFile(filepath.Join(workdir, "stderr.txt")); readErr == nil && len(stderrData) > 0 {
 			errorMsg = string(stderrData)
