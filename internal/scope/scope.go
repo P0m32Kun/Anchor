@@ -356,7 +356,13 @@ func (e *Engine) FilterTargets(ctx context.Context, projectID string, targets []
 	if err != nil {
 		return nil, fmt.Errorf("list scope rules: %w", err)
 	}
+	return e.filterTargetsWithRules(targets, rules)
+}
 
+// filterTargetsWithRules is the pure-logic core of FilterTargets — it does
+// not touch the database, so it can be unit-tested directly with fabricated
+// rule sets.
+func (e *Engine) filterTargetsWithRules(targets []*models.Target, rules []*models.ScopeRule) ([]*models.Target, error) {
 	out := make([]*models.Target, 0, len(targets))
 	for _, t := range targets {
 		if t == nil {
