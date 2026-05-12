@@ -286,4 +286,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /projects/{id}/slow-scans", auth(http.HandlerFunc(s.handleListSlowScans)))
 	mux.Handle("GET /slow-scans/{id}", auth(http.HandlerFunc(s.handleGetSlowScan)))
 	mux.Handle("POST /slow-scans/{id}/cancel", auth(http.HandlerFunc(s.handleCancelSlowScan)))
+	// Finding templates (vulnerability knowledge base)
+	mux.Handle("GET /finding-templates", auth(http.HandlerFunc(s.handleListFindingTemplates)))
+	mux.Handle("POST /finding-templates", auth(http.HandlerFunc(s.handleCreateFindingTemplate)))
+	mux.Handle("GET /finding-templates/{id}", auth(http.HandlerFunc(s.handleGetFindingTemplate)))
+	mux.Handle("PATCH /finding-templates/{id}", auth(http.HandlerFunc(s.handlePatchFindingTemplate)))
+	mux.Handle("DELETE /finding-templates/{id}", auth(http.HandlerFunc(s.handleDeleteFindingTemplate)))
 }

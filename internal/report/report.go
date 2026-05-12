@@ -21,12 +21,16 @@ type ReportData struct {
 	GeneratedAt  time.Time
 }
 
-// ReportFinding wraps a Finding with its related Asset, WebEndpoint, and Evidence.
+// ReportFinding wraps a Finding with its related Asset, WebEndpoint, Evidence,
+// and the matched FindingTemplate (if any). Template fields override the
+// finding's title / severity / summary / remediation at render time when
+// non-empty.
 type ReportFinding struct {
 	Finding      *models.Finding
 	Asset        *models.Asset       // nullable
 	WebEndpoint  *models.WebEndpoint // nullable
 	EvidenceList []*models.Evidence
+	Template     *models.FindingTemplate // nullable
 }
 
 // Aggregate collects all report data from the database for a given project.
@@ -105,6 +109,12 @@ func Aggregate(ctx context.Context, q *db.Queries, project *models.Project) (*Re
 			return nil, fmt.Errorf("list evidence for finding %s: %w", f.ID, err)
 		}
 		rf.EvidenceList = evList
+
+		// Match against the vulnerability template knowledge base.
+		// Errors are non-fatal — templates are an enhancement, not a requirement.
+		if tmpl, terr := q.GetFindingTemplateForFinding(f.SourceTool, f.SourceRuleID, f.MatchedTemplate, f.Title); terr == nil {
+			rf.Template = tmpl
+		}
 
 		data.Findings = append(data.Findings, rf)
 	}

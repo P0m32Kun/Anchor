@@ -661,6 +661,21 @@ export const api = {
 
   writeHttpxFingerprintContent: (id: string, content: string, signal?: AbortSignal) =>
     fetchAPI<HttpxFingerprint>(`/httpx/fingerprints/${id}/content`, { method: "PUT", body: content, signal }),
+
+  listFindingTemplates: (sourceTool?: string, signal?: AbortSignal) =>
+    fetchAPI<FindingTemplate[]>(buildQueryString("/finding-templates", { source_tool: sourceTool }), { signal }),
+
+  getFindingTemplate: (id: string, signal?: AbortSignal) =>
+    fetchAPI<FindingTemplate>(`/finding-templates/${id}`, { signal }),
+
+  createFindingTemplate: (data: Partial<Omit<FindingTemplate, "id" | "created_at" | "updated_at">>, signal?: AbortSignal) =>
+    fetchAPI<FindingTemplate>("/finding-templates", { method: "POST", body: JSON.stringify(data), signal }),
+
+  patchFindingTemplate: (id: string, data: Partial<Omit<FindingTemplate, "id" | "created_at" | "updated_at">>, signal?: AbortSignal) =>
+    fetchAPI<FindingTemplate>(`/finding-templates/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
+
+  deleteFindingTemplate: (id: string, signal?: AbortSignal) =>
+    fetchAPI<void>(`/finding-templates/${id}`, { method: "DELETE", signal }),
 };
 
 export interface Run {
@@ -776,6 +791,19 @@ export interface HttpxFingerprint {
   description?: string;
   type: "favicon" | "tech_detect";
   file_path: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FindingTemplate {
+  id: string;
+  source_tool: string;
+  match_key: string;
+  title: string;
+  severity: "" | "info" | "low" | "medium" | "high" | "critical";
+  summary: string;
+  remediation: string;
   enabled: boolean;
   created_at: string;
   updated_at: string;

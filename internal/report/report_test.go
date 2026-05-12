@@ -240,6 +240,71 @@ func TestGenerateMarkdown_NoSummary(t *testing.T) {
 	}
 }
 
+// --- Template override tests ---
+
+func TestGenerateMarkdown_TemplateOverridesAllFields(t *testing.T) {
+	data := testReportData()
+	data.Findings[0].Template = &models.FindingTemplate{
+		Title:       "已套用：暴露的 Git 目录",
+		Severity:    "critical",
+		Summary:     "模板提供的中文描述。",
+		Remediation: "模板提供的修复建议。",
+		Enabled:     true,
+	}
+	md := GenerateMarkdown(data)
+
+	for _, want := range []string{
+		"已套用：暴露的 Git 目录",
+		"模板提供的中文描述",
+		"模板提供的修复建议",
+		"🔴 严重 · 已套用",
+		"已套用模板",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("expected template-supplied content %q in markdown, got missing", want)
+		}
+	}
+	// Original finding values should not appear (they were overridden).
+	if strings.Contains(md, "Exposed .git Repository") {
+		t.Error("finding title should be overridden by template")
+	}
+	if strings.Contains(md, "A .git directory was found accessible.") {
+		t.Error("finding summary should be overridden by template")
+	}
+}
+
+func TestGenerateMarkdown_TemplateEmptyFieldsFallBackToFinding(t *testing.T) {
+	data := testReportData()
+	// Template only fills summary; title/severity/remediation should fall back.
+	data.Findings[0].Template = &models.FindingTemplate{
+		Summary: "仅描述被模板覆盖。",
+		Enabled: true,
+	}
+	md := GenerateMarkdown(data)
+
+	if !strings.Contains(md, "仅描述被模板覆盖") {
+		t.Error("expected template summary to apply")
+	}
+	if !strings.Contains(md, "Exposed .git Repository") {
+		t.Error("expected finding title to remain when template title empty")
+	}
+	if !strings.Contains(md, "Block access to .git") {
+		t.Error("expected finding remediation to remain when template remediation empty")
+	}
+}
+
+func TestGenerateMarkdown_NoTemplateUsesFinding(t *testing.T) {
+	data := testReportData()
+	// No template set on either finding.
+	md := GenerateMarkdown(data)
+	if strings.Contains(md, "已套用模板") {
+		t.Error("template footer marker should not appear when no template matched")
+	}
+	if !strings.Contains(md, "Exposed .git Repository") {
+		t.Error("finding title should render as-is when no template")
+	}
+}
+
 // --- JSON tests ---
 
 func TestGenerateJSON_Normal(t *testing.T) {

@@ -205,20 +205,26 @@ func formatSeverityBar(counts map[models.FindingSeverity]int) string {
 
 // writeFindingDetailCN renders a single finding in the human-friendly layout.
 // Sections: emoji+severity+title heading → description → affected IP:Port table → remediation → footer metadata.
+// When rf.Template is non-nil, its non-empty fields override the finding's title / severity / summary / remediation.
 func writeFindingDetailCN(sb *strings.Builder, num int, rf *ReportFinding) {
 	f := rf.Finding
 
+	title := pickFromTemplate(rf, func(t *models.FindingTemplate) string { return t.Title }, f.Title)
+	severity := models.FindingSeverity(pickFromTemplate(rf, func(t *models.FindingTemplate) string { return t.Severity }, string(f.Severity)))
+	summary := pickFromTemplate(rf, func(t *models.FindingTemplate) string { return t.Summary }, f.Summary)
+	remediation := pickFromTemplate(rf, func(t *models.FindingTemplate) string { return t.Remediation }, f.Remediation)
+
 	fmt.Fprintf(sb, "### %d. %s %s · %s\n\n",
 		num,
-		severityEmojiOf(f.Severity),
-		severityLabelCN(f.Severity),
-		escapeMDTable(f.Title),
+		severityEmojiOf(severity),
+		severityLabelCN(severity),
+		escapeMDTable(title),
 	)
 
 	// 漏洞描述
 	sb.WriteString("**漏洞描述**\n\n")
-	if strings.TrimSpace(f.Summary) != "" {
-		sb.WriteString(f.Summary)
+	if strings.TrimSpace(summary) != "" {
+		sb.WriteString(summary)
 		sb.WriteString("\n\n")
 	} else {
 		sb.WriteString("*暂无描述。*\n\n")
@@ -231,8 +237,8 @@ func writeFindingDetailCN(sb *strings.Builder, num int, rf *ReportFinding) {
 
 	// 修复建议
 	sb.WriteString("**修复建议**\n\n")
-	if strings.TrimSpace(f.Remediation) != "" {
-		sb.WriteString(f.Remediation)
+	if strings.TrimSpace(remediation) != "" {
+		sb.WriteString(remediation)
 		sb.WriteString("\n\n")
 	} else {
 		sb.WriteString("*暂无修复建议，请咨询安全团队进一步分析。*\n\n")
@@ -250,9 +256,23 @@ func writeFindingDetailCN(sb *strings.Builder, num int, rf *ReportFinding) {
 		meta = append(meta, fmt.Sprintf("置信度 %d%%", f.Confidence))
 	}
 	meta = append(meta, "状态："+statusLabelCN(f.Status))
+	if rf.Template != nil {
+		meta = append(meta, "已套用模板")
+	}
 	fmt.Fprintf(sb, "> %s\n\n", strings.Join(meta, " · "))
 
 	sb.WriteString("---\n\n")
+}
+
+// pickFromTemplate returns the template's non-empty field value if a template
+// is matched, otherwise the fallback value from the finding itself.
+func pickFromTemplate(rf *ReportFinding, get func(*models.FindingTemplate) string, fallback string) string {
+	if rf.Template != nil {
+		if v := strings.TrimSpace(get(rf.Template)); v != "" {
+			return v
+		}
+	}
+	return fallback
 }
 
 // writeAffectedTargets renders the IP:Port section as a compact table.

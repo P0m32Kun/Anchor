@@ -13,6 +13,7 @@
  * | /reports                 | LegacyRouteGuard| Redirect to /projects/:id/reports | Yes         |
  * | /workers                 | WorkersPage    | Worker node management           | Yes         |
  * | /settings                | SettingsPage   | App configuration                | Yes         |
+ * | /vuln-templates          | VulnTemplatesPage | Vulnerability knowledge base  | Yes         |
  * | /projects/:projectId     | ProjectLayout  | Project wrapper + redirect       | No          |
  * | /projects/:projectId     | Navigate       | Index → redirects to targets     | No          |
  * | /projects/:projectId/targets | TargetPage   | Nested: targets                  | No          |
@@ -56,6 +57,7 @@ import EngineKeysPage from "./pages/EngineKeysPage";
 import TemplatesPage from "./pages/TemplatesPage";
 import DictionariesPage from "./pages/DictionariesPage";
 import HttpxFingerprintsPage from "./pages/HttpxFingerprintsPage";
+import VulnTemplatesPage from "./pages/VulnTemplatesPage";
 
 function LegacyRouteGuard() {
   const location = useLocation();
@@ -212,6 +214,7 @@ function AppContent() {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/dictionaries" element={<DictionariesPage />} />
             <Route path="/httpx-fingerprints" element={<HttpxFingerprintsPage />} />
+            <Route path="/vuln-templates" element={<VulnTemplatesPage />} />
             <Route path="/workers" element={<WorkersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/projects" element={<ProjectPage />} />
