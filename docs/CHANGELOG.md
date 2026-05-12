@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-05-12 — 扫描工具超时单位统一
+
+### 根因
+
+`PipelineConfig.NaabuTimeout` 默认 600,被当作秒拼到 `naabu -timeout 600` —— 但 naabu 的 `-timeout` 单位是**毫秒**(CLI 默认 1000ms)。600ms 比默认值还短,扫描完成快但大量端口漏报;如果用户按"秒"理解调大成 600(=600s),naabu 在不可达 host 上长时间无输出,会被 worker `idleOutputTimeout("naabu") = 60s` 直接 kill。
+
+同样的 unit 错位在其他工具上表现为另一种形式:`DNSxTimeout`、`NmapServiceTimeout` 在 `PipelineConfig` 有字段但 `BuildDNSxCommand` / `BuildNmapServiceScanCommand` 根本没把它拼进命令,配置形同虚设。
+
+### 修复原则
+
+**CLI 接收什么单位,配置和 UI 就是什么单位 —— 零转换。**
+
+| 工具 | CLI `-timeout` 单位 | 旧默认 | 新默认 | 备注 |
+|------|---------------------|--------|--------|------|
+| subfinder | 秒 | 300 | 30 | 对齐 CLI 默认 30s |
+| dnsx | 秒 | 5(未传) | 5 | `BuildDNSxCommand` 补传 `-timeout` |
+| naabu | **毫秒** | 600 | **5000** | 字段语义从"秒"改为"毫秒",`BuildNaabuCommand` 删 `*1000` |
+| nmap | 秒(`--host-timeout`) | 600(未传) | 180 | `BuildNmapServiceScanCommand` 补传 `--host-timeout`;10 分钟单 host 过久,3 分钟覆盖慢主机够用 |
+| nuclei | 秒(profile 控制) | light=3 / std=5 / deep=10 | 不变 | — |
+
+### 涉及文件
+
+- 后端:`internal/models/engine.go`(`DefaultPipelineConfig`)、`internal/worker/commands.go`(三个 `BuildXxxCommand`)、`internal/workflow/pipeline_tool.go`(两处调用签名同步)、`internal/workflow/pipeline_e2e_test.go`
+- 前端:`frontend/src/lib/api.ts`(`DEFAULT_PIPELINE_CONFIG`)、`frontend/src/components/ScanModal.tsx`(`BASE_TOOL_FIELDS` / `EXTERNAL_TOOL_FIELDS` 推荐值、单位、min/max)
+
+### 已知遗留
+
+- `docs/design/v0.4-scan-pipeline.md` 第 5.1 节默认值示例仍是旧字段名(`dns_concurrency`/`port_scan_*`/`nerva_*`),且默认值是旧值。属于历史设计文档过期,需要单独清理,本次未动。
+
+---
+
 ## 2026-05-07 — QA 修复 + FOFA email 清理
 
 ### 关键修复:`scan_tasks.run_id` 外键 (问题3)
