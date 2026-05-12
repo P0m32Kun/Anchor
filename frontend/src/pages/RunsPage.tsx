@@ -101,6 +101,21 @@ export default function RunsPage() {
     undefined
   );
 
+  const {
+    loading: targetsLoading,
+  } = useResource(
+    async (signal) => {
+      if (!projectId) return;
+      const data = await api.listTargets(projectId, PAGE_ALL, signal);
+      setTargets(data.data ?? []);
+    },
+    [projectId],
+    undefined
+  );
+
+  const hasTargets = targets.length > 0;
+  const canStartScan = hasTargets && !targetsLoading;
+
   const loadRunDetails = async (runId: string, signal?: AbortSignal) => {
     setSelectedRun(runId);
     setTasksLoading(true);
