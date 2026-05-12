@@ -676,6 +676,9 @@ export const api = {
 
   deleteFindingTemplate: (id: string, signal?: AbortSignal) =>
     fetchAPI<void>(`/finding-templates/${id}`, { method: "DELETE", signal }),
+
+  acceptFindingTemplateUpstream: (id: string, signal?: AbortSignal) =>
+    fetchAPI<FindingTemplate>(`/finding-templates/${id}/accept-upstream`, { method: "POST", signal }),
 };
 
 export interface Run {
