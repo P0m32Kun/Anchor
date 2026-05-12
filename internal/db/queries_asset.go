@@ -201,9 +201,20 @@ func (q *Queries) CreateWebEndpoint(we *models.WebEndpoint) error {
 	if err != nil {
 		return fmt.Errorf("marshal technologies: %w", err)
 	}
+	// Upsert: re-scans of the same URL update mutable fields (status, title,
+	// detected technologies, screenshot). The unique constraint
+	// (project_id, url) used to surface as ERROR-level "UNIQUE constraint
+	// failed" log lines on every re-scan; the new behaviour keeps the row
+	// fresh while preserving the original id / asset_id / created_at.
 	_, err = q.db.Exec(`
 		INSERT INTO web_endpoints (id, project_id, asset_id, url, scheme, host, port, path, status_code, title, technologies, screenshot_artifact_id, source_tool, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(project_id, url) DO UPDATE SET
+			status_code = excluded.status_code,
+			title = excluded.title,
+			technologies = excluded.technologies,
+			screenshot_artifact_id = excluded.screenshot_artifact_id,
+			source_tool = excluded.source_tool`,
 		we.ID, we.ProjectID, we.AssetID, we.URL, we.Scheme, we.Host, we.Port, we.Path, we.StatusCode, we.Title, string(techJSON), we.ScreenshotArtifactID, we.SourceTool, we.CreatedAt)
 	return err
 }
