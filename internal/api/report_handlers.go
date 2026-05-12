@@ -211,7 +211,7 @@ func (s *Server) generateReport(rpt *models.Report, runID string) {
 
 func (s *Server) broadcastReportProgress(rpt *models.Report) {
 	// Get run to find project ID for SSE routing.
-	run, err := s.queries.GetRun(rpt.RunID)
+	run, err := s.queries.GetPipelineRun(rpt.RunID)
 	if err != nil || run == nil {
 		return
 	}
