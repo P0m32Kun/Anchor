@@ -83,7 +83,7 @@ const BASE_TOOL_FIELDS: { group: string; fields: ToolField[]; icon: any }[] = [
     group: "nmap -sV",
     icon: Cpu,
     fields: [
-      { key: "nmap_service_timeout", label: "超时", unit: "秒", min: 30, max: 3600, recommended: 600 },
+      { key: "nmap_service_timeout", label: "超时", unit: "秒", min: 30, max: 1800, recommended: 180 },
     ],
   },
   {
