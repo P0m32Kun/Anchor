@@ -234,6 +234,12 @@ func (s *Server) handleTaskResult(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Error != "" {
+		if err := s.queries.UpdateScanTaskErrorMessage(taskID, req.Error); err != nil {
+			log.Printf("[server] update task %s error_message failed: %v", taskID, err)
+		}
+	}
+
+	if req.Error != "" {
 		_ = s.queries.UpdateScanTaskErrorMessage(taskID, req.Error)
 	}
 
