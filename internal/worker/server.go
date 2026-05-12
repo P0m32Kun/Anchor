@@ -127,7 +127,7 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 		log.Printf("[worker] task %s rate limit applied: %d", taskID, rateLimit)
 	}
 
-	cfg := resolveTimeoutConfig(tool, command)
+	cfg := resolveTimeoutConfig(tool, command, workdir)
 	ctx, cancel := context.WithTimeout(ctx, cfg.RunningTimeout)
 	defer cancel()
 
