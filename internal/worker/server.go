@@ -483,6 +483,93 @@ func defaultToolTimeout(tool string) time.Duration {
 	}
 }
 
+// estimateScanScale returns (targetCount, portsPerTarget, totalProbes) by
+// inspecting command args and reading the target list file.
+func estimateScanScale(command []string, workdir string) (targets, portsPerTarget, total int) {
+	// 1. Port range from strategy
+	strategy := detectScanStrategy(command)
+	switch strategy {
+	case "full":
+		portsPerTarget = 65535
+	case "top1000":
+		portsPerTarget = 1000
+	case "top100":
+		portsPerTarget = 100
+	default:
+		portsPerTarget = 1000
+	}
+
+	// 2. Target count from list file
+	for i, arg := range command {
+		if arg == "-list" || arg == "-l" || arg == "-host" {
+			if i+1 < len(command) {
+				targetFile := command[i+1]
+				data, err := os.ReadFile(targetFile)
+				if err != nil && workdir != "" {
+					data, err = os.ReadFile(filepath.Join(workdir, targetFile))
+				}
+				if err == nil {
+					lines := strings.Split(string(data), "\n")
+					for _, line := range lines {
+						if strings.TrimSpace(line) != "" {
+							targets++
+						}
+					}
+				}
+			}
+		}
+	}
+
+	total = targets * portsPerTarget
+	return
+}
+
+// dynamicRunningTimeout calculates a realistic timeout based on scan scale.
+// Uses conservative per-probe estimates to avoid underestimating.
+func dynamicRunningTimeout(tool string, command []string, workdir string) time.Duration {
+	base := defaultToolTimeout(tool)
+
+	targets, portsPerTarget, total := estimateScanScale(command, workdir)
+	if total <= 0 {
+		return base
+	}
+
+	switch tool {
+	case "naabu":
+		// Conservative: 0.15s per probe (CONNECT with RTT, retries, SYN fallback).
+		// This is pessimistic; root+SYN will be ~5x faster in practice.
+		estimatedSecs := float64(total) * 0.15
+		estimated := time.Duration(estimatedSecs) * time.Second
+		// Add base overhead for startup / file I/O
+		estimated += 5 * time.Minute
+		// Floor at base, ceiling at 3 hours
+		const maxTimeout = 3 * time.Hour
+		if estimated > maxTimeout {
+			return maxTimeout
+		}
+		if estimated < base {
+			return base
+		}
+		log.Printf("[worker] dynamic timeout: %d targets x %d ports = %d probes -> %v",
+			targets, portsPerTarget, total, estimated.Round(time.Minute))
+		return estimated
+	case "nmap":
+		// nmap -sV is slower: ~0.3s per port with version detection
+		estimatedSecs := float64(total) * 0.3
+		estimated := time.Duration(estimatedSecs) * time.Second
+		estimated += 5 * time.Minute
+		const maxTimeout = 2 * time.Hour
+		if estimated > maxTimeout {
+			return maxTimeout
+		}
+		if estimated < base {
+			return base
+		}
+		return estimated
+	}
+	return base
+}
+
 // TaskTimeoutConfig defines tiered timeout settings for external tool execution.
 // It combines stdout idle detection with CPU activity checks to avoid killing
 // slow-but-healthy scans (e.g. naabu CONNECT full-port scan).
