@@ -2,20 +2,13 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-07
+last_updated: 2026-05-12
 scope: design-index
 ---
 
 # Current Design Index
 
 This index separates active proposal material from baseline architecture.
-
-## Accepted Design Documents
-
-| Document | Status | Notes |
-| --- | --- | --- |
-| [`../../design/v0.4-scan-pipeline.md`](../../design/v0.4-scan-pipeline.md) | Accepted (v0.4.0) | Implemented and verified; baseline since 2026-05-07 |
-| [`../../design/v0.4-migrations.md`](../../design/v0.4-migrations.md) | Accepted (v0.4.0) | Schema changes for v0.4 |
 
 ## In-Review Design Documents
 
@@ -27,6 +20,7 @@ This index separates active proposal material from baseline architecture.
 ## Archived Design Material
 
 - Historical designs live under [`../../archived/`](../../archived/).
+- v0.4 design documents (`scan-pipeline.md`, `migrations.md`) were archived on 2026-05-12 after the field names and defaults drifted out of sync with the implementation. Current architecture baseline lives in [`../architecture.md`](../architecture.md).
 - `frontend/DESIGN_REFACTOR_PLAN.md` is archived material and should not be treated as a current plan.
 
 ## Promotion Rule
