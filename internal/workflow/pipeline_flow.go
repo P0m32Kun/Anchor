@@ -40,7 +40,11 @@ func (p *Pipeline) runFlow(ctx context.Context, group targetGroup) error {
 	case models.TargetTypeIP:
 		return p.runIPFlow(ctx, group.Targets)
 	case models.TargetTypeCIDR:
-		return p.runCIDRFlow(ctx, group.Targets)
+		// CIDR targets are expanded to atomic IPs by scope.FilterTargets at
+		// the pipeline entry, so this case should never fire in normal
+		// operation. Treat any CIDR that makes it here as a programming
+		// error (someone bypassed FilterTargets) and surface it loudly.
+		return fmt.Errorf("unexpected CIDR target at runFlow — should have been expanded by scope.FilterTargets (project=%s)", p.projectID)
 	case models.TargetTypeURL:
 		return p.runURLFlow(ctx, group.Targets)
 	default:
