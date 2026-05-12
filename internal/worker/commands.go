@@ -97,8 +97,14 @@ func BuildNaabuCommand(hostFile, portRange string, rate, threads, timeout int) [
 //
 // rateLimit is -rl (requests/second), rateLimitPerMin is -rlm (requests/minute for sensitive targets).
 // concurrency is -c (parallel templates/hosts).
+//
+// -stats -si 30 forces nuclei to emit a progress line to stderr every 30s.
+// This keeps the worker's idle-output watchdog (server.go:idleOutputTimeout)
+// from misfiring on long scans that simply produce no findings — without the
+// stats heartbeat, a 100-target scan with zero matches would emit nothing on
+// stdout and get killed at the 60s idle threshold.
 func BuildNucleiCommand(targetFile, profile string, rateLimit, rateLimitPerMin, concurrency int, tags []string, scanDepth string, workflowDir string) []string {
-	args := []string{"nuclei", "-jsonl", "-l", targetFile}
+	args := []string{"nuclei", "-jsonl", "-l", targetFile, "-stats", "-si", "30"}
 
 	switch profile {
 	case "light":
