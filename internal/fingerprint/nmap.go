@@ -132,16 +132,16 @@ func extractHostIP(addrs []nmapAddress) string {
 }
 
 // ConvertToServiceFingerprints converts nmap results to ServiceFingerprint models.
+//
+// Note: product and version are written directly to the ServiceFingerprint
+// first-class fields (introduced in db migration v15). metadata is reserved
+// for genuinely dynamic / extensible attributes such as CPE — keeping
+// structured semantic fields out of the JSON blob so they remain queryable
+// and indexable at the SQL layer.
 func ConvertToServiceFingerprints(projectID string, results []NmapServiceResult) []models.ServiceFingerprint {
 	var fps []models.ServiceFingerprint
 	for _, r := range results {
 		meta := map[string]interface{}{}
-		if r.Product != "" {
-			meta["product"] = r.Product
-		}
-		if r.Version != "" {
-			meta["version"] = r.Version
-		}
 		if r.CPE != "" {
 			meta["cpe"] = r.CPE
 		}
@@ -151,6 +151,8 @@ func ConvertToServiceFingerprints(projectID string, results []NmapServiceResult)
 			Protocol: r.Protocol,
 			IsWeb:    IsWebService(r),
 			Service:  r.Service,
+			Product:  r.Product,
+			Version:  r.Version,
 			Metadata: meta,
 			Source:   "nmap",
 		}
