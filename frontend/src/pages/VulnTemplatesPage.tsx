@@ -268,6 +268,7 @@ export default function VulnTemplatesPage() {
           <Table>
             <TableHeader className="bg-white/5">
               <TableRow>
+                <TableHead>来源</TableHead>
                 <TableHead>检测工具</TableHead>
                 <TableHead>匹配键</TableHead>
                 <TableHead>模板标题</TableHead>
@@ -282,6 +283,25 @@ export default function VulnTemplatesPage() {
                   key={t.id}
                   className="border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
                 >
+                  <TableCell>
+                    {t.is_builtin ? (
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                          <Lock className="mr-1 h-3 w-3 inline" />
+                          内置
+                        </Badge>
+                        {t.user_modified && (
+                          <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px]">
+                            本地已修改
+                          </Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                        自定义
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="font-mono">{t.source_tool}</Badge>
                   </TableCell>
@@ -306,6 +326,18 @@ export default function VulnTemplatesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
+                      {t.is_builtin && t.user_modified && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                          onClick={() => acceptUpstream(t)}
+                          title="放弃本地修改,应用上游(仓库)版本"
+                        >
+                          <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                          <span className="text-[10px]">应用上游</span>
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -315,15 +347,17 @@ export default function VulnTemplatesPage() {
                       >
                         <Settings2 className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300"
-                        onClick={() => handleDelete(t)}
-                        title="删除"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {!t.is_builtin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300"
+                          onClick={() => handleDelete(t)}
+                          title="删除"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
