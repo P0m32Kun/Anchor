@@ -433,3 +433,57 @@ func defaultToolTimeout(tool string) time.Duration {
 		return 10 * time.Minute
 	}
 }
+
+// idleOutputTimeout returns the maximum allowed period of silence (no stdout/stderr
+// output) before a tool's process is considered hung and killed. Tuned per-tool:
+// nmap -sV runs in periods of computation without progress; nuclei should emit
+// jsonl as soon as a finding matches; httpx/naabu are chatty.
+func idleOutputTimeout(tool string) time.Duration {
+	switch tool {
+	case "nuclei":
+		return 60 * time.Second
+	case "nmap":
+		return 120 * time.Second
+	case "naabu":
+		return 60 * time.Second
+	case "httpx":
+		return 60 * time.Second
+	case "subfinder":
+		return 60 * time.Second
+	case "dnsx":
+		return 60 * time.Second
+	default:
+		return 90 * time.Second
+	}
+}
+
+// idleWatchedWriter is an io.Writer that records the timestamp of the most
+// recent Write call. The watchdog goroutine reads Last() to detect hung
+// subprocesses that produce no output for too long.
+type idleWatchedWriter struct {
+	mu   sync.Mutex
+	buf  []byte
+	last time.Time
+}
+
+func (w *idleWatchedWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	w.last = time.Now()
+	w.buf = append(w.buf, p...)
+	w.mu.Unlock()
+	return len(p), nil
+}
+
+func (w *idleWatchedWriter) Bytes() []byte {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	out := make([]byte, len(w.buf))
+	copy(out, w.buf)
+	return out
+}
+
+func (w *idleWatchedWriter) Last() time.Time {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.last
+}
