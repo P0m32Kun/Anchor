@@ -106,7 +106,7 @@ func TestPipelineE2E(t *testing.T) {
 			EnableNuclei:        true,
 			NaabuRate:           1000,
 			NaabuThreads:        50,
-			NaabuTimeout:        5,
+			NaabuTimeout:        5000,
 			NucleiRateLimit:     100,
 		}).
 		WithRunID(runID)
