@@ -315,7 +315,7 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 	errorMsg := ""
 	if wasIdleKilled {
 		status = "failed"
-		errorMsg = fmt.Sprintf("idle-timeout: no output for %v, process killed", idleThreshold)
+		errorMsg = fmt.Sprintf("idle-timeout: no output for %v, process killed", cfg.IdleTimeout)
 	} else if err != nil && exitCode != 0 {
 		status = "failed"
 		if stderrData, readErr := os.ReadFile(filepath.Join(workdir, "stderr.txt")); readErr == nil && len(stderrData) > 0 {
