@@ -35,6 +35,7 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     container_name: anchor-worker
+    user: root
     environment:
       - ANCHOR_DATA_DIR=/data
       - ANCHOR_CORE_URL=http://server:17421
