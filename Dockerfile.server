@@ -22,9 +22,12 @@ RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/source
 
 WORKDIR /app
 COPY --from=builder /build/anchor .
+# Vulnerability template knowledge base seed (read on every startup).
+COPY --from=builder /build/docs/templates /app/templates
 
 ENV ANCHOR_DATA_DIR=/data
 ENV ANCHOR_PORT=17421
+ENV ANCHOR_TEMPLATES_SEED=/app/templates/vuln-templates.json
 
 EXPOSE 17421
 
