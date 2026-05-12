@@ -139,11 +139,24 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 		return nil
 	}
 
+	// All online workers exhausted (none registered or all marked offline).
+	// Fall back to local server-side execution. Log explicitly so the operator
+	// understands this is a fallback path, not the normal one — in a worker
+	// deployment the server image usually has no tools installed.
 	binary := args[0]
+	if len(triedWorkerIDs) > 0 {
+		log.Printf("[runner] task %s: no remaining online workers (tried %d: %v); attempting local server fallback for tool %q", task.ID, len(triedWorkerIDs), triedWorkerIDs, binary)
+	} else {
+		log.Printf("[runner] task %s: no online worker registered; attempting local server fallback for tool %q", task.ID, binary)
+	}
 	if _, err := exec.LookPath(binary); err != nil {
 		_ = r.queries.UpdateScanTaskStatus(task.ID, models.TaskFailed, nil, &now)
-		return fmt.Errorf("tool not found: %s", binary)
+		if len(triedWorkerIDs) > 0 {
+			return fmt.Errorf("task %s failed: tool %q unavailable — no online worker (tried %v) and server image has no local fallback", task.ID, binary, triedWorkerIDs)
+		}
+		return fmt.Errorf("task %s failed: tool %q unavailable — no online worker registered and server image has no local fallback", task.ID, binary)
 	}
+	log.Printf("[runner] task %s: executing locally on server (fallback path) — tool %q", task.ID, binary)
 
 	// Inject custom nuclei templates if available (local execution fallback)
 	if task.Tool == "nuclei" {
