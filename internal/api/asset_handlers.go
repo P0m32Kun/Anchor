@@ -189,6 +189,8 @@ func (s *Server) handleListServicePorts(w http.ResponseWriter, r *http.Request) 
 				Protocol:    fp.Protocol,
 				State:       "open",
 				ServiceName: fp.Service,
+				Product:     fp.Product,
+				Version:     fp.Version,
 				SourceTools: []string{fp.Source},
 				IsWeb:       fp.IsWeb,
 				CreatedAt:   fp.CreatedAt,
@@ -197,6 +199,12 @@ func (s *Server) handleListServicePorts(w http.ResponseWriter, r *http.Request) 
 			sp := spMap[k]
 			if sp.ServiceName == "" || sp.ServiceName == "未知服务" {
 				sp.ServiceName = fp.Service
+			}
+			if sp.Product == "" {
+				sp.Product = fp.Product
+			}
+			if sp.Version == "" {
+				sp.Version = fp.Version
 			}
 			sp.SourceTools = appendUnique(sp.SourceTools, fp.Source)
 			if fp.IsWeb {
