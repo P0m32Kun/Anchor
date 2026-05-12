@@ -128,11 +128,10 @@ func TestGenerateMarkdown_Normal(t *testing.T) {
 	// Verify key sections are present.
 	sections := []string{
 		"# 安全评估报告",
-		"## 执行摘要",
-		"## 扫描范围",
-		"## 检测方法",
-		"## 漏洞清单",
-		"## 附录",
+		"## 一、风险概览",
+		"## 二、扫描范围",
+		"## 三、漏洞详情",
+		"## 四、附录：检测工具",
 		"Test Project",
 		"TestOrg",
 		"Exposed .git Repository",
@@ -142,6 +141,11 @@ func TestGenerateMarkdown_Normal(t *testing.T) {
 		"nuclei",
 		"Block access to .git",
 		"Content-Security-Policy",
+		"**漏洞描述**",
+		"**涉及 IP:Port**",
+		"**修复建议**",
+		"🟠 高危",
+		"🔵 低危",
 	}
 	for _, section := range sections {
 		if !strings.Contains(md, section) {
@@ -155,14 +159,21 @@ func TestGenerateMarkdown_NoFindings(t *testing.T) {
 	data.Findings = nil
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "本次扫描未发现任何漏洞") {
-		t.Error("expected '本次扫描未发现任何漏洞' message when there are no findings")
+	if !strings.Contains(md, "本次扫描未发现需要报告的漏洞") {
+		t.Error("expected '本次扫描未发现需要报告的漏洞' message when there are no findings")
 	}
 
-	// Severity table should still be present with all-zero counts.
-	for _, sev := range []string{"严重", "高危", "中危", "低危", "信息"} {
-		if !strings.Contains(md, "| "+sev+" | 0 |") {
-			t.Errorf("expected severity table row for %s with count 0", sev)
+	// Severity bar should still show all five buckets with zero counts.
+	expected := []string{
+		"🔴 严重 **0**",
+		"🟠 高危 **0**",
+		"🟡 中危 **0**",
+		"🔵 低危 **0**",
+		"⚪ 信息 **0**",
+	}
+	for _, e := range expected {
+		if !strings.Contains(md, e) {
+			t.Errorf("expected severity bar entry %q, got missing", e)
 		}
 	}
 }
@@ -183,21 +194,22 @@ func TestGenerateMarkdown_NilAssetAndEndpoint(t *testing.T) {
 	data.Findings[0].WebEndpoint = nil
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "**资产** | N/A") {
-		t.Error("expected 'N/A' for nil asset")
-	}
-	if !strings.Contains(md, "**端点** | N/A") {
-		t.Error("expected 'N/A' for nil endpoint")
+	if !strings.Contains(md, "暂无具体目标信息") {
+		t.Error("expected '暂无具体目标信息' when both asset and endpoint are nil")
 	}
 }
 
-func TestGenerateMarkdown_NoEvidence(t *testing.T) {
+func TestGenerateMarkdown_NoEvidenceSection(t *testing.T) {
+	// New human-friendly format removes raw evidence (request/response) entirely.
+	// Verify the section header and any evidence excerpt content are absent.
 	data := testReportData()
-	data.Findings[0].EvidenceList = nil
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "暂无原始证据记录") {
-		t.Error("expected '暂无原始证据记录' message")
+	if strings.Contains(md, "**证据链**") || strings.Contains(md, "证据链") {
+		t.Error("evidence section should be removed from the human-friendly report")
+	}
+	if strings.Contains(md, "GET / HTTP/1.1") || strings.Contains(md, "X-Powered-By: Express") {
+		t.Error("raw evidence excerpts should not appear in the human-friendly report")
 	}
 }
 
@@ -223,8 +235,8 @@ func TestGenerateMarkdown_NoSummary(t *testing.T) {
 	data.Findings[0].Finding.Summary = ""
 	md := GenerateMarkdown(data)
 
-	if !strings.Contains(md, "未提供描述") {
-		t.Error("expected '未提供描述' for empty summary")
+	if !strings.Contains(md, "暂无描述") {
+		t.Error("expected '暂无描述' for empty summary")
 	}
 }
 
