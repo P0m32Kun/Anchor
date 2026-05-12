@@ -1,6 +1,7 @@
 package scope
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/P0m32Kun/Anchor/internal/models"
