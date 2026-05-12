@@ -435,27 +435,132 @@ func defaultToolTimeout(tool string) time.Duration {
 	}
 }
 
-// idleOutputTimeout returns the maximum allowed period of silence (no stdout/stderr
-// output) before a tool's process is considered hung and killed. Tuned per-tool:
-// nmap -sV runs in periods of computation without progress; nuclei should emit
-// jsonl as soon as a finding matches; httpx/naabu are chatty.
-func idleOutputTimeout(tool string) time.Duration {
+// TaskTimeoutConfig defines tiered timeout settings for external tool execution.
+// It combines stdout idle detection with CPU activity checks to avoid killing
+// slow-but-healthy scans (e.g. naabu CONNECT full-port scan).
+type TaskTimeoutConfig struct {
+	StartupTimeout  time.Duration // max time without any output after process starts
+	RunningTimeout  time.Duration // hard ceiling for total execution time
+	IdleTimeout     time.Duration // max silence on stdout/stderr during running
+	CPUCheckEnabled bool          // if true, verify CPU time is growing before idle-kill
+}
+
+// resolveTimeoutConfig returns timeout settings tailored to the tool and scan strategy.
+func resolveTimeoutConfig(tool string, command []string) TaskTimeoutConfig {
+	base := TaskTimeoutConfig{
+		StartupTimeout:  30 * time.Second,
+		RunningTimeout:  defaultToolTimeout(tool),
+		IdleTimeout:     90 * time.Second,
+		CPUCheckEnabled: true,
+	}
+
 	switch tool {
 	case "nuclei":
-		return 60 * time.Second
+		// nuclei emits -stats heartbeat every 30s; 60s is safe
+		base.IdleTimeout = 60 * time.Second
+		base.CPUCheckEnabled = false // stats heartbeat is sufficient
 	case "nmap":
-		return 120 * time.Second
+		base.IdleTimeout = 120 * time.Second
 	case "naabu":
-		return 60 * time.Second
-	case "httpx":
-		return 60 * time.Second
-	case "subfinder":
-		return 60 * time.Second
-	case "dnsx":
-		return 60 * time.Second
-	default:
-		return 90 * time.Second
+		strategy := detectScanStrategy(command)
+		if strategy == "full" {
+			// Full-port CONNECT scan can go minutes between open ports
+			base.IdleTimeout = 5 * time.Minute
+		} else {
+			base.IdleTimeout = 90 * time.Second
+		}
+	case "httpx", "subfinder", "dnsx":
+		base.IdleTimeout = 60 * time.Second
 	}
+	return base
+}
+
+// detectScanStrategy inspects command args to determine scan depth.
+func detectScanStrategy(command []string) string {
+	for i, arg := range command {
+		if arg == "-tp" || arg == "--top-ports" || arg == "-p" {
+			if i+1 < len(command) {
+				switch command[i+1] {
+				case "full", "-":
+					return "full"
+				case "100":
+					return "top100"
+				case "1000":
+					return "top1000"
+				}
+			}
+		}
+		// nmap -p- means all ports
+		if arg == "-p-" {
+			return "full"
+		}
+	}
+	return "default"
+}
+
+// readProcessCPUTime reads the total CPU time (user+system jiffies) for a PID
+// from /proc/<pid>/stat. Returns 0 if the process no longer exists.
+func readProcessCPUTime(pid int) uint64 {
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return 0
+	}
+	fields := strings.Fields(string(data))
+	if len(fields) < 15 {
+		return 0
+	}
+	// fields[13] = utime, fields[14] = stime
+	utime, _ := strconv.ParseUint(fields[13], 10, 64)
+	stime, _ := strconv.ParseUint(fields[14], 10, 64)
+	return utime + stime
+}
+
+// readProcessState returns the State field from /proc/<pid>/status.
+func readProcessState(pid int) string {
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "State:") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "State:"))
+		}
+	}
+	return ""
+}
+
+// isProcessStateHung checks if a process appears truly stuck.
+// It samples CPU time over a short window and inspects process state.
+func isProcessStateHung(pid int) bool {
+	t1 := readProcessCPUTime(pid)
+	state1 := readProcessState(pid)
+	time.Sleep(2 * time.Second)
+	t2 := readProcessCPUTime(pid)
+	state2 := readProcessState(pid)
+
+	// Process exited
+	if t2 == 0 {
+		return false
+	}
+
+	// CPU is still advancing → process is working
+	if t2 > t1 {
+		return false
+	}
+
+	// CPU stalled but process is in D state (uninterruptible sleep, usually IO)
+	// Give it more grace; D state alone doesn't mean deadlocked
+	if strings.HasPrefix(state2, "D") {
+		// If it was also D before, it might be stuck
+		if strings.HasPrefix(state1, "D") {
+			return true
+		}
+		return false
+	}
+
+	// CPU stalled and not in D state → likely hung or finished
+	return true
 }
 
 // idleWatchedWriter is an io.Writer that records the timestamp of the most
