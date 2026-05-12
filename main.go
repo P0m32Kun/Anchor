@@ -50,6 +50,21 @@ func runServer(dataDir string) {
 	defer sqliteDB.Close()
 
 	queries := db.New(sqliteDB)
+
+	// Sync vulnerability template knowledge base from the repo seed JSON.
+	// Non-fatal: any failure is logged and execution continues with whatever
+	// already exists in the database.
+	seedPath := os.Getenv("ANCHOR_TEMPLATES_SEED")
+	if seedPath == "" {
+		seedPath = "docs/templates/vuln-templates.json"
+	}
+	if res, err := queries.SyncFindingTemplatesFromFile(seedPath); err != nil {
+		log.Printf("[seed] finding templates sync (%s): %v", seedPath, err)
+	} else if res != nil && (res.Inserted+res.Updated+res.Preserved+res.Deleted+res.Skipped) > 0 {
+		log.Printf("[seed] finding templates: +%d ~%d ✓%d -%d ⚙%d (insert/update/preserve/delete/skip)",
+			res.Inserted, res.Updated, res.Preserved, res.Deleted, res.Skipped)
+	}
+
 	server := api.NewServer(queries, sqliteDB, dataDir)
 
 	mux := http.NewServeMux()
