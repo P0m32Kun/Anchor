@@ -1,15 +1,17 @@
 ---
-status: accepted
+status: superseded
 source_of_truth: false
 owner: kun
 last_updated: 2026-05-07
+archived_on: 2026-05-12
 scope: v0.4-design
 verification: passed
 ---
 
 # v0.4 设计方案：智能扫描流程与多目标类型支持
 
-> 状态：**Accepted**（2026-05-07）
+> **归档说明（2026-05-12）**:本文档是 v0.4 的早期设计稿,部分字段名(`dns_concurrency`/`port_scan_*`/`nerva_*`)和默认值已与实际实现脱节。当前架构基线见 [`docs/current/architecture.md`](../../current/architecture.md),最新默认值见 `internal/models/engine.go::DefaultPipelineConfig`。
+>
 > 实现已完成，验收测试见 `docs/active/review/v0.4-acceptance.md`
 > 当前架构基线见 `docs/current/architecture.md`
 
