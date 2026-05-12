@@ -805,6 +805,9 @@ export interface FindingTemplate {
   summary: string;
   remediation: string;
   enabled: boolean;
+  is_builtin: boolean;
+  user_modified: boolean;
+  builtin_payload: string;
   created_at: string;
   updated_at: string;
 }
