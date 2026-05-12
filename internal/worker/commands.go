@@ -201,6 +201,9 @@ func BuildDNSxCommand(hostFile string, recordTypes []string, rateLimit, threads,
 	if threads > 0 {
 		args = append(args, "-t", fmt.Sprintf("%d", threads))
 	}
+	if timeout > 0 {
+		args = append(args, "-timeout", fmt.Sprintf("%d", timeout))
+	}
 
 	return args
 }
