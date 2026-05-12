@@ -11,14 +11,14 @@ import (
 
 // AggregateByRun collects report data scoped to a specific pipeline run.
 // It reuses the project-level data but scopes findings to the run's project.
-func AggregateByRun(ctx context.Context, q *db.Queries, runID string) (*ReportData, *models.Run, error) {
-	// Fetch the run.
-	run, err := q.GetRun(runID)
+func AggregateByRun(ctx context.Context, q *db.Queries, runID string) (*ReportData, *models.PipelineRun, error) {
+	// Fetch the pipeline run.
+	run, err := q.GetPipelineRun(runID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("get run: %w", err)
+		return nil, nil, fmt.Errorf("get pipeline run: %w", err)
 	}
 	if run == nil {
-		return nil, nil, fmt.Errorf("run %s not found", runID)
+		return nil, nil, fmt.Errorf("pipeline run %s not found", runID)
 	}
 
 	// Fetch the project.
