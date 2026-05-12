@@ -299,3 +299,110 @@ func TestMatchIP(t *testing.T) {
 	}
 }
 
+// TestFilterTargetsWithRules covers the entry-point scope filter that the
+// pipeline relies on. It uses the pure-logic filterTargetsWithRules helper so
+// no database is required.
+func TestFilterTargetsWithRules(t *testing.T) {
+	e := &Engine{}
+
+	t.Run("CIDR expansion with exclude IP", func(t *testing.T) {
+		targets := []*models.Target{
+			{Type: models.TargetTypeCIDR, Value: "172.30.0.0/29"},
+		}
+		// /29 yields 6 usable hosts (.1..6 after network/broadcast trim).
+		rules := []*models.ScopeRule{
+			{Action: models.ScopeActionInclude, Type: models.TargetTypeCIDR, Value: "172.30.0.0/29"},
+			{Action: models.ScopeActionExclude, Type: models.TargetTypeIP, Value: "172.30.0.1"},
+		}
+		got, err := e.filterTargetsWithRules(targets, rules)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 5 {
+			t.Fatalf("expected 5 IPs (6 hosts minus .1), got %d: %+v", len(got), valuesOf(got))
+		}
+		for _, tgt := range got {
+			if tgt.Value == "172.30.0.1" {
+				t.Errorf(".1 should have been excluded but appeared in output")
+			}
+			if tgt.Type != models.TargetTypeIP {
+				t.Errorf("expected expanded targets to be type=ip, got %s", tgt.Type)
+			}
+		}
+	})
+
+	t.Run("no rules → default deny", func(t *testing.T) {
+		targets := []*models.Target{
+			{Type: models.TargetTypeIP, Value: "10.0.0.5"},
+		}
+		got, err := e.filterTargetsWithRules(targets, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 0 {
+			t.Errorf("whitelist mode should deny with no rules, got %d allowed: %+v", len(got), valuesOf(got))
+		}
+	})
+
+	t.Run("empty input", func(t *testing.T) {
+		got, err := e.filterTargetsWithRules(nil, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 0 {
+			t.Errorf("empty input must yield empty output, got %d", len(got))
+		}
+	})
+
+	t.Run("CIDR too large rejected", func(t *testing.T) {
+		// MaxCIDRHostBits = 16. /15 has 17 host bits → must be rejected.
+		targets := []*models.Target{
+			{Type: models.TargetTypeCIDR, Value: "10.0.0.0/15"},
+		}
+		_, err := e.filterTargetsWithRules(targets, nil)
+		if err == nil {
+			t.Fatalf("expected error for oversized CIDR, got nil")
+		}
+		// Sanity: error should mention the CIDR.
+		if got := err.Error(); !contains(got, "10.0.0.0/15") || !contains(got, "host bits") {
+			t.Errorf("error message should mention CIDR and host bits, got: %s", got)
+		}
+	})
+
+	t.Run("exclude IP wins over include CIDR", func(t *testing.T) {
+		// Plain IP target (not CIDR-expanded) intersecting an include CIDR
+		// and an exclude IP — exclude must win per evaluate() precedence.
+		targets := []*models.Target{
+			{Type: models.TargetTypeIP, Value: "192.168.1.50"},
+		}
+		rules := []*models.ScopeRule{
+			{Action: models.ScopeActionInclude, Type: models.TargetTypeCIDR, Value: "192.168.1.0/24"},
+			{Action: models.ScopeActionExclude, Type: models.TargetTypeIP, Value: "192.168.1.50"},
+		}
+		got, err := e.filterTargetsWithRules(targets, rules)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 0 {
+			t.Errorf("exclude rule should override include, got %d allowed: %+v", len(got), valuesOf(got))
+		}
+	})
+}
+
+func valuesOf(targets []*models.Target) []string {
+	out := make([]string, 0, len(targets))
+	for _, t := range targets {
+		out = append(out, t.Value)
+	}
+	return out
+}
+
+func contains(s, substr string) bool {
+	for i := 0; i+len(substr) <= len(s); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
