@@ -361,8 +361,15 @@ func (lb *limitedBuffer) Len() int      { return lb.buf.Len() }
 func (lb *limitedBuffer) Bytes() []byte { return lb.buf.Bytes() }
 
 // isUnreachableError reports whether the dispatch error indicates the worker
-// is unreachable (connection refused, DNS failure, timeout) rather than a
-// task-level failure.
+// is unreachable (connection refused, DNS failure, network I/O timeout, or an
+// explicit heartbeat-lost signal from the dispatcher) rather than a task-level
+// failure.
+//
+// Note: the bare token "timeout" is intentionally NOT matched here. The
+// dispatcher uses message text such as "exceeded N server-side poll deadline"
+// for a server-side give-up where the worker may still be executing — that
+// case must NOT mark the worker offline. Heartbeat-loss errors include the
+// explicit "worker unreachable" signature and are matched precisely.
 func isUnreachableError(err error) bool {
 	if err == nil {
 		return false
@@ -372,10 +379,10 @@ func isUnreachableError(err error) bool {
 		"post task to worker",
 		"connection refused",
 		"no such host",
-		"timeout",
 		"i/o timeout",
 		"network is unreachable",
 		"dial tcp",
+		"worker unreachable",
 	} {
 		if strings.Contains(msg, signature) {
 			return true
