@@ -1,15 +1,17 @@
 ---
-status: accepted
+status: superseded
 source_of_truth: false
 owner: kun
 last_updated: 2026-05-07
+archived_on: 2026-05-12
 scope: v0.4-migrations
 verification: passed
 ---
 
 # v0.4 数据库迁移记录
 
-> 状态：**Accepted**（2026-05-07）
+> **归档说明(2026-05-12)**:本文档是 v0.4 阶段的迁移记录。后续 v6+ 迁移和当前 schema 见 `internal/db/migrate_*.go` 及 `docs/schema-migrations.md`。
+>
 > v0.4.0 已发布，迁移已通过 E2E 验收（见 `docs/active/review/v0.4-acceptance.md`）
 
 ---
