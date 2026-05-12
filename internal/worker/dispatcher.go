@@ -67,7 +67,42 @@ func (d *Dispatcher) MarkWorkerOffline(workerID string) error {
 }
 
 // DispatchToWorker sends a task to a remote worker and polls until completion.
+// On idle-timeout failure (worker watchdog killed a hung subprocess), the task
+// is retried up to maxDispatchAttempts-1 times before giving up.
 func (d *Dispatcher) DispatchToWorker(ctx context.Context, task *models.ScanTask, worker *models.WorkerNode, workdir string, project *models.Project) error {
+	const maxDispatchAttempts = 3
+	for attempt := 1; attempt <= maxDispatchAttempts; attempt++ {
+		err := d.dispatchOnce(ctx, task, worker, workdir, project)
+		if err == nil {
+			return nil
+		}
+		if attempt >= maxDispatchAttempts {
+			return err
+		}
+		if !d.wasIdleTimeout(task.ID) {
+			return err
+		}
+		log.Printf("[dispatcher] task %s idle-killed on attempt %d, retrying (max %d)", task.ID, attempt, maxDispatchAttempts)
+		if resetErr := d.queries.ResetScanTaskForRetry(task.ID); resetErr != nil {
+			log.Printf("[dispatcher] failed to reset task %s for retry: %v", task.ID, resetErr)
+			return err
+		}
+	}
+	return fmt.Errorf("task %s failed after %d attempts", task.ID, maxDispatchAttempts)
+}
+
+// wasIdleTimeout checks if the most recent task failure was triggered by the
+// worker's idle-output watchdog, in which case a retry is worth attempting.
+func (d *Dispatcher) wasIdleTimeout(taskID string) bool {
+	t, err := d.queries.GetScanTask(taskID)
+	if err != nil || t == nil {
+		return false
+	}
+	return strings.Contains(t.ErrorMessage, "idle-timeout:")
+}
+
+// dispatchOnce sends a single dispatch attempt to a worker and polls for completion.
+func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, worker *models.WorkerNode, workdir string, project *models.Project) error {
 	args := strings.Fields(task.CommandTemplate)
 	inputFiles := collectInputFiles(args)
 	reqBody, _ := json.Marshal(map[string]interface{}{
