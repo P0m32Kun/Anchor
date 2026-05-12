@@ -127,12 +127,14 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 		log.Printf("[worker] task %s rate limit applied: %d", taskID, rateLimit)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, defaultToolTimeout(tool))
+	cfg := resolveTimeoutConfig(tool, command)
+	ctx, cancel := context.WithTimeout(ctx, cfg.RunningTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, binary, command[1:]...)
 	cmd.Dir = workdir
 	cmd.Env = os.Environ()
+	cmd.WaitDelay = 30 * time.Second // Go 1.20+: force-close unresponsive IO after exit
 
 	stdout := &idleWatchedWriter{}
 	stderr := &idleWatchedWriter{}
@@ -144,19 +146,51 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 	ws.mu.Unlock()
 
 	log.Printf("[worker] task %s exec: %s %v", taskID, binary, command[1:])
+	log.Printf("[worker] task %s timeout config: startup=%v idle=%v running=%v cpu-check=%v",
+		taskID, cfg.StartupTimeout, cfg.IdleTimeout, cfg.RunningTimeout, cfg.CPUCheckEnabled)
 
 	startTime := time.Now()
 	stopWatchdog := make(chan struct{})
 	idleKilled := make(chan struct{}, 1)
-	idleThreshold := idleOutputTimeout(tool)
+
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
+
+		inStartup := true
+		startupDeadline := startTime.Add(cfg.StartupTimeout)
+
 		for {
 			select {
 			case <-stopWatchdog:
 				return
 			case <-ticker.C:
+				now := time.Now()
+
+				// Phase 1: Startup — process must produce output within StartupTimeout
+				if inStartup && now.Before(startupDeadline) {
+					last := stdout.Last()
+					if l2 := stderr.Last(); l2.After(last) {
+						last = l2
+					}
+					if !last.IsZero() {
+						inStartup = false
+						log.Printf("[worker] task %s startup OK (first output at %v)", taskID, last.Sub(startTime).Round(time.Second))
+					}
+					continue
+				}
+
+				if inStartup {
+					log.Printf("[worker] task %s startup timeout (%v) expired with no output, killing", taskID, cfg.StartupTimeout)
+					select {
+					case idleKilled <- struct{}{}:
+					default:
+					}
+					cancel()
+					return
+				}
+
+				// Phase 2: Running — check idle timeout
 				last := stdout.Last()
 				if l2 := stderr.Last(); l2.After(last) {
 					last = l2
@@ -164,9 +198,23 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 				if last.IsZero() {
 					last = startTime
 				}
-				since := time.Since(last)
-				if since > idleThreshold {
-					log.Printf("[worker] task %s idle for %v (threshold %v), killing process", taskID, since.Round(time.Second), idleThreshold)
+				since := now.Sub(last)
+
+				if since > cfg.IdleTimeout {
+					// Before killing, verify process isn't just slow via CPU check
+					if cfg.CPUCheckEnabled && cmd.Process != nil {
+						pid := cmd.Process.Pid
+						if !isProcessStateHung(pid) {
+							log.Printf("[worker] task %s idle for %v but CPU still active (pid=%d), extending grace",
+								taskID, since.Round(time.Second), pid)
+							continue
+						}
+						log.Printf("[worker] task %s idle for %v and CPU stalled (pid=%d), killing",
+							taskID, since.Round(time.Second), pid)
+					} else {
+						log.Printf("[worker] task %s idle for %v (threshold %v), killing process",
+							taskID, since.Round(time.Second), cfg.IdleTimeout)
+					}
 					select {
 					case idleKilled <- struct{}{}:
 					default:
