@@ -61,7 +61,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		PortRange:                "top1000",
 		NaabuRate:                1000,
 		NaabuThreads:             100,
-		NaabuTimeout:             5, // seconds; converted to ms when passed to naabu CLI
+		NaabuTimeout:             5000, // milliseconds (naabu CLI default is 1000ms)
 		EnableNmapService:        true,
 		NmapServiceTimeout:       180, // seconds; per-host --host-timeout for -sV scan
 		EnableHttpx:              true,
