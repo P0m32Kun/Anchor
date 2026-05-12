@@ -54,6 +54,8 @@ import SettingsPage from "./pages/SettingsPage";
 import EnginesPage from "./pages/EnginesPage";
 import EngineKeysPage from "./pages/EngineKeysPage";
 import TemplatesPage from "./pages/TemplatesPage";
+import DictionariesPage from "./pages/DictionariesPage";
+import HttpxFingerprintsPage from "./pages/HttpxFingerprintsPage";
 
 function LegacyRouteGuard() {
   const location = useLocation();
@@ -208,6 +210,8 @@ function AppContent() {
             <Route path="/engines" element={<EnginesPage />} />
             <Route path="/engines/keys" element={<EngineKeysPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
+            <Route path="/dictionaries" element={<DictionariesPage />} />
+            <Route path="/httpx-fingerprints" element={<HttpxFingerprintsPage />} />
             <Route path="/workers" element={<WorkersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/projects" element={<ProjectPage />} />

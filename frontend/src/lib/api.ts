@@ -605,6 +605,62 @@ export const api = {
     const base = getApiBase();
     window.open(`${base}/reports/${reportId}/download`, "_blank");
   },
+
+  // --- Dictionaries ---
+  listDictionaries: (category?: string, signal?: AbortSignal) =>
+    fetchAPI<Dictionary[]>(buildQueryString("/dictionaries", { category }), { signal }),
+
+  createDictionary: (data: { name: string; description?: string; category: string; file: File }, signal?: AbortSignal) => {
+    const formData = new FormData();
+    formData.append("name", data.name);
+    formData.append("category", data.category);
+    if (data.description) formData.append("description", data.description);
+    formData.append("file", data.file);
+    return fetchAPI<Dictionary>("/dictionaries", { method: "POST", body: formData, signal });
+  },
+
+  getDictionary: (id: string, signal?: AbortSignal) =>
+    fetchAPI<Dictionary>(`/dictionaries/${id}`, { signal }),
+
+  patchDictionary: (id: string, data: Partial<Omit<Dictionary, "id" | "created_at" | "updated_at" | "file_path" | "line_count" | "size_bytes">>, signal?: AbortSignal) =>
+    fetchAPI<Dictionary>(`/dictionaries/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
+
+  deleteDictionary: (id: string, signal?: AbortSignal) =>
+    fetchAPI<void>(`/dictionaries/${id}`, { method: "DELETE", signal }),
+
+  readDictionaryContent: (id: string, signal?: AbortSignal) =>
+    request(`/dictionaries/${id}/content`, { signal }).then((res) => res.text()),
+
+  writeDictionaryContent: (id: string, content: string, signal?: AbortSignal) =>
+    fetchAPI<Dictionary>(`/dictionaries/${id}/content`, { method: "PUT", body: content, signal }),
+
+  // --- HTTPX Fingerprints ---
+  listHttpxFingerprints: (type?: string, signal?: AbortSignal) =>
+    fetchAPI<HttpxFingerprint[]>(buildQueryString("/httpx/fingerprints", { type }), { signal }),
+
+  createHttpxFingerprint: (data: { name: string; description?: string; type: string; file: File }, signal?: AbortSignal) => {
+    const formData = new FormData();
+    formData.append("name", data.name);
+    formData.append("type", data.type);
+    if (data.description) formData.append("description", data.description);
+    formData.append("file", data.file);
+    return fetchAPI<HttpxFingerprint>("/httpx/fingerprints", { method: "POST", body: formData, signal });
+  },
+
+  getHttpxFingerprint: (id: string, signal?: AbortSignal) =>
+    fetchAPI<HttpxFingerprint>(`/httpx/fingerprints/${id}`, { signal }),
+
+  patchHttpxFingerprint: (id: string, data: Partial<Omit<HttpxFingerprint, "id" | "created_at" | "updated_at" | "file_path" | "type">>, signal?: AbortSignal) =>
+    fetchAPI<HttpxFingerprint>(`/httpx/fingerprints/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
+
+  deleteHttpxFingerprint: (id: string, signal?: AbortSignal) =>
+    fetchAPI<void>(`/httpx/fingerprints/${id}`, { method: "DELETE", signal }),
+
+  readHttpxFingerprintContent: (id: string, signal?: AbortSignal) =>
+    request(`/httpx/fingerprints/${id}/content`, { signal }).then((res) => res.text()),
+
+  writeHttpxFingerprintContent: (id: string, content: string, signal?: AbortSignal) =>
+    fetchAPI<HttpxFingerprint>(`/httpx/fingerprints/${id}/content`, { method: "PUT", body: content, signal }),
 };
 
 export interface Run {
@@ -693,6 +749,29 @@ export interface PipelineConfig {
   nuclei_rate_limit_per_min: number; // -rlm: requests per minute (sensitive targets)
   nuclei_concurrency: number; // -c: parallel templates/hosts
   nuclei_scan_depth: string; // "workflow" | "tags" | "both"
+}
+
+export interface Dictionary {
+  id: string;
+  name: string;
+  description?: string;
+  category: "dirscan" | "subdomain" | "vhost" | "custom";
+  file_path: string;
+  line_count: number;
+  size_bytes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HttpxFingerprint {
+  id: string;
+  name: string;
+  description?: string;
+  type: "favicon" | "tech_detect";
+  file_path: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DashboardRunItem {

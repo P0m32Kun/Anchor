@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/dictionary"
 	"github.com/P0m32Kun/Anchor/internal/health"
+	"github.com/P0m32Kun/Anchor/internal/httpxfp"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/nuclei/custom"
 	"github.com/P0m32Kun/Anchor/internal/scope"
@@ -37,6 +39,8 @@ type Server struct {
 	targetSvc       service.TargetService
 	findingSvc      service.FindingService
 	nucleiCustomMgr *custom.Manager
+	dictMgr         *dictionary.Manager
+	httpxFpMgr      *httpxfp.Manager
 }
 
 func generateAPIToken() string {
@@ -74,6 +78,14 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	s.nucleiCustomMgr = custom.NewManager(queries, rawDB, dataDir, custom.ExecCloner{})
 	if err := s.nucleiCustomMgr.EnsureLayout(); err != nil {
 		log.Printf("[server] nuclei custom layout init: %v (continuing)", err)
+	}
+	s.dictMgr = dictionary.NewManager(queries, dataDir)
+	if err := s.dictMgr.EnsureLayout(); err != nil {
+		log.Printf("[server] dictionary layout init: %v (continuing)", err)
+	}
+	s.httpxFpMgr = httpxfp.NewManager(queries, dataDir)
+	if err := s.httpxFpMgr.EnsureLayout(); err != nil {
+		log.Printf("[server] httpx fingerprint layout init: %v (continuing)", err)
 	}
 	s.markAllWorkersOffline()
 	go s.cleanupStaleWorkers()
@@ -254,4 +266,20 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /nuclei/custom/publish", auth(http.HandlerFunc(s.handlePublishNucleiCustom)))
 	mux.Handle("GET /nuclei/custom/manifest", auth(http.HandlerFunc(s.handleGetNucleiCustomManifest)))
 	mux.Handle("GET /nuclei/custom/bundles/{version}", auth(http.HandlerFunc(s.handleDownloadNucleiCustomBundle)))
+	// Dictionaries
+	mux.Handle("GET /dictionaries", auth(http.HandlerFunc(s.handleListDictionaries)))
+	mux.Handle("POST /dictionaries", auth(http.HandlerFunc(s.handleCreateDictionary)))
+	mux.Handle("GET /dictionaries/{id}", auth(http.HandlerFunc(s.handleGetDictionary)))
+	mux.Handle("PATCH /dictionaries/{id}", auth(http.HandlerFunc(s.handlePatchDictionary)))
+	mux.Handle("DELETE /dictionaries/{id}", auth(http.HandlerFunc(s.handleDeleteDictionary)))
+	mux.Handle("GET /dictionaries/{id}/content", auth(http.HandlerFunc(s.handleReadDictionaryContent)))
+	mux.Handle("PUT /dictionaries/{id}/content", auth(http.HandlerFunc(s.handleWriteDictionaryContent)))
+	// HTTPX fingerprints
+	mux.Handle("GET /httpx/fingerprints", auth(http.HandlerFunc(s.handleListHttpxFingerprints)))
+	mux.Handle("POST /httpx/fingerprints", auth(http.HandlerFunc(s.handleCreateHttpxFingerprint)))
+	mux.Handle("GET /httpx/fingerprints/{id}", auth(http.HandlerFunc(s.handleGetHttpxFingerprint)))
+	mux.Handle("PATCH /httpx/fingerprints/{id}", auth(http.HandlerFunc(s.handlePatchHttpxFingerprint)))
+	mux.Handle("DELETE /httpx/fingerprints/{id}", auth(http.HandlerFunc(s.handleDeleteHttpxFingerprint)))
+	mux.Handle("GET /httpx/fingerprints/{id}/content", auth(http.HandlerFunc(s.handleReadHttpxFingerprintContent)))
+	mux.Handle("PUT /httpx/fingerprints/{id}/content", auth(http.HandlerFunc(s.handleWriteHttpxFingerprintContent)))
 }
