@@ -741,7 +741,7 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   naabu_threads: 100,
   naabu_timeout: 5000,
   enable_nmap_service: true,
-  nmap_service_timeout: 600,
+  nmap_service_timeout: 180,
   enable_httpx: true,
   httpx_rate_limit: 150,
   httpx_threads: 50,
