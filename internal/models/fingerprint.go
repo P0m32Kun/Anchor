@@ -12,6 +12,8 @@ type ServiceFingerprint struct {
 	Protocol  string                 `json:"protocol"`
 	IsWeb     bool                   `json:"is_web"`
 	Service   string                 `json:"service"`
+	Product   string                 `json:"product,omitempty"`
+	Version   string                 `json:"version,omitempty"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 	Source    string                 `json:"source"`
 	CreatedAt time.Time              `json:"created_at"`
