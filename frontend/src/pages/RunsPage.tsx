@@ -353,10 +353,23 @@ export default function RunsPage() {
                     )}
                 </div>
             )}
-            <Button variant="primary" onClick={() => setShowScanModal(true)}>
+            <div className="flex items-center gap-3">
+              {!hasTargets && !targetsLoading && (
+                <div className="flex items-center gap-1.5 text-[11px] text-destructive/80 bg-destructive/5 border border-destructive/10 px-2.5 py-1.5 rounded-lg">
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  <span>未添加扫描目标</span>
+                </div>
+              )}
+              <Button
+                variant="primary"
+                onClick={() => setShowScanModal(true)}
+                disabled={!canStartScan}
+                title={!hasTargets ? "请先前往「目标管理」添加扫描目标" : ""}
+              >
                 <Play className="mr-2 h-4 w-4 fill-current" />
                 启动扫描
-            </Button>
+              </Button>
+            </div>
         </div>
       </div>
 
