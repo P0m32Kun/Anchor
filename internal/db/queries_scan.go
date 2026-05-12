@@ -452,21 +452,23 @@ func (q *Queries) ListCDNResultsByProject(projectID string) ([]*models.CDNResult
 func (q *Queries) SaveServiceFingerprint(r *models.ServiceFingerprint) error {
 	metaJSON, _ := json.Marshal(r.Metadata)
 	_, err := q.db.Exec(`
-		INSERT INTO service_fingerprints (id, project_id, ip, port, protocol, is_web, service, metadata, source, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO service_fingerprints (id, project_id, ip, port, protocol, is_web, service, product, version, metadata, source, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(project_id, ip, port) DO UPDATE SET
 			protocol = excluded.protocol,
 			is_web = excluded.is_web,
 			service = excluded.service,
+			product = excluded.product,
+			version = excluded.version,
 			metadata = excluded.metadata,
 			source = excluded.source,
 			created_at = excluded.created_at
-	`, r.ID, r.ProjectID, r.IP, r.Port, r.Protocol, r.IsWeb, r.Service, string(metaJSON), r.Source, r.CreatedAt)
+	`, r.ID, r.ProjectID, r.IP, r.Port, r.Protocol, r.IsWeb, r.Service, r.Product, r.Version, string(metaJSON), r.Source, r.CreatedAt)
 	return err
 }
 
 func (q *Queries) ListServiceFingerprintsByProject(projectID string) ([]*models.ServiceFingerprint, error) {
-	rows, err := q.db.Query(`SELECT id, project_id, ip, port, protocol, is_web, service, metadata, source, created_at FROM service_fingerprints WHERE project_id = ?`, projectID)
+	rows, err := q.db.Query(`SELECT id, project_id, ip, port, protocol, is_web, service, product, version, metadata, source, created_at FROM service_fingerprints WHERE project_id = ?`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -475,7 +477,7 @@ func (q *Queries) ListServiceFingerprintsByProject(projectID string) ([]*models.
 	for rows.Next() {
 		r := &models.ServiceFingerprint{}
 		var metaJSON string
-		if err := rows.Scan(&r.ID, &r.ProjectID, &r.IP, &r.Port, &r.Protocol, &r.IsWeb, &r.Service, &metaJSON, &r.Source, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.IP, &r.Port, &r.Protocol, &r.IsWeb, &r.Service, &r.Product, &r.Version, &metaJSON, &r.Source, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(metaJSON), &r.Metadata); err != nil {
