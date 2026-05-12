@@ -730,7 +730,7 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   enable_subfinder: true,
   subfinder_rate_limit: 50,
   subfinder_threads: 10,
-  subfinder_timeout: 300,
+  subfinder_timeout: 30,
   enable_dnsx: true,
   dnsx_rate_limit: 100,
   dnsx_threads: 50,
