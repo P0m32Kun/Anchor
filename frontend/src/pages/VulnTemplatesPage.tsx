@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { api, type FindingTemplate } from "../lib/api";
+import { api, type FindingTemplate, API_BASE } from "../lib/api";
+import { getApiToken } from "../lib/config";
 import {
   useToast,
   Button,
@@ -16,7 +17,7 @@ import {
   ConfirmDialog,
   EmptyState,
 } from "../components";
-import { ShieldAlert, Plus, Trash2, Settings2 } from "lucide-react";
+import { ShieldAlert, Plus, Trash2, Settings2, Download, RotateCcw, Lock } from "lucide-react";
 
 const SOURCE_TOOL_OPTIONS = [
   "nuclei",
