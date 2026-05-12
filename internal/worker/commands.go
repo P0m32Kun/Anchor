@@ -167,7 +167,7 @@ func BuildNucleiCustomCommand(targetFile, profile string, rateLimit int, tags []
 // BuildNmapServiceScanCommand builds an nmap -sV command for service fingerprinting.
 // hostFile should contain one host per line; ports is the list of ports to scan.
 // Output is XML to stdout for reliable parsing.
-func BuildNmapServiceScanCommand(hostFile string, ports []int) []string {
+func BuildNmapServiceScanCommand(hostFile string, ports []int, hostTimeout int) []string {
 	portStrs := make([]string, len(ports))
 	for i, p := range ports {
 		portStrs[i] = fmt.Sprintf("%d", p)
