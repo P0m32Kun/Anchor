@@ -52,7 +52,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		EnableSubfinder:          true,
 		SubfinderRateLimit:       50,
 		SubfinderThreads:         10,
-		SubfinderTimeout:         300,
+		SubfinderTimeout:         30, // seconds; aligns with subfinder CLI default
 		EnableDNSx:               true,
 		DNSxRateLimit:            100,
 		DNSxThreads:              50,
