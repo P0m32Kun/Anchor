@@ -22,7 +22,7 @@ This is the only repository-wide implementation plan that agents should treat as
 | --- | --- | --- | --- |
 | Documentation governance | Active | Yes | Consolidate navigation, mark document lifecycle, reduce agent confusion |
 | Current architecture baseline | Active | Yes | Defined in [`architecture.md`](architecture.md) |
-| v0.4 scan pipeline | Accepted | Yes | Verified by `docs/active/review/v0.4-acceptance.md`; design doc `docs/design/v0.4-scan-pipeline.md` is `accepted` |
+| v0.4 scan pipeline | Accepted | Yes | Verified by `docs/active/review/v0.4-acceptance.md`; design doc archived at `docs/archived/v0.4/scan-pipeline.md` (superseded 2026-05-12, see `architecture.md` for current baseline) |
 | Database migration notes for v0.4 | Accepted | Yes | Tied to v0.4; superseded plans now archived |
 | Large-scale refactoring | Backlog | No | See [`../refactoring-plan.md`](../refactoring-plan.md) as an idea pool, not an approved release plan |
 
