@@ -365,7 +365,7 @@ func TestFilterTargetsWithRules(t *testing.T) {
 			t.Fatalf("expected error for oversized CIDR, got nil")
 		}
 		// Sanity: error should mention the CIDR.
-		if got := err.Error(); !contains(got, "10.0.0.0/15") || !contains(got, "host bits") {
+		if got := err.Error(); !strings.Contains(got, "10.0.0.0/15") || !strings.Contains(got, "host bits") {
 			t.Errorf("error message should mention CIDR and host bits, got: %s", got)
 		}
 	})
