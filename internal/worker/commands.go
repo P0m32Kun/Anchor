@@ -184,7 +184,7 @@ func BuildNmapServiceScanCommand(hostFile string, ports []int) []string {
 // BuildDNSxCommand builds a dnsx command for DNS resolution.
 // hostFile should contain one host per line.
 // recordTypes can be a list of record types (e.g. ["a", "aaaa", "cname"]).
-func BuildDNSxCommand(hostFile string, recordTypes []string, rateLimit, threads int) []string {
+func BuildDNSxCommand(hostFile string, recordTypes []string, rateLimit, threads, timeout int) []string {
 	args := []string{"dnsx", "-l", hostFile, "-json"}
 
 	if len(recordTypes) > 0 {
