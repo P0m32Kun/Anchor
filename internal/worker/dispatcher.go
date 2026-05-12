@@ -124,10 +124,24 @@ func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, wo
 		return fmt.Errorf("worker rejected task: %s", resp.Status)
 	}
 
-	// Poll for task completion (up to 10 minutes).
-	ticker := time.NewTicker(2 * time.Second)
+	// Poll for task completion. The server trusts the worker's heartbeat
+	// mechanism: as long as the worker keeps reporting health (the API-server
+	// watchdog marks it offline after ~120s of missed heartbeats), we keep
+	// polling. A hard ceiling acts as a safety net — aligned with the worker's
+	// own RunningTimeout ceiling (3h for naabu / 60min for nuclei) plus
+	// headroom.
+	const (
+		pollInterval        = 2 * time.Second
+		workerCheckInterval = 30 * time.Second
+		maxPollWindow       = 4 * time.Hour
+	)
+	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
-	timeout := time.After(10 * time.Minute)
+	workerCheck := time.NewTicker(workerCheckInterval)
+	defer workerCheck.Stop()
+	hardDeadline := time.After(maxPollWindow)
+	startTime := time.Now()
+	log.Printf("[dispatcher] polling task %s on worker %s (max %v, heartbeat-aware)", task.ID, worker.ID, maxPollWindow)
 
 	for {
 		select {
@@ -142,8 +156,23 @@ func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, wo
 			if t.Status == models.TaskFailed || t.Status == models.TaskScopeDenied || t.Status == models.TaskCancelled {
 				return fmt.Errorf("task %s finished with status: %s", task.ID, t.Status)
 			}
-		case <-timeout:
-			return fmt.Errorf("task %s timeout waiting for worker", task.ID)
+		case <-workerCheck.C:
+			// Trust the heartbeat watchdog: if the API server's background
+			// goroutine has already marked this worker offline (heartbeat lost
+			// > 120s), the task is effectively orphaned — give up and let the
+			// runner retry on another worker.
+			w, err := d.queries.GetWorkerNode(worker.ID)
+			if err != nil || w == nil {
+				continue
+			}
+			if w.Status == models.WorkerStatusOffline {
+				// Include "worker unreachable" so isUnreachableError matches.
+				return fmt.Errorf("task %s: worker %s heartbeat lost (worker unreachable) after %v", task.ID, worker.ID, time.Since(startTime).Round(time.Second))
+			}
+		case <-hardDeadline:
+			// Hard safety ceiling reached. Worker may still be running — this
+			// is NOT an unreachability error, it's a server-side give-up.
+			return fmt.Errorf("task %s exceeded %v server-side poll deadline on worker %s (worker may still be executing; check worker logs)", task.ID, maxPollWindow, worker.ID)
 		case <-ctx.Done():
 			return fmt.Errorf("task %s cancelled", task.ID)
 		}
