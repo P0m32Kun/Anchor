@@ -36,7 +36,6 @@ import {
   Download,
   ChevronDown,
   Trash2,
-  Target
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
