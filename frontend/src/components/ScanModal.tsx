@@ -76,7 +76,7 @@ const BASE_TOOL_FIELDS: { group: string; fields: ToolField[]; icon: any }[] = [
     fields: [
       { key: "naabu_rate", label: "发包速率", unit: "pps", min: 100, max: 10000, recommended: 1000 },
       { key: "naabu_threads", label: "并发线程", unit: "", min: 10, max: 500, recommended: 100 },
-      { key: "naabu_timeout", label: "超时", unit: "秒", min: 30, max: 3600, recommended: 600 },
+      { key: "naabu_timeout", label: "超时", unit: "毫秒", min: 1000, max: 60000, recommended: 5000 },
     ],
   },
   {
