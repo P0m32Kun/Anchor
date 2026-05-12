@@ -163,7 +163,7 @@ func (p *Pipeline) runDNSx(ctx context.Context, domains []string) ([]models.DNSR
 		hostFile = abs
 	}
 
-	cmd := worker.BuildDNSxCommand(hostFile, nil, p.config.DNSxRateLimit, p.config.DNSxThreads)
+	cmd := worker.BuildDNSxCommand(hostFile, nil, p.config.DNSxRateLimit, p.config.DNSxThreads, p.config.DNSxTimeout)
 	task, stdout, err := p.createAndRunTask(ctx, "dnsx", cmd)
 	if err != nil {
 		return nil, err
