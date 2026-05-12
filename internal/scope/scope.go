@@ -324,3 +324,86 @@ func (e *Engine) matchIP(ipStr string, rule *models.ScopeRule) bool {
 	}
 	return false
 }
+
+// MaxCIDRHostBits caps how wide a CIDR FilterTargets is willing to expand.
+// 16 host bits == /16 == 65,536 IPs == ~1 MiB of strings, which is safe in
+// memory and reasonable for an internal-network scan. Anything wider (e.g.
+// 0.0.0.0/0) is rejected explicitly with an actionable error instead of
+// silently OOM-ing the server.
+const MaxCIDRHostBits = 16
+
+// FilterTargets is the single scope-enforcement entry point for the scan
+// pipeline. It performs three jobs in one place so every downstream tool
+// (nmap / naabu / httpx / nuclei) can consume the result without knowing
+// scope rules exist:
+//
+//  1. CIDR-mask sanity check: refuse to expand subnets larger than /16
+//     (~65k hosts) to bound memory usage.
+//  2. CIDR expansion: replace each `cidr` Target with the underlying
+//     `ip` Targets (using ExpandCIDR's existing network/broadcast trim).
+//  3. Rule evaluation: drop any Target denied by the project's ScopeRules
+//     (exclude rules win over include rules; default is deny unless an
+//     include rule matches).
+//
+// `company` Targets are passed through unevaluated — they're expanded later
+// in runCompanyFlow via FOFA, which re-enters Check on each derived target.
+//
+// Decisions are NOT persisted here (Check / ValidateBeforeRun handle that
+// when individual tools call them). FilterTargets is a pure filter so the
+// pipeline can run it once at the entry and rely on the result.
+func (e *Engine) FilterTargets(ctx context.Context, projectID string, targets []*models.Target) ([]*models.Target, error) {
+	rules, err := e.queries.ListScopeRulesByProject(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("list scope rules: %w", err)
+	}
+
+	out := make([]*models.Target, 0, len(targets))
+	for _, t := range targets {
+		if t == nil {
+			continue
+		}
+		switch t.Type {
+		case models.TargetTypeCIDR:
+			// Mask sanity check before we allocate any memory for expansion.
+			_, ipnet, err := net.ParseCIDR(t.Value)
+			if err != nil {
+				return nil, fmt.Errorf("parse CIDR %q: %w", t.Value, err)
+			}
+			ones, bits := ipnet.Mask.Size()
+			hostBits := bits - ones
+			if hostBits > MaxCIDRHostBits {
+				return nil, fmt.Errorf("CIDR %s is too large (%d host bits, limit is /%d): refuse to expand to avoid OOM", t.Value, hostBits, bits-MaxCIDRHostBits)
+			}
+
+			ips, err := ExpandCIDR(t.Value)
+			if err != nil {
+				return nil, fmt.Errorf("expand CIDR %q: %w", t.Value, err)
+			}
+			for _, ip := range ips {
+				expanded := &models.Target{
+					ID:        t.ID, // reference parent CIDR for traceability
+					ProjectID: t.ProjectID,
+					Type:      models.TargetTypeIP,
+					Value:     ip,
+					Source:    t.Source,
+					Status:    t.Status,
+					CreatedAt: t.CreatedAt,
+				}
+				decision, _, _ := e.evaluate(expanded, rules)
+				if decision == models.ScopeAllow {
+					out = append(out, expanded)
+				}
+			}
+		case models.TargetTypeCompany:
+			// Pass through — FOFA expansion happens later, scope check
+			// runs on each derived domain/ip then.
+			out = append(out, t)
+		default:
+			decision, _, _ := e.evaluate(t, rules)
+			if decision == models.ScopeAllow {
+				out = append(out, t)
+			}
+		}
+	}
+	return out, nil
+}
