@@ -31,7 +31,7 @@
 
 ### 已知遗留
 
-- `docs/design/v0.4-scan-pipeline.md` 第 5.1 节默认值示例仍是旧字段名(`dns_concurrency`/`port_scan_*`/`nerva_*`),且默认值是旧值。属于历史设计文档过期,需要单独清理,本次未动。
+无。`docs/design/v0.4-scan-pipeline.md` 和 `docs/design/v0.4-migrations.md` 因字段名与实现脱节,已同步归档到 `docs/archived/v0.4/scan-pipeline.md` 和 `migrations.md`(标记 `status: superseded`)。设计索引 `docs/design/README.md`、`docs/current/design/README.md`、`docs/current/plan.md` 中的引用已更新。
 
 ---
 
