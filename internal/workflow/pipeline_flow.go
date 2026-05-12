@@ -370,64 +370,11 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 	return nil
 }
 
-// runCIDRFlow: nmap-alive → Naabu → nmap -sV → split → httpx → Nuclei.
-func (p *Pipeline) runCIDRFlow(ctx context.Context, targets []*models.Target) error {
-	cidrs := extractTargetValues(targets)
-
-	// Alive check via nmap (nmap expands CIDR and filters dead IPs)
-	p.setStage(StageAlive)
-	aliveIPs, aliveErr := p.runNmapAlive(ctx, cidrs)
-	if aliveErr != nil {
-		log.Printf("nmap alive: %v", aliveErr)
-		p.failStage(StageAlive, aliveErr.Error())
-		aliveIPs = cidrs
-	} else {
-		if len(aliveIPs) == 0 && len(cidrs) > 0 {
-			log.Printf("[pipeline] nmap reported 0 alive, falling back to %d CIDR inputs", len(cidrs))
-			aliveIPs = cidrs
-		}
-		p.completeStage(StageAlive)
-	}
-
-	// Port scan
-	p.setStage(StagePortScan)
-	ports, err := p.runNaabu(ctx, aliveIPs)
-	if err != nil {
-		log.Printf("naabu: %v", err)
-		p.failStage(StagePortScan, err.Error())
-	} else {
-		p.completeStage(StagePortScan)
-	}
-
-	// Service fingerprint (nmap -sV)
-	p.setStage(StageFingerprint)
-	var fpResults []fingerprint.NmapServiceResult
-	if p.config.EnableNmapService && len(ports) > 0 {
-		fpResults, err = p.runNmapServiceScan(ctx, ports)
-		if err != nil {
-			log.Printf("nmap -sV: %v", err)
-			p.failStage(StageFingerprint, err.Error())
-		} else {
-			p.completeStage(StageFingerprint)
-		}
-	} else {
-		p.completeStage(StageFingerprint)
-	}
-
-	p.saveFingerprints(fpResults)
-
-	// Fallback: if nmap produced no results, feed naabu ports directly to httpx.
-	var extraHTTPXTargets []string
-	if len(fpResults) == 0 && len(ports) > 0 {
-		for _, port := range ports {
-			extraHTTPXTargets = append(extraHTTPXTargets, fmt.Sprintf("%s:%d", port.IP, port.Port))
-		}
-	}
-
-	p.runHTTPXAndNuclei(ctx, fpResults, extraHTTPXTargets)
-
-	return nil
-}
+// runCIDRFlow was removed in favor of single-point scope filtering: see
+// scope.Engine.FilterTargets, which now expands CIDR Targets to atomic IP
+// Targets at the pipeline entry. Subsequent processing reuses runIPFlow.
+// runFlow's TargetTypeCIDR case is a guard against any caller that bypasses
+// the entry filter.
 
 // runURLFlow: httpx → Nuclei.
 func (p *Pipeline) runURLFlow(ctx context.Context, targets []*models.Target) error {
