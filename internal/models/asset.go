@@ -85,6 +85,8 @@ type ServicePort struct {
 	Protocol     string    `json:"protocol"`
 	State        string    `json:"state"`
 	ServiceName  string    `json:"service_name"`
+	Product      string    `json:"product,omitempty"`
+	Version      string    `json:"version,omitempty"`
 	Title        string    `json:"title"`
 	Technologies []string  `json:"technologies"`
 	URL          string    `json:"url"`
