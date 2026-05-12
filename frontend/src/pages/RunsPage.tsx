@@ -55,6 +55,8 @@ export default function RunsPage() {
   const runs = useStore((state) => state.runs) ?? [];
   const setRuns = useStore((state) => state.setRuns);
   const setRunsError = useStore((state) => state.setRunsError);
+  const targets = useStore((state) => state.targets) ?? [];
+  const setTargets = useStore((state) => state.setTargets);
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
   const [tasks, setTasks] = useState<ScanTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
