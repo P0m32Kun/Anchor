@@ -767,9 +767,6 @@ export interface PipelineConfig {
   nuclei_rate_limit_per_min: number; // -rlm: requests per minute (sensitive targets)
   nuclei_concurrency: number; // -c: parallel templates/hosts
   nuclei_scan_depth: string; // "workflow" | "tags" | "both"
-  enable_urlfinder: boolean;
-  urlfinder_rate_limit: number;
-  urlfinder_timeout: number;
   enable_ffuf: boolean;
   ffuf_rate_limit: number;
   ffuf_timeout: number;
@@ -784,6 +781,7 @@ export interface Dictionary {
   file_path: string;
   line_count: number;
   size_bytes: number;
+  builtin: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -870,48 +868,35 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   nuclei_rate_limit_per_min: 0,
   nuclei_concurrency: 25,
   nuclei_scan_depth: "tags",
-  enable_urlfinder: true,
-  urlfinder_rate_limit: 6,
-  urlfinder_timeout: 30,
   enable_ffuf: true,
   ffuf_rate_limit: 6,
   ffuf_timeout: 30,
   ffuf_dictionary_id: "",
 };
 
-export interface PortRangePreset {
-  value: string;
-  label: string;
-  description: string;
-}
+// Mirrors internal/worker/commands.go:HighRiskPorts — curated list of high-value
+// attack-surface ports (Redis/ES/MongoDB/Docker/K8s/Ollama, …) that Naabu's
+// built-in top-N presets miss. Used as the default pre-fill for the -p custom
+// port input.
+export const DEFAULT_HIGH_RISK_PORTS =
+  "21,22,23,25,53,80,81,88,110,135,139,143,389,443,445,465,587,636,873,993,995," +
+  "1080,1099,1433,1521,1723,2049,2082,2375,2376,2480,3000,3128,3306,3389," +
+  "4040,4194,4369,4444,4848,5000,5432,5601,5672,5900,5901,5984,6379,6443," +
+  "7000,7001,7002,7077,7474,8000,8001,8008,8009,8020,8060,8080,8081,8086,8088,8090,8161,8200,8443,8500,8531,8888,8983," +
+  "9000,9001,9042,9043,9060,9080,9090,9091,9092,9100,9200,9300,9418,9443,9981," +
+  "10000,10250,10255,11211,11434,15672,15692,16379,18091," +
+  "27017,27018,27019,28017,50000,50070,50075,61613,61616";
 
-export const PORT_RANGE_PRESETS: PortRangePreset[] = [
-  {
-    value: "top100",
-    label: "Top 100 常用端口",
-    description: "Naabu 默认快扫，覆盖 Web/SSH/SMB 等高频服务",
-  },
-  {
-    value: "top1000",
-    label: "Top 1000 常用端口",
-    description: "更广覆盖，但漏掉 Redis 6379、ES 9200、Kubelet 10250 等",
-  },
-  {
-    value: "high-risk",
-    label: "高危端口（推荐）",
-    description: "115 个攻击面端口，覆盖 Redis/ES/MongoDB/Docker/K8s/Ollama 等高价值目标",
-  },
-  {
-    value: "full",
-    label: "全端口（1-65535）",
-    description: "最完整但最慢，建议仅在内网或小范围使用",
-  },
-  {
-    value: "custom",
-    label: "自定义",
-    description: "手动指定端口，例如 80,443,8080 或 1-1000",
-  },
-];
+// Maps to naabu's -tp flag values supported by the backend (see
+// internal/worker/commands.go:BuildNaabuCommand).
+export const TP_PRESET_VALUES = ["top100", "top1000", "full"] as const;
+export type TpPresetValue = (typeof TP_PRESET_VALUES)[number];
+
+export const TP_PRESET_LABELS: Record<TpPresetValue, string> = {
+  top100: "Top 100 常用端口",
+  top1000: "Top 1000 常用端口",
+  full: "全端口 (1-65535)",
+};
 
 // --- Engine Search ---
 

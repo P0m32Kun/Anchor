@@ -83,6 +83,13 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	if err := s.dictMgr.EnsureLayout(); err != nil {
 		log.Printf("[server] dictionary layout init: %v (continuing)", err)
 	}
+	builtinDictRoot := os.Getenv("ANCHOR_BUILTIN_DICT_ROOT")
+	if builtinDictRoot == "" {
+		builtinDictRoot = "/opt/dict"
+	}
+	if err := s.dictMgr.SeedBuiltin(builtinDictRoot); err != nil {
+		log.Printf("[server] dictionary builtin seed: %v (continuing)", err)
+	}
 	s.httpxFpMgr = httpxfp.NewManager(queries, dataDir)
 	if err := s.httpxFpMgr.EnsureLayout(); err != nil {
 		log.Printf("[server] httpx fingerprint layout init: %v (continuing)", err)

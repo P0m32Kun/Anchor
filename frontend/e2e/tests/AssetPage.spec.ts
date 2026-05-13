@@ -1,17 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createProject } from "../fixtures/api-helpers";
-import { cleanupTestData } from "../fixtures/db-utils";
-
-async function setCurrentProject(page: any, projectId: string) {
-	await page.goto("/");
-	await page.evaluate((id: string) => {
-		localStorage.setItem(
-			"app-store",
-			JSON.stringify({ state: { currentProjectId: id }, version: 0 }),
-		);
-	}, projectId);
-	await page.reload();
-}
+import { cleanupTestData, setCurrentProject } from "../fixtures/db-utils";
 
 test.describe
 	.serial("AssetPage", () => {
@@ -23,33 +12,55 @@ test.describe
 			await cleanupTestData();
 		});
 
-		test("TC-1: 页面加载并显示资产清单", async ({ page }) => {
+		test("空状态：无资产时显示引导文案", async ({ page }) => {
 			const project = await createProject({
-				name: "Asset Test Project",
+				name: "Asset Empty Project",
 				organization: "Test Org",
-				purpose: "Asset testing",
+				purpose: "Asset empty state",
 			});
 			await setCurrentProject(page, project.id);
 
 			await page.goto("/assets");
 			await expect(page).toHaveURL(/\/projects\/.*\/assets/);
+			// 标题可见
 			await expect(page.getByText("资产清单")).toBeVisible();
+			// 空状态文案存在（EmptyState 渲染为 <h3>）
+			await expect(
+				page.getByRole("heading", { name: "未找到资产" }),
+			).toBeVisible();
 		});
 
-		test("TC-2: 筛选输入框可用", async ({ page }) => {
+		test("切换标签页：资产 / Web / 端口三个 tab 均可点击", async ({
+			page,
+		}) => {
 			const project = await createProject({
-				name: "Asset Filter Project",
+				name: "Asset Tabs Project",
 				organization: "Test Org",
-				purpose: "Asset filter testing",
+				purpose: "Asset tab switching",
 			});
 			await setCurrentProject(page, project.id);
 
 			await page.goto("/assets");
 			await expect(page).toHaveURL(/\/projects\/.*\/assets/);
 
-			await page.getByPlaceholder("筛选资产值...").fill("test-asset");
-			await expect(page.getByPlaceholder("筛选资产值...")).toHaveValue(
-				"test-asset",
-			);
+			// 三个 tab 默认显示
+			const tabs = ["资产", "Web", "端口"];
+			for (const name of tabs) {
+				await expect(
+					page.getByRole("button", { name }).first(),
+				).toBeVisible();
+			}
+
+			// 切换到 Web tab
+			await page.getByRole("button", { name: "Web" }).first().click();
+			await expect(
+				page.getByRole("heading", { name: "未找到 Web 端点" }),
+			).toBeVisible();
+
+			// 切换到端口 tab
+			await page.getByRole("button", { name: "端口" }).first().click();
+			await expect(
+				page.getByRole("heading", { name: "未探测到端口" }),
+			).toBeVisible();
 		});
 	});

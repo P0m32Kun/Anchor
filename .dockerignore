@@ -15,6 +15,7 @@ bin/
 
 # Documentation
 docs/
+!docs/templates/
 *.md
 
 # Scripts and config

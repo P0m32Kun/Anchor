@@ -15,10 +15,14 @@ agent-browser screenshot
 ### Expected Results
 - [ ] Page title "Settings" visible
 - [ ] "Server 地址" section with input + buttons
-- [ ] "扫描配置" section with port range dropdown
+- [ ] "API Token" section with input + show/hide toggle
 - [ ] "本地 Worker 自动启动" toggle (Tauri mode only)
 - [ ] "数据目录" info (Tauri mode only)
 - [ ] "版本" info visible
+
+> 端口扫描配置已下沉到 ScanModal 内部(-tp 预设 / -p 自定义),不再出现在 Settings 页;
+> ScanModal 端口 UI 的 E2E 覆盖见 `qa-regression.spec.ts`、`full-flow.spec.ts`、
+> `high-risk-pipeline.spec.ts`、`internal-scan-live.spec.ts`。
 
 ## Test 2: Server URL save/reset
 
@@ -47,34 +51,7 @@ agent-browser screenshot
 - [ ] Page reloads after save
 - [ ] Reset restores default URL
 
-## Test 3: Port range configuration
-
-### Steps
-
-```bash
-agent-browser navigate http://localhost:1420/settings
-
-# Change dropdown selection
-agent-browser click "端口范围"
-agent-browser click "Top 1000 常用端口"
-agent-browser screenshot
-
-# Select custom
-agent-browser click "端口范围"
-agent-browser click "自定义"
-agent-browser screenshot
-
-# Custom input should appear
-agent-browser type "自定义端口" "80,443,8080"
-agent-browser screenshot
-```
-
-### Expected Results
-- [ ] Dropdown changes selection
-- [ ] Custom input appears when "自定义" selected
-- [ ] Input accepts text
-
-## Test 4: DISABLED buttons must be documented
+## Test 3: DISABLED buttons must be documented
 
 ### Steps
 
@@ -84,9 +61,6 @@ agent-browser snapshot
 ```
 
 ### Expected Results
-- [ ] "保存扫描配置" button is DISABLED
-  - Reason: Requires current project ID to call API
-  - TODO: Wire to actual API when project context is available
 - [ ] "本地 Worker 自动启动" toggle is static UI only
   - Reason: No state binding implemented
   - TODO: Connect to Tauri store or config

@@ -1,17 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { setCurrentProject } from "./fixtures/db-utils";
 
 const INTERNAL_PROJECT_ID = "id-1777974377683904884-35";
-
-async function setCurrentProject(page: any, projectId: string) {
-	await page.goto("/");
-	await page.evaluate((id: string) => {
-		localStorage.setItem(
-			"app-store",
-			JSON.stringify({ state: { currentProjectId: id }, version: 0 }),
-		);
-	}, projectId);
-	await page.reload();
-}
 
 test("内网真实目标 - 验证 Nuclei 参数传到 worker", async ({ page }) => {
 	test.setTimeout(60000);

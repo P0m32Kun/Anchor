@@ -2,9 +2,10 @@ package db
 
 import "database/sql"
 
-// migrateV17 creates the slow_scan_tasks table for background slow scanning
-// (urlfinder + ffuf). These tasks run after the main pipeline completes and
-// feed discovered URLs back into the httpx -> nuclei loop.
+// migrateV17 creates the slow_scan_tasks table for background slow scanning.
+// Originally hosted urlfinder + ffuf; urlfinder has since been removed (see
+// 2026-05-13 cleanup). The CHECK still accepts 'urlfinder' so historical rows
+// from older runs remain readable — new code only emits 'ffuf'.
 func migrateV17(db *sql.DB) error {
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS slow_scan_tasks (

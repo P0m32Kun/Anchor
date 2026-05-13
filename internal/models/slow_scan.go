@@ -5,8 +5,7 @@ import "time"
 type SlowScanTool string
 
 const (
-	SlowScanToolUrlfinder SlowScanTool = "urlfinder"
-	SlowScanToolFfuf      SlowScanTool = "ffuf"
+	SlowScanToolFfuf SlowScanTool = "ffuf"
 )
 
 type SlowScanStatus string

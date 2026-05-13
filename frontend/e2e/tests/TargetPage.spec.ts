@@ -1,17 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createProject } from "../fixtures/api-helpers";
-import { cleanupTestData } from "../fixtures/db-utils";
-
-async function setCurrentProject(page: any, projectId: string) {
-	await page.goto("/");
-	await page.evaluate((id: string) => {
-		localStorage.setItem(
-			"app-store",
-			JSON.stringify({ state: { currentProjectId: id }, version: 0 }),
-		);
-	}, projectId);
-	await page.reload();
-}
+import { cleanupTestData, setCurrentProject } from "../fixtures/db-utils";
 
 test.describe
 	.serial("TargetPage", () => {

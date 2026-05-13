@@ -232,3 +232,44 @@ export async function healthCheck(): Promise<{ status: string }> {
 	const res = await apiFetch("/health");
 	return res.json();
 }
+
+// --- Pipeline / Scan ---
+
+/**
+ * Wait for a scan pipeline to complete by polling the pipeline status endpoint.
+ *
+ * 1. Fetches the list of scan runs for the project to get the most recent run ID
+ * 2. Polls `/projects/:id/pipeline/runs/:runId` every 5 seconds until status
+ *    transitions away from "running" or "pending"
+ * 3. Returns the final status
+ *
+ * @throws if no scan run is found for the project
+ */
+export async function waitForPipeline(
+	projectId: string,
+	timeoutMs: number = 20 * 60 * 1000,
+): Promise<{ runId: string; status: string }> {
+	// 1. Get the most recent scan run ID
+	const listRes = await apiFetch(`/projects/${projectId}/scan/runs`);
+	const listBody = await listRes.json();
+	const runs: Array<{ id: string }> = Array.isArray(listBody)
+		? listBody
+		: (listBody.data ?? []);
+	const runId = runs[0]?.id;
+	if (!runId) throw new Error(`No scan runs found for project ${projectId}`);
+
+	// 2. Poll until completion
+	const start = Date.now();
+	let status = "running";
+	while ((status === "running" || status === "pending") && Date.now() - start < timeoutMs) {
+		await sleep(5_000);
+		const res = await apiFetch(`/projects/${projectId}/pipeline/runs/${runId}`);
+		const d = (await res.json()) as { status: string };
+		status = d.status;
+	}
+	return { runId, status };
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}

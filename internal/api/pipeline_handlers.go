@@ -356,17 +356,19 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 				})
 			})
 
+		// Pipeline.Run() owns pipeline_runs.status / error / completed_at —
+		// it writes the final state internally (failed if any main-flow stage
+		// failed, completed otherwise). The handler only needs to log if Run
+		// returned an error and emit the SSE completion event so the UI
+		// reloads run details.
 		if err := pipeline.Run(ctx, projectID); err != nil {
 			log.Printf("scan run %s for project %s: %v", runID, projectID, err)
-			s.queries.UpdatePipelineRunError(runID, err.Error())
 		}
-		completedAt := time.Now().UTC()
-		s.queries.UpdatePipelineRunCompleted(runID, completedAt)
 
 		s.broadcastProjectSSE(projectID, map[string]interface{}{
 			"event":  "pipeline_complete",
 			"run_id": runID,
-			"time":   completedAt.Format(time.RFC3339),
+			"time":   time.Now().UTC().Format(time.RFC3339),
 		})
 	}()
 

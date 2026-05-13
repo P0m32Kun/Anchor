@@ -43,13 +43,10 @@ type PipelineConfig struct {
 	NucleiConcurrency        int    `json:"nuclei_concurrency"`        // -c: parallel templates/hosts
 	NucleiScanDepth          string `json:"nuclei_scan_depth"`         // "workflow" | "tags" | "both"
 	// Slow scanning tools
-	EnableUrlfinder    bool   `json:"enable_urlfinder"`
-	UrlfinderRateLimit int    `json:"urlfinder_rate_limit"`   // rpm
-	UrlfinderTimeout   int    `json:"urlfinder_timeout"`      // seconds
-	EnableFfuf         bool   `json:"enable_ffuf"`
-	FfufRateLimit      int    `json:"ffuf_rate_limit"`        // rps
-	FfufTimeout        int    `json:"ffuf_timeout"`           // seconds
-	FfufDictionaryID   string `json:"ffuf_dictionary_id"`     // optional
+	EnableFfuf       bool   `json:"enable_ffuf"`
+	FfufRateLimit    int    `json:"ffuf_rate_limit"`        // rps
+	FfufTimeout      int    `json:"ffuf_timeout"`           // seconds
+	FfufDictionaryID string `json:"ffuf_dictionary_id"`     // optional
 }
 
 func DefaultPipelineConfig() PipelineConfig {
@@ -81,12 +78,9 @@ func DefaultPipelineConfig() PipelineConfig {
 		NucleiConcurrency:        25,
 		NucleiScanDepth:          "tags",
 		// Slow scanning defaults — very low rate for background operation
-		EnableUrlfinder:    true,
-		UrlfinderRateLimit: 6, // ~1 req/10s
-		UrlfinderTimeout:   30,
-		EnableFfuf:         true,
-		FfufRateLimit:      6, // rps
-		FfufTimeout:        30,
-		FfufDictionaryID:   "",
+		EnableFfuf:       true,
+		FfufRateLimit:    6, // rps
+		FfufTimeout:      30,
+		FfufDictionaryID: "",
 	}
 }

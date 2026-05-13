@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse, PAGE_ALL } from "../lib/api";
+import { api, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse, type ScopeRule, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
 import { useResource } from "../hooks";
 import {
@@ -36,7 +36,9 @@ import {
   Zap,
   FileUp,
   X,
-  Users
+  Users,
+  Ban,
+  Check
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -227,6 +229,30 @@ export default function TargetPage() {
   const targets = useStore((state) => state.targets) ?? [];
   const toast = useToast();
 
+  const [scopeRules, setScopeRules] = useState<ScopeRule[]>([]);
+
+  const { excludedRules, includedRules } = useMemo(() => {
+    const excluded: ScopeRule[] = [];
+    const included: ScopeRule[] = [];
+    for (const r of scopeRules) {
+      if (r.action === "exclude") excluded.push(r);
+      else included.push(r);
+    }
+    return { excludedRules: excluded, includedRules: included };
+  }, [scopeRules]);
+
+  const {
+    reload: loadScopeRules,
+  } = useResource(
+    async (signal) => {
+      if (!projectId) return;
+      const data = await api.listScopeRules(projectId, PAGE_ALL, signal);
+      setScopeRules(data.data ?? []);
+    },
+    [projectId],
+    undefined
+  );
+
   const {
     loading,
     error,
@@ -302,6 +328,7 @@ export default function TargetPage() {
       });
       // 等待后端 SQLite WAL 刷新，确保新规则对后续查询可见
       await new Promise((r) => setTimeout(r, 500));
+      await loadScopeRules();
       const t = await api.createTarget(projectId, { type: pendingType, value: pendingValue });
       if ("needs_scope_confirmation" in t && t.needs_scope_confirmation) {
         toast("Scope 规则已添加，但目标仍需要确认，请手动检查。", "warning");
@@ -318,6 +345,14 @@ export default function TargetPage() {
     }
   };
 
+  const inferScopeType = (value: string): string => {
+    const v = value.trim();
+    if (v.includes("/")) return "cidr";
+    if (/^https?:\/\//i.test(v)) return "url";
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(v)) return "ip";
+    return "domain";
+  };
+
   const addScopeRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId || !scopeValue.trim()) {
@@ -330,10 +365,11 @@ export default function TargetPage() {
       await api.createScopeRule({
         project_id: projectId,
         action: scopeAction,
-        type: "domain",
+        type: inferScopeType(scopeValue),
         value: scopeValue,
       });
       setScopeValue("");
+      await loadScopeRules();
       toast("规则已添加", "success");
     } catch (err) {
     } finally {
@@ -491,7 +527,7 @@ export default function TargetPage() {
                     <CardTitle className="text-lg">批量导入</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <FileImport projectId={currentProject.id} onImported={loadTargets} />
+                    <FileImport projectId={currentProject.id} onImported={() => { loadTargets(); loadScopeRules(); }} />
                 </CardContent>
             </Card>
 
@@ -520,6 +556,58 @@ export default function TargetPage() {
                             添加规则
                         </Button>
                     </form>
+
+                    {/* 已排除的 IP / 域名 */}
+                    {excludedRules.length > 0 && (
+                        <div className="pt-3 border-t border-border/50">
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight mb-2 flex items-center gap-1.5">
+                                <Ban className="h-3 w-3 text-brand-danger" />
+                                已排除 ({excludedRules.length})
+                            </div>
+                            <div className="space-y-1.5 max-h-40 overflow-auto pr-1 custom-scrollbar">
+                                {excludedRules.map((rule) => (
+                                    <div
+                                        key={rule.id}
+                                        className="flex items-center justify-between p-1.5 rounded bg-background/50 border border-border/50"
+                                    >
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <Ban className="h-3 w-3 text-brand-danger shrink-0" />
+                                            <code className="text-xs font-mono truncate">{rule.value}</code>
+                                        </div>
+                                        <Badge variant="outline" className="text-[9px] h-4 px-1 shrink-0 ml-2">
+                                            {rule.type}
+                                        </Badge>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 已包含的规则（如果有） */}
+                    {includedRules.length > 0 && (
+                        <div className="pt-3 border-t border-border/50">
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight mb-2 flex items-center gap-1.5">
+                                <Check className="h-3 w-3 text-brand-success" />
+                                已包含 ({includedRules.length})
+                            </div>
+                            <div className="space-y-1.5 max-h-40 overflow-auto pr-1 custom-scrollbar">
+                                {includedRules.map((rule) => (
+                                    <div
+                                        key={rule.id}
+                                        className="flex items-center justify-between p-1.5 rounded bg-background/50 border border-border/50"
+                                    >
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <Check className="h-3 w-3 text-brand-success shrink-0" />
+                                            <code className="text-xs font-mono truncate">{rule.value}</code>
+                                        </div>
+                                        <Badge variant="outline" className="text-[9px] h-4 px-1 shrink-0 ml-2">
+                                            {rule.type}
+                                        </Badge>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </aside>

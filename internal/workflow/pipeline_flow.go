@@ -195,13 +195,15 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 		}
 	}
 
-	// S4: CDN filtering
-	p.setStage(StageCDNFilter)
+	// S4: CDN filtering (skipped entirely when disabled — no stage record is
+	// created so the UI doesn't show a misleading "CDN 过滤 0.0s" row in
+	// modes like internal scan where CDN filtering doesn't apply).
 	allIPs := resolve.ExtractAllIPs(dnsRecords)
 	var nonCDNIPs []string
 	var cdnDomains []string
 	var cdnResults []models.CDNResult
 	if p.config.EnableCDNFilter {
+		p.setStage(StageCDNFilter)
 		nonCDNIPs, cdnResults, err = p.cdnDet.FilterCDNIPs(ctx, allIPs)
 		if err != nil {
 			log.Printf("cdn filter: %v", err)
@@ -221,7 +223,6 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 		cdnDomains = resolve.ExtractCDNDomains(dnsRecords, cdnResults)
 	} else {
 		nonCDNIPs = allIPs
-		p.completeStage(StageCDNFilter)
 	}
 
 	// S4.5: Alive check via nmap (filters dead IPs so naabu only scans live hosts)
@@ -286,13 +287,13 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 
 // runIPFlow: CDN → Naabu → nmap -sV → split → httpx → Nuclei.
 func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) error {
-	p.setStage(StageCDNFilter)
-
 	ips := extractTargetValues(targets)
 
-	// CDN filter
+	// CDN filter (skipped entirely when disabled — no stage record so the UI
+	// doesn't show a misleading "CDN 过滤 0.0s" row in internal scan mode).
 	var nonCDNIPs []string
 	if p.config.EnableCDNFilter {
+		p.setStage(StageCDNFilter)
 		var cdnResults []models.CDNResult
 		var err error
 		nonCDNIPs, cdnResults, err = p.cdnDet.FilterCDNIPs(ctx, ips)
@@ -312,7 +313,6 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 		}
 	} else {
 		nonCDNIPs = ips
-		p.completeStage(StageCDNFilter)
 	}
 
 	// Alive check via nmap

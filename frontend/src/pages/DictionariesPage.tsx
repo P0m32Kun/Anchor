@@ -272,7 +272,14 @@ export default function DictionariesPage() {
                 >
                   <TableCell>
                     <div className="flex flex-col gap-0.5">
-                      <span className="font-medium">{dict.name}</span>
+                      <span className="font-medium flex items-center gap-1.5">
+                        {dict.name}
+                        {dict.builtin && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/30">
+                            内置
+                          </span>
+                        )}
+                      </span>
                       {dict.description && (
                         <span className="text-xs text-muted-foreground">
                           {dict.description}
@@ -298,7 +305,8 @@ export default function DictionariesPage() {
                         size="sm"
                         className="h-8 w-8 p-0"
                         onClick={() => openContentEditor(dict)}
-                        title="编辑内容"
+                        disabled={dict.builtin}
+                        title={dict.builtin ? "内置字典只读" : "编辑内容"}
                       >
                         <FileText className="h-3.5 w-3.5" />
                       </Button>
@@ -307,7 +315,8 @@ export default function DictionariesPage() {
                         size="sm"
                         className="h-8 w-8 p-0"
                         onClick={() => openEditModal(dict)}
-                        title="编辑信息"
+                        disabled={dict.builtin}
+                        title={dict.builtin ? "内置字典只读" : "编辑信息"}
                       >
                         <Settings2 className="h-3.5 w-3.5" />
                       </Button>
@@ -316,7 +325,8 @@ export default function DictionariesPage() {
                         size="sm"
                         className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300"
                         onClick={() => handleDelete(dict)}
-                        title="删除"
+                        disabled={dict.builtin}
+                        title={dict.builtin ? "内置字典只读" : "删除"}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

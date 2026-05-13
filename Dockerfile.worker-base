@@ -28,6 +28,8 @@ RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && 
     go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
     go install github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest && \
     go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
+    go install github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest && \
+    go install github.com/ffuf/ffuf/v2@latest && \
     nuclei -update-templates
 
 # --- Stage 2: 精简运行时基础镜像 ---
@@ -53,11 +55,21 @@ RUN wget -q -O /tmp/chrome.zip \
 
 ENV CHROME_PATH=/usr/bin/chromium
 
-COPY --from=tools-builder /go/bin/subfinder /usr/local/bin/
-COPY --from=tools-builder /go/bin/naabu    /usr/local/bin/
-COPY --from=tools-builder /go/bin/httpx    /usr/local/bin/
-COPY --from=tools-builder /go/bin/nuclei   /usr/local/bin/
-COPY --from=tools-builder /go/bin/cdncheck /usr/local/bin/
-COPY --from=tools-builder /go/bin/dnsx     /usr/local/bin/
+COPY --from=tools-builder /go/bin/subfinder  /usr/local/bin/
+COPY --from=tools-builder /go/bin/naabu      /usr/local/bin/
+COPY --from=tools-builder /go/bin/httpx      /usr/local/bin/
+COPY --from=tools-builder /go/bin/nuclei     /usr/local/bin/
+COPY --from=tools-builder /go/bin/cdncheck   /usr/local/bin/
+COPY --from=tools-builder /go/bin/dnsx       /usr/local/bin/
+COPY --from=tools-builder /go/bin/urlfinder  /usr/local/bin/
+COPY --from=tools-builder /go/bin/ffuf       /usr/local/bin/
 COPY --from=tools-builder /root/nuclei-templates /root/nuclei-templates
+
+# Built-in dictionaries (RBKD-SEC/dict). Worker reads file paths recorded by
+# the server's startup-time seed; the path layout must match the server image
+# exactly, hence cloning to the same /opt/dict location in both.
+ARG DICT_REPO=https://github.com/RBKD-SEC/dict.git
+ARG DICT_REF=main
+RUN git clone --depth 1 --branch ${DICT_REF} ${DICT_REPO} /opt/dict && \
+    rm -rf /opt/dict/.git
 

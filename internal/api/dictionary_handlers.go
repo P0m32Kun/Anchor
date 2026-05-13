@@ -94,6 +94,9 @@ func (s *Server) handlePatchDictionary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
+	if !s.requireUserDictionary(w, id) {
+		return
+	}
 
 	var req struct {
 		Name        string `json:"name,omitempty"`
@@ -128,6 +131,9 @@ func (s *Server) handleDeleteDictionary(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	id := r.PathValue("id")
+	if !s.requireUserDictionary(w, id) {
+		return
+	}
 	if err := s.dictMgr.Delete(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "delete dictionary: %v", err))
 		return
@@ -157,6 +163,9 @@ func (s *Server) handleWriteDictionaryContent(w http.ResponseWriter, r *http.Req
 		return
 	}
 	id := r.PathValue("id")
+	if !s.requireUserDictionary(w, id) {
+		return
+	}
 	content, err := io.ReadAll(io.LimitReader(r.Body, 10<<20))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "failed to read body").WithDetail(err.Error()))
@@ -168,4 +177,26 @@ func (s *Server) handleWriteDictionaryContent(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusOK, d)
+}
+
+// requireUserDictionary blocks write/delete requests against builtin dictionaries.
+// Writes the HTTP response and returns false if the request was rejected.
+// Returns true if the caller should proceed. When the dictionary lookup fails,
+// the response is written and false is returned — the downstream handler should
+// simply return without further action.
+func (s *Server) requireUserDictionary(w http.ResponseWriter, id string) bool {
+	d, err := s.dictMgr.Get(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get dictionary: %v", err))
+		return false
+	}
+	if d == nil {
+		writeError(w, http.StatusNotFound, errors.Newf(errors.ErrNotFound, "dictionary %s not found", id))
+		return false
+	}
+	if d.Builtin {
+		writeError(w, http.StatusForbidden, errors.New(errors.ErrForbidden, "builtin dictionary is read-only"))
+		return false
+	}
+	return true
 }

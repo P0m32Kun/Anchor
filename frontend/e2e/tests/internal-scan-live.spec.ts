@@ -1,7 +1,7 @@
 /**
  * 测试层级: E2E
  * 覆盖流程: API 创建项目 + 注入 CIDR scope + 注入 5 个 IP 目标(§3.3 例外,scope confirm 产品 bug) →
- *           UI 启动 ScanModal 选内网+高危端口 → API 轮询等待完成 →
+ *           UI 启动 ScanModal 选内网 + 切到 -p 自定义(默认高危端口) → API 轮询等待完成 →
  *           UI 验证 TargetPage/AssetPage/FindingsPage
  * 前置依赖: anchor-server / anchor-worker / 全部 rangefield 容器已启动
  * UI 断言点:
@@ -15,6 +15,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { cleanupTestData, createProject, addTarget } from "../fixtures/db-utils";
+import { waitForPipeline } from "../fixtures/api-helpers";
 
 const API_BASE = "http://localhost:17421";
 const API_TOKEN = "p0m32kun";
@@ -71,7 +72,7 @@ test.describe.serial("内网扫描 E2E — UI 主导", () => {
 		await cleanupTestData();
 	});
 
-	test("UI 验证目标 → 启动内网高危扫描 → 验证资产/Findings", async ({ page }) => {
+	test("UI 验证目标 → 启动内网 -p 自定义扫描 → 验证资产/Findings", async ({ page }) => {
 		const log = (msg: string) => {
 			const ts = new Date().toISOString().slice(11, 19);
 			console.log(`[${ts}] ${msg}`);
@@ -92,7 +93,7 @@ test.describe.serial("内网扫描 E2E — UI 主导", () => {
 		log("Step 1 完成: 5 个目标全部在表格中");
 
 		// ── Step 2: UI 启动扫描 ──
-		log("Step 2: UI 启动内网高危扫描");
+		log("Step 2: UI 启动内网扫描(-p 自定义端口,默认填充高危端口)");
 		await page.goto(`/projects/${projectId}/runs`);
 		await expect(
 			page.getByRole("heading", { name: "扫描执行" }),
@@ -105,42 +106,41 @@ test.describe.serial("内网扫描 E2E — UI 主导", () => {
 
 		await page.locator("button", { hasText: "内网扫描" }).first().click();
 		await page.getByRole("button", { name: /配置参数/ }).click();
-		await page.locator("button", { hasText: "高危端口（推荐）" }).first().click();
+		// 切到 -p 自定义模式(textarea 自动填高危端口列表,含 6379 Redis 等高价值目标)
+		await page.getByLabel("端口模式 -p 自定义").click();
+		await expect(page.getByLabel("自定义端口列表")).toHaveValue(/6379/);
+		// Fix 3 (2026-05-13): enable_ffuf 默认 true,无字典时启动按钮被 disabled。
+		// 这里关闭 ffuf 让按钮可点(靶场没预置字典)。
+		const ffufLabel = page.getByText("Ffuf", { exact: true });
+		await expect(ffufLabel).toBeVisible();
+		await ffufLabel.locator("..").click();
 		await page.getByRole("button", { name: /立即启动扫描/ }).click();
 		await expect(page.getByText("扫描任务已启动")).toBeVisible({
 			timeout: 10_000,
 		});
 
-		// ── Step 3: 轮询等待扫描完成(API 轮询,§3.3 例外)──
+		// ── Step 3: 等待扫描完成(waitForPipeline,最长 25 分钟) ──
 		log("Step 3: 轮询等待扫描完成(最长 25 分钟)");
-		const start = Date.now();
-		const maxWait = 25 * 60 * 1000;
-		let runStatus = "";
-		let runId = "";
-
-		while (Date.now() - start < maxWait) {
-			const res = await page.request.get(
-				`${API_BASE}/projects/${projectId}/scan/runs?page=1&page_size=10`,
-				{ headers: { Authorization: `Bearer ${API_TOKEN}` } },
-			);
-			if (res.ok()) {
-				const body = (await res.json()) as {
-					data: Array<{
-						id: string;
-						status: string;
-					}>;
-				};
-				const runs = body.data || [];
-				if (runs.length > 0) {
-					runId = runs[0].id;
-					runStatus = runs[0].status;
-					if (runStatus !== "running" && runStatus !== "pending") break;
-				}
-			}
-			await page.waitForTimeout(5_000);
-		}
+		const { status: runStatus, runId } = await waitForPipeline(projectId, 25 * 60 * 1000);
 		expect(runStatus).toBe("completed");
-		log(`Step 3 完成: run=${runId} 耗时 ${Math.round((Date.now() - start) / 1000)}s`);
+		log(`Step 3 完成: run=${runId}`);
+
+		// ── Step 3.5: stage 反馈断言(Fix 1 回归) ──
+		// Fix 1 (2026-05-12): 内网模式不再上报 cdn_filter stage。
+		// (Fix 2 慢速 stage 可见性此处不验证:ffuf 已被关闭,urlfinder 已剔除。)
+		log("Step 3.5: 验证 stages 数组中 Fix 1 的行为");
+		const stagesRes = await page.request.get(
+			`${API_BASE}/projects/${projectId}/pipeline/runs/${runId}/stages`,
+			{ headers: { Authorization: `Bearer ${API_TOKEN}` } },
+		);
+		expect(stagesRes.ok()).toBe(true);
+		const stagesBody = (await stagesRes.json()) as {
+			stages: Array<{ stage: string; status: string; error?: string | null }>;
+		};
+		const stageNames = stagesBody.stages.map((s) => s.stage);
+		log(`stages: ${stageNames.join(", ")}`);
+		expect(stageNames).not.toContain("cdn_filter"); // Fix 1
+		expect(stageNames).not.toContain("urlfinder"); // tool removed
 
 		// ── Step 4: UI 验证 AssetPage ──
 		log("Step 4: UI 验证 AssetPage");

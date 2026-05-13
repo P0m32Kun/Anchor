@@ -39,11 +39,12 @@ type Pipeline struct {
 	config        models.PipelineConfig
 	runID         string
 	onStageChange StageEventCallback
+	emitter       *StageEmitter
 }
 
 // NewPipeline creates a new Pipeline instance.
 func NewPipeline(queries *db.Queries, runner *worker.Runner, scopeEng *scope.Engine, dataDir string) *Pipeline {
-	return &Pipeline{
+	p := &Pipeline{
 		queries:  queries,
 		runner:   runner,
 		scope:    scopeEng,
@@ -52,6 +53,10 @@ func NewPipeline(queries *db.Queries, runner *worker.Runner, scopeEng *scope.Eng
 		merger:   asset.NewMerger(queries),
 		dataDir:  dataDir,
 	}
+	// Start with an empty-runID emitter so setStage/completeStage/failStage
+	// are safely no-ops until WithRunID is called.
+	p.emitter = NewStageEmitter(queries, "", nil)
+	return p
 }
 
 // WithConfig sets the pipeline configuration.
@@ -70,11 +75,13 @@ func (p *Pipeline) WithFOFA(apiKey string) *Pipeline {
 
 func (p *Pipeline) WithRunID(runID string) *Pipeline {
 	p.runID = runID
+	p.emitter = NewStageEmitter(p.queries, runID, p.onStageChange)
 	return p
 }
 
 func (p *Pipeline) WithStageCallback(cb StageEventCallback) *Pipeline {
 	p.onStageChange = cb
+	p.emitter = NewStageEmitter(p.queries, p.runID, cb)
 	return p
 }
 
@@ -175,40 +182,37 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 		}
 	}
 
+	// Pipeline lifecycle has two phases:
+	//   1. Main flow stages (alive/portscan/.../vuln) just finished.
+	//   2. Slow scan stages (ffuf) — part of the same pipeline_run lifecycle,
+	//      not a fire-and-forget background task.
+	// We DO NOT set pipeline_run.status to completed until phase 2 also
+	// finishes, so consumers reading "status=completed" can trust the run is
+	// fully done. The handleCreateScan handler already wraps Pipeline.Run in
+	// a goroutine, so the longer wall-clock time here only blocks that
+	// background goroutine, not the API response.
+
+	// Phase 1 cleanup: finalize any main-flow stages still marked running and
+	// decide whether the main flow itself succeeded. Slow-scan stages haven't
+	// been emitted yet, so this check is purely about main pipeline health.
+	var mainHasFailed bool
 	if p.runID != "" {
 		now := time.Now().UTC()
-
-		// Check if any stage failed.
 		stages, _ := p.queries.ListPipelineRunStages(p.runID)
-		hasFailedStage := false
 		for _, s := range stages {
+			if isSlowScanStage(s.Stage) {
+				continue
+			}
 			if s.Status == models.StageStatusFailed {
-				hasFailedStage = true
-				break
+				mainHasFailed = true
 			}
-		}
-
-		var errMsg string
-		if flowErr != nil {
-			errMsg = flowErr.Error()
-		} else if hasFailedStage {
-			errMsg = "one or more stages failed"
-		}
-
-		if flowErr != nil || hasFailedStage {
-			if errMsg != "" {
-				p.queries.UpdatePipelineRunError(p.runID, errMsg)
-			}
-			p.queries.UpdatePipelineRunStatus(p.runID, "failed")
-		} else {
-			p.queries.UpdatePipelineRunCompleted(p.runID, now)
-		}
-
-		// Mark any still-running stages as completed (or failed if overall failed).
-		for _, s := range stages {
 			if s.Status == models.StageStatusRunning {
-				if flowErr != nil || hasFailedStage {
+				// A stage left in "running" after the main flow returned means
+				// the flow itself exited (panic, early return) without cleanup.
+				// Mark it failed/completed in line with the overall outcome.
+				if flowErr != nil {
 					p.queries.UpdatePipelineRunStageRecord(s.ID, models.StageStatusFailed, "pipeline aborted", &now)
+					mainHasFailed = true
 				} else {
 					p.queries.UpdatePipelineRunStageRecord(s.ID, models.StageStatusCompleted, "", &now)
 				}
@@ -216,17 +220,56 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 		}
 	}
 
-	// Trigger background slow scans after successful pipeline completion.
-	if flowErr == nil {
-		slowScan := NewSlowScanOrchestrator(p.queries, p.runner, p.dataDir).WithConfig(p.config)
-		go func() {
-			if err := slowScan.Run(context.Background(), p.projectID, p.runID); err != nil {
-				log.Printf("[pipeline] slow scan orchestrator: %v", err)
+	// Slow scan trigger: main flow must be clean. If any main-flow stage failed
+	// (or the flow returned an error) we skip slow scan entirely — partial
+	// data isn't worth burning brute-force budget on, and the previous
+	// behavior of running slow scan after a half-broken pipeline produced
+	// confusing UI (post-fail ffuf rows showing up). This resolves the
+	// historical TODO around slow-scan trigger gating.
+	shouldRunSlowScan := flowErr == nil && !mainHasFailed
+	if shouldRunSlowScan {
+		slowScan := NewSlowScanOrchestrator(p.queries, p.runner, p.dataDir).
+			WithConfig(p.config).
+			WithStageEmitter(p.emitter)
+		if err := slowScan.Run(ctx, p.projectID, p.runID); err != nil {
+			log.Printf("[pipeline] slow scan orchestrator: %v", err)
+		}
+	}
+
+	// Phase 2 final settlement: now that everything (main + slow scan) is
+	// done, write the run's terminal status. Slow scan stage failures
+	// (e.g. ffuf brute-force hit no valid paths against an internal target)
+	// are expected in some target types and DO NOT mark the run as failed —
+	// they show as a failed stage in the UI but the run as a whole still
+	// counts as completed. Only main-flow failures fail the run.
+	if p.runID != "" {
+		now := time.Now().UTC()
+		var errMsg string
+		if flowErr != nil {
+			errMsg = flowErr.Error()
+		} else if mainHasFailed {
+			errMsg = "one or more stages failed"
+		}
+
+		if flowErr != nil || mainHasFailed {
+			if errMsg != "" {
+				p.queries.UpdatePipelineRunError(p.runID, errMsg)
 			}
-		}()
+			p.queries.UpdatePipelineRunStatus(p.runID, "failed")
+		} else {
+			p.queries.UpdatePipelineRunCompleted(p.runID, now)
+		}
 	}
 
 	return flowErr
+}
+
+// isSlowScanStage reports whether a stage name belongs to the post-pipeline
+// slow scan phase. Slow-scan stages are tracked in pipeline_run_stages alongside
+// main flow stages but are treated as soft — their failure does not promote
+// the run to failed. Adding a new slow-scan tool means adding its stage here.
+func isSlowScanStage(stage string) bool {
+	return stage == string(StageFfuf)
 }
 
 // --- Utility functions ---

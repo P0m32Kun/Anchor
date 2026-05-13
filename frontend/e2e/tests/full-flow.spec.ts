@@ -18,6 +18,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { cleanupTestData, addTarget } from "../fixtures/db-utils";
+import { waitForPipeline } from "../fixtures/api-helpers";
 
 const API_BASE = "http://localhost:17421";
 const API_TOKEN = "p0m32kun";
@@ -141,7 +142,13 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 
 		// step 2: 选 Top 100 端口(最快)
 		await expect(page.getByText("端口探测范围")).toBeVisible();
-		await page.locator("button", { hasText: "Top 100 常用端口" }).first().click();
+		await page.getByLabel("端口模式 -tp 预设").click();
+		await page.getByLabel("Top-N 端口预设").selectOption("top100");
+		// enable_ffuf 默认 true,无字典时启动按钮被 disabled。
+		// 关闭 ffuf 让按钮可点(本测试不需要 ffuf 阶段)。
+		const ffufLabel = page.getByText("Ffuf", { exact: true });
+		await expect(ffufLabel).toBeVisible();
+		await ffufLabel.locator("..").click();
 		await page.getByRole("button", { name: /立即启动扫描/ }).click();
 
 		// 启动成功的 UI 信号
@@ -153,32 +160,9 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		const runCard = page.locator('[class*="cursor-pointer"]').first();
 		await expect(runCard).toBeVisible({ timeout: 15_000 });
 
-		// ── Step 6: 等待 Pipeline 完成(API 轮询,例外条款) ──
-		log("Step 6: Poll pipeline status via API while UI shows Run card");
-		// ScanModal 调 POST /projects/:id/scan,run 列表在 /scan/runs;
-		// 单次状态查询走 /pipeline/runs/:id(后端 model 统一,详见 internal/api/server.go)
-		const runs = await page.request
-			.get(`${API_BASE}/projects/${projectId}/scan/runs`, {
-				headers: { Authorization: `Bearer ${API_TOKEN}` },
-			})
-			.then((r) => r.json() as Promise<{ data: Array<{ id: string }> }>);
-		const runId = runs.data?.[0]?.id;
-		expect(runId, "未找到任何 scan run").toBeDefined();
-
-		const start = Date.now();
-		const maxWait = 20 * 60 * 1000;
-		let status = "running";
-		while (status === "running" && Date.now() - start < maxWait) {
-			await page.waitForTimeout(5_000);
-			const res = await page.request.get(
-				`${API_BASE}/projects/${projectId}/pipeline/runs/${runId}`,
-				{ headers: { Authorization: `Bearer ${API_TOKEN}` } },
-			);
-			if (res.ok()) {
-				const d = (await res.json()) as { status: string };
-				status = d.status;
-			}
-		}
+		// ── Step 6: 等待 Pipeline 完成(waitForPipeline) ──
+		log("Step 6: Poll pipeline status via API");
+		const { status } = await waitForPipeline(projectId);
 		log(`Pipeline final status: ${status}`);
 		expect(status).toBe("completed");
 

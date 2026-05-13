@@ -19,6 +19,7 @@ type Dictionary struct {
 	FilePath    string             `json:"file_path" db:"file_path"`
 	LineCount   int                `json:"line_count" db:"line_count"`
 	SizeBytes   int64              `json:"size_bytes" db:"size_bytes"`
+	Builtin     bool               `json:"builtin" db:"builtin"`
 	CreatedAt   time.Time          `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time          `json:"updated_at" db:"updated_at"`
 }

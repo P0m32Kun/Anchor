@@ -1,16 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createProject } from "./fixtures/api-helpers";
-
-async function setCurrentProject(page: any, projectId: string) {
-	await page.goto("/");
-	await page.evaluate((id: string) => {
-		localStorage.setItem(
-			"app-store",
-			JSON.stringify({ state: { currentProjectId: id }, version: 0 }),
-		);
-	}, projectId);
-	await page.reload();
-}
+import { setCurrentProject } from "./fixtures/db-utils";
 
 test.describe.serial("ScanModal Nuclei 参数 E2E", () => {
 	let projectId: string;

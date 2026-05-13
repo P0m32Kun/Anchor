@@ -1,13 +1,13 @@
 /**
  * 测试层级: E2E
  * 覆盖流程: UI 创建项目 → API 注入 IP 目标(§3.3 例外,scope confirm 产品 bug) →
- *           ScanModal 选"高危端口"preset → 等待 pipeline 完成 →
+ *           ScanModal 切到 -p 自定义模式(默认填充高危端口) → 等待 pipeline 完成 →
  *           AssetPage 看到 6379 端口 → FindingsPage 看到 critical/high finding 行
  * 前置依赖: anchor-server / anchor-worker / anchor-rangefield(rf-redis 监听 172.30.0.13:6379)已经启动
  * UI 断言点:
  *   - 项目卡片可见 → 跳转 /targets
  *   - TargetPage 表格中能看到 172.30.0.13 行
- *   - ScanModal 选"高危端口(推荐)" 后能看到选中态
+ *   - ScanModal 切到 -p 自定义后,textarea 默认值包含 6379
  *   - RunsPage 上扫描启动后能看到 run 卡片
  *   - 完成后 AssetPage 看到 172.30.0.13、Asset 详情/端口区域包含 6379
  *   - FindingsPage 至少有一条 critical/high 行(可见 severity 标签)
@@ -18,6 +18,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { cleanupTestData, addTarget } from "../fixtures/db-utils";
+import { waitForPipeline } from "../fixtures/api-helpers";
 
 const API_BASE = "http://localhost:17421";
 const API_TOKEN = "p0m32kun";
@@ -34,7 +35,7 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		await cleanupTestData();
 	});
 
-	test("UI 选高危端口 preset → 扫到 Redis 6379 → 至少 1 条 critical/high finding", async ({
+	test("UI 切 -p 自定义(默认高危端口) → 扫到 Redis 6379 → 至少 1 条 critical/high finding", async ({
 		page,
 	}) => {
 		const log = (msg: string) => {
@@ -56,7 +57,7 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		await page.getByPlaceholder("客户名称或部门").fill("E2E HighRisk");
 		await page
 			.getByPlaceholder("测试目的或项目背景")
-			.fill("高危端口 preset UI 验收");
+			.fill("-p 自定义端口 UI 验收");
 		await page.getByRole("button", { name: "创建项目", exact: true }).click();
 
 		// 项目卡片标题渲染为 <h3>,匹配 heading role
@@ -90,8 +91,8 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 			page.getByRole("cell", { name: REDIS_IP }).first(),
 		).toBeVisible({ timeout: 10_000 });
 
-		// ── Step 3: 通过 ScanModal 选 "高危端口" preset ──
-		log("Step 3: Open ScanModal and select high-risk port preset");
+		// ── Step 3: 通过 ScanModal 切到 -p 自定义模式(默认填充高危端口列表) ──
+		log("Step 3: Open ScanModal and switch to -p custom mode (default high-risk ports)");
 		await page.goto(`/projects/${projectId}/runs`);
 		await expect(
 			page.getByRole("heading", { name: "扫描执行" }),
@@ -106,15 +107,16 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		await page.locator("button", { hasText: "内网扫描" }).first().click();
 		await page.getByRole("button", { name: /配置参数/ }).click();
 
-		// step 2: 选 "高危端口(推荐)" preset
-		const highRiskBtn = page.locator("button", {
-			hasText: "高危端口（推荐）",
-		});
-		await highRiskBtn.first().click();
-		// 选中态: ring/border 颜色变化用 className 难断言,改为断言 description 文本可见
-		await expect(
-			page.getByText(/115 个攻击面端口/),
-		).toBeVisible();
+		// step 2: 切到 -p 自定义模式（textarea 自动填充高危端口列表，
+		// 后端 BuildNaabuCommand 收到 -p <ports> 与旧的 "high-risk" 别名等价）
+		await page.getByLabel("端口模式 -p 自定义").click();
+		const portTextarea = page.getByLabel("自定义端口列表");
+		await expect(portTextarea).toBeVisible();
+		// 默认填充的高危端口列表里必须包含 6379（Redis）
+		await expect(portTextarea).toHaveValue(/6379/);
+
+		// Ffuf 默认开启但无字典时 disable 立即启动扫描;关掉 Ffuf 以解锁按钮。
+		await page.getByRole("button", { name: /^Ffuf/ }).click();
 
 		await page.getByRole("button", { name: /立即启动扫描/ }).click();
 		await expect(page.getByText("扫描任务已启动")).toBeVisible({
@@ -125,33 +127,11 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		const runCard = page.locator('[class*="cursor-pointer"]').first();
 		await expect(runCard).toBeVisible({ timeout: 15_000 });
 
-		// ── Step 4: 等待 pipeline 完成(API 轮询,例外条款) ──
+		// ── Step 4: 等待 pipeline 完成(waitForPipeline) ──
 		log("Step 4: Poll until pipeline completes");
-		// 列表在 /scan/runs,状态查询在 /pipeline/runs/:id(详见 internal/api/server.go)
-		const runs = await page.request
-			.get(`${API_BASE}/projects/${projectId}/scan/runs`, {
-				headers: { Authorization: `Bearer ${API_TOKEN}` },
-			})
-			.then((r) => r.json() as Promise<{ data: Array<{ id: string }> }>);
-		const runId = runs.data?.[0]?.id;
-		expect(runId).toBeDefined();
-
-		const start = Date.now();
-		const maxWait = 20 * 60 * 1000;
-		let status = "running";
-		while (status === "running" && Date.now() - start < maxWait) {
-			await page.waitForTimeout(5_000);
-			const res = await page.request.get(
-				`${API_BASE}/projects/${projectId}/pipeline/runs/${runId}`,
-				{ headers: { Authorization: `Bearer ${API_TOKEN}` } },
-			);
-			if (res.ok()) {
-				const d = (await res.json()) as { status: string };
-				status = d.status;
-			}
-		}
+		const { status, runId } = await waitForPipeline(projectId);
 		expect(status).toBe("completed");
-		log(`Pipeline completed in ${Math.round((Date.now() - start) / 1000)}s`);
+		log(`Pipeline ${runId} completed`);
 
 		// ── Step 5: UI 验证资产 + 端口 ──
 		log("Step 5: Verify asset on AssetPage (port 6379 soft-checked)");

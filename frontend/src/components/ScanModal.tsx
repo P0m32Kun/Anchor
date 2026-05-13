@@ -2,7 +2,16 @@ import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import { Button } from "./Button";
 import { Input } from "./Input";
-import { PipelineConfig, DEFAULT_PIPELINE_CONFIG, PORT_RANGE_PRESETS, Dictionary, api } from "../lib/api";
+import {
+  PipelineConfig,
+  DEFAULT_PIPELINE_CONFIG,
+  DEFAULT_HIGH_RISK_PORTS,
+  TP_PRESET_VALUES,
+  TP_PRESET_LABELS,
+  TpPresetValue,
+  Dictionary,
+  api,
+} from "../lib/api";
 import { cn } from "../lib/utils";
 import { Zap, Globe, Shield, Gauge, Cpu, CheckCircle2, RotateCcw, ChevronRight, Search } from "lucide-react";
 
@@ -151,10 +160,73 @@ const SCAN_DEPTH_OPTIONS: {
   },
 ];
 
+type PortMode = "tp" | "p";
+
+// Derive UI state from the persisted port_range string. The backend (see
+// internal/worker/commands.go:BuildNaabuCommand) accepts top-N presets, the
+// magic "high-risk" alias, or a raw comma-separated port list — we normalize
+// those into the two-mode UI here.
+function decodePortRange(raw: string): {
+  mode: PortMode;
+  tpValue: TpPresetValue;
+  pValue: string;
+} {
+  const normalized = raw.trim().toLowerCase();
+  switch (normalized) {
+    case "":
+    case "top100":
+    case "tp100":
+    case "top-100":
+      return { mode: "tp", tpValue: "top100", pValue: DEFAULT_HIGH_RISK_PORTS };
+    case "top1000":
+    case "tp1000":
+    case "top-1000":
+      return { mode: "tp", tpValue: "top1000", pValue: DEFAULT_HIGH_RISK_PORTS };
+    case "full":
+    case "tpfull":
+    case "topfull":
+    case "top-full":
+      return { mode: "tp", tpValue: "full", pValue: DEFAULT_HIGH_RISK_PORTS };
+    case "high-risk":
+    case "highrisk":
+    case "hr":
+      return { mode: "p", tpValue: "top1000", pValue: DEFAULT_HIGH_RISK_PORTS };
+    default:
+      return { mode: "p", tpValue: "top1000", pValue: raw };
+  }
+}
+
 export default function ScanModal({ open, onClose, onStart, loading }: ScanModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mode, setMode] = useState<ScanMode>(() => loadStoredMode());
   const [config, setConfig] = useState<PipelineConfig>(() => loadStoredConfig());
+
+  const initialPort = decodePortRange(config.port_range);
+  const [portMode, setPortMode] = useState<PortMode>(initialPort.mode);
+  const [tpValue, setTpValue] = useState<TpPresetValue>(initialPort.tpValue);
+  const [pValue, setPValue] = useState<string>(initialPort.pValue);
+
+  const handlePortModeSwitch = (next: PortMode) => {
+    setPortMode(next);
+    setConfig((prev) => ({
+      ...prev,
+      port_range: next === "tp" ? tpValue : pValue,
+    }));
+  };
+
+  const handleTpChange = (next: TpPresetValue) => {
+    setTpValue(next);
+    setConfig((prev) => ({ ...prev, port_range: next }));
+  };
+
+  const handlePChange = (next: string) => {
+    setPValue(next);
+    setConfig((prev) => ({ ...prev, port_range: next }));
+  };
+
+  const handleResetHighRiskPorts = () => {
+    handlePChange(DEFAULT_HIGH_RISK_PORTS);
+  };
 
   const handleReset = () => {
     setStep(1);
@@ -182,6 +254,10 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
 
   const handleResetDefaults = () => {
     setConfig({ ...DEFAULT_PIPELINE_CONFIG });
+    const reset = decodePortRange(DEFAULT_PIPELINE_CONFIG.port_range);
+    setPortMode(reset.mode);
+    setTpValue(reset.tpValue);
+    setPValue(reset.pValue);
     localStorage.removeItem(SCAN_CONFIG_STORAGE_KEY);
   };
 
@@ -195,10 +271,15 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
 
   const [dictionaries, setDictionaries] = useState<Dictionary[]>([]);
   useEffect(() => {
-    if (config.enable_ffuf) {
+    if (config.enable_ffuf && dictionaries.length === 0) {
       api.listDictionaries("dirscan").then(setDictionaries).catch(() => {});
     }
   }, [config.enable_ffuf]);
+
+  // Fix 3 frontend guard: ffuf without a dictionary would silently skip
+  // server-side. Disable the start button and flag the dictionary select so
+  // the user fixes it instead of losing ffuf coverage to a misconfiguration.
+  const ffufMisconfigured = config.enable_ffuf && !config.ffuf_dictionary_id;
 
   return (
     <Modal open={open} onClose={handleClose} title="新建扫描流水线" size="lg">
@@ -283,23 +364,82 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
                     <Zap className="h-3 w-3" />
                     端口探测范围
                  </label>
-                 <div className="grid grid-cols-1 gap-2">
-                    {PORT_RANGE_PRESETS.slice(0, 4).map((preset) => (
-                        <button
-                        key={preset.value}
-                        onClick={() => setConfig((prev) => ({ ...prev, port_range: preset.value }))}
-                        className={cn(
-                            "text-left p-3 rounded-xl border text-xs transition-all duration-200",
-                            config.port_range === preset.value
-                                ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
-                                : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"
-                        )}
-                        >
-                        <div className="font-bold text-foreground">{preset.label}</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">{preset.description}</div>
-                        </button>
+
+                 {/* Mode switch: -tp 预设 vs -p 自定义 */}
+                 <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-white/[0.02] border border-white/5">
+                    {[
+                       { value: "tp" as PortMode, label: "-tp 预设", hint: "Naabu Top-N" },
+                       { value: "p" as PortMode, label: "-p 自定义", hint: "指定端口列表" },
+                    ].map((opt) => (
+                       <button
+                          key={opt.value}
+                          aria-label={`端口模式 ${opt.label}`}
+                          aria-pressed={portMode === opt.value}
+                          onClick={() => handlePortModeSwitch(opt.value)}
+                          className={cn(
+                             "px-3 py-2 rounded-lg text-xs font-bold transition-all duration-200 flex flex-col items-start gap-0.5",
+                             portMode === opt.value
+                                ? "bg-primary/10 text-primary ring-1 ring-primary/30"
+                                : "text-muted-foreground hover:text-foreground hover:bg-white/[0.03]"
+                          )}
+                       >
+                          <span className="font-mono">{opt.label}</span>
+                          <span className="text-[9px] font-normal text-muted-foreground/60 normal-case tracking-normal">
+                             {opt.hint}
+                          </span>
+                       </button>
                     ))}
                  </div>
+
+                 {portMode === "tp" && (
+                    <div className="space-y-2 animate-in fade-in duration-200">
+                       <div className="relative">
+                          <select
+                             aria-label="Top-N 端口预设"
+                             value={tpValue}
+                             onChange={(e) => handleTpChange(e.target.value as TpPresetValue)}
+                             className="w-full h-10 px-3 pr-9 rounded-xl bg-white/5 border border-white/5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 appearance-none"
+                          >
+                             {TP_PRESET_VALUES.map((v) => (
+                                <option key={v} value={v} className="bg-slate-900">
+                                   {TP_PRESET_LABELS[v]}
+                                </option>
+                             ))}
+                          </select>
+                          <ChevronRight className="absolute right-3 top-3 h-4 w-4 rotate-90 text-muted-foreground/50 pointer-events-none" />
+                       </div>
+                       <p className="text-[10px] text-muted-foreground/60 leading-relaxed">
+                          Naabu 默认 Top 100 仅覆盖高频服务；Top 1000 更广但可能漏掉 Redis/ES/K8s；全端口最慢。
+                       </p>
+                    </div>
+                 )}
+
+                 {portMode === "p" && (
+                    <div className="space-y-2 animate-in fade-in duration-200">
+                       <textarea
+                          aria-label="自定义端口列表"
+                          value={pValue}
+                          onChange={(e) => handlePChange(e.target.value)}
+                          rows={4}
+                          spellCheck={false}
+                          placeholder="例如：80,443,8080,1-1000"
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/5 text-[11px] font-mono text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/30 resize-y leading-relaxed"
+                       />
+                       <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-muted-foreground/60">
+                             逗号分隔，支持范围如 1-1000；默认填充高危端口
+                          </span>
+                          <button
+                             type="button"
+                             onClick={handleResetHighRiskPorts}
+                             className="text-[10px] font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 shrink-0"
+                          >
+                             <RotateCcw className="h-2.5 w-2.5" />
+                             恢复高危端口
+                          </button>
+                       </div>
+                    </div>
+                 )}
               </div>
 
               <div className="space-y-3">
@@ -335,62 +475,7 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
             </label>
 
             {/* Toggle buttons */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* UrlFinder toggle */}
-              <div className="space-y-3">
-                <button
-                  onClick={() => setConfig((prev) => ({ ...prev, enable_urlfinder: !prev.enable_urlfinder }))}
-                  className={cn(
-                    "w-full text-left p-3 rounded-xl border text-xs transition-all duration-200",
-                    config.enable_urlfinder
-                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
-                      : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"
-                  )}
-                >
-                  <div className="font-bold text-foreground">UrlFinder</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">URL 发现与收集</div>
-                </button>
-
-                {config.enable_urlfinder && (
-                  <div className="p-4 rounded-2xl border border-white/5 bg-white/[0.01] space-y-4">
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-medium text-muted-foreground">速率限制</label>
-                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 6rpm</span>
-                      </div>
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={60}
-                          value={config.urlfinder_rate_limit}
-                          onChange={(e) => updateConfig("urlfinder_rate_limit", e.target.value)}
-                          className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
-                        />
-                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">rpm</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-medium text-muted-foreground">超时</label>
-                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 30秒</span>
-                      </div>
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          min={10}
-                          max={300}
-                          value={config.urlfinder_timeout}
-                          onChange={(e) => updateConfig("urlfinder_timeout", e.target.value)}
-                          className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
-                        />
-                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">秒</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
+            <div className="grid grid-cols-1 gap-4">
               {/* Ffuf toggle */}
               <div className="space-y-3">
                 <button
@@ -449,7 +534,11 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
                         <select
                           value={config.ffuf_dictionary_id}
                           onChange={(e) => setConfig((prev) => ({ ...prev, ffuf_dictionary_id: e.target.value }))}
-                          className="w-full h-8 px-2 rounded-md bg-white/5 border border-white/5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                          aria-invalid={ffufMisconfigured || undefined}
+                          className={cn(
+                            "w-full h-8 px-2 rounded-md bg-white/5 border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30",
+                            ffufMisconfigured ? "border-destructive/60 ring-1 ring-destructive/30" : "border-white/5"
+                          )}
                         >
                           <option value="" className="bg-slate-900">请选择字典</option>
                           {dictionaries.map((d) => (
@@ -460,6 +549,9 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
                         </select>
                       ) : (
                         <div className="text-[10px] text-muted-foreground/50 py-1.5">请先上传字典</div>
+                      )}
+                      {ffufMisconfigured && (
+                        <div className="text-[10px] text-destructive">请选择 Ffuf 字典,或关闭 Ffuf</div>
                       )}
                     </div>
                   </div>
@@ -524,7 +616,13 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
               <Button variant="ghost" onClick={() => setStep(1)} disabled={loading} className="rounded-xl">
                 上一步
               </Button>
-              <Button onClick={handleStart} loading={loading} className="rounded-xl px-8 font-black shadow-lg shadow-primary/20">
+              <Button
+                onClick={handleStart}
+                loading={loading}
+                disabled={loading || ffufMisconfigured}
+                title={ffufMisconfigured ? "请选择 Ffuf 字典或关闭 Ffuf" : undefined}
+                className="rounded-xl px-8 font-black shadow-lg shadow-primary/20"
+              >
                 立即启动扫描
               </Button>
             </div>

@@ -169,15 +169,7 @@ export default function RunsPage() {
         error?: string;
       };
       if (msg.event === "pipeline_stage_change" && msg.run_id === selectedRun) {
-        setStages((prev) => {
-          const idx = prev.findIndex((s) => s.stage === msg.stage);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = { ...next[idx], status: msg.status ?? "running", error: msg.error };
-            return next;
-          }
-          return prev;
-        });
+        setStages((prev) => mergeStageEvent(prev, msg));
         if (msg.status === "failed" && msg.error) {
           toast(`阶段 ${msg.stage} 失败: ${msg.error}`, "error");
         }
@@ -790,4 +782,52 @@ const STAGE_LABELS: Record<string, string> = {
   fingerprint: "服务指纹",
   httpx: "Web 探活",
   vuln: "漏洞探测",
+  ffuf: "目录爆破 (慢速)",
 };
+
+// mergeStageEvent reduces an SSE pipeline_stage_change event into the local
+// stages array. Existing stage rows get their status flipped; previously
+// unseen stages (the slow-scan urlfinder/ffuf events arrive after the initial
+// loadRunDetails snapshot is taken) are appended with a tmp- id that gets
+// replaced when pipeline_complete triggers a reload from the server.
+//
+// Exported so the SSE merge logic is unit-testable without rendering RunsPage.
+export interface StageEventMessage {
+  run_id?: string;
+  stage?: string;
+  status?: string;
+  error?: string;
+}
+
+export function mergeStageEvent(
+  prev: PipelineRunStage[],
+  msg: StageEventMessage,
+): PipelineRunStage[] {
+  if (!msg.stage) {
+    return prev;
+  }
+  const idx = prev.findIndex((s) => s.stage === msg.stage);
+  if (idx >= 0) {
+    const existing = prev[idx];
+    const nextStatus = msg.status ?? "running";
+    if (existing.status === nextStatus && existing.error === msg.error) {
+      return prev;
+    }
+    const next = [...prev];
+    next[idx] = { ...next[idx], status: nextStatus, error: msg.error };
+    return next;
+  }
+  const now = new Date().toISOString();
+  return [
+    ...prev,
+    {
+      id: `tmp-${msg.stage}-${Date.now()}`,
+      run_id: msg.run_id ?? "",
+      stage: msg.stage,
+      status: msg.status ?? "running",
+      error: msg.error,
+      started_at: now,
+      created_at: now,
+    },
+  ];
+}

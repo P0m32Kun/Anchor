@@ -26,7 +26,6 @@ const SOURCE_TOOL_OPTIONS = [
   "httpx",
   "dnsx",
   "ffuf",
-  "urlfinder",
   "其他",
 ];
 
