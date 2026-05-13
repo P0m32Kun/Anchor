@@ -602,6 +602,7 @@ export default function RunsPage() {
         onClose={() => setShowScanModal(false)}
         onStart={handleStartScan}
         loading={creating}
+        projectId={projectId ?? undefined}
       />
 
       <ConfirmDialog

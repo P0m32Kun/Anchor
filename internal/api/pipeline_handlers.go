@@ -324,6 +324,14 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 
 	cfg := buildConfigForMode(req.Mode, req.Config)
 
+	// Persist config to project so the ScanModal can reload it next time.
+	// Side effects (save failure) are non-fatal — the pipeline still runs.
+	if cfgJSON, err := json.Marshal(cfg); err == nil {
+		if err := s.queries.UpdateProjectPipelineConfig(projectID, string(cfgJSON)); err != nil {
+			log.Printf("[scan] persist pipeline config for project %s: %v", projectID, err)
+		}
+	}
+
 	// Create pipeline run with mode
 	runID := util.GenerateID()
 	now := time.Now().UTC()

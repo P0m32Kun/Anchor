@@ -36,14 +36,20 @@ func BuildSubfinderCommand(domain string, rateLimit, threads, timeout int) []str
 
 // BuildHttpxCommand builds an httpx command that reads hosts from a file.
 // hostFile should contain one host per line.
+// customFpFile is the path to a custom fingerprint file (Wappalyzer JSON format, optional).
+// -td enables technology detection output (required for custom fingerprints to take effect).
+// -cff loads the custom fingerprint file.
 // Output goes to stdout as JSONL so the worker can capture it as an artifact.
-func BuildHttpxCommand(hostFile string, rateLimit, threads int) []string {
-	args := []string{"httpx", "-json", "-l", hostFile, "-follow-redirects"}
+func BuildHttpxCommand(hostFile string, rateLimit, threads int, customFpFile string) []string {
+	args := []string{"httpx", "-json", "-l", hostFile, "-follow-redirects", "-td"}
 	if rateLimit > 0 {
 		args = append(args, "-rate-limit", fmt.Sprintf("%d", rateLimit))
 	}
 	if threads > 0 {
 		args = append(args, "-threads", fmt.Sprintf("%d", threads))
+	}
+	if customFpFile != "" {
+		args = append(args, "-cff", customFpFile)
 	}
 	return args
 }

@@ -39,9 +39,9 @@ func setupManager(t *testing.T) (*Manager, *sql.DB) {
 
 func TestLayout_FilePath(t *testing.T) {
 	l := NewLayout("/data")
-	got := l.FilePath("fp-1", "favicon")
-	if got != "/data/httpx/fingerprints/favicon/fp-1.json" {
-		t.Errorf("FilePath = %q, want /data/httpx/fingerprints/favicon/fp-1.json", got)
+	got := l.FilePath("fp-1")
+	if got != "/data/httpx/fingerprints/fp-1.json" {
+		t.Errorf("FilePath = %q, want /data/httpx/fingerprints/fp-1.json", got)
 	}
 }
 

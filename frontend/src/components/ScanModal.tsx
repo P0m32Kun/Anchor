@@ -41,6 +41,7 @@ interface ScanModalProps {
   onClose: () => void;
   onStart: (mode: ScanMode, config: PipelineConfig) => void;
   loading?: boolean;
+  projectId?: string;
 }
 
 const MODE_OPTIONS: {
@@ -196,10 +197,27 @@ function decodePortRange(raw: string): {
   }
 }
 
-export default function ScanModal({ open, onClose, onStart, loading }: ScanModalProps) {
+export default function ScanModal({ open, onClose, onStart, loading, projectId }: ScanModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mode, setMode] = useState<ScanMode>(() => loadStoredMode());
   const [config, setConfig] = useState<PipelineConfig>(() => loadStoredConfig());
+
+  // Merge project pipeline config on mount so saved settings (e.g.
+  // nuclei_scan_depth) are honoured even when localStorage is stale.
+  useEffect(() => {
+    if (!projectId || !open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const projectCfg = await api.getPipelineConfig(projectId);
+        if (cancelled) return;
+        setConfig((prev) => ({ ...prev, ...projectCfg }));
+      } catch {
+        // Project has no saved config — keep localStorage baseline.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId, open]);
 
   const initialPort = decodePortRange(config.port_range);
   const [portMode, setPortMode] = useState<PortMode>(initialPort.mode);

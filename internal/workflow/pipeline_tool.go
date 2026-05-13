@@ -200,11 +200,23 @@ func (p *Pipeline) runHttpx(ctx context.Context, hosts []string) ([]*models.WebE
 		hostFile = abs
 	}
 
-	task, stdout, err := p.createAndRunTask(ctx, "httpx", worker.BuildHttpxCommand(hostFile, p.config.HttpxRateLimit, p.config.HttpxThreads))
+	// Get enabled custom fingerprint files (all types merged into one file)
+	customFpFile, err := p.prepareHttpxFingerprints()
+	if err != nil {
+		log.Printf("[pipeline] prepare httpx fingerprints: %v", err)
+		// Continue without custom fingerprints
+	}
+
+	task, stdout, err := p.createAndRunTask(ctx, "httpx", worker.BuildHttpxCommand(hostFile, p.config.HttpxRateLimit, p.config.HttpxThreads, customFpFile))
 	if err != nil {
 		return nil, err
 	}
 	_ = task
+
+	// Clean up temporary fingerprint file
+	if customFpFile != "" {
+		defer os.Remove(customFpFile)
+	}
 
 	endpoints := parser.ParseHttpxOutput(bytes.NewReader(stdout))
 	var saved []*models.WebEndpoint
@@ -235,6 +247,71 @@ func (p *Pipeline) runHttpx(ctx context.Context, hosts []string) ([]*models.WebE
 		}
 	}
 	return saved, nil
+}
+
+// prepareHttpxFingerprints collects all enabled custom fingerprint files and
+// returns the path to a single merged temporary file for httpx -cff.
+// Returns empty string if no enabled fingerprints exist.
+func (p *Pipeline) prepareHttpxFingerprints() (customFpFile string, err error) {
+	fingerprints, err := p.queries.ListEnabledHttpxFingerprints("")
+	if err != nil {
+		log.Printf("[pipeline] list enabled fingerprints: %v", err)
+		return "", err
+	}
+	if len(fingerprints) == 0 {
+		return "", nil
+	}
+
+	customFpFile, err = p.mergeFingerprintFiles(fingerprints)
+	if err != nil {
+		log.Printf("[pipeline] merge fingerprint files: %v", err)
+		return "", err
+	}
+
+	return customFpFile, nil
+}
+
+// mergeFingerprintFiles merges multiple fingerprint files into a single temporary file.
+// Returns the path to the temporary file.
+func (p *Pipeline) mergeFingerprintFiles(fingerprints []*models.HttpxFingerprint) (string, error) {
+	// Create a temporary file in the workdir
+	workDir := filepath.Join(p.dataDir, "workdirs", p.projectID)
+	if err := os.MkdirAll(workDir, 0750); err != nil {
+		return "", err
+	}
+
+	tempFile := filepath.Join(workDir, fmt.Sprintf("httpx-cff-%s.tmp", util.GenerateID()))
+	var mergedContent []byte
+
+	for _, fp := range fingerprints {
+		// Read the fingerprint file content
+		content, err := os.ReadFile(fp.FilePath)
+		if err != nil {
+			log.Printf("[pipeline] read fingerprint file %s: %v", fp.FilePath, err)
+			continue
+		}
+		// Merge: for JSON files, we need to merge the arrays
+		// For simplicity, we just concatenate the content (assuming line-delimited JSON)
+		if len(mergedContent) > 0 {
+			mergedContent = append(mergedContent, '\n')
+		}
+		mergedContent = append(mergedContent, content...)
+	}
+
+	if len(mergedContent) == 0 {
+		return "", fmt.Errorf("no valid fingerprint content")
+	}
+
+	if err := os.WriteFile(tempFile, mergedContent, 0640); err != nil {
+		return "", err
+	}
+
+	// Return absolute path
+	abs, err := filepath.Abs(tempFile)
+	if err != nil {
+		return tempFile, nil
+	}
+	return abs, nil
 }
 
 func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndpoint) error {

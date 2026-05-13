@@ -478,7 +478,7 @@ func (s *SlowScanOrchestrator) feedToHttpxNuclei(ctx context.Context, urls []str
 	}
 
 	// Run httpx
-	cmd := worker.BuildHttpxCommand(hostFile, s.config.HttpxRateLimit, s.config.HttpxThreads)
+	cmd := worker.BuildHttpxCommand(hostFile, s.config.HttpxRateLimit, s.config.HttpxThreads, "")
 	scanTask := &models.ScanTask{
 		ID:              util.GenerateID(),
 		ProjectID:       s.projectID,

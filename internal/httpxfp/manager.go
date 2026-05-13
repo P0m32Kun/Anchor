@@ -34,17 +34,17 @@ func (m *Manager) Create(name, description string, fpType models.HttpxFingerprin
 		Name:        name,
 		Description: description,
 		Type:        fpType,
-		FilePath:    m.layout.FilePath(id, string(fpType)),
+		FilePath:    m.layout.FilePath(id),
 		Enabled:     true,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
 
-	if err := m.layout.WriteFile(id, string(fpType), content); err != nil {
+	if err := m.layout.WriteFile(id, content); err != nil {
 		return nil, fmt.Errorf("write file: %w", err)
 	}
 	if err := m.q.CreateHttpxFingerprint(f); err != nil {
-		_ = m.layout.DeleteFile(id, string(fpType))
+		_ = m.layout.DeleteFile(id)
 		return nil, fmt.Errorf("create fingerprint: %w", err)
 	}
 	return f, nil
@@ -88,7 +88,7 @@ func (m *Manager) UpdateContent(id string, content []byte) (*models.HttpxFingerp
 	if f == nil {
 		return nil, fmt.Errorf("fingerprint %s not found", id)
 	}
-	if err := m.layout.WriteFile(id, string(f.Type), content); err != nil {
+	if err := m.layout.WriteFile(id, content); err != nil {
 		return nil, fmt.Errorf("write file: %w", err)
 	}
 	f.UpdatedAt = time.Now().UTC()
@@ -106,7 +106,7 @@ func (m *Manager) ReadContent(id string) ([]byte, error) {
 	if f == nil {
 		return nil, fmt.Errorf("fingerprint %s not found", id)
 	}
-	return m.layout.ReadFile(id, string(f.Type))
+	return m.layout.ReadFile(id)
 }
 
 func (m *Manager) Delete(ctx context.Context, id string) error {
@@ -115,7 +115,7 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	if f != nil {
-		_ = m.layout.DeleteFile(id, string(f.Type))
+		_ = m.layout.DeleteFile(id)
 	}
 	return m.q.DeleteHttpxFingerprint(id)
 }
