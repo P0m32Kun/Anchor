@@ -29,6 +29,25 @@ func (q *Queries) GetNucleiCustomSource(id string) (*models.NucleiCustomSource, 
 	return scanNucleiCustomSource(row)
 }
 
+// ListEnabledNucleiCustomSourceIDs returns the IDs of all enabled custom sources.
+// Used by the pipeline to construct precise -w workflow paths.
+func (q *Queries) ListEnabledNucleiCustomSourceIDs() ([]string, error) {
+	rows, err := q.db.Query(`SELECT id FROM nuclei_custom_sources WHERE enabled = 1 ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (q *Queries) ListNucleiCustomSources() ([]*models.NucleiCustomSource, error) {
 	rows, err := q.db.Query(`
 		SELECT id, name, type, uri, branch, enabled, routing_policy, status,

@@ -378,41 +378,28 @@ func (ws *WorkerServer) reportResult(taskID, status string, artifacts []map[stri
 	log.Printf("[worker] task %s finished: %s artifacts=%d error=%q", taskID, status, len(artifacts), errorMsg)
 }
 
-// injectCustomNucleiTemplates checks for a local custom bundle and appends
-// -t (templates) and -w (workflows) flags to the nuclei command if the
-// directories exist and are not already present in the command.
-//
-// scanDepth controls workflow injection:
-//   - "tags":    only inject -t (official + custom templates), skip -w
-//   - "workflow": only inject -w (custom workflows), skip -t
-//   - "both":    inject official -t AND custom -w
-//   - "":        inject both (default, backwards compatible)
-//
-// Official workflows (/root/nuclei-templates/workflows) are intentionally
-// excluded — only custom workflows from imported template sources are used.
+// injectCustomNucleiTemplates injects official and custom template directories
+// via -t flags. Workflow injection (-w) is handled by the pipeline with precise
+// per-service paths; the worker only layers template directories for tag-based
+// matching.
 //
 // Directory structure:
 //   ~/templates-{sourceId}/  - custom templates (templates/ + workflows/)
-//   ~/nuclei-templates/      - official nuclei templates (no workflows used)
+//   ~/nuclei-templates/      - official nuclei templates
 func (ws *WorkerServer) injectCustomNucleiTemplates(command []string, taskID string, scanDepth string) []string {
 	home, _ := os.UserHomeDir()
 	if home == "" {
 		return command
 	}
 
-	injectTemplates := scanDepth == "tags" || scanDepth == "both" || scanDepth == ""
-	injectWorkflows := scanDepth == "workflow" || scanDepth == "both" || scanDepth == ""
-
-	// Inject official templates directory (only for tags/both modes)
-	if injectTemplates {
-		officialPath := filepath.Join(home, "nuclei-templates")
-		if info, err := os.Stat(officialPath); err == nil && info.IsDir() {
-			command = append(command, "-t", officialPath)
-			log.Printf("[worker] task %s injected official templates: %s", taskID, officialPath)
-		}
+	// Inject official templates directory
+	officialPath := filepath.Join(home, "nuclei-templates")
+	if info, err := os.Stat(officialPath); err == nil && info.IsDir() {
+		command = append(command, "-t", officialPath)
+		log.Printf("[worker] task %s injected official templates: %s", taskID, officialPath)
 	}
 
-	// Scan for template source directories (~/templates-*)
+	// Scan for custom template source directories (~/templates-*)
 	entries, err := os.ReadDir(home)
 	if err != nil {
 		return command
@@ -428,23 +415,9 @@ func (ws *WorkerServer) injectCustomNucleiTemplates(command []string, taskID str
 		}
 
 		sourceDir := filepath.Join(home, name)
-
-		// Inject templates for tags/both mode
-		if injectTemplates {
-			tplDir := filepath.Join(sourceDir, "templates")
-			if info, err := os.Stat(tplDir); err == nil && info.IsDir() {
-				command = append(command, "-t", sourceDir)
-				log.Printf("[worker] task %s injected custom templates: %s", taskID, sourceDir)
-			}
-		}
-
-		// Inject workflows for workflow/both mode
-		if injectWorkflows {
-			wfDir := filepath.Join(sourceDir, "workflows")
-			if info, err := os.Stat(wfDir); err == nil && info.IsDir() {
-				command = append(command, "-w", wfDir)
-				log.Printf("[worker] task %s injected custom workflows: %s", taskID, wfDir)
-			}
+		if info, err := os.Stat(sourceDir); err == nil && info.IsDir() {
+			command = append(command, "-t", sourceDir)
+			log.Printf("[worker] task %s injected custom templates: %s", taskID, sourceDir)
 		}
 	}
 
