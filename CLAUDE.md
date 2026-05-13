@@ -10,7 +10,7 @@ This project is indexed by GitNexus as **Anchor** (8472 symbols, 18153 relations
 - **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
 - **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-groupes ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
 
 ## Never Do
@@ -41,3 +41,25 @@ This project is indexed by GitNexus as **Anchor** (8472 symbols, 18153 relations
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+---
+
+# Anchor 项目约定
+
+## 工作语言
+
+- **所有对话使用中文进行**
+
+## 验证要求
+
+- **修复后只跑 build/typecheck 不算修完** — 必须起服务跑通真实场景（E2E）
+
+## 配置单位
+
+- **包装外部 CLI 工具时禁止在代码里做单位转换**（如 `*1000`），字段单位与工具自身一致
+
+## 文档入口
+
+- `docs/current/plan.md` — 当前唯一有效的实施计划
+- `docs/current/architecture.md` — 当前运行时架构基线
+- `docs/current/code-health-audit.md` — 多阶段代码健康审计计划（2026-05-13 激活）

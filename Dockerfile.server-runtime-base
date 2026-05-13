@@ -1,0 +1,23 @@
+# Anchor Server Runtime Base Image
+# 预装运行时依赖（apt 包 + 字典仓库），极少更新
+# 首次使用: docker build -f Dockerfile.server-runtime-base -t anchor-server-runtime-base:latest .
+#
+# 更新时机：
+#   - apt 依赖变化时
+#   - dict 仓库更新时（DICT_REF 变化）
+#   - 安全补丁更新时
+
+FROM debian:bookworm-slim
+
+RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+    ca-certificates libsqlite3-0 wget git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Built-in dictionaries (RBKD-SEC/dict). The server's startup seed walks this
+# tree and registers each file in the dictionaries table with builtin=1.
+ARG DICT_REPO=https://github.com/RBKD-SEC/dict.git
+ARG DICT_REF=main
+RUN git clone --depth 1 --branch ${DICT_REF} ${DICT_REPO} /opt/dict && \
+    rm -rf /opt/dict/.git
