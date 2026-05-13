@@ -230,6 +230,7 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 	if shouldRunSlowScan {
 		slowScan := NewSlowScanOrchestrator(p.queries, p.runner, p.dataDir).
 			WithConfig(p.config).
+			WithMerger(p.merger).
 			WithStageEmitter(p.emitter)
 		if err := slowScan.Run(ctx, p.projectID, p.runID); err != nil {
 			log.Printf("[pipeline] slow scan orchestrator: %v", err)
@@ -269,7 +270,7 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 // main flow stages but are treated as soft — their failure does not promote
 // the run to failed. Adding a new slow-scan tool means adding its stage here.
 func isSlowScanStage(stage string) bool {
-	return stage == string(StageFfuf)
+	return stage == string(StageFfuf) || stage == string(StageURLFinder)
 }
 
 // --- Utility functions ---

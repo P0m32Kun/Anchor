@@ -3,6 +3,7 @@
 .PHONY: logs logs-server logs-worker status shell-server shell-worker
 .PHONY: build-worker-base build-worker-builder-base push-worker-base pull-worker-base setup-worker-base
 .PHONY: build-server-base push-server-base pull-server-base setup-server-base
+.PHONY: build-server-runtime-base push-server-runtime-base pull-server-runtime-base
 .PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-full
 .PHONY: range-up range-down range-status range-logs
 .PHONY: dev-web tauri-dev tauri-build
@@ -56,7 +57,21 @@ pull-server-base:
 	docker pull p0m32kun/anchor-server-base:latest
 	docker tag p0m32kun/anchor-server-base:latest anchor-server-base:latest
 
-setup-server-base: build-server-base
+setup-server-base: build-server-base build-server-runtime-base
+
+# --- Server Runtime Base Image ---
+build-server-runtime-base:
+	docker build -f Dockerfile.server-runtime-base -t anchor-server-runtime-base:latest .
+
+push-server-runtime-base:
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		-f Dockerfile.server-runtime-base \
+		-t p0m32kun/anchor-server-runtime-base:latest \
+		--push .
+
+pull-server-runtime-base:
+	docker pull p0m32kun/anchor-server-runtime-base:latest
+	docker tag p0m32kun/anchor-server-runtime-base:latest anchor-server-runtime-base:latest
 
 # 首次设置：构建 worker 的两个基础镜像
 setup-worker-base: build-worker-base build-worker-builder-base

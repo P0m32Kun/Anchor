@@ -25,7 +25,7 @@ describe("mergeStageEvent (RunsPage SSE reducer)", () => {
   });
 
   // REGRESSION: this is the heart of Fix 2 on the frontend. Slow-scan stages
-  // (currently just ffuf — urlfinder was removed) arrive AFTER the initial
+  // (ffuf, urlfinder) arrive AFTER the initial
   // loadRunDetails snapshot was taken, so the reducer must append unknown
   // stages — not drop them. The pre-fix code returned `prev` unchanged when
   // findIndex < 0, which is exactly why slow-scan rows didn't show up in the UI.

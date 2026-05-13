@@ -47,6 +47,9 @@ type PipelineConfig struct {
 	FfufRateLimit    int    `json:"ffuf_rate_limit"`        // rps
 	FfufTimeout      int    `json:"ffuf_timeout"`           // seconds
 	FfufDictionaryID string `json:"ffuf_dictionary_id"`     // optional
+	EnableURLFinder  bool   `json:"enable_urlfinder"`
+	URLFinderThreads int    `json:"urlfinder_threads"`       // default 50
+	URLFinderTimeout int    `json:"urlfinder_timeout"`       // seconds, default 10
 }
 
 func DefaultPipelineConfig() PipelineConfig {
@@ -82,5 +85,8 @@ func DefaultPipelineConfig() PipelineConfig {
 		FfufRateLimit:    6, // rps
 		FfufTimeout:      30,
 		FfufDictionaryID: "",
+		EnableURLFinder:  true,
+		URLFinderThreads: 20,
+		URLFinderTimeout: 10,
 	}
 }

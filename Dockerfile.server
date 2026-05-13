@@ -12,22 +12,7 @@ COPY . .
 RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor .
 
 # --- Runtime ---
-FROM debian:bookworm-slim
-
-RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-    ca-certificates libsqlite3-0 wget git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Built-in dictionaries (RBKD-SEC/dict). The server's startup seed walks this
-# tree and registers each file in the dictionaries table with builtin=1. The
-# worker image must clone the same ref to the same path so file_paths recorded
-# here resolve identically inside the worker container.
-ARG DICT_REPO=https://github.com/RBKD-SEC/dict.git
-ARG DICT_REF=main
-RUN git clone --depth 1 --branch ${DICT_REF} ${DICT_REPO} /opt/dict && \
-    rm -rf /opt/dict/.git
+FROM anchor-server-runtime-base:latest
 
 WORKDIR /app
 COPY --from=builder /build/anchor .

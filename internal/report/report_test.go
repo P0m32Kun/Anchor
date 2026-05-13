@@ -474,3 +474,100 @@ func TestFilterByStatus_Empty(t *testing.T) {
 		t.Error("expected nil result for nil input")
 	}
 }
+
+// --- Pipe escaping regression (20260427-markdown-pipe-corruption) ---
+
+func TestGenerateMarkdown_PipeInFindingTitle(t *testing.T) {
+	data := testReportData()
+	data.Findings[0].Finding.Title = "SQL Injection | Union Based"
+	data.Findings[0].Asset = &models.Asset{
+		ID:    "asset-001",
+		Type:  models.AssetTypeDomain,
+		Value: "example.com",
+	}
+	data.Findings[0].WebEndpoint = &models.WebEndpoint{
+		ID:  "ep-001",
+		URL: "https://example.com/search?q=test|123",
+	}
+	md := GenerateMarkdown(data)
+
+	// Title with | should render correctly in heading (not break markdown).
+	if !strings.Contains(md, "SQL Injection \\| Union Based") {
+		t.Errorf("pipe in title should be escaped, got:\n%s", md)
+	}
+	// URL with | should be escaped in table cell.
+	if !strings.Contains(md, "test\\|123") {
+		t.Errorf("pipe in URL should be escaped in table, got:\n%s", md)
+	}
+}
+
+func TestGenerateMarkdown_PipeInAssetValue(t *testing.T) {
+	data := testReportData()
+	data.Findings[0].Asset = &models.Asset{
+		ID:    "asset-001",
+		Type:  models.AssetTypeDomain,
+		Value: "a|b.example.com",
+	}
+	data.Findings[0].WebEndpoint = nil
+	md := GenerateMarkdown(data)
+
+	// Asset value with | in the "涉及 IP:Port" table should be escaped.
+	if !strings.Contains(md, "a\\|b.example.com") {
+		t.Errorf("pipe in asset value should be escaped in table, got:\n%s", md)
+	}
+	// Table header should still be intact.
+	if !strings.Contains(md, "| 资产 | 端口 | 访问地址 |") {
+		t.Error("table header should be intact")
+	}
+}
+
+func TestGenerateMarkdown_PipeInMultipleFields(t *testing.T) {
+	data := testReportData()
+	data.Findings[0].Finding.Title = "Vuln A | B"
+	data.Findings[0].Asset = &models.Asset{
+		ID:    "asset-001",
+		Type:  models.AssetTypeIP,
+		Value: "10.0.0.1",
+	}
+	data.Findings[0].WebEndpoint = &models.WebEndpoint{
+		ID:  "ep-001",
+		URL: "http://10.0.0.1/path?a=1|2",
+		Port: intPtr(8080),
+	}
+	md := GenerateMarkdown(data)
+
+	// Both title and URL should have pipes escaped.
+	if !strings.Contains(md, "Vuln A \\| B") {
+		t.Errorf("pipe in title should be escaped")
+	}
+	if !strings.Contains(md, "a=1\\|2") {
+		t.Errorf("pipe in URL should be escaped")
+	}
+}
+
+func intPtr(v int) *int { return &v }
+
+// --- escapeMDTable unit tests ---
+
+func TestEscapeMDTable(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"no change", "hello", "hello"},
+		{"single pipe", "a|b", `a\|b`},
+		{"multiple pipes", "a|b|c", `a\|b\|c`},
+		{"newline", "line1\nline2", "line1 line2"},
+		{"pipe and newline", "a|b\nc", `a\|b c`},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := escapeMDTable(tt.input)
+			if got != tt.want {
+				t.Errorf("escapeMDTable(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

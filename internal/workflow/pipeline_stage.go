@@ -17,7 +17,8 @@ const (
 	// Slow-scan stages emitted by SlowScanOrchestrator post-pipeline. They
 	// only show up when the main flow has at least one live web endpoint and
 	// the matching tool is enabled.
-	StageFfuf StageID = "ffuf"
+	StageFfuf      StageID = "ffuf"
+	StageURLFinder StageID = "urlfinder"
 )
 
 // StageEventCallback is invoked when a pipeline stage changes state.

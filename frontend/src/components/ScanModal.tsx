@@ -55,7 +55,7 @@ const MODE_OPTIONS: {
     mode: "external",
     label: "外网扫描",
     description: "面向互联网的资产发现与漏洞检测",
-    tools: ["FOFA", "Subfinder", "DNSx", "CDNCheck", "Naabu", "nmap -sV", "HTTPX", "Nuclei"],
+    tools: ["FOFA", "Subfinder", "DNSx", "CDNCheck", "nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Ffuf", "URLFinder"],
     icon: Globe,
     color: "text-blue-400",
   },
@@ -63,7 +63,7 @@ const MODE_OPTIONS: {
     mode: "internal",
     label: "内网扫描",
     description: "内网资产端口、服务与漏洞检测",
-    tools: ["Naabu", "nmap -sV", "HTTPX", "Nuclei"],
+    tools: ["nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Ffuf", "URLFinder"],
     icon: Shield,
     color: "text-emerald-400",
   },
@@ -553,6 +553,61 @@ export default function ScanModal({ open, onClose, onStart, loading }: ScanModal
                       {ffufMisconfigured && (
                         <div className="text-[10px] text-destructive">请选择 Ffuf 字典,或关闭 Ffuf</div>
                       )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* URLFinder toggle */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => setConfig((prev) => ({ ...prev, enable_urlfinder: !prev.enable_urlfinder }))}
+                  className={cn(
+                    "w-full text-left p-3 rounded-xl border text-xs transition-all duration-200",
+                    config.enable_urlfinder
+                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"
+                  )}
+                >
+                  <div className="font-bold text-foreground">URLFinder</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">从页面中提取 URL 与 JS 链接,扩展攻击面</div>
+                </button>
+
+                {config.enable_urlfinder && (
+                  <div className="p-4 rounded-2xl border border-white/5 bg-white/[0.01] space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-medium text-muted-foreground">线程数</label>
+                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 20</span>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={config.urlfinder_threads}
+                          onChange={(e) => updateConfig("urlfinder_threads", e.target.value)}
+                          className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
+                        />
+                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">threads</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-medium text-muted-foreground">超时</label>
+                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 10秒</span>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={120}
+                          value={config.urlfinder_timeout}
+                          onChange={(e) => updateConfig("urlfinder_timeout", e.target.value)}
+                          className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
+                        />
+                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">秒</span>
+                      </div>
                     </div>
                   </div>
                 )}

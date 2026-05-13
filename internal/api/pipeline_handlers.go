@@ -402,3 +402,52 @@ func (s *Server) handleListScanRuns(w http.ResponseWriter, r *http.Request) {
 
 	writePaginatedJSON(w, runs, total, pg)
 }
+
+func (s *Server) handleCancelPipelineRun(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	runID := r.PathValue("runId")
+	if projectID == "" || runID == "" {
+		writeError(w, http.StatusBadRequest, errors.New("MISSING_PARAM", "Project ID and Run ID are required"))
+		return
+	}
+
+	run, err := s.queries.GetPipelineRun(runID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
+		return
+	}
+	if run == nil || run.ProjectID != projectID {
+		writeError(w, http.StatusNotFound, errors.New("NOT_FOUND", "pipeline run not found"))
+		return
+	}
+
+	if run.Status == "completed" || run.Status == "failed" || run.Status == "cancelled" {
+		writeError(w, http.StatusBadRequest, errors.New("ALREADY_FINISHED", "run already finished"))
+		return
+	}
+
+	tasks, err := s.queries.ListScanTasksByRun(runID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
+		return
+	}
+
+	now := time.Now().UTC()
+	for _, task := range tasks {
+		if task.Status == models.TaskCompleted || task.Status == models.TaskFailed || task.Status == models.TaskCancelled {
+			continue
+		}
+		_ = s.queries.UpdateScanTaskStatus(task.ID, models.TaskCancelled, nil, &now)
+		_ = s.worker.Cancel(task.ID)
+	}
+
+	s.queries.UpdatePipelineRunStatus(runID, "cancelled")
+
+	s.broadcastProjectSSE(projectID, map[string]interface{}{
+		"event":  "pipeline_complete",
+		"run_id": runID,
+		"time":   now.Format(time.RFC3339),
+	})
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}

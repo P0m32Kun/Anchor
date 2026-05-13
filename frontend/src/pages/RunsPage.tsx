@@ -227,6 +227,21 @@ export default function RunsPage() {
   const isCurrentRunActive =
     currentRun?.status === "running" || currentRun?.status === "pending";
 
+  // Keep polling for a few cycles after the run finishes so the final batch
+  // of task status updates (completed/failed) reaches the UI.  Without this
+  // cooldown the polling stops the moment the run flips to "completed" and
+  // the last few task cards stay stuck on "running" until the user reloads.
+  const [cooldown, setCooldown] = useState(false);
+  useEffect(() => {
+    if (isCurrentRunActive) {
+      setCooldown(false);
+    } else if (selectedRun && currentRun && !cooldown) {
+      setCooldown(true);
+      const t = setTimeout(() => setCooldown(false), 15000);
+      return () => clearTimeout(t);
+    }
+  }, [isCurrentRunActive, selectedRun, currentRun?.status]);
+
   usePolling(
     async () => {
       if (!selectedRun) return;
@@ -234,7 +249,7 @@ export default function RunsPage() {
     },
     {
       interval: 3000,
-      enabled: !!selectedRun && isCurrentRunActive,
+      enabled: !!selectedRun && (isCurrentRunActive || cooldown),
       pauseOnHidden: true,
     }
   );
@@ -261,10 +276,10 @@ export default function RunsPage() {
   };
 
   const handleCancelRun = async () => {
-    if (!cancelTargetRun || cancelling) return;
+    if (!cancelTargetRun || cancelling || !projectId) return;
     setCancelling(true);
     try {
-      await api.cancelRun(cancelTargetRun.id);
+      await api.cancelPipelineRun(projectId, cancelTargetRun.id);
       toast("扫描任务已取消", "success");
       await loadRuns();
       if (selectedRun === cancelTargetRun.id) {
@@ -738,14 +753,23 @@ function ReportButton({
   );
 }
 
+// Slow-scan stages run concurrently so time-range matching alone puts all
+// concurrent tasks under every overlapping stage.  For these stages we also
+// require the task's tool name to match the stage name.
+const SLOW_SCAN_STAGES = new Set(["ffuf", "urlfinder"]);
+
 function tasksInStage(stage: PipelineRunStage, allTasks: ScanTask[]): ScanTask[] {
   if (!stage.started_at) return [];
   const stageStart = new Date(stage.started_at).getTime();
   const stageEnd = stage.completed_at ? new Date(stage.completed_at).getTime() : Infinity;
+  const slow = SLOW_SCAN_STAGES.has(stage.stage);
   return allTasks.filter((t) => {
     if (!t.started_at) return false;
     const ts = new Date(t.started_at).getTime();
-    return ts >= stageStart && ts <= stageEnd;
+    if (ts < stageStart || ts > stageEnd) return false;
+    // For slow-scan stages, only show tasks whose tool matches the stage.
+    if (slow && t.tool !== stage.stage) return false;
+    return true;
   });
 }
 
@@ -778,11 +802,13 @@ const STAGE_LABELS: Record<string, string> = {
   subdomain: "子域名发现",
   resolve: "DNS 解析",
   cdn_filter: "CDN 过滤",
+  alive: "主机存活探测",
   portscan: "端口扫描",
   fingerprint: "服务指纹",
   httpx: "Web 探活",
   vuln: "漏洞探测",
   ffuf: "目录爆破 (慢速)",
+  urlfinder: "URL 发现 (慢速)",
 };
 
 // mergeStageEvent reduces an SSE pipeline_stage_change event into the local

@@ -228,13 +228,13 @@ func TestIsSlowScanStage(t *testing.T) {
 		slow  bool
 	}{
 		{"ffuf", true},
+		{"urlfinder", true},
 		{"alive", false},
 		{"portscan", false},
 		{"fingerprint", false},
 		{"httpx", false},
 		{"vuln", false},
 		{"cdn_filter", false},
-		{"urlfinder", false}, // removed tool — must NOT be treated as slow scan
 		{"", false},
 		{"unknown_stage", false},
 	}

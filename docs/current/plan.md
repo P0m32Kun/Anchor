@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-07
+last_updated: 2026-05-13
 scope: repository-wide
 ---
 
@@ -20,6 +20,7 @@ This is the only repository-wide implementation plan that agents should treat as
 
 | Workstream | Status | Source of truth? | Notes |
 | --- | --- | --- | --- |
+| Code health audit | Active | Yes | Multi-phase audit plan in [`code-health-audit.md`](code-health-audit.md); P0 safety & contract, P1 architecture, P2 test strategy, P3 frontend |
 | Documentation governance | Active | Yes | Consolidate navigation, mark document lifecycle, reduce agent confusion |
 | Current architecture baseline | Active | Yes | Defined in [`architecture.md`](architecture.md) |
 | v0.4 scan pipeline | Accepted | Yes | Verified by `docs/active/review/v0.4-acceptance.md`; design doc archived at `docs/archived/v0.4/scan-pipeline.md` (superseded 2026-05-12, see `architecture.md` for current baseline) |

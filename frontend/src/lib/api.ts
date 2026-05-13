@@ -489,6 +489,8 @@ export const api = {
     fetchAPI<ScanTask[]>(`/runs/${id}/tasks`, { signal }),
   cancelRun: (id: string, signal?: AbortSignal) =>
     fetchAPI<{ status: string }>(`/runs/${id}/cancel`, { method: "POST", signal }),
+  cancelPipelineRun: (projectId: string, runId: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/projects/${projectId}/pipeline/runs/${runId}/cancel`, { method: "POST", signal }),
 
   // --- Pipeline Config (project-scoped) ---
   getPipelineConfig: (projectId: string, signal?: AbortSignal) =>
@@ -771,6 +773,9 @@ export interface PipelineConfig {
   ffuf_rate_limit: number;
   ffuf_timeout: number;
   ffuf_dictionary_id: string;
+  enable_urlfinder: boolean;
+  urlfinder_threads: number;
+  urlfinder_timeout: number;
 }
 
 export interface Dictionary {
@@ -872,6 +877,9 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   ffuf_rate_limit: 6,
   ffuf_timeout: 30,
   ffuf_dictionary_id: "",
+  enable_urlfinder: true,
+  urlfinder_threads: 20,
+  urlfinder_timeout: 10,
 };
 
 // Mirrors internal/worker/commands.go:HighRiskPorts — curated list of high-value

@@ -140,7 +140,6 @@ test.describe.serial("内网扫描 E2E — UI 主导", () => {
 		const stageNames = stagesBody.stages.map((s) => s.stage);
 		log(`stages: ${stageNames.join(", ")}`);
 		expect(stageNames).not.toContain("cdn_filter"); // Fix 1
-		expect(stageNames).not.toContain("urlfinder"); // tool removed
 
 		// ── Step 4: UI 验证 AssetPage ──
 		log("Step 4: UI 验证 AssetPage");
