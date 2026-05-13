@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -206,15 +207,34 @@ func (p *Pipeline) runHttpx(ctx context.Context, hosts []string) ([]*models.WebE
 	_ = task
 
 	endpoints := parser.ParseHttpxOutput(bytes.NewReader(stdout))
+	var saved []*models.WebEndpoint
 	for _, ep := range endpoints {
-		ep.ID = util.GenerateID()
-		ep.ProjectID = p.projectID
-		ep.CreatedAt = time.Now().UTC()
-		if err := p.queries.CreateWebEndpoint(ep); err != nil {
+		host := ep.Host
+		if host == "" {
+			continue
+		}
+		assetType := "domain"
+		if net.ParseIP(host) != nil {
+			assetType = "ip"
+		}
+		hostAsset, _, err := p.merger.MergeOrCreateAsset(p.projectID, assetType, host, "httpx")
+		if err != nil {
+			log.Printf("[pipeline] merge/create asset %s: %v", host, err)
+			continue
+		}
+		we, _, err := p.merger.CreateWebEndpointIfNotExists(
+			p.projectID, hostAsset.ID, ep.URL, ep.Scheme, ep.Host,
+			ep.Port, ep.Path, ep.Title, ep.StatusCode, ep.Technologies, "httpx",
+		)
+		if err != nil {
 			log.Printf("[pipeline] save web endpoint %s: %v", ep.URL, err)
+			continue
+		}
+		if we != nil {
+			saved = append(saved, we)
 		}
 	}
-	return endpoints, nil
+	return saved, nil
 }
 
 func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndpoint) error {
@@ -229,23 +249,55 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 		urlToEndpoint[ep.URL] = ep
 	}
 
-	for tagKey, urls := range groups {
-		tags := strings.Split(tagKey, ",")
-		targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
-		if err := os.WriteFile(targetFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
-			continue
-		}
-		if abs, err := filepath.Abs(targetFile); err == nil {
-			targetFile = abs
+	if p.config.NucleiScanDepth == "workflow" {
+		// Workflow mode: run each tag's workflow file separately for precision
+		// tagKey format: "tag1,tag2" → split and run each workflow individually
+		tagToURLs := make(map[string][]string)
+		for tagKey, urls := range groups {
+			tags := strings.Split(tagKey, ",")
+			for _, tag := range tags {
+				tagToURLs[tag] = append(tagToURLs[tag], urls...)
+			}
 		}
 
-		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, tags, p.config.NucleiScanDepth, DefaultWorkflowDir))
-		if err != nil {
-			log.Printf("nuclei task for tags %s: %v", tagKey, err)
-			continue
+		for tag, urls := range tagToURLs {
+			targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
+			if err := os.WriteFile(targetFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
+				continue
+			}
+			if abs, err := filepath.Abs(targetFile); err == nil {
+				targetFile = abs
+			}
+
+			templatePath := fmt.Sprintf("workflows/%s.yaml", tag)
+			task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, nil, p.config.NucleiScanDepth, "", templatePath))
+			if err != nil {
+				log.Printf("nuclei task for workflow %s: %v", tag, err)
+				continue
+			}
+			_ = task
+			p.saveNucleiFindings(stdout, urlToEndpoint, nil)
 		}
-		_ = task
-		p.saveNucleiFindings(stdout, urlToEndpoint, nil)
+	} else {
+		// Tags or both mode: use tag-based matching
+		for tagKey, urls := range groups {
+			tags := strings.Split(tagKey, ",")
+			targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
+			if err := os.WriteFile(targetFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
+				continue
+			}
+			if abs, err := filepath.Abs(targetFile); err == nil {
+				targetFile = abs
+			}
+
+			task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, tags, p.config.NucleiScanDepth, DefaultWorkflowDir, ""))
+			if err != nil {
+				log.Printf("nuclei task for tags %s: %v", tagKey, err)
+				continue
+			}
+			_ = task
+			p.saveNucleiFindings(stdout, urlToEndpoint, nil)
+		}
 	}
 
 	return nil
@@ -275,7 +327,17 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Nm
 			targetFile = abs
 		}
 
-		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, []string{tag}, p.config.NucleiScanDepth, DefaultWorkflowDir))
+		// When scanDepth is "workflow", use -t workflows/{tag}.yaml instead of -tags
+		// This allows precise per-service template targeting (e.g., workflows/mysql.yaml)
+		var tags []string
+		var templatePath string
+		if p.config.NucleiScanDepth == "workflow" {
+			templatePath = fmt.Sprintf("workflows/%s.yaml", tag)
+		} else {
+			tags = []string{tag}
+		}
+
+		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, tags, p.config.NucleiScanDepth, "", templatePath))
 		if err != nil {
 			log.Printf("nuclei task for tag %s: %v", tag, err)
 			continue

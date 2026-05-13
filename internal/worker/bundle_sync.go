@@ -32,31 +32,49 @@ type BundleSourceEntry struct {
 // BundleSyncer manages the local nuclei custom template bundle on a worker node.
 // It fetches the manifest from the server, downloads and extracts new bundles,
 // and atomically switches the "current" symlink.
+//
+// Directory structure:
+//   ~/nuclei-templates/  ← nuclei official templates (managed by nuclei)
+//   ~/templates/         ← our custom templates (managed by us)
 type BundleSyncer struct {
 	dataDir    string
 	coreURL    string
 	apiToken   string
 	httpClient *http.Client
+	homeDir    string // cached home directory
 }
 
 // NewBundleSyncer creates a syncer for the worker's local bundle cache.
 func NewBundleSyncer(dataDir, coreURL, apiToken string) *BundleSyncer {
+	home, _ := os.UserHomeDir()
 	return &BundleSyncer{
 		dataDir:    dataDir,
 		coreURL:    coreURL,
 		apiToken:   apiToken,
 		httpClient: &http.Client{Timeout: 60 * time.Second},
+		homeDir:    home,
 	}
 }
 
-// BundlesRoot returns the local bundles directory.
+// customTemplatesRoot returns the root directory for custom templates.
+// This is ~/templates/
+func (s *BundleSyncer) customTemplatesRoot() string {
+	if s.homeDir != "" {
+		return filepath.Join(s.homeDir, "templates")
+	}
+	// Fallback to dataDir if home dir not available
+	return filepath.Join(s.dataDir, "custom-templates")
+}
+
+// BundlesRoot returns the local bundles directory for metadata and cache.
 func (s *BundleSyncer) BundlesRoot() string {
 	return filepath.Join(s.dataDir, "nuclei", "custom", "bundles")
 }
 
-// CurrentBundleDir returns the path to the "current" symlink target.
+// CurrentBundleDir returns the path to the active custom template directory.
+// This is ~/templates/current/ which is a symlink to the actual version directory.
 func (s *BundleSyncer) CurrentBundleDir() string {
-	return filepath.Join(s.BundlesRoot(), "current")
+	return filepath.Join(s.customTemplatesRoot(), "current")
 }
 
 // CurrentVersion reads the active bundle version from the current symlink.
@@ -141,7 +159,8 @@ func (s *BundleSyncer) fetchManifest() (*BundleManifest, error) {
 	return &manifest, nil
 }
 
-// downloadAndExtract fetches the bundle .tar.gz and extracts it to a version directory.
+// downloadAndExtract fetches the bundle .tar.gz and extracts it to a version directory
+// under nuclei's template root: ~/.local/share/nuclei-templates/custom/{version}/
 func (s *BundleSyncer) downloadAndExtract(version string) error {
 	url := fmt.Sprintf("%s/nuclei/custom/bundles/%s", s.coreURL, version)
 	req, _ := http.NewRequest("GET", url, nil)
@@ -159,49 +178,51 @@ func (s *BundleSyncer) downloadAndExtract(version string) error {
 		return fmt.Errorf("download bundle: %s", resp.Status)
 	}
 
-	bundlesRoot := s.BundlesRoot()
-	if err := os.MkdirAll(bundlesRoot, 0o755); err != nil {
-		return fmt.Errorf("mkdir bundles: %w", err)
+	// Ensure nuclei template directory exists
+	customRoot := s.customTemplatesRoot()
+	if err := os.MkdirAll(customRoot, 0o755); err != nil {
+		return fmt.Errorf("mkdir custom root: %w", err)
 	}
 
-	// Extract to a temp dir first, then rename atomically
-	tmpDir := filepath.Join(bundlesRoot, ".tmp-"+version)
+	// Extract to a temp dir first
+	tmpDir := filepath.Join(customRoot, ".tmp-"+version)
 	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
 		return fmt.Errorf("mkdir tmp: %w", err)
 	}
+	defer os.RemoveAll(tmpDir)
 
 	if err := extractTarGz(resp.Body, tmpDir); err != nil {
-		os.RemoveAll(tmpDir)
 		return fmt.Errorf("extract: %w", err)
 	}
 
-	target := filepath.Join(bundlesRoot, version)
-	// Remove existing if present
+	// Move to version directory atomically
+	target := filepath.Join(customRoot, version)
 	os.RemoveAll(target)
 	if err := os.Rename(tmpDir, target); err != nil {
-		os.RemoveAll(tmpDir)
 		return fmt.Errorf("rename: %w", err)
 	}
 
+	log.Printf("[worker] bundle extracted to %s", target)
 	return nil
 }
 
 // switchCurrent atomically updates the "current" symlink to point to version.
+// The symlink is at ~/.local/share/nuclei-templates/custom/current
+// pointing to the version directory (e.g., "sha256:abc123").
 func (s *BundleSyncer) switchCurrent(version string) error {
-	bundlesRoot := s.BundlesRoot()
+	customRoot := s.customTemplatesRoot()
 	current := s.CurrentBundleDir()
-	target := filepath.Join(bundlesRoot, version)
+	target := version // relative path from customRoot to version dir
 
-	// Create relative symlink
-	relPath, err := filepath.Rel(bundlesRoot, target)
-	if err != nil {
-		return fmt.Errorf("compute relative path: %w", err)
+	// Ensure customRoot exists
+	if err := os.MkdirAll(customRoot, 0o755); err != nil {
+		return fmt.Errorf("mkdir custom root: %w", err)
 	}
 
 	// Atomic: write to tmp link, then rename
 	tmpLink := current + ".tmp"
 	os.Remove(tmpLink)
-	if err := os.Symlink(relPath, tmpLink); err != nil {
+	if err := os.Symlink(target, tmpLink); err != nil {
 		return fmt.Errorf("create tmp symlink: %w", err)
 	}
 	if err := os.Rename(tmpLink, current); err != nil {
@@ -211,14 +232,28 @@ func (s *BundleSyncer) switchCurrent(version string) error {
 	return nil
 }
 
-// TemplatesDir returns the path to the current bundle's templates directory.
+// TemplatesDir returns the path to the templates directory.
+// Returns ~/templates/templates if current/ exists (bundle mode),
+// otherwise returns ~/templates (direct mode).
 func (s *BundleSyncer) TemplatesDir() string {
-	return filepath.Join(s.CurrentBundleDir(), "templates")
+	currentDir := filepath.Join(s.customTemplatesRoot(), "current", "templates")
+	if _, err := os.Stat(currentDir); err == nil {
+		return currentDir
+	}
+	// Direct mode: templates are in ~/templates directly
+	return s.customTemplatesRoot()
 }
 
-// WorkflowsDir returns the path to the current bundle's workflows directory.
+// WorkflowsDir returns the path to the workflows directory.
+// Returns ~/templates/current/workflows if current/ exists (bundle mode),
+// otherwise returns ~/templates/workflows (direct mode).
 func (s *BundleSyncer) WorkflowsDir() string {
-	return filepath.Join(s.CurrentBundleDir(), "workflows")
+	currentDir := filepath.Join(s.customTemplatesRoot(), "current", "workflows")
+	if _, err := os.Stat(currentDir); err == nil {
+		return currentDir
+	}
+	// Direct mode: workflows are in ~/templates/workflows
+	return filepath.Join(s.customTemplatesRoot(), "workflows")
 }
 
 // TemplateVersionsJSON returns the JSON string for heartbeat reporting.

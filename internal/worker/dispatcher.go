@@ -106,6 +106,16 @@ func (d *Dispatcher) wasIdleTimeout(taskID string) bool {
 func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, worker *models.WorkerNode, workdir string, project *models.Project) error {
 	args := strings.Fields(task.CommandTemplate)
 	inputFiles := collectInputFiles(args)
+
+	// Extract scanDepth from project config for nuclei workflow injection control.
+	scanDepth := ""
+	if task.Tool == "nuclei" && project.PipelineConfig != nil && *project.PipelineConfig != "" {
+		var cfg models.PipelineConfig
+		if err := json.Unmarshal([]byte(*project.PipelineConfig), &cfg); err == nil {
+			scanDepth = cfg.NucleiScanDepth
+		}
+	}
+
 	reqBody, _ := json.Marshal(map[string]interface{}{
 		"task_id":     task.ID,
 		"tool":        task.Tool,
@@ -113,6 +123,7 @@ func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, wo
 		"workdir":     workdir,
 		"rate_limit":  project.RateLimit,
 		"input_files": inputFiles,
+		"scan_depth":  scanDepth,
 	})
 
 	resp, err := d.httpClient.Post(worker.Endpoint+"/tasks", "application/json", bytes.NewReader(reqBody))

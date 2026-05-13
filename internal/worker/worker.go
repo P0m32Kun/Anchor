@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -101,6 +102,12 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 		return fmt.Errorf("empty command template")
 	}
 
+	// Handle shell commands: "sh -c <rest...>" needs the rest joined as a
+	// single argument so sh interprets it as a command string.
+	if args[0] == "sh" && len(args) > 2 && args[1] == "-c" {
+		args = []string{"sh", "-c", strings.Join(args[2:], " ")}
+	}
+
 	// Fetch project to check rate limit.
 	project, err := r.queries.GetProject(task.ProjectID)
 	if err != nil {
@@ -160,7 +167,14 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 
 	// Inject custom nuclei templates if available (local execution fallback)
 	if task.Tool == "nuclei" {
-		args = r.injectCustomNucleiTemplates(args)
+		scanDepth := ""
+		if project.PipelineConfig != nil && *project.PipelineConfig != "" {
+			var cfg models.PipelineConfig
+			if err := json.Unmarshal([]byte(*project.PipelineConfig), &cfg); err == nil {
+				scanDepth = cfg.NucleiScanDepth
+			}
+		}
+		args = r.injectCustomNucleiTemplates(args, scanDepth)
 	}
 
 	// Append rate limit arguments if configured.
@@ -321,10 +335,29 @@ func (r *Runner) Cancel(taskID string) error {
 // injectCustomNucleiTemplates checks for a local custom bundle and appends
 // -t (templates) and -w (workflows) flags to the nuclei command if the
 // directories exist and are not already present in the command.
-func (r *Runner) injectCustomNucleiTemplates(command []string) []string {
+//
+// scanDepth controls workflow injection:
+//   - "tags":    only inject -t (templates), skip -w (workflows)
+//   - "workflow": only inject -w (workflows), skip -t (templates)
+//   - "both":    inject both -t and -w
+//   - "":        inject both (default, backwards compatible)
+//
+// We inject both custom and official nuclei templates directories so
+// workflows can reference templates from either location.
+func (r *Runner) injectCustomNucleiTemplates(command []string, scanDepth string) []string {
 	syncer := NewBundleSyncer(r.dataDir, "", "")
-	templatesDir := syncer.TemplatesDir()
+	customTemplatesDir := syncer.TemplatesDir()
 	workflowsDir := syncer.WorkflowsDir()
+
+	// Get official nuclei templates directory
+	home, _ := os.UserHomeDir()
+	officialTemplatesDir := ""
+	if home != "" {
+		officialPath := filepath.Join(home, "nuclei-templates")
+		if info, err := os.Stat(officialPath); err == nil && info.IsDir() {
+			officialTemplatesDir = officialPath
+		}
+	}
 
 	hasTemplatesFlag := false
 	hasWorkflowsFlag := false
@@ -337,13 +370,30 @@ func (r *Runner) injectCustomNucleiTemplates(command []string) []string {
 		}
 	}
 
-	if !hasTemplatesFlag {
-		if info, err := os.Stat(templatesDir); err == nil && info.IsDir() {
-			command = append(command, "-t", templatesDir)
+	// Determine what to inject based on scanDepth
+	wantTemplates := true
+	wantWorkflows := true
+	switch scanDepth {
+	case "tags":
+		wantWorkflows = false
+	case "workflow":
+		wantTemplates = false
+	case "both", "":
+		// inject both (default)
+	}
+
+	// Always inject official templates directory first (if exists)
+	if !hasTemplatesFlag && officialTemplatesDir != "" {
+		command = append(command, "-t", officialTemplatesDir)
+	}
+
+	if wantTemplates && !hasTemplatesFlag {
+		if info, err := os.Stat(customTemplatesDir); err == nil && info.IsDir() {
+			command = append(command, "-t", customTemplatesDir)
 		}
 	}
 
-	if !hasWorkflowsFlag {
+	if wantWorkflows && !hasWorkflowsFlag {
 		if info, err := os.Stat(workflowsDir); err == nil && info.IsDir() {
 			command = append(command, "-w", workflowsDir)
 		}

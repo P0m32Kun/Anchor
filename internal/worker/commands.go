@@ -104,7 +104,7 @@ func BuildNaabuCommand(hostFile, portRange string, rate, threads, timeout int) [
 // from misfiring on long scans that simply produce no findings — without the
 // stats heartbeat, a 100-target scan with zero matches would emit nothing on
 // stdout and get killed at the 60s idle threshold.
-func BuildNucleiCommand(targetFile, profile string, rateLimit, rateLimitPerMin, concurrency int, tags []string, scanDepth string, workflowDir string) []string {
+func BuildNucleiCommand(targetFile, profile string, rateLimit, rateLimitPerMin, concurrency int, tags []string, scanDepth string, workflowDir string, templatePath string) []string {
 	args := []string{"nuclei", "-jsonl", "-l", targetFile, "-stats", "-si", "30"}
 
 	switch profile {
@@ -116,21 +116,26 @@ func BuildNucleiCommand(targetFile, profile string, rateLimit, rateLimitPerMin, 
 		args = append(args, "-severity", "critical,high,medium,low,info", "-timeout", "10")
 	}
 
-	switch scanDepth {
-	case "workflow":
-		if workflowDir != "" {
-			args = append(args, "-w", workflowDir)
-		}
-	case "both":
-		if workflowDir != "" {
-			args = append(args, "-w", workflowDir)
-		}
-		if len(tags) > 0 {
-			args = append(args, "-tags", strings.Join(tags, ","))
-		}
-	default: // "tags" or empty
-		if len(tags) > 0 {
-			args = append(args, "-tags", strings.Join(tags, ","))
+	// templatePath takes precedence for precise per-service template targeting
+	if templatePath != "" {
+		args = append(args, "-t", templatePath)
+	} else {
+		switch scanDepth {
+		case "workflow":
+			if workflowDir != "" {
+				args = append(args, "-w", workflowDir)
+			}
+		case "both":
+			if workflowDir != "" {
+				args = append(args, "-w", workflowDir)
+			}
+			if len(tags) > 0 {
+				args = append(args, "-tags", strings.Join(tags, ","))
+			}
+		default: // "tags" or empty
+			if len(tags) > 0 {
+				args = append(args, "-tags", strings.Join(tags, ","))
+			}
 		}
 	}
 
@@ -152,7 +157,7 @@ func BuildNucleiCommand(targetFile, profile string, rateLimit, rateLimitPerMin, 
 // customTemplatesDir and customWorkflowsDir are absolute paths on the worker;
 // either may be empty if that directory does not exist.
 func BuildNucleiCustomCommand(targetFile, profile string, rateLimit int, tags []string, customTemplatesDir, customWorkflowsDir string) []string {
-	args := BuildNucleiCommand(targetFile, profile, rateLimit, 0, 0, tags, "tags", "")
+	args := BuildNucleiCommand(targetFile, profile, rateLimit, 0, 0, tags, "tags", "", "")
 
 	if customTemplatesDir != "" {
 		args = append(args, "-t", customTemplatesDir)
@@ -253,6 +258,33 @@ func BuildNmapAliveCommand(hostFile string) []string {
 		"-oG", "-",
 		"-iL", hostFile,
 	}
+}
+
+// BuildURLFinderCommand builds a pingc0y/URLFinder command for extracting
+// URLs and JS links from web pages to expand the attack surface.
+// inputFile contains one URL per line. workdir is used for the JSON output file.
+// The command writes JSON to a file in workdir and cats it to stdout so the
+// runner can capture it as an artifact.
+//
+// Key flags:
+//   -f  batch URL file
+//   -s  status code filter (all = show all)
+//   -m  crawl mode (1=normal, 2=deep+JS, 3=deep+JS+crawl-JS-files)
+//   -o  output file path
+//   -t  thread count (default 50)
+//   -time  timeout in seconds (default 5)
+func BuildURLFinderCommand(inputFile, workdir string, threads, timeout int) []string {
+	outFile := workdir + "/urlfinder-output.json"
+	cmd := fmt.Sprintf("urlfinder -f %s -s 200,301,302,401,403,405,500 -m 1 -o %s", inputFile, outFile)
+	if threads > 0 {
+		cmd += fmt.Sprintf(" -t %d", threads)
+	}
+	if timeout > 0 {
+		cmd += fmt.Sprintf(" -time %d", timeout)
+	}
+	cmd += " && cat " + outFile
+	// Wrap in sh -c so the shell can handle the && operator.
+	return []string{"sh", "-c", cmd}
 }
 
 // appendRateLimitArgs appends tool-specific rate limit flags to the argument list.

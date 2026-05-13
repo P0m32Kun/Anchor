@@ -5,12 +5,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/P0m32Kun/Anchor/internal/asset"
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/nuclei"
@@ -19,11 +21,9 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
-// SlowScanOrchestrator manages background slow scanning tasks (currently
-// just ffuf — urlfinder was removed 2026-05-13 after its `-json` flag bug
-// was discovered; the OSINT use case never fit internal-scan targets anyway).
-// Slow scan runs after the main pipeline completes and feeds discovered URLs
-// back into the httpx -> nuclei loop.
+// SlowScanOrchestrator manages background slow scanning tasks (ffuf and
+// urlfinder). Slow scan runs after the main pipeline completes and feeds
+// discovered URLs back into the httpx -> nuclei loop.
 //
 // Stage reporting: when an emitter is wired in via WithStageEmitter, the
 // orchestrator reports ffuf as a first-class pipeline stage so the UI shows
@@ -34,6 +34,7 @@ import (
 type SlowScanOrchestrator struct {
 	queries   *db.Queries
 	runner    *worker.Runner
+	merger    *asset.Merger
 	dataDir   string
 	config    models.PipelineConfig
 	projectID string
@@ -66,6 +67,11 @@ func (s *SlowScanOrchestrator) WithStageEmitter(e *StageEmitter) *SlowScanOrches
 	if e != nil {
 		s.emitter = e
 	}
+	return s
+}
+
+func (s *SlowScanOrchestrator) WithMerger(m *asset.Merger) *SlowScanOrchestrator {
+	s.merger = m
 	return s
 }
 
@@ -132,6 +138,11 @@ func (s *SlowScanOrchestrator) Run(ctx context.Context, projectID string, runID 
 		}
 	}
 
+	var wantURLFinder bool
+	if s.config.EnableURLFinder {
+		wantURLFinder = true
+	}
+
 	if len(endpoints) == 0 {
 		log.Printf("[slow-scan] no web endpoints discovered, skipping ffuf")
 		return nil
@@ -150,6 +161,10 @@ func (s *SlowScanOrchestrator) Run(ctx context.Context, projectID string, runID 
 	if wantFfuf {
 		s.emitter.Set(StageFfuf)
 		markStarted(StageFfuf)
+	}
+	if wantURLFinder {
+		s.emitter.Set(StageURLFinder)
+		markStarted(StageURLFinder)
 	}
 
 	var wg sync.WaitGroup
@@ -193,14 +208,47 @@ func (s *SlowScanOrchestrator) Run(ctx context.Context, projectID string, runID 
 		}
 	}
 
+	// URLFinder runs in batch mode against all endpoints at once.
+	urlFinderAgg := &aggregate{}
+	if wantURLFinder {
+		urlFinderAgg.attempts = 1
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					urlFinderAgg.mu.Lock()
+					urlFinderAgg.failures++
+					urlFinderAgg.errs = append(urlFinderAgg.errs, fmt.Sprintf("panic: %v", r))
+					urlFinderAgg.mu.Unlock()
+					log.Printf("[slow-scan] urlfinder panic: %v", r)
+				}
+			}()
+			urls, err := s.runURLFinder(ctx, endpoints, runID)
+			if err != nil {
+				urlFinderAgg.mu.Lock()
+				urlFinderAgg.failures++
+				urlFinderAgg.errs = append(urlFinderAgg.errs, err.Error())
+				urlFinderAgg.mu.Unlock()
+				log.Printf("[slow-scan] urlfinder: %v", err)
+				return
+			}
+			mu.Lock()
+			discoveredURLs = append(discoveredURLs, urls...)
+			mu.Unlock()
+		}()
+	}
+
 	wg.Wait()
 
-	// Emit terminal stage event. Partial failure is still "completed" — the
-	// stage produced some results — but we attach the failed-endpoint count so
-	// the UI shows context. Total failure is "failed".
+	// Emit terminal stage events.
 	if wantFfuf {
 		finalizeStage(s.emitter, StageFfuf, ffufAgg.attempts, ffufAgg.failures, ffufAgg.errs)
 		markTerminated(StageFfuf)
+	}
+	if wantURLFinder {
+		finalizeStage(s.emitter, StageURLFinder, urlFinderAgg.attempts, urlFinderAgg.failures, urlFinderAgg.errs)
+		markTerminated(StageURLFinder)
 	}
 
 	// Deduplicate and feed to httpx -> nuclei
@@ -313,6 +361,89 @@ func (s *SlowScanOrchestrator) runFfuf(ctx context.Context, endpoint *models.Web
 	return urls, nil
 }
 
+// runURLFinder runs pingc0y/URLFinder in batch mode against all web endpoints.
+// It extracts URLs and JS links from page source to expand the attack surface.
+func (s *SlowScanOrchestrator) runURLFinder(ctx context.Context, endpoints []*models.WebEndpoint, runID string) ([]string, error) {
+	s.sem <- struct{}{}
+	defer func() { <-s.sem }()
+
+	// Write endpoint URLs to input file
+	workdir := filepath.Join(s.dataDir, "workdirs", s.projectID, "urlfinder-"+util.GenerateID())
+	if err := os.MkdirAll(workdir, 0750); err != nil {
+		return nil, fmt.Errorf("create workdir: %w", err)
+	}
+
+	var urls []string
+	for _, ep := range endpoints {
+		if ep.URL != "" {
+			urls = append(urls, ep.URL)
+		}
+	}
+	if len(urls) == 0 {
+		return nil, nil
+	}
+
+	inputFile := filepath.Join(workdir, "input.txt")
+	if err := os.WriteFile(inputFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
+		return nil, fmt.Errorf("write input: %w", err)
+	}
+
+	// Create slow scan task record
+	task := &models.SlowScanTask{
+		ID:        util.GenerateID(),
+		ProjectID: s.projectID,
+		TargetID:  nil,
+		RunID:     &runID,
+		Tool:      models.SlowScanToolURLFinder,
+		Status:    models.SlowScanPending,
+		Timeout:   s.config.URLFinderTimeout,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	if err := s.queries.CreateSlowScanTask(task); err != nil {
+		return nil, fmt.Errorf("create task: %w", err)
+	}
+
+	cmd := worker.BuildURLFinderCommand(inputFile, workdir, s.config.URLFinderThreads, s.config.URLFinderTimeout)
+	scanTask := &models.ScanTask{
+		ID:              util.GenerateID(),
+		ProjectID:       s.projectID,
+		RunID:           &runID,
+		Tool:            "urlfinder",
+		CommandTemplate: strings.Join(cmd, " "),
+		Status:          models.TaskCreated,
+		CreatedAt:       time.Now().UTC(),
+	}
+	if err := s.queries.CreateScanTask(scanTask); err != nil {
+		return nil, fmt.Errorf("create scan task: %w", err)
+	}
+
+	now := time.Now().UTC()
+	s.queries.SetSlowScanRunning(task.ID, now)
+
+	if err := s.runner.Run(ctx, scanTask.ID); err != nil {
+		s.queries.UpdateSlowScanStatus(task.ID, models.SlowScanFailed, err.Error(), &now)
+		return nil, err
+	}
+
+	stdout, err := s.readTaskStdout(scanTask.ID)
+	if err != nil {
+		s.queries.UpdateSlowScanStatus(task.ID, models.SlowScanFailed, err.Error(), &now)
+		return nil, err
+	}
+
+	results, _ := parser.ParseURLFinderOutput(bytes.NewReader(stdout))
+	var discovered []string
+	for _, r := range results {
+		if r.URL != "" {
+			discovered = append(discovered, r.URL)
+		}
+	}
+
+	s.queries.UpdateSlowScanStatus(task.ID, models.SlowScanCompleted, "", &now)
+	return discovered, nil
+}
+
 // feedToHttpxNuclei runs httpx on discovered URLs, saves new WebEndpoints, then runs nuclei.
 func (s *SlowScanOrchestrator) feedToHttpxNuclei(ctx context.Context, urls []string, existingEndpoints []*models.WebEndpoint) error {
 	if len(urls) == 0 {
@@ -372,14 +503,30 @@ func (s *SlowScanOrchestrator) feedToHttpxNuclei(ctx context.Context, urls []str
 	endpoints := parser.ParseHttpxOutput(bytes.NewReader(stdout))
 	var savedEndpoints []*models.WebEndpoint
 	for _, ep := range endpoints {
-		ep.ID = util.GenerateID()
-		ep.ProjectID = s.projectID
-		ep.CreatedAt = time.Now().UTC()
-		if err := s.queries.CreateWebEndpoint(ep); err != nil {
+		host := ep.Host
+		if host == "" {
+			continue
+		}
+		assetType := "domain"
+		if net.ParseIP(host) != nil {
+			assetType = "ip"
+		}
+		hostAsset, _, err := s.merger.MergeOrCreateAsset(s.projectID, assetType, host, "httpx")
+		if err != nil {
+			log.Printf("[slow-scan] merge/create asset %s: %v", host, err)
+			continue
+		}
+		we, _, err := s.merger.CreateWebEndpointIfNotExists(
+			s.projectID, hostAsset.ID, ep.URL, ep.Scheme, ep.Host,
+			ep.Port, ep.Path, ep.Title, ep.StatusCode, ep.Technologies, "httpx",
+		)
+		if err != nil {
 			log.Printf("[slow-scan] save endpoint %s: %v", ep.URL, err)
 			continue
 		}
-		savedEndpoints = append(savedEndpoints, ep)
+		if we != nil {
+			savedEndpoints = append(savedEndpoints, we)
+		}
 	}
 	log.Printf("[slow-scan] saved %d new web endpoints", len(savedEndpoints))
 
@@ -404,7 +551,7 @@ func (s *SlowScanOrchestrator) feedToHttpxNuclei(ctx context.Context, urls []str
 			continue
 		}
 
-		cmd := worker.BuildNucleiCommand(targetFile, "deep", s.config.NucleiRateLimit, s.config.NucleiRateLimitPerMinute, s.config.NucleiConcurrency, tags, s.config.NucleiScanDepth, "")
+		cmd := worker.BuildNucleiCommand(targetFile, "deep", s.config.NucleiRateLimit, s.config.NucleiRateLimitPerMinute, s.config.NucleiConcurrency, tags, s.config.NucleiScanDepth, "", "")
 		scanTask := &models.ScanTask{
 			ID:              util.GenerateID(),
 			ProjectID:       s.projectID,

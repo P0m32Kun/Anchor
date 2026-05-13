@@ -53,6 +53,7 @@ func (ws *WorkerServer) handleTask(w http.ResponseWriter, r *http.Request) {
 		Workdir    string            `json:"workdir"`
 		RateLimit  int               `json:"rate_limit"`
 		InputFiles map[string]string `json:"input_files"`
+		ScanDepth  string            `json:"scan_depth"` // "workflow" | "tags" | "both"
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -82,13 +83,13 @@ func (ws *WorkerServer) handleTask(w http.ResponseWriter, r *http.Request) {
 
 	// Execute task asynchronously
 	// Use background context so task execution survives HTTP connection close.
-	go ws.executeTask(context.Background(), req.TaskID, req.Tool, req.Command, req.Workdir, req.RateLimit)
+	go ws.executeTask(context.Background(), req.TaskID, req.Tool, req.Command, req.Workdir, req.RateLimit, req.ScanDepth)
 
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]string{"status": "accepted"})
 }
 
-func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, command []string, workdir string, rateLimit int) {
+func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, command []string, workdir string, rateLimit int, scanDepth string) {
 	log.Printf("[worker] executeTask begin: taskID=%s tool=%s workdir=%s command=%v", taskID, tool, workdir, command)
 
 	if workdir == "" {
@@ -110,7 +111,13 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 
 	// Inject custom nuclei templates if available
 	if tool == "nuclei" {
-		command = ws.injectCustomNucleiTemplates(command, taskID)
+		command = ws.injectCustomNucleiTemplates(command, taskID, scanDepth)
+	}
+
+	// Handle shell commands: "sh -c <rest...>" needs the rest joined as a
+	// single argument so sh interprets it as a command string.
+	if len(command) > 2 && command[0] == "sh" && command[1] == "-c" {
+		command = []string{"sh", "-c", strings.Join(command[2:], " ")}
 	}
 
 	binary := command[0]
@@ -374,12 +381,35 @@ func (ws *WorkerServer) reportResult(taskID, status string, artifacts []map[stri
 // injectCustomNucleiTemplates checks for a local custom bundle and appends
 // -t (templates) and -w (workflows) flags to the nuclei command if the
 // directories exist and are not already present in the command.
-func (ws *WorkerServer) injectCustomNucleiTemplates(command []string, taskID string) []string {
+//
+// scanDepth controls workflow injection:
+//   - "tags":    only inject -t (templates), skip -w (workflows)
+//   - "workflow": only inject -w (workflows), skip -t (templates)
+//   - "both":    inject both -t and -w
+//   - "":        inject both (default, backwards compatible)
+//
+// Directory structure:
+//   ~/templates/          - custom templates (our workflows and templates)
+//   ~/nuclei-templates/   - official nuclei templates
+//
+// We inject both directories so workflows can reference templates from either
+// location using relative paths.
+func (ws *WorkerServer) injectCustomNucleiTemplates(command []string, taskID string, scanDepth string) []string {
 	syncer := NewBundleSyncer(ws.dataDir, "", "")
-	templatesDir := syncer.TemplatesDir()
+	customTemplatesDir := syncer.TemplatesDir()
 	workflowsDir := syncer.WorkflowsDir()
 
-	// Check if custom template paths are already in the command
+	// Get official nuclei templates directory
+	home, _ := os.UserHomeDir()
+	officialTemplatesDir := ""
+	if home != "" {
+		officialPath := filepath.Join(home, "nuclei-templates")
+		if info, err := os.Stat(officialPath); err == nil && info.IsDir() {
+			officialTemplatesDir = officialPath
+		}
+	}
+
+	// Check if custom template/workflow paths are already in the command
 	hasTemplatesFlag := false
 	hasWorkflowsFlag := false
 	for _, arg := range command {
@@ -391,14 +421,33 @@ func (ws *WorkerServer) injectCustomNucleiTemplates(command []string, taskID str
 		}
 	}
 
-	if !hasTemplatesFlag {
-		if info, err := os.Stat(templatesDir); err == nil && info.IsDir() {
-			command = append(command, "-t", templatesDir)
-			log.Printf("[worker] task %s injected custom templates: %s", taskID, templatesDir)
+	// Determine what to inject based on scanDepth
+	wantTemplates := true
+	wantWorkflows := true
+	switch scanDepth {
+	case "tags":
+		wantWorkflows = false
+	case "workflow":
+		wantTemplates = false
+	case "both", "":
+		// inject both (default)
+	}
+
+	// Always inject official templates directory first (if exists)
+	// This allows workflows to reference official templates using relative paths
+	if !hasTemplatesFlag && officialTemplatesDir != "" {
+		command = append(command, "-t", officialTemplatesDir)
+		log.Printf("[worker] task %s injected official templates: %s", taskID, officialTemplatesDir)
+	}
+
+	if wantTemplates && !hasTemplatesFlag {
+		if info, err := os.Stat(customTemplatesDir); err == nil && info.IsDir() {
+			command = append(command, "-t", customTemplatesDir)
+			log.Printf("[worker] task %s injected custom templates: %s", taskID, customTemplatesDir)
 		}
 	}
 
-	if !hasWorkflowsFlag {
+	if wantWorkflows && !hasWorkflowsFlag {
 		if info, err := os.Stat(workflowsDir); err == nil && info.IsDir() {
 			command = append(command, "-w", workflowsDir)
 			log.Printf("[worker] task %s injected custom workflows: %s", taskID, workflowsDir)
