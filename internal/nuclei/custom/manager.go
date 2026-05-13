@@ -1,8 +1,12 @@
 package custom
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -554,6 +558,102 @@ func (m *Manager) ValidateAll() ([]*models.NucleiCustomValidationResult, error) 
 		results = append(results, r)
 	}
 	return results, nil
+}
+
+// BuildSourceBundle creates a bundle for a single source.
+// This is used by workers to sync individual sources to ~/templates-{sourceId}/.
+// Returns version (content hash) and archive path.
+func (m *Manager) BuildSourceBundle(sourceID string) (version string, archivePath string, err error) {
+	_, err = m.GetByID(sourceID)
+	if err != nil {
+		return "", "", err
+	}
+
+	files, err := m.layout.WalkFiles(sourceID)
+	if err != nil {
+		return "", "", fmt.Errorf("walk source %s: %w", sourceID, err)
+	}
+	if len(files) == 0 {
+		return "", "", fmt.Errorf("source %s has no files", sourceID)
+	}
+
+	// Compute version from source content (deterministic)
+	h := sha256.New()
+	filePaths := make([]string, 0, len(files))
+	for _, f := range files {
+		filePaths = append(filePaths, f.Path)
+		data, err := m.layout.ReadFile(sourceID, f.Path)
+		if err != nil {
+			return "", "", fmt.Errorf("read file: %w", err)
+		}
+		h.Write([]byte(f.Path))
+		h.Write(data)
+	}
+	version = "source:" + sourceID + ":" + hex.EncodeToString(h.Sum(nil))
+
+	// Check cache
+	cachedPath := filepath.Join(m.layout.BundlesRoot(), version+".tar.gz")
+	if info, err := os.Stat(cachedPath); err == nil && info.Mode().IsRegular() {
+		return version, cachedPath, nil
+	}
+
+	// Build archive
+	if err := m.layout.EnsureBundlesRoot(); err != nil {
+		return "", "", fmt.Errorf("ensure bundles root: %w", err)
+	}
+
+	tmpDir := filepath.Join(m.layout.BundlesRoot(), ".tmp-"+version)
+	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+		return "", "", fmt.Errorf("create tmp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	archiveFile := filepath.Join(tmpDir, "bundle.tar.gz")
+	if err := m.createSourceArchive(sourceID, filePaths, archiveFile); err != nil {
+		return "", "", err
+	}
+
+	// Move to final location
+	os.RemoveAll(cachedPath)
+	if err := os.Rename(archiveFile, cachedPath); err != nil {
+		return "", "", fmt.Errorf("move archive: %w", err)
+	}
+
+	return version, cachedPath, nil
+}
+
+// createSourceArchive builds a .tar.gz archive for a single source.
+func (m *Manager) createSourceArchive(sourceID string, filePaths []string, archivePath string) error {
+	f, err := os.Create(archivePath)
+	if err != nil {
+		return fmt.Errorf("create archive: %w", err)
+	}
+	defer f.Close()
+
+	gw := gzip.NewWriter(f)
+	defer gw.Close()
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+
+	for _, filePath := range filePaths {
+		data, err := m.layout.ReadFile(sourceID, filePath)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", filePath, err)
+		}
+
+		// Use file path as archive path (templates/xxx.yaml, workflows/xxx.yaml)
+		if err := tw.WriteHeader(&tar.Header{
+			Name: filePath,
+			Mode: 0o644,
+			Size: int64(len(data)),
+		}); err != nil {
+			return fmt.Errorf("write header %s: %w", filePath, err)
+		}
+		if _, err := tw.Write(data); err != nil {
+			return fmt.Errorf("write %s: %w", filePath, err)
+		}
+	}
+	return nil
 }
 
 // Publish builds a bundle from all enabled sources and activates it.

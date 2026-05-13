@@ -33,9 +33,18 @@ type BundleSourceEntry struct {
 // It fetches the manifest from the server, downloads and extracts new bundles,
 // and atomically switches the "current" symlink.
 //
-// Directory structure:
-//   ~/nuclei-templates/  ← nuclei official templates (managed by nuclei)
-//   ~/templates/         ← our custom templates (managed by us)
+// Directory structure (matches official nuclei-templates layout):
+//
+//	~/templates/              ← custom templates root (matches nuclei-templates structure)
+//	~/templates/current/      ← active bundle (symlink to version directory)
+//	~/templates/{version}/    ← version directory
+//	  ├── templates/          ← template files (http/, network/, etc.)
+//	  └── workflows/          ← workflow files
+//
+//	~/nuclei-templates/       ← official nuclei templates
+//
+// This structure ensures workflow relative paths work correctly:
+//   nuclei -t ~/nuclei-templates -t ~/templates -w workflows/xxx.yaml
 type BundleSyncer struct {
 	dataDir    string
 	coreURL    string
@@ -45,6 +54,8 @@ type BundleSyncer struct {
 }
 
 // NewBundleSyncer creates a syncer for the worker's local bundle cache.
+// Templates are stored in ~/templates/ to match the official nuclei-templates
+// structure, ensuring workflow relative paths work correctly.
 func NewBundleSyncer(dataDir, coreURL, apiToken string) *BundleSyncer {
 	home, _ := os.UserHomeDir()
 	return &BundleSyncer{

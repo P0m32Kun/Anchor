@@ -116,9 +116,9 @@ func BuildNucleiCommand(targetFile, profile string, rateLimit, rateLimitPerMin, 
 		args = append(args, "-severity", "critical,high,medium,low,info", "-timeout", "10")
 	}
 
-	// templatePath takes precedence for precise per-service template targeting
+	// templatePath takes precedence for precise per-service workflow targeting
 	if templatePath != "" {
-		args = append(args, "-t", templatePath)
+		args = append(args, "-w", templatePath)
 	} else {
 		switch scanDepth {
 		case "workflow":

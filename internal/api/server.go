@@ -268,6 +268,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleReadNucleiCustomFile)))
 	mux.Handle("PUT /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleWriteNucleiCustomFile)))
 	mux.Handle("DELETE /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleDeleteNucleiCustomFile)))
+		mux.Handle("GET /nuclei/custom/sources/{id}/bundle", auth(http.HandlerFunc(s.handleDownloadNucleiCustomSourceBundle)))
 	// Phase 2: Validation & Publishing
 	mux.Handle("POST /nuclei/custom/sources/{id}/validate", auth(http.HandlerFunc(s.handleValidateNucleiCustomSource)))
 	mux.Handle("POST /nuclei/custom/validate", auth(http.HandlerFunc(s.handleValidateAllNucleiCustom)))

@@ -546,13 +546,13 @@ export const api = {
   listNucleiCustomSources: (signal?: AbortSignal) =>
     fetchAPI<NucleiCustomSource[]>("/nuclei/custom/sources", { signal }),
 
-  createNucleiCustomGitSource: (data: { name: string; uri: string; branch?: string; routing_policy: string }, signal?: AbortSignal) =>
+  createNucleiCustomGitSource: (data: { name: string; uri: string; branch?: string }, signal?: AbortSignal) =>
     fetchAPI<NucleiCustomSource>("/nuclei/custom/sources/git", { method: "POST", body: JSON.stringify(data), signal }),
 
-  createNucleiCustomUploadSource: (name: string, routingPolicy: string, file: File, signal?: AbortSignal) => {
+  createNucleiCustomUploadSource: (name: string, file: File, signal?: AbortSignal) => {
     const formData = new FormData();
     formData.append("name", name);
-    formData.append("routing_policy", routingPolicy);
+    formData.append("routing_policy", "manual"); // 默认值，后端已不再使用
     formData.append("file", file);
     return fetchAPI<NucleiCustomSource>("/nuclei/custom/sources/upload", { method: "POST", body: formData, signal });
   },

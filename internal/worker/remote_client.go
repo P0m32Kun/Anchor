@@ -1,11 +1,16 @@
 package worker
 
 import (
+	archive_tar "archive/tar"
+	"compress/gzip"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -94,13 +99,13 @@ func (c *RemoteClient) StartHeartbeat(interval time.Duration) {
 func (c *RemoteClient) StartBundleSync(interval time.Duration) {
 	// Sync immediately on start
 	go func() {
-		c.syncBundle()
+		c.syncSources()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				c.syncBundle()
+				c.syncSources()
 			case <-c.stopCh:
 				return
 			}
@@ -108,15 +113,76 @@ func (c *RemoteClient) StartBundleSync(interval time.Duration) {
 	}()
 }
 
-func (c *RemoteClient) syncBundle() {
-	version, err := c.syncer.Sync()
+// syncSources fetches all enabled custom template sources from the server
+// and syncs each to its own directory ~/templates-{sourceId}/.
+func (c *RemoteClient) syncSources() {
+	// Fetch all enabled sources from the server
+	req, _ := http.NewRequest("GET", c.coreURL+"/nuclei/custom/sources", nil)
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		log.Printf("[worker] bundle sync error: %v", err)
+		log.Printf("[worker] fetch sources error: %v", err)
 		return
 	}
-	if version != "" {
-		log.Printf("[worker] active bundle version: %s", version)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[worker] fetch sources status: %s", resp.Status)
+		return
 	}
+
+	var sources []struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		Enabled bool   `json:"enabled"`
+		Status  string `json:"status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&sources); err != nil {
+		log.Printf("[worker] decode sources: %v", err)
+		return
+	}
+
+	// Sync each enabled source to its own directory
+	for _, src := range sources {
+		if !src.Enabled || src.Status != "ready" {
+			continue
+		}
+		if err := c.syncSource(src.ID, src.Name); err != nil {
+			log.Printf("[worker] sync source %s (%s): %v", src.ID, src.Name, err)
+		}
+	}
+}
+
+// syncSource downloads a single source's files to ~/templates-{sourceId}/.
+func (c *RemoteClient) syncSource(sourceID, sourceName string) error {
+	// Fetch the source bundle as a tar.gz
+	req, _ := http.NewRequest("GET", c.coreURL+"/nuclei/custom/sources/"+sourceID+"/bundle", nil)
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("download bundle: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("bundle not found (source may not be published yet)")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download bundle: %s", resp.Status)
+	}
+
+	// Extract to ~/templates-{sourceId}/
+	home, _ := os.UserHomeDir()
+	targetDir := filepath.Join(home, "templates-"+sourceID)
+
+	if err := extractTarGzToDir(resp.Body, targetDir); err != nil {
+		return fmt.Errorf("extract: %w", err)
+	}
+
+	log.Printf("[worker] synced source %s to %s", sourceName, targetDir)
+	return nil
 }
 
 func (c *RemoteClient) heartbeat() {
@@ -225,4 +291,61 @@ func (c *RemoteClient) executeTask(taskID, tool string, payload map[string]inter
 // Stop gracefully shuts down the remote client.
 func (c *RemoteClient) Stop() {
 	close(c.stopCh)
+}
+
+// extractTarGzToDir extracts a .tar.gz stream to targetDir.
+func extractTarGzToDir(r io.Reader, targetDir string) error {
+	gz, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("gzip reader: %w", err)
+	}
+	defer gz.Close()
+
+	tr := archive_tar.NewReader(gz)
+
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return fmt.Errorf("mkdir target: %w", err)
+	}
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("tar next: %w", err)
+		}
+
+		// Sanitize path
+		name := filepath.Clean(hdr.Name)
+		if name == ".." || filepath.HasPrefix(name, "../") || filepath.HasPrefix(name, "/") {
+			return fmt.Errorf("unsafe tar entry: %s", hdr.Name)
+		}
+
+		target := filepath.Join(targetDir, name)
+
+		switch hdr.Typeflag {
+		case archive_tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return fmt.Errorf("mkdir %s: %w", name, err)
+			}
+		case archive_tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return fmt.Errorf("mkdir parent %s: %w", name, err)
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			if err != nil {
+				return fmt.Errorf("create %s: %w", name, err)
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				return fmt.Errorf("write %s: %w", name, err)
+			}
+			f.Close()
+		default:
+			// Skip non-regular files
+			continue
+		}
+	}
+	return nil
 }

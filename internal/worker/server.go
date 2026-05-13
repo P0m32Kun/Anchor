@@ -395,62 +395,47 @@ func (ws *WorkerServer) reportResult(taskID, status string, artifacts []map[stri
 // We inject both directories so workflows can reference templates from either
 // location using relative paths.
 func (ws *WorkerServer) injectCustomNucleiTemplates(command []string, taskID string, scanDepth string) []string {
-	syncer := NewBundleSyncer(ws.dataDir, "", "")
-	customTemplatesDir := syncer.TemplatesDir()
-	workflowsDir := syncer.WorkflowsDir()
-
-	// Get official nuclei templates directory
 	home, _ := os.UserHomeDir()
-	officialTemplatesDir := ""
-	if home != "" {
-		officialPath := filepath.Join(home, "nuclei-templates")
-		if info, err := os.Stat(officialPath); err == nil && info.IsDir() {
-			officialTemplatesDir = officialPath
+	if home == "" {
+		return command
+	}
+
+	// Always inject official templates directory first
+	officialPath := filepath.Join(home, "nuclei-templates")
+	if info, err := os.Stat(officialPath); err == nil && info.IsDir() {
+		command = append(command, "-t", officialPath)
+		log.Printf("[worker] task %s injected official templates: %s", taskID, officialPath)
+	}
+
+	// Scan for template source directories (~/templates-*)
+	entries, err := os.ReadDir(home)
+	if err != nil {
+		return command
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
 		}
-	}
-
-	// Check if custom template/workflow paths are already in the command
-	hasTemplatesFlag := false
-	hasWorkflowsFlag := false
-	for _, arg := range command {
-		if arg == "-t" {
-			hasTemplatesFlag = true
+		name := entry.Name()
+		// Match templates-{sourceId} pattern
+		if !strings.HasPrefix(name, "templates-") {
+			continue
 		}
-		if arg == "-w" {
-			hasWorkflowsFlag = true
+
+		sourceDir := filepath.Join(home, name)
+		// Verify it has templates/ or workflows/ subdirectory
+		hasContent := false
+		for _, subdir := range []string{"templates", "workflows"} {
+			if info, err := os.Stat(filepath.Join(sourceDir, subdir)); err == nil && info.IsDir() {
+				hasContent = true
+				break
+			}
 		}
-	}
 
-	// Determine what to inject based on scanDepth
-	wantTemplates := true
-	wantWorkflows := true
-	switch scanDepth {
-	case "tags":
-		wantWorkflows = false
-	case "workflow":
-		wantTemplates = false
-	case "both", "":
-		// inject both (default)
-	}
-
-	// Always inject official templates directory first (if exists)
-	// This allows workflows to reference official templates using relative paths
-	if !hasTemplatesFlag && officialTemplatesDir != "" {
-		command = append(command, "-t", officialTemplatesDir)
-		log.Printf("[worker] task %s injected official templates: %s", taskID, officialTemplatesDir)
-	}
-
-	if wantTemplates && !hasTemplatesFlag {
-		if info, err := os.Stat(customTemplatesDir); err == nil && info.IsDir() {
-			command = append(command, "-t", customTemplatesDir)
-			log.Printf("[worker] task %s injected custom templates: %s", taskID, customTemplatesDir)
-		}
-	}
-
-	if wantWorkflows && !hasWorkflowsFlag {
-		if info, err := os.Stat(workflowsDir); err == nil && info.IsDir() {
-			command = append(command, "-w", workflowsDir)
-			log.Printf("[worker] task %s injected custom workflows: %s", taskID, workflowsDir)
+		if hasContent {
+			command = append(command, "-t", sourceDir)
+			log.Printf("[worker] task %s injected custom source: %s", taskID, sourceDir)
 		}
 	}
 

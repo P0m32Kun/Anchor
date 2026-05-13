@@ -32,7 +32,6 @@ import {
   FileText,
   Folder,
   Save,
-  Package,
   ToggleLeft,
   ToggleRight,
   Edit3,
@@ -40,7 +39,7 @@ import {
   Layers,
 } from "lucide-react";
 
-type TabMode = "sources" | "manifest";
+type TabMode = "sources";
 
 type TreeNode = {
   name: string;
@@ -122,8 +121,8 @@ export default function TemplatesPage() {
   const [confirmConfig, setConfirmConfig] = useState({ title: "", onConfirm: () => {} });
 
   // Form state
-  const [gitForm, setGitForm] = useState({ name: "", uri: "", branch: "", routing_policy: "manual" });
-  const [uploadForm, setUploadForm] = useState({ name: "", routing_policy: "manual", file: null as File | null });
+  const [gitForm, setGitForm] = useState({ name: "", uri: "", branch: "" });
+  const [uploadForm, setUploadForm] = useState({ name: "", file: null as File | null });
 
   // File editing
   const [editSourceId, setEditSourceId] = useState("");
@@ -132,7 +131,6 @@ export default function TemplatesPage() {
   const [editFileLoading, setEditFileLoading] = useState(false);
 
   // Manifest
-  const [manifest, setManifest] = useState<{ version: string; sources: { id: string; name: string; files: string[]; checksum: string }[]; created_at: string } | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -191,11 +189,10 @@ export default function TemplatesPage() {
         name: gitForm.name.trim(),
         uri: gitForm.uri.trim(),
         branch: gitForm.branch.trim() || undefined,
-        routing_policy: gitForm.routing_policy,
       });
       toast("Git模板源创建成功", "success");
       setGitModalOpen(false);
-      setGitForm({ name: "", uri: "", branch: "", routing_policy: "manual" });
+      setGitForm({ name: "", uri: "", branch: "" });
       loadSources();
     } catch (err: any) {
     }
@@ -209,12 +206,11 @@ export default function TemplatesPage() {
     try {
       await api.createNucleiCustomUploadSource(
         uploadForm.name.trim(),
-        uploadForm.routing_policy,
         uploadForm.file
       );
       toast("模板上传成功", "success");
       setUploadModalOpen(false);
-      setUploadForm({ name: "", routing_policy: "manual", file: null });
+      setUploadForm({ name: "", file: null });
       loadSources();
     } catch (err: any) {
     }
@@ -264,24 +260,6 @@ export default function TemplatesPage() {
       }
       loadSources();
     } catch (err: any) {
-    }
-  }
-
-  async function handlePublish() {
-    try {
-      const res = await api.publishNucleiCustom();
-      toast(`Bundle 发布成功: ${res.version.slice(0, 16)}...`, "success");
-      loadManifest();
-    } catch (err: any) {
-    }
-  }
-
-  async function loadManifest() {
-    try {
-      const m = await api.getNucleiCustomManifest();
-      setManifest(m);
-    } catch {
-      setManifest(null);
     }
   }
 
@@ -375,10 +353,6 @@ export default function TemplatesPage() {
             <Upload className="mr-2 h-4 w-4" />
             上传
           </Button>
-          <Button onClick={handlePublish}>
-            <Package className="mr-2 h-4 w-4" />
-            发布 Bundle
-          </Button>
         </div>
       </div>
 
@@ -386,13 +360,11 @@ export default function TemplatesPage() {
       <div className="flex gap-1 border-b border-white/5 pb-0">
         {[
           { key: "sources" as TabMode, label: "模板源", icon: FileCode },
-          { key: "manifest" as TabMode, label: "已发布 Bundle", icon: Package },
         ].map((t) => (
           <button
             key={t.key}
             onClick={() => {
               setActiveTab(t.key);
-              if (t.key === "manifest") loadManifest();
             }}
             className={cn(
               "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
@@ -427,7 +399,6 @@ export default function TemplatesPage() {
                   <TableHead>名称</TableHead>
                   <TableHead>类型</TableHead>
                   <TableHead>状态</TableHead>
-                  <TableHead>策略</TableHead>
                   <TableHead>同步时间</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
@@ -456,11 +427,6 @@ export default function TemplatesPage() {
                         <span className="text-xs text-muted-foreground capitalize">{src.type}</span>
                       </TableCell>
                       <TableCell>{statusBadge(src.status)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {src.routing_policy}
-                        </Badge>
-                      </TableCell>
                       <TableCell>
                         <span className="text-xs text-muted-foreground">
                           {src.last_sync_at
@@ -628,43 +594,6 @@ export default function TemplatesPage() {
         </Card>
       )}
 
-      {/* Manifest Tab */}
-      {activeTab === "manifest" && (
-        <Card className="p-8">
-          {!manifest ? (
-            <EmptyState
-              title="暂无已发布的 Bundle"
-              description="点击「发布 Bundle」将已启用的模板源打包并激活"
-            />
-          ) : (
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <Package className="h-8 w-8 text-primary" />
-                <div>
-                  <div className="text-lg font-bold">已激活的 Bundle</div>
-                  <div className="text-xs font-mono text-muted-foreground">{manifest.version}</div>
-                </div>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                发布时间: {new Date(manifest.created_at).toLocaleString("zh-CN")}
-              </div>
-              <div className="space-y-3">
-                <div className="text-sm font-bold">包含的源:</div>
-                {manifest.sources.map((s) => (
-                  <div key={s.id} className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm">{s.name}</span>
-                      <Badge variant="outline" className="font-mono text-xs">{s.files.length} files</Badge>
-                    </div>
-                    <div className="text-xs font-mono text-muted-foreground mt-1">{s.checksum.slice(0, 16)}...</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
-
       {/* Git Import Modal */}
       <Modal
         open={gitModalOpen}
@@ -703,17 +632,6 @@ export default function TemplatesPage() {
               placeholder="main"
             />
           </div>
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">路由策略</label>
-            <select
-              value={gitForm.routing_policy}
-              onChange={(e) => setGitForm((p) => ({ ...p, routing_policy: e.target.value }))}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
-            >
-              <option value="manual">manual — 仅手动指定使用</option>
-              <option value="auto">auto — 自动包含在所有扫描中</option>
-            </select>
-          </div>
         </div>
       </Modal>
 
@@ -738,17 +656,6 @@ export default function TemplatesPage() {
               onChange={(e) => setUploadForm((p) => ({ ...p, name: e.target.value }))}
               placeholder="模板源名称"
             />
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">路由策略</label>
-            <select
-              value={uploadForm.routing_policy}
-              onChange={(e) => setUploadForm((p) => ({ ...p, routing_policy: e.target.value }))}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
-            >
-              <option value="manual">manual — 仅手动指定使用</option>
-              <option value="auto">auto — 自动包含在所有扫描中</option>
-            </select>
           </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">文件</label>

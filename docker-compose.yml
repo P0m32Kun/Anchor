@@ -43,6 +43,7 @@ services:
       - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
     volumes:
       - anchor-data:/data
+      - anchor-worker-home:/root  # 持久化 ~/templates/
     restart: unless-stopped
     privileged: true
     cap_add:
@@ -66,4 +67,4 @@ networks:
 
 volumes:
   anchor-data:
-  anchor-worker-data:
+  anchor-worker-home:  # Worker 家目录，持久化 ~/templates/

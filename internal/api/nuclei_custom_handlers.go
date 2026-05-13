@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	stdErrors "errors"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -17,7 +18,7 @@ type createNucleiCustomGitRequest struct {
 	Name          string `json:"name"`
 	URI           string `json:"uri"`
 	Branch        string `json:"branch,omitempty"`
-	RoutingPolicy string `json:"routing_policy"`
+	RoutingPolicy string `json:"routing_policy,omitempty"` // 可选，默认为 "manual"
 }
 
 type patchNucleiCustomSourceRequest struct {
@@ -53,11 +54,22 @@ func (s *Server) handleCreateNucleiCustomGitSource(w http.ResponseWriter, r *htt
 		return
 	}
 
-	src, err := s.nucleiCustomMgr.CreateFromGit(r.Context(), req.Name, req.URI, req.Branch, req.RoutingPolicy)
+	routingPolicy := req.RoutingPolicy
+	if routingPolicy == "" {
+		routingPolicy = "manual"
+	}
+	src, err := s.nucleiCustomMgr.CreateFromGit(r.Context(), req.Name, req.URI, req.Branch, routingPolicy)
 	if err != nil {
 		writeNucleiCustomError(w, err)
 		return
 	}
+
+	// Auto-publish after creating source
+	if _, pubErr := s.nucleiCustomMgr.Publish(); pubErr != nil {
+		// Log publish error but don't fail the request - source was created successfully
+		log.Printf("[api] auto-publish after git source creation: %v", pubErr)
+	}
+
 	writeJSON(w, http.StatusCreated, src)
 }
 
@@ -90,6 +102,13 @@ func (s *Server) handleCreateNucleiCustomUploadSource(w http.ResponseWriter, r *
 		writeNucleiCustomError(w, err)
 		return
 	}
+
+	// Auto-publish after uploading source
+	if _, pubErr := s.nucleiCustomMgr.Publish(); pubErr != nil {
+		// Log publish error but don't fail the request - source was created successfully
+		log.Printf("[api] auto-publish after upload: %v", pubErr)
+	}
+
 	writeJSON(w, http.StatusCreated, src)
 }
 
@@ -250,6 +269,35 @@ func splitNucleiCustomFilePath(r *http.Request) (id, rel string, ok bool) {
 		return "", "", false
 	}
 	return id, rel, true
+}
+
+func (s *Server) handleDownloadNucleiCustomSourceBundle(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id is required"))
+		return
+	}
+
+	// Get source info
+	src, err := s.nucleiCustomMgr.GetByID(id)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+
+	// Build a bundle for just this source on-the-fly
+	version, archivePath, err := s.nucleiCustomMgr.BuildSourceBundle(id)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+
+	log.Printf("[api] serving bundle for source %s (%s), version %s", src.Name, id, version)
+	http.ServeFile(w, r, archivePath)
 }
 
 // --- Phase 2: Validation & Publishing ---
