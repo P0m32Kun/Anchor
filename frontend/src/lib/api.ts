@@ -409,8 +409,17 @@ export const api = {
   listTargets: (projectId: string, pagination?: PaginationParams, signal?: AbortSignal) =>
     fetchAPI<PaginatedResponse<Target>>(buildQueryString(`/projects/${projectId}/targets`, { page: pagination?.page, page_size: pagination?.page_size }), { signal }),
 
+  deleteTarget: (projectId: string, targetId: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/projects/${projectId}/targets/${targetId}`, { method: "DELETE", signal }),
+
   createScopeRule: (data: { project_id: string; action: string; type: string; value: string; reason?: string }, signal?: AbortSignal) =>
     fetchAPI<ScopeRule>("/scope-rules", { method: "POST", body: JSON.stringify(data), signal }),
+
+  deleteScopeRule: (ruleId: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/scope-rules/${ruleId}`, { method: "DELETE", signal }),
+
+  parseScopeValue: (value: string, signal?: AbortSignal) =>
+    fetchAPI<{ rules: Array<{ type: string; value: string }> }>("/scope-rules/parse", { method: "POST", body: JSON.stringify({ value }), signal }),
 
   listScopeRules: (projectId: string, pagination?: PaginationParams, signal?: AbortSignal) =>
     fetchAPI<PaginatedResponse<ScopeRule>>(buildQueryString("/scope-rules", { project_id: projectId, page: pagination?.page, page_size: pagination?.page_size }), { signal }),
@@ -652,7 +661,7 @@ export const api = {
   getHttpxFingerprint: (id: string, signal?: AbortSignal) =>
     fetchAPI<HttpxFingerprint>(`/httpx/fingerprints/${id}`, { signal }),
 
-  patchHttpxFingerprint: (id: string, data: Partial<Omit<HttpxFingerprint, "id" | "created_at" | "updated_at" | "file_path" | "type">>, signal?: AbortSignal) =>
+  patchHttpxFingerprint: (id: string, data: Partial<Omit<HttpxFingerprint, "id" | "created_at" | "updated_at" | "file_path">>, signal?: AbortSignal) =>
     fetchAPI<HttpxFingerprint>(`/httpx/fingerprints/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
 
   deleteHttpxFingerprint: (id: string, signal?: AbortSignal) =>

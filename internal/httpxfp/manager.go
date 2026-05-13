@@ -62,7 +62,7 @@ func (m *Manager) Get(id string) (*models.HttpxFingerprint, error) {
 	return m.q.GetHttpxFingerprint(id)
 }
 
-func (m *Manager) Update(id, name, description string, enabled bool) (*models.HttpxFingerprint, error) {
+func (m *Manager) Update(id, name, description string, fpType models.HttpxFingerprintType, enabled bool) (*models.HttpxFingerprint, error) {
 	f, err := m.q.GetHttpxFingerprint(id)
 	if err != nil {
 		return nil, err
@@ -72,6 +72,7 @@ func (m *Manager) Update(id, name, description string, enabled bool) (*models.Ht
 	}
 	f.Name = name
 	f.Description = description
+	f.Type = fpType
 	f.Enabled = enabled
 	f.UpdatedAt = time.Now().UTC()
 	if err := m.q.UpdateHttpxFingerprint(f); err != nil {

@@ -96,30 +96,52 @@ func (s *Server) handlePatchHttpxFingerprint(w http.ResponseWriter, r *http.Requ
 	id := r.PathValue("id")
 
 	var req struct {
-		Name        string `json:"name,omitempty"`
-		Description string `json:"description,omitempty"`
-		Enabled     *bool  `json:"enabled,omitempty"`
+		Name        *string                        `json:"name,omitempty"`
+		Description *string                        `json:"description,omitempty"`
+		Enabled     *bool                          `json:"enabled,omitempty"`
+		Type        *models.HttpxFingerprintType   `json:"type,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
 		return
 	}
 
-	if req.Name == "" {
-		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "name is required"))
+	// Fetch existing fingerprint to get current values
+	f, err := s.httpxFpMgr.Get(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get fingerprint: %v", err))
 		return
 	}
-	enabled := true
+	if f == nil {
+		writeError(w, http.StatusNotFound, errors.Newf(errors.ErrNotFound, "fingerprint %s not found", id))
+		return
+	}
+
+	// Use provided values or fall back to existing ones
+	name := f.Name
+	description := f.Description
+	enabled := f.Enabled
+	fpType := f.Type
+
+	if req.Name != nil {
+		name = *req.Name
+	}
+	if req.Description != nil {
+		description = *req.Description
+	}
 	if req.Enabled != nil {
 		enabled = *req.Enabled
 	}
+	if req.Type != nil {
+		fpType = *req.Type
+	}
 
-	f, err := s.httpxFpMgr.Update(id, req.Name, req.Description, enabled)
+	updated, err := s.httpxFpMgr.Update(id, name, description, fpType, enabled)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update fingerprint: %v", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, f)
+	writeJSON(w, http.StatusOK, updated)
 }
 
 func (s *Server) handleDeleteHttpxFingerprint(w http.ResponseWriter, r *http.Request) {

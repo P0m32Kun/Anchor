@@ -105,7 +105,7 @@ func TestManager_ListEnabled(t *testing.T) {
 	m.Create("fp2", "", models.HttpxFingerprintTypeFavicon, []byte("b"))
 
 	// Disable fp1
-	m.Update(f1.ID, "fp1", "", false)
+	m.Update(f1.ID, "fp1", "", models.HttpxFingerprintTypeFavicon, false)
 
 	enabled, err := m.ListEnabled("favicon")
 	if err != nil {
@@ -135,7 +135,7 @@ func TestManager_Update(t *testing.T) {
 
 	f, _ := m.Create("old", "old desc", models.HttpxFingerprintTypeFavicon, []byte("x"))
 
-	updated, err := m.Update(f.ID, "new", "new desc", false)
+	updated, err := m.Update(f.ID, "new", "new desc", models.HttpxFingerprintTypeFavicon, false)
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestManager_Delete(t *testing.T) {
 func TestManager_Update_NotFound(t *testing.T) {
 	m, _ := setupManager(t)
 
-	_, err := m.Update("nonexistent", "x", "y", true)
+	_, err := m.Update("nonexistent", "x", "y", models.HttpxFingerprintTypeFavicon, true)
 	if err == nil {
 		t.Error("expected error for non-existent fingerprint")
 	}

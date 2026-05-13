@@ -46,7 +46,7 @@ export default function HttpxFingerprintsPage() {
   const [uploadForm, setUploadForm] = useState({
     name: "",
     description: "",
-    type: "favicon" as "favicon" | "tech_detect",
+    type: "tech_detect" as "favicon" | "tech_detect",
     file: null as File | null,
   });
 
@@ -99,7 +99,7 @@ export default function HttpxFingerprintsPage() {
       });
       toast("指纹文件上传成功", "success");
       setUploadModalOpen(false);
-      setUploadForm({ name: "", description: "", type: "favicon", file: null });
+      setUploadForm({ name: "", description: "", type: "tech_detect", file: null });
       loadFingerprints();
     } catch (err: any) {
       // errors handled by global handler
@@ -376,8 +376,8 @@ export default function HttpxFingerprintsPage() {
               }
               className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
             >
-              <option value="favicon">favicon — Favicon 哈希识别</option>
-              <option value="tech_detect">tech_detect — 技术栈检测</option>
+              <option value="tech_detect">tech_detect — 技术栈检测 (Wappalyzer JSON)</option>
+              <option value="favicon">favicon — Favicon 哈希</option>
             </select>
           </div>
           <div>
