@@ -25,6 +25,12 @@ import (
 // hard-coded into the Docker image.
 const DefaultWorkflowDir = ""
 
+// BuiltinWorkflowDir is the path to the official nuclei-templates workflows
+// directory on the worker. Used by the pipeline to pass -w for "workflow" and
+// "both" scan depths. Custom bundles are layered on top by the worker at
+// execution time via injectCustomNucleiTemplates.
+const BuiltinWorkflowDir = "/root/nuclei-templates/workflows"
+
 // Pipeline orchestrates the complete scan workflow.
 type Pipeline struct {
 	queries       *db.Queries
