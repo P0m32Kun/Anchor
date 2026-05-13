@@ -22,14 +22,10 @@ import (
 
 // DefaultWorkflowDir is empty because custom templates/workflows are injected
 // at execution time by the worker (from the active custom bundle) rather than
-// hard-coded into the Docker image.
+// hard-coded into the Docker image. The worker's injectCustomNucleiTemplates
+// layers -t (official + custom templates) and -w (custom workflows) onto the
+// command depending on scanDepth.
 const DefaultWorkflowDir = ""
-
-// BuiltinWorkflowDir is the path to the official nuclei-templates workflows
-// directory on the worker. Used by the pipeline to pass -w for "workflow" and
-// "both" scan depths. Custom bundles are layered on top by the worker at
-// execution time via injectCustomNucleiTemplates.
-const BuiltinWorkflowDir = "/root/nuclei-templates/workflows"
 
 // Pipeline orchestrates the complete scan workflow.
 type Pipeline struct {

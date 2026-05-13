@@ -327,17 +327,10 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 	}
 
 	if p.config.NucleiScanDepth == "workflow" {
-		// Workflow mode: run each tag's workflow file separately for precision
-		// tagKey format: "tag1,tag2" → split and run each workflow individually
-		tagToURLs := make(map[string][]string)
+		// Workflow mode: worker injects custom -w from template sources.
+		// Pipeline just passes the target list per tag group; nuclei will
+		// match against the injected workflow directory.
 		for tagKey, urls := range groups {
-			tags := strings.Split(tagKey, ",")
-			for _, tag := range tags {
-				tagToURLs[tag] = append(tagToURLs[tag], urls...)
-			}
-		}
-
-		for tag, urls := range tagToURLs {
 			targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
 			if err := os.WriteFile(targetFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
 				continue
@@ -346,10 +339,9 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 				targetFile = abs
 			}
 
-			templatePath := fmt.Sprintf("workflows/%s.yaml", tag)
-			task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, nil, p.config.NucleiScanDepth, "", templatePath))
+			task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, nil, p.config.NucleiScanDepth, DefaultWorkflowDir, ""))
 			if err != nil {
-				log.Printf("nuclei task for workflow %s: %v", tag, err)
+				log.Printf("nuclei task for workflow group %s: %v", tagKey, err)
 				continue
 			}
 			_ = task
@@ -367,7 +359,7 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 				targetFile = abs
 			}
 
-			task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, tags, p.config.NucleiScanDepth, BuiltinWorkflowDir, ""))
+			task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, tags, p.config.NucleiScanDepth, DefaultWorkflowDir, ""))
 			if err != nil {
 				log.Printf("nuclei task for tags %s: %v", tagKey, err)
 				continue
@@ -404,17 +396,16 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Nm
 			targetFile = abs
 		}
 
-		// When scanDepth is "workflow", use -t workflows/{tag}.yaml instead of -tags
-		// This allows precise per-service template targeting (e.g., workflows/mysql.yaml)
+		// scanDepth controls strategy:
+		//   "tags": pipeline generates -tags, worker injects custom -t
+		//   "workflow": worker injects custom -w (no -tags from pipeline)
+		//   "both": pipeline generates -tags, worker injects custom -w
 		var tags []string
-		var templatePath string
-		if p.config.NucleiScanDepth == "workflow" {
-			templatePath = fmt.Sprintf("workflows/%s.yaml", tag)
-		} else {
+		if p.config.NucleiScanDepth != "workflow" {
 			tags = []string{tag}
 		}
 
-		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, tags, p.config.NucleiScanDepth, BuiltinWorkflowDir, templatePath))
+		task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, tags, p.config.NucleiScanDepth, DefaultWorkflowDir, ""))
 		if err != nil {
 			log.Printf("nuclei task for tag %s: %v", tag, err)
 			continue
