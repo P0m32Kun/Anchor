@@ -7,12 +7,12 @@ import (
 
 // URLFinderLink represents a single URL or JS link extracted by pingc0y/URLFinder.
 type URLFinderLink struct {
-	URL      string `json:"url"`
-	Status   string `json:"status"`
-	Size     string `json:"size"`
-	Title    string `json:"title"`
-	Redirect string `json:"redirect"`
-	Source   string `json:"source"`
+	URL      string `json:"Url"`      // URLFinder uses capital-U "Url"
+	Status   string `json:"Status"`
+	Size     string `json:"Size"`
+	Title    string `json:"Title"`
+	Redirect string `json:"Redirect"`
+	Source   string `json:"Source"`
 }
 
 // URLFinderOutput is the top-level JSON structure produced by URLFinder -o.
