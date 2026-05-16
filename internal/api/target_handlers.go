@@ -46,6 +46,15 @@ func (s *Server) handleListTargets(w http.ResponseWriter, r *http.Request) {
 	writePaginatedJSON(w, result.Data, result.Total, page)
 }
 
+func (s *Server) handleDeleteTarget(w http.ResponseWriter, r *http.Request) {
+	targetID := r.PathValue("targetId")
+	if err := s.targetSvc.Delete(r.Context(), targetID); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New(errors.ErrInternal, "delete target failed").WithDetail(err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
 func (s *Server) handleImportTargets(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
 

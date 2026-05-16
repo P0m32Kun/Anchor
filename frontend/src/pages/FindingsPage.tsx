@@ -334,32 +334,34 @@ export default function FindingsPage() {
       {/* Floating Batch Actions Bar */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-8 duration-300">
-           <div className="flex items-center gap-4 px-6 py-3 rounded-full bg-foreground text-background shadow-2xl ring-1 ring-border border border-white/20">
-              <span className="text-sm font-bold border-r border-background/20 pr-4">
+           <div className="flex items-center gap-4 px-6 py-3 rounded-full bg-zinc-900 text-zinc-100 shadow-2xl ring-1 ring-white/10 border border-white/10 backdrop-blur-md">
+              <span className="text-sm font-bold border-r border-white/20 pr-4">
                 已选中 {selectedIds.size} 项
               </span>
               <div className="flex items-center gap-2">
-                 <Select 
-                    value={batchStatus} 
+                 <Select
+                    value={batchStatus}
                     onChange={e => setBatchStatus(e.target.value)}
-                    className="h-8 w-32 text-xs bg-background text-foreground border-none"
+                    className="h-8 w-32 text-xs bg-white/10 text-white border-none focus:ring-0"
                  >
-                    <option value="">批量修改状态...</option>
-                    {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    <option value="" className="bg-zinc-900 text-white">批量修改状态...</option>
+                    {Object.entries(statusLabels).map(([v, l]) => (
+                       <option key={v} value={v} className="bg-zinc-900 text-white">{l}</option>
+                    ))}
                  </Select>
-                 <Button 
-                    variant="primary" 
-                    size="sm" 
-                    className="h-8 rounded-full px-4" 
+                 <Button
+                    variant="primary"
+                    size="sm"
+                    className="h-8 rounded-full px-4"
                     onClick={batchChangeStatus}
                     loading={batchUpdating}
                  >
                     立即执行
                  </Button>
-                 <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 text-background hover:bg-white/10 rounded-full"
+                 <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-white/70 hover:bg-white/10 hover:text-white rounded-full"
                     onClick={() => setSelectedIds(new Set())}
                  >
                     <X className="h-4 w-4" />
@@ -368,7 +370,6 @@ export default function FindingsPage() {
            </div>
         </div>
       )}
-
       {detailOpen && currentFinding && (
         <FindingDetail
           finding={currentFinding.finding}

@@ -231,11 +231,12 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 	if aliveErr != nil {
 		log.Printf("nmap alive: %v", aliveErr)
 		p.failStage(StageAlive, aliveErr.Error())
-		aliveIPs = nonCDNIPs
+		// Don't fall back to all IPs on error — skip port scan entirely
+		aliveIPs = nil
 	} else {
 		if len(aliveIPs) == 0 && len(nonCDNIPs) > 0 {
-			log.Printf("[pipeline] nmap reported 0 alive, falling back to %d input hosts", len(nonCDNIPs))
-			aliveIPs = nonCDNIPs
+			log.Printf("[pipeline] nmap reported 0 alive hosts out of %d inputs, skipping port scan", len(nonCDNIPs))
+			// No fallback: naabu would waste time scanning dead hosts
 		}
 		p.completeStage(StageAlive)
 	}
@@ -321,11 +322,12 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 	if aliveErr != nil {
 		log.Printf("nmap alive: %v", aliveErr)
 		p.failStage(StageAlive, aliveErr.Error())
-		aliveIPs = nonCDNIPs
+		// Don't fall back to all IPs on error — skip port scan entirely
+		aliveIPs = nil
 	} else {
 		if len(aliveIPs) == 0 && len(nonCDNIPs) > 0 {
-			log.Printf("[pipeline] nmap reported 0 alive, falling back to %d input hosts", len(nonCDNIPs))
-			aliveIPs = nonCDNIPs
+			log.Printf("[pipeline] nmap reported 0 alive hosts out of %d inputs, skipping port scan", len(nonCDNIPs))
+			// No fallback: naabu would waste time scanning dead hosts
 		}
 		p.completeStage(StageAlive)
 	}

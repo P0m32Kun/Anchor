@@ -11,9 +11,9 @@ import (
 
 // StageEmitter upserts pipeline_run_stages rows and fans out stage events to
 // SSE subscribers. It is the single source of truth for "a pipeline stage
-// changed status" — Pipeline uses it for the main flow stages, and
-// SlowScanOrchestrator uses it for post-pipeline slow scan stages, so both
-// surfaces share identical DB and SSE semantics.
+// changed status" — every pipeline stage (alive, portscan, httpx, ffuf,
+// urlfinder, nuclei, etc.) uses this emitter so all surfaces share identical
+// DB and SSE semantics.
 //
 // When runID is empty (manual single-task invocation, bench runs) all methods
 // are no-ops, matching the prior behavior of the freestanding setStage helpers.

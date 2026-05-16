@@ -23,24 +23,84 @@ import (
 )
 
 // Server holds API dependencies.
+//
+// 字段按消费面分四类(查询请参考 internal/api/README.md):
+//   - 广字段(被多数 handler 使用,改动会牵连大面积):queries / dataDir
+//   - 业务子系统字段(几个 handler 共用):scopeEng / worker
+//   - 任务分发与 SSE 子系统(run/worker/report/sse 四个文件共享):
+//     sseClients / taskQueue / taskResults / mu
+//   - 单一消费者字段(只服务一个 handler 文件,改动 blast radius 极小):
+//     rawDB / health / apiToken / projectSvc / targetSvc / findingSvc /
+//     nucleiCustomMgr / dictMgr / httpxFpMgr
+//
+// 改任何字段前,先在 README.md 找消费者列表,再决定动手范围。
 type Server struct {
-	queries         *db.Queries
-	rawDB           *sql.DB
-	scopeEng        *scope.Engine
-	worker          *worker.Runner
-	health          *health.Checker
-	dataDir         string
-	sseClients      map[string]map[string]chan []byte
-	taskQueue       map[string]chan *models.ScanTask
-	taskResults     map[string]chan map[string]interface{}
-	mu              sync.Mutex
-	apiToken        string
-	projectSvc      service.ProjectService
-	targetSvc       service.TargetService
-	findingSvc      service.FindingService
+	// queries: 持久化层。绝大多数 handler 都直接使用,改签名前慎重。
+	// 消费者: archive / asset / dashboard / engine / finding_template /
+	//   pipeline / report / retest / run / scope / slow_scan / task /
+	//   worker / workdir_cleanup / workflow / handlers
+	queries *db.Queries
+
+	// rawDB: 原始 sql.DB,仅在需要事务/低层 API 时使用。
+	// 消费者: retest_handlers.go
+	rawDB *sql.DB
+
+	// scopeEng: 范围(scope)校验引擎。
+	// 消费者: pipeline / run / scope / workflow
+	scopeEng *scope.Engine
+
+	// worker: 本地 worker.Runner(注意区别于 worker 包内的 RemoteAgent)。
+	// 消费者: pipeline / run / slow_scan / task / workflow
+	worker *worker.Runner
+
+	// health: 工具可用性探测器。
+	// 消费者: handlers.go(/health/tools, /health/check)
+	health *health.Checker
+
+	// dataDir: 数据/产物目录根路径。
+	// 消费者: archive / handlers / pipeline / report / run /
+	//   worker / workdir_cleanup / workflow
+	dataDir string
+
+	// 任务分发与 SSE 子系统 ↓↓↓ 这 4 个字段绑在一起,要改一起改。
+	// 受 mu 保护,跨 goroutine 读写。
+
+	// sseClients: project_id -> client_id -> event chan。
+	// 消费者: report_handlers.go / sse.go
+	sseClients map[string]map[string]chan []byte
+
+	// taskQueue: worker_id -> 待派发任务 chan。
+	// 消费者: run_handlers.go / worker_handlers.go
+	taskQueue map[string]chan *models.ScanTask
+
+	// taskResults: worker_id -> 结果回报 chan。
+	// 消费者: worker_handlers.go
+	taskResults map[string]chan map[string]interface{}
+
+	// mu: 保护 sseClients / taskQueue / taskResults 的并发访问。
+	// 消费者: run / report / sse / worker
+	mu sync.Mutex
+
+	// 任务分发与 SSE 子系统 ↑↑↑
+
+	// apiToken: 启动时生成或从 ANCHOR_API_TOKEN 读取。
+	// 消费者: middleware.go(TokenAuthMiddleware)
+	apiToken string
+
+	// 业务服务层(每个只服务对应一个 handler 文件)↓
+
+	// projectSvc 消费者: project_handlers.go
+	projectSvc service.ProjectService
+	// targetSvc 消费者: target_handlers.go
+	targetSvc service.TargetService
+	// findingSvc 消费者: finding_handlers.go
+	findingSvc service.FindingService
+	// nucleiCustomMgr 消费者: nuclei_custom_handlers.go
 	nucleiCustomMgr *custom.Manager
-	dictMgr         *dictionary.Manager
-	httpxFpMgr      *httpxfp.Manager
+	// dictMgr 消费者: dictionary_handlers.go
+	dictMgr *dictionary.Manager
+	// httpxFpMgr 消费者: httpx_fingerprint_handlers.go
+	httpxFpMgr *httpxfp.Manager
 }
 
 func generateAPIToken() string {
@@ -96,6 +156,7 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	}
 	s.markAllWorkersOffline()
 	go s.cleanupStaleWorkers()
+	go s.startWorkdirCleanup()
 	return s
 }
 
@@ -189,6 +250,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /projects/{id}/targets", auth(http.HandlerFunc(s.handleCreateTarget)))
 	mux.Handle("POST /projects/{id}/targets/import", auth(http.HandlerFunc(s.handleImportTargets)))
 	mux.Handle("GET /projects/{id}/targets", auth(http.HandlerFunc(s.handleListTargets)))
+	mux.Handle("DELETE /projects/{id}/targets/{targetId}", auth(http.HandlerFunc(s.handleDeleteTarget)))
 	mux.Handle("POST /projects/{id}/runs", auth(http.HandlerFunc(s.handleCreateRun)))
 	mux.Handle("GET /projects/{id}/runs", auth(http.HandlerFunc(s.handleListRuns)))
 	mux.Handle("GET /runs/{id}", auth(http.HandlerFunc(s.handleGetRun)))
@@ -221,6 +283,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /findings/{id}/curl", auth(http.HandlerFunc(s.handleGetFindingCurl)))
 	mux.Handle("POST /scope-rules", auth(http.HandlerFunc(s.handleCreateScopeRule)))
 	mux.Handle("GET /scope-rules", auth(http.HandlerFunc(s.handleListScopeRules)))
+	mux.Handle("DELETE /scope-rules/{id}", auth(http.HandlerFunc(s.handleDeleteScopeRule)))
+	mux.Handle("POST /scope-rules/parse", auth(http.HandlerFunc(s.handleParseScopeValue)))
 	mux.Handle("POST /projects/{id}/scope-rules/batch", auth(http.HandlerFunc(s.handleBatchCreateScopeRules)))
 	mux.Handle("POST /scan-plans", auth(http.HandlerFunc(s.handleCreateScanPlan)))
 	mux.Handle("POST /scan-plans/{id}/approve", auth(http.HandlerFunc(s.handleApprovePlan)))
@@ -229,6 +293,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /scan-tasks/{id}/cancel", auth(http.HandlerFunc(s.handleCancelTask)))
 	mux.Handle("POST /tasks/run", auth(http.HandlerFunc(s.handleRunTask)))
 	mux.Handle("GET /tasks/{id}/artifacts", auth(http.HandlerFunc(s.handleListArtifacts)))
+	mux.Handle("GET /artifacts/content", auth(http.HandlerFunc(s.handleGetArtifactContent)))
 	mux.Handle("GET /health/tools", auth(http.HandlerFunc(s.handleToolHealth)))
 	mux.Handle("POST /health/check", auth(http.HandlerFunc(s.handleHealthCheck)))
 	mux.Handle("GET /projects/{id}/events", auth(http.HandlerFunc(s.handleProjectSSE)))
@@ -236,6 +301,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /projects/{id}/reports/export.json", auth(http.HandlerFunc(s.handleExportReportJSON)))
 	// Report engine
 	mux.Handle("POST /runs/{runId}/report", auth(http.HandlerFunc(s.handleCreateReport)))
+	mux.Handle("GET /runs/{runId}/report", auth(http.HandlerFunc(s.handleGetReportByRun)))
 	mux.Handle("GET /reports/{reportId}", auth(http.HandlerFunc(s.handleGetReport)))
 	mux.Handle("GET /reports/{reportId}/download", auth(http.HandlerFunc(s.handleDownloadReport)))
 	mux.Handle("DELETE /reports/{reportId}", auth(http.HandlerFunc(s.handleDeleteReport)))

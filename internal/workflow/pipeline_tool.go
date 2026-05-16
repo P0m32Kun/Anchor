@@ -446,16 +446,21 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Nm
 }
 
 // customWorkflowPaths returns the absolute paths to custom workflow directories
-// on the worker: /root/templates-{sourceID}/workflows
+// on the worker. Since all custom templates live under ~/nuclei-templates/ (nuclei's
+// default search path), we only need to point -w at the per-source workflow files.
+// The worker path is /root/nuclei-templates/{install_path}/workflows/.
 func (p *Pipeline) customWorkflowPaths() []string {
-	sourceIDs, err := p.queries.ListEnabledNucleiCustomSourceIDs()
+	sources, err := p.queries.ListNucleiCustomSources()
 	if err != nil {
-		log.Printf("[pipeline] list enabled nuclei custom sources: %v", err)
+		log.Printf("[pipeline] list nuclei custom sources: %v", err)
 		return nil
 	}
 	var paths []string
-	for _, id := range sourceIDs {
-		paths = append(paths, filepath.Join("/root", "templates-"+id, "workflows"))
+	for _, src := range sources {
+		if !src.Enabled || src.InstallPath == "" {
+			continue
+		}
+		paths = append(paths, filepath.Join("/root", "nuclei-templates", src.InstallPath, "workflows"))
 	}
 	return paths
 }
@@ -499,6 +504,87 @@ func (p *Pipeline) createAndRunTask(ctx context.Context, tool string, args []str
 	}
 
 	return task, stdout, nil
+}
+
+// runFfuf runs a single ffuf brute-force against one web endpoint.
+// Returns discovered URLs (url_list2).
+func (p *Pipeline) runFfuf(ctx context.Context, endpoint *models.WebEndpoint) ([]string, error) {
+	if !p.config.EnableFfuf || p.config.FfufDictionaryID == "" {
+		return nil, nil
+	}
+
+	// Get dictionary
+	dict, err := p.queries.GetDictionary(p.config.FfufDictionaryID)
+	if err != nil || dict == nil {
+		return nil, fmt.Errorf("dictionary not found: %s", p.config.FfufDictionaryID)
+	}
+
+	// Build target URL with FUZZ placeholder
+	base := strings.TrimSuffix(endpoint.URL, "/")
+	targetURL := base + "/FUZZ"
+
+	// Build and run via worker
+	cmd := worker.BuildFfufCommand(targetURL, dict.FilePath, p.config.FfufRateLimit, p.config.FfufTimeout)
+	task, stdout, err := p.createAndRunTask(ctx, "ffuf", cmd)
+	if err != nil {
+		return nil, err
+	}
+	_ = task
+
+	results, _ := parser.ParseFfufOutput(bytes.NewReader(stdout))
+	var urls []string
+	for _, r := range results {
+		if r.URL != "" {
+			urls = append(urls, r.URL)
+		}
+	}
+	return urls, nil
+}
+
+// runURLFinder runs pingc0y/URLFinder in batch mode against all web endpoints.
+// Returns discovered URLs (url_list3).
+func (p *Pipeline) runURLFinder(ctx context.Context, endpoints []*models.WebEndpoint) ([]string, error) {
+	if !p.config.EnableURLFinder {
+		return nil, nil
+	}
+
+	// Collect endpoint URLs
+	var urls []string
+	for _, ep := range endpoints {
+		if ep.URL != "" {
+			urls = append(urls, ep.URL)
+		}
+	}
+	if len(urls) == 0 {
+		return nil, nil
+	}
+
+	// Write input file
+	workdir := filepath.Join(p.dataDir, "workdirs", p.projectID, "urlfinder-"+util.GenerateID())
+	if err := os.MkdirAll(workdir, 0750); err != nil {
+		return nil, fmt.Errorf("create workdir: %w", err)
+	}
+	inputFile := filepath.Join(workdir, "input.txt")
+	if err := os.WriteFile(inputFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
+		return nil, fmt.Errorf("write input: %w", err)
+	}
+
+	// Build and run via worker
+	cmd := worker.BuildURLFinderCommand(inputFile, workdir, p.config.URLFinderThreads, p.config.URLFinderTimeout)
+	task, stdout, err := p.createAndRunTask(ctx, "urlfinder", cmd)
+	if err != nil {
+		return nil, err
+	}
+	_ = task
+
+	results, _ := parser.ParseURLFinderOutput(bytes.NewReader(stdout))
+	var discovered []string
+	for _, r := range results {
+		if r.URL != "" {
+			discovered = append(discovered, r.URL)
+		}
+	}
+	return discovered, nil
 }
 
 func (p *Pipeline) readTaskStdout(taskID string) ([]byte, error) {

@@ -24,6 +24,7 @@ const (
 type NucleiCustomSource struct {
 	ID              string                   `json:"id" db:"id"`
 	Name            string                   `json:"name" db:"name"`
+	InstallPath     string                   `json:"install_path" db:"install_path"`
 	Type            NucleiCustomSourceType   `json:"type" db:"type"`
 	URI             *string                  `json:"uri,omitempty" db:"uri"`
 	Branch          *string                  `json:"branch,omitempty" db:"branch"`

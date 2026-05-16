@@ -100,8 +100,11 @@ func (m *Manager) GetByID(id string) (*models.NucleiCustomSource, error) {
 // CreateFromGit clones a public HTTPS git repo into the source's files/ dir.
 // On success the row is moved to status=ready; on failure the DB row and any
 // partial files are removed before returning.
-func (m *Manager) CreateFromGit(ctx context.Context, name, uri, branch, routingPolicy string) (*models.NucleiCustomSource, error) {
+func (m *Manager) CreateFromGit(ctx context.Context, name, installPath, uri, branch, routingPolicy string) (*models.NucleiCustomSource, error) {
 	if err := validateName(name); err != nil {
+		return nil, err
+	}
+	if err := validateInstallPath(installPath); err != nil {
 		return nil, err
 	}
 	if err := validateRoutingPolicy(routingPolicy); err != nil {
@@ -115,6 +118,7 @@ func (m *Manager) CreateFromGit(ctx context.Context, name, uri, branch, routingP
 	src := &models.NucleiCustomSource{
 		ID:            util.GenerateID(),
 		Name:          name,
+		InstallPath:   installPath,
 		Type:          models.NucleiCustomSourceTypeGit,
 		URI:           strPtr(uri),
 		Branch:        nullableStr(branch),
@@ -170,8 +174,11 @@ func (m *Manager) CreateFromGit(ctx context.Context, name, uri, branch, routingP
 
 // CreateFromUpload accepts a single yaml/yml file or a zip archive, extracts
 // it under the source's templates/ subtree, and marks the source ready.
-func (m *Manager) CreateFromUpload(ctx context.Context, name, routingPolicy, filename string, body io.Reader) (*models.NucleiCustomSource, error) {
+func (m *Manager) CreateFromUpload(ctx context.Context, name, installPath, routingPolicy, filename string, body io.Reader) (*models.NucleiCustomSource, error) {
 	if err := validateName(name); err != nil {
+		return nil, err
+	}
+	if err := validateInstallPath(installPath); err != nil {
 		return nil, err
 	}
 	if err := validateRoutingPolicy(routingPolicy); err != nil {
@@ -439,6 +446,29 @@ func validateName(name string) error {
 	return nil
 }
 
+// validateInstallPath checks that install_path is a simple directory name
+// suitable for use under ~/nuclei-templates/. Must be non-empty, max 64 chars,
+// contain only alphanumeric, hyphen, underscore, and dot.
+func validateInstallPath(p string) error {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return apperrors.New(apperrors.ErrBadRequest, "install_path is required (use the repo name)")
+	}
+	if len(p) > 64 {
+		return apperrors.New(apperrors.ErrBadRequest, "install_path too long (max 64)")
+	}
+	if p == "." || p == ".." {
+		return apperrors.New(apperrors.ErrBadRequest, "install_path cannot be . or ..")
+	}
+	for _, r := range p {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			continue
+		}
+		return apperrors.Newf(apperrors.ErrBadRequest, "install_path %q contains invalid character %q", p, r)
+	}
+	return nil
+}
+
 func validateRoutingPolicy(p string) error {
 	if _, ok := allowedRoutingPolicies[p]; !ok {
 		return apperrors.Newf(apperrors.ErrBadRequest, "routing_policy %q is not supported", p)
@@ -522,7 +552,14 @@ func (m *Manager) ValidateSource(id string) (*models.NucleiCustomValidationResul
 	if !result.OK {
 		errMsg := strings.Join(result.Errors, "; ")
 		src.LastError = &errMsg
-		src.Status = models.NucleiCustomSourceStatusError
+		// Workflow template references may be unresolved because the user
+		// hasn't populated the custom bundle yet — this is expected and
+		// should not mark the source as broken. nuclei will skip missing
+		// templates at scan time. Only critical errors (syntax, corruption)
+		// should block the source.
+		if src.Status != models.NucleiCustomSourceStatusReady {
+			src.Status = models.NucleiCustomSourceStatusError
+		}
 	} else {
 		src.LastError = nil
 		if src.Status == models.NucleiCustomSourceStatusError {
@@ -623,7 +660,14 @@ func (m *Manager) BuildSourceBundle(sourceID string) (version string, archivePat
 }
 
 // createSourceArchive builds a .tar.gz archive for a single source.
+// Files are placed under {install_path}/ so extracting to ~/nuclei-templates/
+// creates the source subdirectory that nuclei natively searches.
 func (m *Manager) createSourceArchive(sourceID string, filePaths []string, archivePath string) error {
+	src, err := m.q.GetNucleiCustomSource(sourceID)
+	if err != nil || src == nil || src.InstallPath == "" {
+		return fmt.Errorf("source %s has no install_path", sourceID)
+	}
+
 	f, err := os.Create(archivePath)
 	if err != nil {
 		return fmt.Errorf("create archive: %w", err)
@@ -641,16 +685,17 @@ func (m *Manager) createSourceArchive(sourceID string, filePaths []string, archi
 			return fmt.Errorf("read %s: %w", filePath, err)
 		}
 
-		// Use file path as archive path (templates/xxx.yaml, workflows/xxx.yaml)
+		// Archive path: {install_path}/{filePath}
+		archiveEntryPath := src.InstallPath + "/" + filePath
 		if err := tw.WriteHeader(&tar.Header{
-			Name: filePath,
+			Name: archiveEntryPath,
 			Mode: 0o644,
 			Size: int64(len(data)),
 		}); err != nil {
-			return fmt.Errorf("write header %s: %w", filePath, err)
+			return fmt.Errorf("write header %s: %w", archiveEntryPath, err)
 		}
 		if _, err := tw.Write(data); err != nil {
-			return fmt.Errorf("write %s: %w", filePath, err)
+			return fmt.Errorf("write %s: %w", archiveEntryPath, err)
 		}
 	}
 	return nil

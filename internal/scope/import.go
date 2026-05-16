@@ -196,6 +196,14 @@ func parseLine(line string) []ImportTarget {
 	return targets
 }
 
+// ParseLine parses a single "<type>:<value>" or "<value>" line and returns
+// the expanded targets. It is the exported version of parseLine for use by
+// other packages like the API layer when parsing scope rule values.
+func ParseLine(line string) []ImportTarget {
+	return parseLine(line)
+}
+
+// expandCommas splits a line by commas and trims whitespace,
 // expandCommas splits a line by commas and trims whitespace,
 // filtering out empty segments.
 func expandCommas(line string) []string {

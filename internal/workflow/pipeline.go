@@ -1,12 +1,17 @@
 package workflow
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/asset"
@@ -14,9 +19,12 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/fingerprint"
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/nuclei"
+	"github.com/P0m32Kun/Anchor/internal/parser"
 	"github.com/P0m32Kun/Anchor/internal/resolve"
 	"github.com/P0m32Kun/Anchor/internal/scope"
 	"github.com/P0m32Kun/Anchor/internal/search"
+	"github.com/P0m32Kun/Anchor/internal/util"
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
@@ -29,19 +37,28 @@ const DefaultWorkflowDir = ""
 
 // Pipeline orchestrates the complete scan workflow.
 type Pipeline struct {
-	queries       *db.Queries
-	runner        *worker.Runner
-	scope         *scope.Engine
-	resolver      *resolve.Resolver
-	cdnDet        *cdn.Detector
-	fofa          *search.FofaClient
-	merger        *asset.Merger
-	dataDir       string
-	projectID     string
-	config        models.PipelineConfig
-	runID         string
-	onStageChange StageEventCallback
-	emitter       *StageEmitter
+	queries          *db.Queries
+	runner           *worker.Runner
+	scope            *scope.Engine
+	resolver         *resolve.Resolver
+	cdnDet           *cdn.Detector
+	fofa             *search.FofaClient
+	merger           *asset.Merger
+	dataDir          string
+	projectID        string
+	config           models.PipelineConfig
+	runID            string
+	onStageChange    StageEventCallback
+	emitter          *StageEmitter
+	findingBuf       *db.FindingBuffer
+	seenDedupKeys    map[string]bool
+	deferredEvidence []deferredEvidence
+}
+
+// deferredEvidence holds nuclei evidence data to be created after findings are flushed.
+type deferredEvidence struct {
+	findingID string
+	nr        parser.NucleiResult
 }
 
 // NewPipeline creates a new Pipeline instance.
@@ -89,6 +106,20 @@ func (p *Pipeline) WithStageCallback(cb StageEventCallback) *Pipeline {
 
 var requiredTools = []string{"subfinder", "naabu", "cdncheck", "httpx", "nuclei", "dnsx", "nmap"}
 
+// flushFindingsAndEvidence flushes the finding buffer and creates deferred evidence.
+// Called via defer in Run() and explicitly at pipeline boundaries.
+func (p *Pipeline) flushFindingsAndEvidence() {
+	if p.findingBuf != nil {
+		if err := p.findingBuf.Flush(); err != nil {
+			log.Printf("[pipeline] flush findings: %v", err)
+		}
+	}
+	for _, de := range p.deferredEvidence {
+		p.collectNucleiEvidence(de.findingID, de.nr)
+	}
+	p.deferredEvidence = nil
+}
+
 func (p *Pipeline) checkTools() []string {
 	var missing []string
 	for _, tool := range requiredTools {
@@ -102,6 +133,19 @@ func (p *Pipeline) checkTools() []string {
 // Run executes the pipeline for a project.
 func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 	p.projectID = projectID
+	p.findingBuf = db.NewFindingBuffer(p.queries, 500, 5*time.Second)
+	p.seenDedupKeys = make(map[string]bool)
+	p.deferredEvidence = nil
+	defer p.flushFindingsAndEvidence()
+
+	// Register shutdown hook to flush buffer on SIGTERM/SIGINT.
+	buf := p.findingBuf
+	util.OnShutdown(func() error {
+		if buf != nil {
+			return buf.Flush()
+		}
+		return nil
+	})
 
 	// Load project config if not set
 	if p.config == (models.PipelineConfig{}) {
@@ -184,80 +228,45 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 		}
 	}
 
-	// Pipeline lifecycle has two phases:
-	//   1. Main flow stages (alive/portscan/.../vuln) just finished.
-	//   2. Slow scan stages (ffuf) — part of the same pipeline_run lifecycle,
-	//      not a fire-and-forget background task.
-	// We DO NOT set pipeline_run.status to completed until phase 2 also
-	// finishes, so consumers reading "status=completed" can trust the run is
-	// fully done. The handleCreateScan handler already wraps Pipeline.Run in
-	// a goroutine, so the longer wall-clock time here only blocks that
-	// background goroutine, not the API response.
+	// Post-phase: run URL discovery (ffuf + urlfinder) against first-pass
+	// web endpoints, then feed any new URLs through a second httpx → nuclei
+	// round. This runs regardless of whether the main flow had failures —
+	// scanning should be as complete as possible. The run status is determined
+	// by ALL stages equally after everything finishes.
+	p.runPostPhase(ctx, projectID)
 
-	// Phase 1 cleanup: finalize any main-flow stages still marked running and
-	// decide whether the main flow itself succeeded. Slow-scan stages haven't
-	// been emitted yet, so this check is purely about main pipeline health.
-	var mainHasFailed bool
+	// Final status settlement: query all stages (including ffuf/urlfinder/
+	// httpx_2/vuln_2) and determine run outcome. Any failed stage fails
+	// the run, including the second pass.
 	if p.runID != "" {
 		now := time.Now().UTC()
 		stages, _ := p.queries.ListPipelineRunStages(p.runID)
 		for _, s := range stages {
-			if isSlowScanStage(s.Stage) {
-				continue
-			}
-			if s.Status == models.StageStatusFailed {
-				mainHasFailed = true
-			}
 			if s.Status == models.StageStatusRunning {
-				// A stage left in "running" after the main flow returned means
-				// the flow itself exited (panic, early return) without cleanup.
-				// Mark it failed/completed in line with the overall outcome.
 				if flowErr != nil {
 					p.queries.UpdatePipelineRunStageRecord(s.ID, models.StageStatusFailed, "pipeline aborted", &now)
-					mainHasFailed = true
 				} else {
 					p.queries.UpdatePipelineRunStageRecord(s.ID, models.StageStatusCompleted, "", &now)
 				}
 			}
 		}
-	}
-
-	// Slow scan trigger: main flow must be clean. If any main-flow stage failed
-	// (or the flow returned an error) we skip slow scan entirely — partial
-	// data isn't worth burning brute-force budget on, and the previous
-	// behavior of running slow scan after a half-broken pipeline produced
-	// confusing UI (post-fail ffuf rows showing up). This resolves the
-	// historical TODO around slow-scan trigger gating.
-	shouldRunSlowScan := flowErr == nil && !mainHasFailed
-	if shouldRunSlowScan {
-		slowScan := NewSlowScanOrchestrator(p.queries, p.runner, p.dataDir).
-			WithConfig(p.config).
-			WithMerger(p.merger).
-			WithStageEmitter(p.emitter)
-		if err := slowScan.Run(ctx, p.projectID, p.runID); err != nil {
-			log.Printf("[pipeline] slow scan orchestrator: %v", err)
-		}
-	}
-
-	// Phase 2 final settlement: now that everything (main + slow scan) is
-	// done, write the run's terminal status. Slow scan stage failures
-	// (e.g. ffuf brute-force hit no valid paths against an internal target)
-	// are expected in some target types and DO NOT mark the run as failed —
-	// they show as a failed stage in the UI but the run as a whole still
-	// counts as completed. Only main-flow failures fail the run.
-	if p.runID != "" {
-		now := time.Now().UTC()
-		var errMsg string
-		if flowErr != nil {
-			errMsg = flowErr.Error()
-		} else if mainHasFailed {
-			errMsg = "one or more stages failed"
-		}
-
-		if flowErr != nil || mainHasFailed {
-			if errMsg != "" {
-				p.queries.UpdatePipelineRunError(p.runID, errMsg)
+		// Re-query after cleanup for accurate status
+		stages, _ = p.queries.ListPipelineRunStages(p.runID)
+		hasFailed := flowErr != nil
+		for _, s := range stages {
+			if s.Status == models.StageStatusFailed || s.Status == "failed" {
+				hasFailed = true
+				break
 			}
+		}
+		if hasFailed {
+			var errMsg string
+			if flowErr != nil {
+				errMsg = flowErr.Error()
+			} else {
+				errMsg = "one or more stages failed"
+			}
+			p.queries.UpdatePipelineRunError(p.runID, errMsg)
 			p.queries.UpdatePipelineRunStatus(p.runID, "failed")
 		} else {
 			p.queries.UpdatePipelineRunCompleted(p.runID, now)
@@ -267,12 +276,229 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 	return flowErr
 }
 
-// isSlowScanStage reports whether a stage name belongs to the post-pipeline
-// slow scan phase. Slow-scan stages are tracked in pipeline_run_stages alongside
-// main flow stages but are treated as soft — their failure does not promote
-// the run to failed. Adding a new slow-scan tool means adding its stage here.
-func isSlowScanStage(stage string) bool {
-	return stage == string(StageFfuf) || stage == string(StageURLFinder)
+// runPostPhase runs URL discovery tools (ffuf + urlfinder) against first-pass
+// web endpoints, then feeds newly discovered URLs through a second httpx → nuclei
+// round (httpx_2 / vuln_2 stages). This is the natural continuation of the
+// pipeline — not a "slow scan" concept, just more pipeline stages.
+func (p *Pipeline) runPostPhase(ctx context.Context, projectID string) {
+	endpoints, err := p.queries.ListWebEndpointsByProject(projectID)
+	if err != nil || len(endpoints) == 0 {
+		return
+	}
+
+	wantFfuf := p.config.EnableFfuf && p.config.FfufDictionaryID != ""
+	wantURLFinder := p.config.EnableURLFinder
+	if !wantFfuf && !wantURLFinder {
+		return
+	}
+
+	// Emit stages for parallel URL discovery
+	if wantFfuf {
+		p.setStage(StageFfuf)
+	}
+	if wantURLFinder {
+		p.setStage(StageURLFinder)
+	}
+
+	// Concurrent fan-out: ffuf per-endpoint + urlfinder batch
+	var wg sync.WaitGroup
+	var discoveredURLs []string
+	var mu sync.Mutex
+	var ffufFailures int
+	const maxFfufConcurrency = 5
+	ffufSem := make(chan struct{}, maxFfufConcurrency)
+
+	for _, ep := range endpoints {
+		if !wantFfuf {
+			break
+		}
+		wg.Add(1)
+		ffufSem <- struct{}{}
+		go func(endpoint *models.WebEndpoint) {
+			defer wg.Done()
+			defer func() { <-ffufSem }()
+			urls, err := p.runFfuf(ctx, endpoint)
+			if err != nil {
+				log.Printf("[pipeline] ffuf %s: %v", endpoint.URL, err)
+				mu.Lock()
+				ffufFailures++
+				mu.Unlock()
+				return
+			}
+			mu.Lock()
+			discoveredURLs = append(discoveredURLs, urls...)
+			mu.Unlock()
+		}(ep)
+	}
+
+	if wantURLFinder {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			urls, err := p.runURLFinder(ctx, endpoints)
+			if err != nil {
+				log.Printf("[pipeline] urlfinder: %v", err)
+				return
+			}
+			mu.Lock()
+			discoveredURLs = append(discoveredURLs, urls...)
+			mu.Unlock()
+		}()
+	}
+
+	wg.Wait()
+
+	// Complete URL discovery stages
+	if wantFfuf {
+		if ffufFailures > 0 {
+			p.failStage(StageFfuf, fmt.Sprintf("%d/%d endpoints failed", ffufFailures, len(endpoints)))
+		} else {
+			p.completeStage(StageFfuf)
+		}
+	}
+	if wantURLFinder {
+		p.completeStage(StageURLFinder)
+	}
+
+	// Feed new URLs through httpx_2 → vuln_2
+	if len(discoveredURLs) > 0 {
+		unique := dedupStrings(discoveredURLs)
+		p.feedToHttpxNuclei(ctx, unique, endpoints)
+	}
+}
+
+// feedToHttpxNuclei runs httpx (with custom fingerprints) on discovered URLs,
+// saves new WebEndpoints, then runs nuclei and persists findings.
+func (p *Pipeline) feedToHttpxNuclei(ctx context.Context, urls []string, existingEndpoints []*models.WebEndpoint) {
+	if len(urls) == 0 {
+		return
+	}
+
+	// Deduplicate against existing web endpoints
+	existingSet := make(map[string]bool, len(existingEndpoints))
+	for _, ep := range existingEndpoints {
+		existingSet[ep.URL] = true
+	}
+	var newURLs []string
+	for _, u := range urls {
+		if !existingSet[u] {
+			newURLs = append(newURLs, u)
+		}
+	}
+	if len(newURLs) == 0 {
+		log.Printf("[pipeline] all %d discovered URLs already exist, skipping", len(urls))
+		return
+	}
+	log.Printf("[pipeline] feeding %d new URLs to httpx/nuclei (deduped from %d)", len(newURLs), len(urls))
+
+	// Write host file
+	hostFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("httpx2-%s.txt", util.GenerateID()))
+	if err := os.MkdirAll(filepath.Dir(hostFile), 0750); err != nil {
+		return
+	}
+	if err := os.WriteFile(hostFile, []byte(strings.Join(newURLs, "\n")), 0640); err != nil {
+		return
+	}
+
+	// Prepare custom fingerprint file
+	customFpFile, err := p.prepareHttpxFingerprints()
+	if err != nil {
+		log.Printf("[pipeline] prepare httpx fingerprints: %v", err)
+	}
+	if customFpFile != "" {
+		defer os.Remove(customFpFile)
+	}
+
+	// --- httpx_2 stage ---
+	p.setStage(StageHTTPX2)
+	cmd := worker.BuildHttpxCommand(hostFile, p.config.HttpxRateLimit, p.config.HttpxThreads, customFpFile)
+	task, stdout, err := p.createAndRunTask(ctx, "httpx", cmd)
+	if err != nil {
+		p.failStage(StageHTTPX2, err.Error())
+		return
+	}
+	_ = task
+
+	endpoints := parser.ParseHttpxOutput(bytes.NewReader(stdout))
+	var savedEndpoints []*models.WebEndpoint
+	for _, ep := range endpoints {
+		host := ep.Host
+		if host == "" {
+			continue
+		}
+		assetType := "domain"
+		if net.ParseIP(host) != nil {
+			assetType = "ip"
+		}
+		hostAsset, _, err := p.merger.MergeOrCreateAsset(p.projectID, assetType, host, "httpx")
+		if err != nil {
+			log.Printf("[pipeline] merge/create asset %s: %v", host, err)
+			continue
+		}
+		we, _, err := p.merger.CreateWebEndpointIfNotExists(
+			p.projectID, hostAsset.ID, ep.URL, ep.Scheme, ep.Host,
+			ep.Port, ep.Path, ep.Title, ep.StatusCode, ep.Technologies, "httpx",
+		)
+		if err != nil {
+			log.Printf("[pipeline] save endpoint %s: %v", ep.URL, err)
+			continue
+		}
+		if we != nil {
+			savedEndpoints = append(savedEndpoints, we)
+		}
+	}
+	p.completeStage(StageHTTPX2)
+	log.Printf("[pipeline] httpx_2: saved %d new web endpoints", len(savedEndpoints))
+
+	if len(savedEndpoints) == 0 {
+		return
+	}
+
+	// --- vuln_2 stage ---
+	p.setStage(StageVuln2)
+
+	urlToEndpoint := make(map[string]*models.WebEndpoint)
+	for _, ep := range savedEndpoints {
+		urlToEndpoint[ep.URL] = ep
+	}
+
+	groups := make(map[string][]string)
+	for _, ep := range savedEndpoints {
+		key := strings.Join(nuclei.MapPreciseTags(ep.Technologies, ""), ",")
+		if key == "" {
+			key = "generic"
+		}
+		groups[key] = append(groups[key], ep.URL)
+	}
+
+	var vulnErr error
+	for tagKey, urls := range groups {
+		tags := strings.Split(tagKey, ",")
+		targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei2-%s.txt", util.GenerateID()))
+		if err := os.WriteFile(targetFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
+			continue
+		}
+
+		cmd := worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit,
+			p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency,
+			tags, p.config.NucleiScanDepth, "", "")
+		_, nucleiStdout, err := p.createAndRunTask(ctx, "nuclei", cmd)
+		if err != nil {
+			log.Printf("[pipeline] vuln_2 nuclei error for tags %s: %v", tagKey, err)
+			vulnErr = err
+			continue
+		}
+		p.saveNucleiFindings(nucleiStdout, urlToEndpoint, nil)
+	}
+
+	// Flush findings before creating evidence (FK constraint).
+	p.flushFindingsAndEvidence()
+
+	if vulnErr != nil {
+		p.failStage(StageVuln2, vulnErr.Error())
+	} else {
+		p.completeStage(StageVuln2)
+	}
 }
 
 // --- Utility functions ---

@@ -100,8 +100,29 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing != nil {
-		writeJSON(w, http.StatusOK, existing)
-		return
+		if existing.Status == models.ReportComplete {
+			writeJSON(w, http.StatusOK, existing)
+			return
+		}
+		if existing.Status == models.ReportGenerating {
+			// If it's already generating, check if it's "stuck" (older than 10 mins).
+			// If stuck, we restart it. If not stuck, we just return it so frontend can wait for SSE.
+			if time.Since(existing.CreatedAt) < 10*time.Minute {
+				writeJSON(w, http.StatusAccepted, existing)
+				return
+			}
+			// Restart stuck generation.
+			existing.Status = models.ReportGenerating
+			existing.CreatedAt = time.Now().UTC()
+			s.queries.UpdateReport(existing)
+			go s.generateReport(existing, runID)
+			writeJSON(w, http.StatusAccepted, existing)
+			return
+		}
+		// If failed, we allow re-creating (delete old one first).
+		if existing.Status == models.ReportFailed {
+			s.queries.DeleteReport(existing.ID)
+		}
 	}
 
 	// Fetch run to validate.
@@ -233,6 +254,20 @@ func (s *Server) broadcastReportProgress(rpt *models.Report) {
 			}
 		}
 	}
+}
+
+func (s *Server) handleGetReportByRun(w http.ResponseWriter, r *http.Request) {
+	runID := r.PathValue("runId")
+	rpt, err := s.queries.GetReportByRunID(runID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get report: %v", err))
+		return
+	}
+	if rpt == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "report not found"))
+		return
+	}
+	writeJSON(w, http.StatusOK, rpt)
 }
 
 func (s *Server) handleGetReport(w http.ResponseWriter, r *http.Request) {

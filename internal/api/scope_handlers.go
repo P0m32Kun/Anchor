@@ -7,8 +7,50 @@ import (
 
 	"github.com/P0m32Kun/Anchor/internal/errors"
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/scope"
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
+
+// ParseScopeRequest 解析scope规则值的请求
+type ParseScopeRequest struct {
+	Value string `json:"value"`
+}
+
+// ParseScopeResponse 解析scope规则值的响应
+type ParseScopeResponse struct {
+	Rules []struct {
+		Type  string `json:"type"`
+		Value string `json:"value"`
+	} `json:"rules"`
+}
+
+func (s *Server) handleParseScopeValue(w http.ResponseWriter, r *http.Request) {
+	var req ParseScopeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	// 复用scope包的parseLine逻辑来解析单个值
+	parsed := scope.ParseLine(req.Value)
+	response := ParseScopeResponse{Rules: make([]struct {
+		Type  string `json:"type"`
+		Value string `json:"value"`
+	}, 0, len(parsed))}
+
+	for _, p := range parsed {
+		response.Rules = append(response.Rules, struct {
+			Type  string `json:"type"`
+			Value string `json:"value"`
+		}{
+			Type:  string(p.Type),
+			Value: p.Value,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
 
 func (s *Server) handleCreateScopeRule(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -59,6 +101,15 @@ func (s *Server) handleListScopeRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writePaginatedJSON(w, rules, total, page)
+}
+
+func (s *Server) handleDeleteScopeRule(w http.ResponseWriter, r *http.Request) {
+	ruleID := r.PathValue("id")
+	if err := s.queries.DeleteScopeRule(ruleID); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "delete scope rule failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 func (s *Server) handleBatchCreateScopeRules(w http.ResponseWriter, r *http.Request) {

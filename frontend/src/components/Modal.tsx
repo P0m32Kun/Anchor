@@ -7,7 +7,7 @@ import { Button } from "./Button";
 interface ModalProps {
   open: boolean;
   onClose: () => void;
-  title?: string;
+  title?: ReactNode;
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
@@ -74,15 +74,16 @@ export default function Modal({
         aria-modal="true"
         aria-labelledby={title ? "modal-title" : undefined}
         className={cn(
-          "relative z-10 w-full rounded-2xl border border-white/10 bg-card/90 backdrop-blur-xl shadow-2xl animate-in zoom-in-95 duration-300 outline-none overflow-hidden",
+          "relative z-10 w-full rounded-2xl border border-white/10 bg-card/90 backdrop-blur-xl shadow-2xl animate-in zoom-in-95 duration-300 outline-none overflow-hidden flex flex-col",
+          "max-h-[90vh]", // Ensure it doesn't exceed 90% of the viewport height
           sizeMap[size]
         )}
       >
         {/* 顶部装饰条 */}
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent shrink-0" />
 
         {(title || description) && (
-          <div className="px-6 pt-6 pb-2 flex items-start justify-between">
+          <div className="px-6 pt-6 pb-2 flex items-start justify-between shrink-0">
             <div className="space-y-1">
               {title && (
                 <h2 id="modal-title" className="text-xl font-bold tracking-tight text-foreground">
@@ -107,10 +108,10 @@ export default function Modal({
             </div>
         )}
 
-        <div className="px-6 py-4">{children}</div>
+        <div className="px-6 py-4 overflow-y-auto flex-1">{children}</div>
         
         {footer && (
-          <div className="px-6 py-4 bg-white/5 border-t border-white/5 flex justify-end gap-3">
+          <div className="px-6 py-4 bg-white/5 border-t border-white/5 flex justify-end gap-3 shrink-0">
             {footer}
           </div>
         )}

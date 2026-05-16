@@ -75,7 +75,7 @@ func TestManager_CreateFromGit_Happy(t *testing.T) {
 	}}
 	m, _ := newTestManager(t, cloner)
 
-	src, err := m.CreateFromGit(context.Background(), "demo", "https://example.com/x.git", "main", "manual")
+	src, err := m.CreateFromGit(context.Background(), "demo", "demo", "https://example.com/x.git", "main", "manual")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestManager_CreateFromGit_RollbackOnCloneFailure(t *testing.T) {
 	cloner := &fakeCloner{err: errors.New("clone refused")}
 	m, _ := newTestManager(t, cloner)
 
-	_, err := m.CreateFromGit(context.Background(), "demo", "https://example.com/x.git", "", "manual")
+	_, err := m.CreateFromGit(context.Background(), "demo", "demo", "https://example.com/x.git", "", "manual")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -120,7 +120,7 @@ func TestManager_CreateFromGit_RollbackOnCloneFailure(t *testing.T) {
 
 func TestManager_CreateFromGit_RejectsNonHTTPS(t *testing.T) {
 	m, _ := newTestManager(t, &fakeCloner{})
-	_, err := m.CreateFromGit(context.Background(), "demo", "git@github.com:foo/bar.git", "", "manual")
+	_, err := m.CreateFromGit(context.Background(), "demo", "demo", "git@github.com:foo/bar.git", "", "manual")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -133,7 +133,7 @@ func TestManager_CreateFromGit_RejectsNonHTTPS(t *testing.T) {
 func TestManager_CreateFromUpload_YAML(t *testing.T) {
 	m, _ := newTestManager(t, &fakeCloner{})
 	body := bytes.NewReader([]byte("id: hello\n"))
-	src, err := m.CreateFromUpload(context.Background(), "demo", "manual", "hello.yaml", body)
+	src, err := m.CreateFromUpload(context.Background(), "demo", "demo", "manual", "hello.yaml", body)
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestManager_CreateFromUpload_ZipWithTraversalEntryRejected(t *testing.T) {
 		t.Fatalf("zip close: %v", err)
 	}
 
-	_, err = m.CreateFromUpload(context.Background(), "demo", "manual", "evil.zip", bytes.NewReader(buf.Bytes()))
+	_, err = m.CreateFromUpload(context.Background(), "demo", "demo", "manual", "evil.zip", bytes.NewReader(buf.Bytes()))
 	if err == nil {
 		t.Fatal("expected error for traversal entry")
 	}
@@ -177,7 +177,7 @@ func TestManager_CreateFromUpload_ZipWithTraversalEntryRejected(t *testing.T) {
 func TestManager_Patch_NameAndEnabled(t *testing.T) {
 	cloner := &fakeCloner{files: map[string]string{"templates/a.yaml": "id: a\n"}}
 	m, _ := newTestManager(t, cloner)
-	src, err := m.CreateFromGit(context.Background(), "demo", "https://example.com/x.git", "", "manual")
+	src, err := m.CreateFromGit(context.Background(), "demo", "demo", "https://example.com/x.git", "", "manual")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestManager_Patch_DoesNotTouchTypeOrURI(t *testing.T) {
 	// This test confirms that a no-op patch leaves immutable fields untouched.
 	cloner := &fakeCloner{files: map[string]string{"templates/a.yaml": "id: a\n"}}
 	m, _ := newTestManager(t, cloner)
-	src, _ := m.CreateFromGit(context.Background(), "demo", "https://example.com/x.git", "main", "manual")
+	src, _ := m.CreateFromGit(context.Background(), "demo", "demo", "https://example.com/x.git", "main", "manual")
 
 	updated, err := m.Patch(src.ID, SourcePatch{})
 	if err != nil {
@@ -215,7 +215,7 @@ func TestManager_Patch_DoesNotTouchTypeOrURI(t *testing.T) {
 func TestManager_Delete_RemovesRowAndDisk(t *testing.T) {
 	cloner := &fakeCloner{files: map[string]string{"templates/a.yaml": "id: a\n"}}
 	m, _ := newTestManager(t, cloner)
-	src, _ := m.CreateFromGit(context.Background(), "demo", "https://example.com/x.git", "", "manual")
+	src, _ := m.CreateFromGit(context.Background(), "demo", "demo", "https://example.com/x.git", "", "manual")
 
 	dir := m.Layout().SourceDir(src.ID)
 	if _, err := os.Stat(dir); err != nil {
@@ -236,7 +236,7 @@ func TestManager_Delete_RemovesRowAndDisk(t *testing.T) {
 
 func TestManager_FileCRUD_RoundTrip(t *testing.T) {
 	m, _ := newTestManager(t, &fakeCloner{})
-	src, err := m.CreateFromUpload(context.Background(), "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: hello\n")))
+	src, err := m.CreateFromUpload(context.Background(), "demo", "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: hello\n")))
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -284,7 +284,7 @@ func TestManager_FileCRUD_RoundTrip(t *testing.T) {
 
 func TestManager_WriteFile_RejectsDisallowedExtension(t *testing.T) {
 	m, _ := newTestManager(t, &fakeCloner{})
-	src, _ := m.CreateFromUpload(context.Background(), "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
+	src, _ := m.CreateFromUpload(context.Background(), "demo", "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
 
 	err := m.WriteFile(src.ID, "templates/evil.sh", []byte("#!/bin/sh\nrm -rf /\n"))
 	if err == nil {
@@ -298,7 +298,7 @@ func TestManager_WriteFile_RejectsDisallowedExtension(t *testing.T) {
 
 func TestManager_WriteFile_RejectsTraversal(t *testing.T) {
 	m, _ := newTestManager(t, &fakeCloner{})
-	src, _ := m.CreateFromUpload(context.Background(), "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
+	src, _ := m.CreateFromUpload(context.Background(), "demo", "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
 
 	err := m.WriteFile(src.ID, "../escape.yaml", []byte("id: x\n"))
 	if err == nil {
@@ -308,7 +308,7 @@ func TestManager_WriteFile_RejectsTraversal(t *testing.T) {
 
 func TestManager_WriteFile_OversizeRejected(t *testing.T) {
 	m, _ := newTestManager(t, &fakeCloner{})
-	src, _ := m.CreateFromUpload(context.Background(), "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
+	src, _ := m.CreateFromUpload(context.Background(), "demo", "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
 
 	big := make([]byte, MaxWriteFileBytes+1)
 	err := m.WriteFile(src.ID, "templates/huge.yaml", big)
@@ -323,7 +323,7 @@ func TestManager_WriteFile_OversizeRejected(t *testing.T) {
 
 func TestManager_WriteFile_ConcurrentWritersDontRace(t *testing.T) {
 	m, _ := newTestManager(t, &fakeCloner{})
-	src, _ := m.CreateFromUpload(context.Background(), "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
+	src, _ := m.CreateFromUpload(context.Background(), "demo", "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
 
 	const N = 16
 	var wg sync.WaitGroup
@@ -347,7 +347,7 @@ func TestManager_WriteFile_ConcurrentWritersDontRace(t *testing.T) {
 
 func TestManager_Refresh_OnlyValidForGitSources(t *testing.T) {
 	m, _ := newTestManager(t, &fakeCloner{})
-	src, _ := m.CreateFromUpload(context.Background(), "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
+	src, _ := m.CreateFromUpload(context.Background(), "demo", "demo", "manual", "hello.yaml", bytes.NewReader([]byte("id: x\n")))
 
 	_, err := m.Refresh(context.Background(), src.ID)
 	if err == nil {
@@ -363,7 +363,7 @@ func TestManager_Refresh_GitSwapsFilesAtomically(t *testing.T) {
 	cloner := &fakeCloner{files: map[string]string{"templates/v1.yaml": "id: v1\n"}}
 	m, _ := newTestManager(t, cloner)
 
-	src, err := m.CreateFromGit(context.Background(), "demo", "https://example.com/x.git", "", "manual")
+	src, err := m.CreateFromGit(context.Background(), "demo", "demo", "https://example.com/x.git", "", "manual")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}

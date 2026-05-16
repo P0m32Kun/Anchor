@@ -48,5 +48,7 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Immediately clean up workdir files on project deletion.
+	s.cleanupProjectWorkdir(id)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }

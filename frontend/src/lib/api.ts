@@ -259,6 +259,7 @@ export interface ScanTask {
   id: string;
   project_id: string;
   tool: string;
+  command_template?: string;
   status: string;
   error_message?: string;
   started_at?: string;
@@ -448,6 +449,9 @@ export const api = {
   listArtifacts: (taskId: string, signal?: AbortSignal) =>
     fetchAPI<any[]>(`/tasks/${taskId}/artifacts`, { signal }),
 
+  getArtifactContent: (artifactId: string, signal?: AbortSignal) =>
+    request(`/artifacts/content?id=${artifactId}`, { signal }).then((res) => res.text()),
+
   listToolHealth: (signal?: AbortSignal) => fetchAPI<ToolHealth[]>("/health/tools", { signal }),
 
   runHealthCheck: (signal?: AbortSignal) => fetchAPI<ToolHealth[]>("/health/check", { method: "POST", signal }),
@@ -555,13 +559,14 @@ export const api = {
   listNucleiCustomSources: (signal?: AbortSignal) =>
     fetchAPI<NucleiCustomSource[]>("/nuclei/custom/sources", { signal }),
 
-  createNucleiCustomGitSource: (data: { name: string; uri: string; branch?: string }, signal?: AbortSignal) =>
+  createNucleiCustomGitSource: (data: { name: string; install_path: string; uri: string; branch?: string }, signal?: AbortSignal) =>
     fetchAPI<NucleiCustomSource>("/nuclei/custom/sources/git", { method: "POST", body: JSON.stringify(data), signal }),
 
-  createNucleiCustomUploadSource: (name: string, file: File, signal?: AbortSignal) => {
+  createNucleiCustomUploadSource: (name: string, installPath: string, file: File, signal?: AbortSignal) => {
     const formData = new FormData();
     formData.append("name", name);
-    formData.append("routing_policy", "manual"); // 默认值，后端已不再使用
+    formData.append("install_path", installPath);
+    formData.append("routing_policy", "manual");
     formData.append("file", file);
     return fetchAPI<NucleiCustomSource>("/nuclei/custom/sources/upload", { method: "POST", body: formData, signal });
   },
@@ -605,6 +610,9 @@ export const api = {
 
   getReport: (reportId: string, signal?: AbortSignal) =>
     fetchAPI<Report>(`/reports/${reportId}`, { signal }),
+
+  getReportByRun: (runId: string, signal?: AbortSignal, skipGlobalError?: boolean) =>
+    fetchAPI<Report>(`/runs/${runId}/report`, { signal, skipGlobalError }),
 
   deleteReport: (reportId: string, signal?: AbortSignal) =>
     fetchAPI<{ status: string }>(`/reports/${reportId}`, { method: "DELETE", signal }),

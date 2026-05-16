@@ -14,7 +14,15 @@ import {
   CardDescription,
   CardContent,
   Badge,
-  SkeletonList
+  SeverityBadge,
+  SkeletonList,
+  Modal,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
 } from "../components";
 import { useToast } from "../components/Toast";
 import { getApiBase } from "../lib/config";
@@ -36,6 +44,7 @@ import {
   Download,
   ChevronDown,
   Trash2,
+  Copy,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -70,6 +79,11 @@ export default function RunsPage() {
   const [reports, setReports] = useState<Map<string, Report>>(new Map());
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
 
+  const [inspectingTask, setInspectingTask] = useState<ScanTask | null>(null);
+  const [inspectingLogs, setInspectingLogs] = useState<string>("");
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logViewMode, setLogViewMode] = useState<"raw" | "parsed">("parsed");
+
   const lastToastErrorRef = useRef<string | null>(null);
 
   const maybeToastError = useCallback(
@@ -100,6 +114,39 @@ export default function RunsPage() {
     [projectId],
     undefined
   );
+
+  // Track runs that have been checked for reports (even if no report exists)
+  // to avoid repeated 404 calls after each poll cycle.
+  const [checkedReportRuns, setCheckedReportRuns] = useState<Set<string>>(new Set());
+
+  // Reset checked set when project changes
+  useEffect(() => {
+    setCheckedReportRuns(new Set());
+  }, [projectId]);
+
+  // Load existing reports for runs
+  useEffect(() => {
+    if (!runs.length) return;
+    runs.forEach(async (run) => {
+      if (reports.has(run.id) || generatingReports.has(run.id) || checkedReportRuns.has(run.id)) return;
+      if (run.status !== 'completed' && run.status !== 'failed') return;
+      try {
+        const rpt = await api.getReportByRun(run.id, undefined, true);
+        if (rpt) {
+          setReports((prev) => new Map(prev).set(run.id, rpt));
+          if (rpt.status === 'generating') {
+            setGeneratingReports((prev) => new Set(prev).add(run.id));
+          }
+        } else {
+          // Mark as checked so we don't retry; 404 is expected for runs without reports.
+          setCheckedReportRuns((prev) => new Set(prev).add(run.id));
+        }
+      } catch (err) {
+        // ignore 404 — report doesn't exist yet, mark as checked
+        setCheckedReportRuns((prev) => new Set(prev).add(run.id));
+      }
+    });
+  }, [runs, reports.size, generatingReports.size, checkedReportRuns.size]);
 
   const {
     loading: targetsLoading,
@@ -300,8 +347,9 @@ export default function RunsPage() {
     setGeneratingReports((prev) => new Set(prev).add(runId));
     try {
       const rpt = await api.createReport(runId);
+      setReports((prev) => new Map(prev).set(runId, rpt));
+      
       if (rpt.status === "complete") {
-        setReports((prev) => new Map(prev).set(runId, rpt));
         setGeneratingReports((prev) => { const next = new Set(prev); next.delete(runId); return next; });
         toast("报告已生成", "success");
       } else if (rpt.status === "failed") {
@@ -326,6 +374,31 @@ export default function RunsPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "删除报告失败";
       toast(msg, "error");
+    }
+  };
+
+  const handleInspectTask = async (task: ScanTask) => {
+    setInspectingTask(task);
+    setInspectingLogs("");
+    setLogsLoading(true);
+    try {
+      const artifacts = await api.listArtifacts(task.id);
+      // Sort to prioritize stdout, then stderr, then others
+      const stdout = artifacts.find(a => a.type === 'stdout');
+      const stderr = artifacts.find(a => a.type === 'stderr');
+      
+      const targetArtifact = stdout || stderr;
+      if (targetArtifact) {
+        const content = await api.getArtifactContent(targetArtifact.id);
+        setInspectingLogs(content);
+      } else {
+        setInspectingLogs("(无日志输出)");
+      }
+    } catch (err) {
+      console.error("Failed to load logs:", err);
+      setInspectingLogs("加载日志失败: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setLogsLoading(false);
     }
   };
 
@@ -563,9 +636,16 @@ export default function RunsPage() {
                                             {stageTasks.length > 0 && (
                                                 <div className="pl-14 pr-4 pb-3 -mt-1 space-y-1.5">
                                                     {stageTasks.map((task) => (
-                                                        <div key={task.id} className="flex items-center justify-between gap-3 text-[11px] py-1 border-l border-border/40 pl-3">
+                                                        <div 
+                                                            key={task.id} 
+                                                            className="flex items-center justify-between gap-3 text-[11px] py-1 border-l border-border/40 pl-3 hover:bg-primary/[0.03] cursor-pointer transition-colors group/task"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleInspectTask(task);
+                                                            }}
+                                                        >
                                                             <div className="flex items-center gap-2 min-w-0">
-                                                                <span className="px-1.5 py-0.5 rounded bg-muted font-mono font-bold text-muted-foreground text-[10px]">
+                                                                <span className="px-1.5 py-0.5 rounded bg-muted font-mono font-bold text-muted-foreground text-[10px] group-hover/task:bg-primary/10 group-hover/task:text-primary transition-colors">
                                                                     {task.tool}
                                                                 </span>
                                                                 <span className="font-mono text-muted-foreground opacity-50 truncate">#{task.id.slice(-6)}</span>
@@ -573,14 +653,17 @@ export default function RunsPage() {
                                                                     {formatTaskDuration(task)}
                                                                 </span>
                                                             </div>
-                                                            <Badge variant={
-                                                                task.status === 'completed' ? 'success' :
-                                                                task.status === 'failed' ? 'destructive' :
-                                                                task.status === 'running' ? 'info' :
-                                                                'secondary'
-                                                            } className="h-4 px-1 text-[9px] shrink-0">
-                                                                {task.status}
-                                                            </Badge>
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge variant={
+                                                                    task.status === 'completed' ? 'success' :
+                                                                    task.status === 'failed' ? 'destructive' :
+                                                                    task.status === 'running' ? 'info' :
+                                                                    'secondary'
+                                                                } className="h-4 px-1 text-[9px] shrink-0">
+                                                                    {task.status}
+                                                                </Badge>
+                                                                <Terminal className="h-3 w-3 text-muted-foreground/30 group-hover/task:text-primary transition-colors" />
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -619,6 +702,15 @@ export default function RunsPage() {
         cancelText="稍后处理"
         variant="danger"
         loading={cancelling}
+      />
+
+      <TaskDetailsModal
+        task={inspectingTask}
+        logs={inspectingLogs}
+        loading={logsLoading}
+        viewMode={logViewMode}
+        onViewModeChange={setLogViewMode}
+        onClose={() => setInspectingTask(null)}
       />
     </div>
   );
@@ -754,22 +846,41 @@ function ReportButton({
   );
 }
 
-// Slow-scan stages run concurrently so time-range matching alone puts all
-// concurrent tasks under every overlapping stage.  For these stages we also
-// require the task's tool name to match the stage name.
-const SLOW_SCAN_STAGES = new Set(["ffuf", "urlfinder"]);
+// Mapping of stages to the tools they are allowed to contain.
+// This prevents tasks from appearing in multiple stages if they start/end 
+// at the exact same time as a stage boundary.
+const STAGE_TOOL_ALLOWLIST: Record<string, string[]> = {
+  alive: ["nmap"],
+  portscan: ["naabu"],
+  fingerprint: ["nmap"],
+  httpx: ["httpx"],
+  vuln: ["nuclei"],
+  subdomain: ["subfinder"],
+  resolve: ["dnsx"],
+  cdn_filter: ["cdncheck"],
+  ffuf: ["ffuf"],
+  urlfinder: ["urlfinder"],
+  httpx_2: ["httpx"],
+  vuln_2: ["nuclei"],
+};
 
 function tasksInStage(stage: PipelineRunStage, allTasks: ScanTask[]): ScanTask[] {
   if (!stage.started_at) return [];
   const stageStart = new Date(stage.started_at).getTime();
   const stageEnd = stage.completed_at ? new Date(stage.completed_at).getTime() : Infinity;
-  const slow = SLOW_SCAN_STAGES.has(stage.stage);
+  
+  const allowedTools = STAGE_TOOL_ALLOWLIST[stage.stage];
+
   return allTasks.filter((t) => {
     if (!t.started_at) return false;
     const ts = new Date(t.started_at).getTime();
+    
+    // Time boundary check
     if (ts < stageStart || ts > stageEnd) return false;
-    // For slow-scan stages, only show tasks whose tool matches the stage.
-    if (slow && t.tool !== stage.stage) return false;
+    
+    // Strict tool matching if allowlist exists for this stage
+    if (allowedTools && !allowedTools.includes(t.tool)) return false;
+    
     return true;
   });
 }
@@ -810,6 +921,8 @@ const STAGE_LABELS: Record<string, string> = {
   vuln: "漏洞探测",
   ffuf: "目录爆破 (慢速)",
   urlfinder: "URL 发现 (慢速)",
+  httpx_2: "Web 探活 (2)",
+  vuln_2: "漏洞扫描 (2)",
 };
 
 // mergeStageEvent reduces an SSE pipeline_stage_change event into the local
@@ -858,3 +971,594 @@ export function mergeStageEvent(
     },
   ];
 }
+
+// --- Task Parsed View Component ---
+
+function TaskParsedView({ task, logs }: { task: ScanTask; logs: string }) {
+  if (!logs) return (
+    <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground gap-2">
+      <Activity className="h-8 w-8 opacity-20" />
+      <span className="italic text-sm">NO DATA RECEIVED YET</span>
+    </div>
+  );
+
+  const lines = logs.trim().split("\n");
+
+  const tryParseJSONL = <T,>(lines: string[]): T[] => {
+    const results: T[] = [];
+    for (const line of lines) {
+      try {
+        if (line.trim() && (line.trim().startsWith("{") || line.trim().startsWith("["))) {
+          results.push(JSON.parse(line));
+        }
+      } catch (e) {
+        // ignore invalid lines
+      }
+    }
+    return results;
+  };
+
+  const TableContainer = ({ children }: { children: React.ReactNode }) => (
+    <div className="overflow-hidden rounded-xl border border-border/50 bg-card">
+        {children}
+    </div>
+  );
+
+  switch (task.tool) {
+    case "nuclei": {
+      const data = tryParseJSONL<any>(lines);
+      return (
+        <TableContainer>
+            <Table>
+            <TableHeader className="bg-muted/50">
+                <TableRow>
+                <TableHead className="w-[200px] text-[10px] uppercase font-bold">TEMPLATE ID</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold">TARGET</TableHead>
+                <TableHead className="w-[100px] text-[10px] uppercase font-bold text-center">SEVERITY</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold text-right pr-6">MATCHER</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((item, idx) => (
+                <TableRow key={idx} className="hover:bg-muted/30 transition-colors border-border/40">
+                    <TableCell className="font-mono text-[11px] text-primary font-bold py-3">{item["template-id"]}</TableCell>
+                    <TableCell className="font-mono text-[11px] py-3 break-all">{item["matched-at"] || item["host"]}</TableCell>
+                    <TableCell className="text-center py-3">
+                    <SeverityBadge severity={item["info"]?.["severity"] || "info"} className="h-5 px-1.5" />
+                    </TableCell>
+                    <TableCell className="text-right pr-6 py-3">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted font-mono text-muted-foreground">
+                            {item["matcher-name"] || "match"}
+                        </span>
+                    </TableCell>
+                </TableRow>
+                ))}
+                {data.length === 0 && (
+                    <TableRow>
+                        <TableCell colSpan={4} className="text-center py-20">
+                            <div className="flex flex-col items-center gap-2">
+                                <CheckCircle2 className="h-8 w-8 text-brand-success opacity-20" />
+                                <span className="text-sm font-medium text-muted-foreground">CLEAN: NO VULNERABILITIES DETECTED</span>
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                )}
+            </TableBody>
+            </Table>
+        </TableContainer>
+      );
+    }
+
+    case "httpx": {
+      const data = tryParseJSONL<any>(lines);
+      return (
+        <TableContainer>
+            <Table>
+            <TableHeader className="bg-muted/50">
+                <TableRow>
+                <TableHead className="text-[10px] uppercase font-bold">URL</TableHead>
+                <TableHead className="w-[80px] text-[10px] uppercase font-bold text-center">STATUS</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold">PAGE TITLE</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold pr-6">TECHNOLOGIES</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((item, idx) => (
+                <TableRow key={idx} className="hover:bg-muted/30 transition-colors border-border/40">
+                    <TableCell className="font-mono text-[11px] text-primary py-3 max-w-[300px] truncate">{item["url"]}</TableCell>
+                    <TableCell className="text-center py-3">
+                    <Badge variant={item["status_code"] >= 200 && item["status_code"] < 300 ? "success" : "secondary"} className="h-5 px-1.5 font-mono text-[10px]">
+                        {item["status_code"]}
+                    </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate text-[11px] py-3 text-muted-foreground font-medium">{item["title"] || "-"}</TableCell>
+                    <TableCell className="pr-6 py-3">
+                    <div className="flex flex-wrap gap-1">
+                        {(item["technologies"] || []).map((t: string) => (
+                        <Badge key={t} variant="outline" className="text-[9px] px-1.5 h-4 font-bold border-primary/20 bg-primary/[0.03] text-primary/80">
+                            {t}
+                        </Badge>
+                        ))}
+                        {!(item["technologies"]?.length) && <span className="text-muted-foreground/30">—</span>}
+                    </div>
+                    </TableCell>
+                </TableRow>
+                ))}
+            </TableBody>
+            </Table>
+        </TableContainer>
+      );
+    }
+
+    case "naabu": {
+      const data = tryParseJSONL<any>(lines);
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+            {data.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-muted/20 hover:bg-primary/[0.03] hover:border-primary/30 transition-all group">
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-tighter">Host IP</span>
+                        <span className="font-mono text-[11px] text-foreground font-medium">{item["ip"]}</span>
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-tighter text-right">Open Port</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-success animate-pulse" />
+                            <span className="font-mono text-sm text-primary font-bold">{item["port"]}</span>
+                        </div>
+                    </div>
+                </div>
+            ))}
+            {data.length === 0 && (
+                <div className="col-span-full py-20 text-center flex flex-col items-center gap-2 opacity-30">
+                    <Zap className="h-8 w-8" />
+                    <span className="text-sm italic uppercase font-bold">No Open Ports Found</span>
+                </div>
+            )}
+        </div>
+      );
+    }
+
+    case "subfinder": {
+      const data = tryParseJSONL<any>(lines);
+      return (
+        <div className="p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-border/50 pb-2">
+            <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                <Activity className="h-3 w-3" />
+                Domains Discovered
+            </h5>
+            <Badge variant="secondary" className="font-mono text-[10px]">{data.length}</Badge>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+            {data.map((item, idx) => (
+              <div key={idx} className="px-3 py-2 bg-muted/30 rounded-lg border border-border/40 font-mono text-[11px] text-primary truncate hover:border-primary/30 transition-all cursor-default">
+                {item["host"]}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    case "ffuf": {
+      const data = tryParseJSONL<any>(lines);
+      return (
+        <TableContainer>
+            <Table>
+            <TableHeader className="bg-muted/50">
+                <TableRow>
+                <TableHead className="text-[10px] uppercase font-bold">DISCOVERED PATH</TableHead>
+                <TableHead className="w-[80px] text-[10px] uppercase font-bold text-center">STATUS</TableHead>
+                <TableHead className="w-[100px] text-[10px] uppercase font-bold text-right">SIZE</TableHead>
+                <TableHead className="w-[100px] text-[10px] uppercase font-bold text-right pr-6">WORDS</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((item, idx) => (
+                <TableRow key={idx} className="hover:bg-muted/30 transition-colors border-border/40">
+                    <TableCell className="font-mono text-[11px] text-primary py-3 break-all">{item["url"]}</TableCell>
+                    <TableCell className="text-center py-3">
+                    <Badge variant={item["status"] >= 200 && item["status"] < 300 ? "success" : "secondary"} className="h-5 px-1.5 font-mono text-[10px]">
+                        {item["status"]}
+                    </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-[11px] text-muted-foreground py-3">{item["length"]}</TableCell>
+                    <TableCell className="text-right font-mono text-[11px] text-muted-foreground pr-6 py-3">{item["words"]}</TableCell>
+                </TableRow>
+                ))}
+            </TableBody>
+            </Table>
+        </TableContainer>
+      );
+    }
+
+    case "urlfinder": {
+        try {
+            const data = JSON.parse(logs);
+            const results = Array.isArray(data) ? data : data.results || [];
+            return (
+                <TableContainer>
+                    <Table>
+                    <TableHeader className="bg-muted/50">
+                        <TableRow>
+                            <TableHead className="text-[10px] uppercase font-bold">SOURCE LINK / URL</TableHead>
+                            <TableHead className="w-[150px] text-[10px] uppercase font-bold text-right pr-6">TYPE</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {results.map((item: any, idx: number) => (
+                            <TableRow key={idx} className="hover:bg-muted/30 transition-colors border-border/40">
+                                <TableCell className="font-mono text-[11px] text-primary break-all py-3">{item.url || item.Url || item}</TableCell>
+                                <TableCell className="text-right pr-6 py-3">
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted font-bold text-muted-foreground uppercase tracking-tighter">
+                                        {item.source || item.Source || "Extracted"}
+                                    </span>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </TableContainer>
+            );
+        } catch (e) {
+            return <pre className="p-5 text-[11px] font-mono leading-relaxed bg-muted/20 rounded-xl">{logs}</pre>;
+        }
+    }
+
+    case "nmap": {
+        // Handle -oG (greppable) output for alive check
+        if (logs.includes("Host:") && logs.includes("Status: Up")) {
+            const aliveIps = lines
+                .filter(l => l.includes("Host:") && l.includes("Status: Up"))
+                .map(l => l.match(/Host: ([0-9.]+)/)?.[1])
+                .filter(Boolean);
+            return (
+                <div className="p-5 space-y-4">
+                    <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                        <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                            <Activity className="h-3 w-3" />
+                            Hosts Alive
+                        </h5>
+                        <Badge variant="success" className="font-mono text-[10px]">{aliveIps.length}</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                        {aliveIps.map((ip, idx) => (
+                            <div key={idx} className="px-2 py-2 bg-brand-success/10 border border-brand-success/20 rounded-lg font-mono text-[11px] text-brand-success text-center font-bold">
+                                {ip}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+        
+        if (logs.startsWith("<?xml")) {
+            return (
+                <div className="p-5 space-y-4">
+                    <div className="flex items-center gap-2 border-b border-border/50 pb-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Port & Service Inventory</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4">
+                        {logs.match(/<host[\s\S]*?<\/host>/g)?.map((hostXml, hIdx) => {
+                            const ip = hostXml.match(/addr="([0-9.]+)"/)?.[1];
+                            const ports = hostXml.match(/<port[\s\S]*?<\/port>/g)?.map(portXml => {
+                                const port = portXml.match(/portid="([0-9]+)"/)?.[1];
+                                const service = portXml.match(/name="([^"]+)"/)?.[1];
+                                const product = portXml.match(/product="([^"]+)"/)?.[1];
+                                const version = portXml.match(/version="([^"]+)"/)?.[1];
+                                return { port, service, product, version };
+                            });
+                            if (!ports?.length) return null;
+                            return (
+                                <div key={hIdx} className="rounded-xl border border-border/50 bg-card overflow-hidden shadow-sm">
+                                    <div className="bg-muted/40 px-4 py-2 font-mono text-[11px] font-bold border-b border-border/40 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                            <span>HOST: {ip}</span>
+                                        </div>
+                                        <span className="text-[10px] text-muted-foreground font-normal">{ports.length} ports open</span>
+                                    </div>
+                                    <Table>
+                                        <TableBody>
+                                            {ports?.map((p, pIdx) => (
+                                                <TableRow key={pIdx} className="hover:bg-muted/20 border-border/30 last:border-0">
+                                                    <TableCell className="w-24 font-mono text-primary font-bold py-2 pl-6">{p.port}</TableCell>
+                                                    <TableCell className="w-32 font-mono text-[11px] py-2">{p.service}</TableCell>
+                                                    <TableCell className="text-muted-foreground text-[10px] py-2 font-medium">
+                                                        {p.product} <span className="opacity-50">{p.version}</span>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+        return <pre className="p-5 text-[11px] font-mono leading-relaxed bg-muted/20 rounded-xl">{logs}</pre>;
+    }
+
+    case "dnsx": {
+      const data = tryParseJSONL<any>(lines);
+      return (
+        <TableContainer>
+            <Table>
+            <TableHeader className="bg-muted/50">
+                <TableRow>
+                <TableHead className="text-[10px] uppercase font-bold">DOMAIN / HOST</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold pr-6">RESOLUTION RECORDS</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((item, idx) => (
+                <TableRow key={idx} className="hover:bg-muted/30 transition-colors border-border/40">
+                    <TableCell className="font-mono text-[11px] text-primary font-bold py-3">{item["host"]}</TableCell>
+                    <TableCell className="font-mono pr-6 py-3">
+                        <div className="flex flex-wrap gap-1.5">
+                            {(item["a"] || []).map((a: string) => (
+                                <Badge key={a} variant="outline" className="text-[10px] font-bold border-brand-success/30 bg-brand-success/[0.03] text-brand-success">
+                                    A: {a}
+                                </Badge>
+                            ))}
+                            {(item["cname"] || []).map((c: string) => (
+                                <Badge key={c} variant="secondary" className="text-[10px] font-bold border-border bg-muted/50 text-muted-foreground">
+                                    CN: {c}
+                                </Badge>
+                            ))}
+                        </div>
+                    </TableCell>
+                </TableRow>
+                ))}
+            </TableBody>
+            </Table>
+        </TableContainer>
+      );
+    }
+
+    default:
+      return (
+        <div className="p-20 text-center flex flex-col items-center gap-4">
+          <div className="p-4 rounded-full bg-muted/50 border border-border/50">
+            <Terminal className="h-10 w-10 text-muted-foreground opacity-20" />
+          </div>
+          <div className="space-y-1">
+            <h5 className="font-bold text-foreground uppercase tracking-widest text-sm">NO FORMATTER AVAILABLE</h5>
+            <p className="text-xs text-muted-foreground">The results for tool <span className="font-mono text-primary">{task.tool}</span> are shown in raw format.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => {}} className="mt-2 border-border/50">
+            Switch to Raw Logs
+          </Button>
+        </div>
+      );
+  }
+}
+
+// --- Task Details Modal Component ---
+
+function TaskDetailsModal({
+  task,
+  logs,
+  loading,
+  viewMode,
+  onViewModeChange,
+  onClose,
+}: {
+  task: ScanTask | null;
+  logs: string;
+  loading: boolean;
+  viewMode: "raw" | "parsed";
+  onViewModeChange: (mode: "raw" | "parsed") => void;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+
+  const handleCopyCommand = (cmd: string) => {
+    navigator.clipboard.writeText(cmd);
+    toast("命令已复制到剪贴板", "success");
+  };
+
+  const handleDownloadLog = () => {
+    if (!task) return;
+    const blob = new Blob([logs], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `task_${task.tool}_${task.id.slice(-8)}.log`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  if (!task) return null;
+
+  return (
+    <Modal
+      open={!!task}
+      onClose={onClose}
+      title={
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full pr-12 gap-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <Terminal className="h-5 w-5 text-primary shrink-0" />
+            <span className="truncate font-bold text-lg">任务详情: {task.tool}</span>
+            <Badge variant="secondary" className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-muted/50 border-border/50 text-muted-foreground shrink-0 ml-1">
+              #{task.id.slice(-8).toUpperCase()}
+            </Badge>
+          </div>
+          <div className="flex bg-muted/50 p-1 rounded-xl border border-border/50 shrink-0">
+            <button
+              onClick={() => onViewModeChange("parsed")}
+              className={cn(
+                "px-4 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-200",
+                viewMode === "parsed" ? "bg-card text-foreground shadow-md ring-1 ring-black/5" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+              )}
+            >
+              格式化输出
+            </button>
+            <button
+              onClick={() => onViewModeChange("raw")}
+              className={cn(
+                "px-4 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-200",
+                viewMode === "raw" ? "bg-card text-foreground shadow-md ring-1 ring-black/5" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+              )}
+            >
+              原始日志
+            </button>
+          </div>
+        </div>
+      }
+      size="xl"
+    >
+      <div className="space-y-6">
+        {/* Execution Summary Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-muted/30 border border-border/50 rounded-xl p-3 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Activity className="h-3.5 w-3.5" />
+              <span className="text-[10px] uppercase font-bold tracking-wider">执行状态</span>
+            </div>
+            <div className="flex items-center">
+              <Badge variant={
+                task.status === 'completed' ? 'success' :
+                task.status === 'failed' ? 'destructive' :
+                task.status === 'running' ? 'info' :
+                'secondary'
+              } className="uppercase text-[10px] h-5">
+                {task.status}
+              </Badge>
+            </div>
+          </div>
+          
+          <div className="bg-muted/30 border border-border/50 rounded-xl p-3 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              <span className="text-[10px] uppercase font-bold tracking-wider">运行时长</span>
+            </div>
+            <div className="text-sm font-mono font-bold text-foreground">
+              {formatTaskDuration(task) || "0.0s"}
+            </div>
+          </div>
+
+          <div className="bg-muted/30 border border-border/50 rounded-xl p-3 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Zap className="h-3.5 w-3.5" />
+              <span className="text-[10px] uppercase font-bold tracking-wider">退出代码</span>
+            </div>
+            <div className={cn(
+              "text-sm font-mono font-bold",
+              task.exit_code === 0 ? "text-brand-success" : "text-destructive"
+            )}>
+              {task.exit_code !== undefined ? task.exit_code : "-"}
+            </div>
+          </div>
+
+          <div className="bg-muted/30 border border-border/50 rounded-xl p-3 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <History className="h-3.5 w-3.5" />
+              <span className="text-[10px] uppercase font-bold tracking-wider">启动时间</span>
+            </div>
+            <div className="text-sm font-mono text-foreground">
+              {task.started_at ? new Date(task.started_at).toLocaleTimeString() : "-"}
+            </div>
+          </div>
+        </div>
+
+        {/* Command Line with Terminal-like Header */}
+        <div className="border border-border/50 rounded-xl overflow-hidden bg-card/50">
+          <div className="bg-muted/50 px-4 py-2 border-b border-border/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-destructive/50" />
+                <div className="w-2.5 h-2.5 rounded-full bg-warning/50" />
+                <div className="w-2.5 h-2.5 rounded-full bg-brand-success/50" />
+              </div>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-2">Shell Command</span>
+            </div>
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-[10px] gap-1 hover:bg-primary/10 hover:text-primary transition-colors"
+                onClick={() => handleCopyCommand(task.command_template || "")}
+            >
+                <Copy className="h-3 w-3" />
+                COPY
+            </Button>
+          </div>
+          <div className="p-4 font-mono text-[11px] break-all leading-relaxed text-muted-foreground selection:bg-primary/20">
+            <span className="text-brand-success mr-2">$</span>
+            {task.command_template || "(无命令信息)"}
+          </div>
+        </div>
+
+        {/* Console Logs / Parsed Output Area */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                {viewMode === "raw" ? "Console Output" : "Structure Data"}
+              </h4>
+            </div>
+          </div>
+          
+          <div className={cn(
+              "relative min-h-[450px] rounded-xl border border-border/50 overflow-hidden shadow-sm transition-all",
+              viewMode === "raw" ? "bg-[#0d1117] ring-1 ring-white/5" : "bg-card"
+          )}>
+            {loading ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/60 backdrop-blur-md z-10">
+                <div className="relative">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+                  <Activity className="h-5 w-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-sm font-bold text-foreground">正在拉取扫描结果</span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-tighter">Syncing from worker node...</span>
+                </div>
+              </div>
+            ) : viewMode === "raw" ? (
+              <div className="font-mono text-[11px] leading-relaxed text-slate-300 overflow-auto h-full max-h-[600px] p-5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                {logs ? (
+                  <pre className="whitespace-pre-wrap break-all selection:bg-primary/40 selection:text-white">
+                    {logs}
+                  </pre>
+                ) : (
+                  <div className="flex flex-col h-[400px] items-center justify-center text-muted-foreground gap-3">
+                    <Terminal className="h-10 w-10 opacity-10" />
+                    <span className="italic opacity-50 text-sm">NO LOG OUTPUT RECORDED</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-full overflow-auto max-h-[600px] scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                <TaskParsedView task={task} logs={logs} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-4 border-t border-border/50">
+          <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
+            {loading ? "Waiting for response..." : (logs ? `Received ${Math.round(logs.length / 1024)} KB data` : "No data available")}
+          </div>
+          <div className="flex gap-3">
+            {logs && !loading && (
+              <Button variant="outline" onClick={handleDownloadLog} size="sm" className="gap-2 h-9 border-border/50 hover:bg-primary/5 hover:border-primary/30 transition-all">
+                <Download className="h-3.5 w-3.5" />
+                下载完整日志
+              </Button>
+            )}
+            <Button variant="secondary" onClick={onClose} size="sm" className="h-9 px-6 font-bold shadow-sm">
+              关闭面板
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+

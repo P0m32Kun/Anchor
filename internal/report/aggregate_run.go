@@ -10,33 +10,8 @@ import (
 )
 
 // AggregateByRun collects report data scoped to a specific pipeline run.
-// It reuses the project-level data but scopes findings to the run's project.
 func AggregateByRun(ctx context.Context, q *db.Queries, runID string) (*ReportData, *models.PipelineRun, error) {
-	// Fetch the pipeline run.
-	run, err := q.GetPipelineRun(runID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get pipeline run: %w", err)
-	}
-	if run == nil {
-		return nil, nil, fmt.Errorf("pipeline run %s not found", runID)
-	}
-
-	// Fetch the project.
-	project, err := q.GetProject(run.ProjectID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get project: %w", err)
-	}
-	if project == nil {
-		return nil, nil, fmt.Errorf("project %s not found", run.ProjectID)
-	}
-
-	// Reuse existing Aggregate for the project-level data.
-	data, err := Aggregate(ctx, q, project)
-	if err != nil {
-		return nil, nil, fmt.Errorf("aggregate: %w", err)
-	}
-
-	return data, run, nil
+	return AggregateByRunWithBatchEvidence(ctx, q, runID)
 }
 
 // AggregateByRunWithBatchEvidence is like AggregateByRun but uses batch evidence
@@ -93,8 +68,8 @@ func AggregateByRunWithBatchEvidence(ctx context.Context, q *db.Queries, runID s
 		return nil, nil, fmt.Errorf("list web endpoints: %w", err)
 	}
 
-	// Fetch report-eligible findings.
-	findings, err := q.ListFindingsForReport(project.ID)
+	// Fetch report-eligible findings scoped to this run.
+	findings, err := q.ListFindingsByRun(project.ID, runID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list findings: %w", err)
 	}

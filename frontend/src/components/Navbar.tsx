@@ -1,6 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type React from "react";
+import { useEffect, useRef } from "react";
 import { useStore } from "../lib/store";
+import { api, PAGE_ALL } from "../lib/api";
 import { cn } from "../lib/utils";
 import {
   LayoutDashboard,
@@ -82,9 +84,30 @@ export function Navbar() {
   const navigate = useNavigate();
   const currentProjectId = useStore((s) => s.currentProjectId);
   const projects = useStore((s) => s.projects);
+  const setProjects = useStore((s) => s.setProjects);
   const setCurrentProjectId = useStore((s) => s.setCurrentProjectId);
   const collapsed = useStore((s) => s.sidebarCollapsed);
   const toggleCollapsed = useStore((s) => s.toggleSidebarCollapsed);
+  const loadRef = useRef(false);
+
+  // 自动加载 projects 列表（仅一次）
+  useEffect(() => {
+    if (loadRef.current) return;
+    loadRef.current = true;
+
+    if (projects.length === 0) {
+      const ctrl = new AbortController();
+      api.listProjects(PAGE_ALL, ctrl.signal)
+        .then((res) => {
+          setProjects(res.data ?? []);
+        })
+        .catch((err) => {
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          console.error("Failed to load projects:", err);
+        });
+      return () => ctrl.abort();
+    }
+  }, [projects, setProjects]);
 
   const projectLinks: NavItem[] = currentProjectId
     ? [

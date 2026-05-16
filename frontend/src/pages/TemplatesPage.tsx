@@ -41,6 +41,17 @@ import {
 
 type TabMode = "sources";
 
+/** 将显示名转为合法的路径名：小写、空格→连字符、只保留字母数字和-_ */
+function toInstallPath(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9\-_.]/g, "")
+    .replace(/^[.\-]+/, "")
+    .slice(0, 64) || "custom-templates";
+}
+
 type TreeNode = {
   name: string;
   path: string;
@@ -121,8 +132,8 @@ export default function TemplatesPage() {
   const [confirmConfig, setConfirmConfig] = useState({ title: "", onConfirm: () => {} });
 
   // Form state
-  const [gitForm, setGitForm] = useState({ name: "", uri: "", branch: "" });
-  const [uploadForm, setUploadForm] = useState({ name: "", file: null as File | null });
+  const [gitForm, setGitForm] = useState({ name: "", install_path: "", uri: "", branch: "" });
+  const [uploadForm, setUploadForm] = useState({ name: "", install_path: "", file: null as File | null });
 
   // File editing
   const [editSourceId, setEditSourceId] = useState("");
@@ -187,12 +198,13 @@ export default function TemplatesPage() {
     try {
       await api.createNucleiCustomGitSource({
         name: gitForm.name.trim(),
+        install_path: gitForm.install_path.trim() || toInstallPath(gitForm.name),
         uri: gitForm.uri.trim(),
         branch: gitForm.branch.trim() || undefined,
       });
       toast("Git模板源创建成功", "success");
       setGitModalOpen(false);
-      setGitForm({ name: "", uri: "", branch: "" });
+      setGitForm({ name: "", install_path: "", uri: "", branch: "" });
       loadSources();
     } catch (err: any) {
     }
@@ -206,11 +218,12 @@ export default function TemplatesPage() {
     try {
       await api.createNucleiCustomUploadSource(
         uploadForm.name.trim(),
+        uploadForm.install_path.trim() || toInstallPath(uploadForm.name),
         uploadForm.file
       );
       toast("模板上传成功", "success");
       setUploadModalOpen(false);
-      setUploadForm({ name: "", file: null });
+      setUploadForm({ name: "", install_path: "", file: null });
       loadSources();
     } catch (err: any) {
     }
@@ -597,7 +610,7 @@ export default function TemplatesPage() {
       {/* Git Import Modal */}
       <Modal
         open={gitModalOpen}
-        onClose={() => setGitModalOpen(false)}
+        onClose={() => { setGitModalOpen(false); setGitForm({ name: "", install_path: "", uri: "", branch: "" }); }}
         title="从 Git 导入模板源"
         description="克隆一个公开的 Git 仓库作为模板源"
         footer={
@@ -612,8 +625,21 @@ export default function TemplatesPage() {
             <label className="text-sm font-medium mb-1.5 block">名称</label>
             <Input
               value={gitForm.name}
-              onChange={(e) => setGitForm((p) => ({ ...p, name: e.target.value }))}
+              onChange={(e) => setGitForm((p) => ({ ...p, name: e.target.value, install_path: p.install_path || toInstallPath(e.target.value) }))}
               placeholder="例如: RBKD-SEC Templates"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">
+              安装路径
+              <span className="text-[10px] text-muted-foreground ml-1">
+                (~nuclei-templates/下的目录名，默认由名称自动生成)
+              </span>
+            </label>
+            <Input
+              value={gitForm.install_path}
+              onChange={(e) => setGitForm((p) => ({ ...p, install_path: e.target.value }))}
+              placeholder="r bkd-templates"
             />
           </div>
           <div>
@@ -638,7 +664,7 @@ export default function TemplatesPage() {
       {/* Upload Modal */}
       <Modal
         open={uploadModalOpen}
-        onClose={() => setUploadModalOpen(false)}
+        onClose={() => { setUploadModalOpen(false); setUploadForm({ name: "", install_path: "", file: null }); }}
         title="上传模板源"
         description="上传单个 YAML 文件或 ZIP 压缩包"
         footer={
@@ -653,8 +679,21 @@ export default function TemplatesPage() {
             <label className="text-sm font-medium mb-1.5 block">名称</label>
             <Input
               value={uploadForm.name}
-              onChange={(e) => setUploadForm((p) => ({ ...p, name: e.target.value }))}
+              onChange={(e) => setUploadForm((p) => ({ ...p, name: e.target.value, install_path: p.install_path || toInstallPath(e.target.value) }))}
               placeholder="模板源名称"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">
+              安装路径
+              <span className="text-[10px] text-muted-foreground ml-1">
+                (~nuclei-templates/下的目录名，默认由名称自动生成)
+              </span>
+            </label>
+            <Input
+              value={uploadForm.install_path}
+              onChange={(e) => setUploadForm((p) => ({ ...p, install_path: e.target.value }))}
+              placeholder="my-templates"
             />
           </div>
           <div>

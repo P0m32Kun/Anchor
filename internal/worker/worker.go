@@ -18,6 +18,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/toolguard"
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
@@ -32,6 +33,8 @@ type Runner struct {
 	scopeEng   *scope.Engine
 	dataDir    string
 	dispatcher *Dispatcher
+	governor   *ResourceGovernor
+	allowlist  *toolguard.Allowlist
 	procs      map[string]*exec.Cmd
 	doneChs    map[string]chan struct{} // closed when process exits
 	mu         sync.RWMutex
@@ -43,9 +46,17 @@ func NewRunner(q *db.Queries, scopeEng *scope.Engine, dataDir string) *Runner {
 		scopeEng:   scopeEng,
 		dataDir:    dataDir,
 		dispatcher: NewDispatcher(q),
+		governor:   NewResourceGovernor(LoadGovernorConfigFromEnv(), nil),
+		allowlist:  toolguard.NewAllowlist(),
 		procs:      make(map[string]*exec.Cmd),
 		doneChs:    make(map[string]chan struct{}),
 	}
+}
+
+// SetGovernor swaps the resource governor (used by tests and bootstrapping
+// when a custom sampler or disabled governor is desired).
+func (r *Runner) SetGovernor(g *ResourceGovernor) {
+	r.governor = g
 }
 
 // Run executes a tool for the given task.
@@ -56,6 +67,12 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 	}
 	if task == nil {
 		return fmt.Errorf("task not found: %s", taskID)
+	}
+
+	// Resource governance: gate new task execution on memory/CPU thresholds.
+	// Acquire may block (memory) or sleep (CPU); ctx cancellation aborts.
+	if err := r.governor.Acquire(ctx); err != nil {
+		return fmt.Errorf("resource governor blocked task %s: %w", taskID, err)
 	}
 
 	now := time.Now().UTC()
@@ -179,6 +196,12 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 
 	// Append rate limit arguments if configured.
 	cmdArgs := appendRateLimitArgs(args[1:], task.Tool, project.RateLimit)
+
+	// Allowlist: reject unknown binaries or args with shell metacharacters.
+	if err := r.allowlist.Validate(binary, cmdArgs); err != nil {
+		_ = r.queries.UpdateScanTaskStatus(task.ID, models.TaskFailed, nil, &now)
+		return fmt.Errorf("task %s failed: allowlist rejected command: %w", taskID, err)
+	}
 
 	cmd := exec.CommandContext(ctx, binary, cmdArgs...)
 	cmd.Dir = workdir
@@ -332,73 +355,11 @@ func (r *Runner) Cancel(taskID string) error {
 	return nil
 }
 
-// injectCustomNucleiTemplates checks for a local custom bundle and appends
-// -t (templates) and -w (workflows) flags to the nuclei command if the
-// directories exist and are not already present in the command.
-//
-// scanDepth controls workflow injection:
-//   - "tags":    only inject -t (templates), skip -w (workflows)
-//   - "workflow": only inject -w (workflows), skip -t (templates)
-//   - "both":    inject both -t and -w
-//   - "":        inject both (default, backwards compatible)
-//
-// We inject both custom and official nuclei templates directories so
-// workflows can reference templates from either location.
+// injectCustomNucleiTemplates is a no-op. All custom templates now live
+// under ~/nuclei-templates/ (nuclei's default search path), so nuclei finds
+// them natively without -t or -w injection. The pipeline passes precise
+// -w paths for workflow invocations.
 func (r *Runner) injectCustomNucleiTemplates(command []string, scanDepth string) []string {
-	syncer := NewBundleSyncer(r.dataDir, "", "")
-	customTemplatesDir := syncer.TemplatesDir()
-	workflowsDir := syncer.WorkflowsDir()
-
-	// Get official nuclei templates directory
-	home, _ := os.UserHomeDir()
-	officialTemplatesDir := ""
-	if home != "" {
-		officialPath := filepath.Join(home, "nuclei-templates")
-		if info, err := os.Stat(officialPath); err == nil && info.IsDir() {
-			officialTemplatesDir = officialPath
-		}
-	}
-
-	hasTemplatesFlag := false
-	hasWorkflowsFlag := false
-	for _, arg := range command {
-		if arg == "-t" {
-			hasTemplatesFlag = true
-		}
-		if arg == "-w" {
-			hasWorkflowsFlag = true
-		}
-	}
-
-	// Determine what to inject based on scanDepth
-	wantTemplates := true
-	wantWorkflows := true
-	switch scanDepth {
-	case "tags":
-		wantWorkflows = false
-	case "workflow":
-		wantTemplates = false
-	case "both", "":
-		// inject both (default)
-	}
-
-	// Always inject official templates directory first (if exists)
-	if !hasTemplatesFlag && officialTemplatesDir != "" {
-		command = append(command, "-t", officialTemplatesDir)
-	}
-
-	if wantTemplates && !hasTemplatesFlag {
-		if info, err := os.Stat(customTemplatesDir); err == nil && info.IsDir() {
-			command = append(command, "-t", customTemplatesDir)
-		}
-	}
-
-	if wantWorkflows && !hasWorkflowsFlag {
-		if info, err := os.Stat(workflowsDir); err == nil && info.IsDir() {
-			command = append(command, "-w", workflowsDir)
-		}
-	}
-
 	return command
 }
 

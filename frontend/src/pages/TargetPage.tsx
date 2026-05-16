@@ -38,7 +38,8 @@ import {
   X,
   Users,
   Ban,
-  Check
+  Check,
+  Trash2
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -285,6 +286,8 @@ export default function TargetPage() {
   const [addingScope, setAddingScope] = useState(false);
   const [dryRunLoading, setDryRunLoading] = useState(false);
   const [dryRunConfirmOpen, setDryRunConfirmOpen] = useState(false);
+  const [deletingTargetId, setDeletingTargetId] = useState<string | null>(null);
+  const [deletingScopeRuleId, setDeletingScopeRuleId] = useState<string | null>(null);
 
   const addTarget = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -345,14 +348,6 @@ export default function TargetPage() {
     }
   };
 
-  const inferScopeType = (value: string): string => {
-    const v = value.trim();
-    if (v.includes("/")) return "cidr";
-    if (/^https?:\/\//i.test(v)) return "url";
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(v)) return "ip";
-    return "domain";
-  };
-
   const addScopeRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId || !scopeValue.trim()) {
@@ -362,18 +357,56 @@ export default function TargetPage() {
     if (addingScope) return;
     setAddingScope(true);
     try {
-      await api.createScopeRule({
-        project_id: projectId,
-        action: scopeAction,
-        type: inferScopeType(scopeValue),
-        value: scopeValue,
-      });
+      // 调用后端解析API，复用目标导入的解析能力（支持IP范围如172.30.0.1-3）
+      const parseResult = await api.parseScopeValue(scopeValue);
+      const rules = parseResult.rules;
+
+      // 批量创建解析后的规则
+      for (const rule of rules) {
+        await api.createScopeRule({
+          project_id: projectId,
+          action: scopeAction,
+          type: rule.type,
+          value: rule.value,
+        });
+      }
+
       setScopeValue("");
       await loadScopeRules();
-      toast("规则已添加", "success");
+      if (rules.length > 1) {
+        toast(`已添加 ${rules.length} 条规则`, "success");
+      } else {
+        toast("规则已添加", "success");
+      }
     } catch (err) {
     } finally {
       setAddingScope(false);
+    }
+  };
+
+  const deleteTarget = async (targetId: string) => {
+    if (!projectId || deletingTargetId) return;
+    setDeletingTargetId(targetId);
+    try {
+      await api.deleteTarget(projectId, targetId);
+      setTargets(targets.filter((t) => t.id !== targetId));
+      toast("目标已删除", "success");
+    } catch (err) {
+    } finally {
+      setDeletingTargetId(null);
+    }
+  };
+
+  const deleteScopeRule = async (ruleId: string) => {
+    if (deletingScopeRuleId) return;
+    setDeletingScopeRuleId(ruleId);
+    try {
+      await api.deleteScopeRule(ruleId);
+      setScopeRules(scopeRules.filter((r) => r.id !== ruleId));
+      toast("规则已删除", "success");
+    } catch (err) {
+    } finally {
+      setDeletingScopeRuleId(null);
     }
   };
 
@@ -467,6 +500,7 @@ export default function TargetPage() {
                             <TableHead className="w-24">类型</TableHead>
                             <TableHead>目标值</TableHead>
                             <TableHead className="w-48 text-right text-muted-foreground">创建时间</TableHead>
+                            <TableHead className="w-16"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -480,6 +514,17 @@ export default function TargetPage() {
                             <TableCell className="font-medium font-mono text-sm">{t.value}</TableCell>
                             <TableCell className="text-right text-xs text-muted-foreground">
                                 {new Date(t.created_at).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                                    onClick={() => deleteTarget(t.id)}
+                                    disabled={deletingTargetId === t.id}
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
                             </TableCell>
                         </TableRow>
                         ))}
@@ -568,15 +613,26 @@ export default function TargetPage() {
                                 {excludedRules.map((rule) => (
                                     <div
                                         key={rule.id}
-                                        className="flex items-center justify-between p-1.5 rounded bg-background/50 border border-border/50"
+                                        className="flex items-center justify-between p-1.5 rounded bg-background/50 border border-border/50 group"
                                     >
-                                        <div className="flex items-center gap-1.5 min-w-0">
+                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                             <Ban className="h-3 w-3 text-brand-danger shrink-0" />
                                             <code className="text-xs font-mono truncate">{rule.value}</code>
                                         </div>
-                                        <Badge variant="outline" className="text-[9px] h-4 px-1 shrink-0 ml-2">
-                                            {rule.type}
-                                        </Badge>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <Badge variant="outline" className="text-[9px] h-4 px-1">
+                                                {rule.type}
+                                            </Badge>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => deleteScopeRule(rule.id)}
+                                                disabled={deletingScopeRuleId === rule.id}
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -594,15 +650,26 @@ export default function TargetPage() {
                                 {includedRules.map((rule) => (
                                     <div
                                         key={rule.id}
-                                        className="flex items-center justify-between p-1.5 rounded bg-background/50 border border-border/50"
+                                        className="flex items-center justify-between p-1.5 rounded bg-background/50 border border-border/50 group"
                                     >
-                                        <div className="flex items-center gap-1.5 min-w-0">
+                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                             <Check className="h-3 w-3 text-brand-success shrink-0" />
                                             <code className="text-xs font-mono truncate">{rule.value}</code>
                                         </div>
-                                        <Badge variant="outline" className="text-[9px] h-4 px-1 shrink-0 ml-2">
-                                            {rule.type}
-                                        </Badge>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <Badge variant="outline" className="text-[9px] h-4 px-1">
+                                                {rule.type}
+                                            </Badge>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => deleteScopeRule(rule.id)}
+                                                disabled={deletingScopeRuleId === rule.id}
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

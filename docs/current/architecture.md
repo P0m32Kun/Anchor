@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-13
+last_updated: 2026-05-16
 scope: runtime-baseline
 ---
 
@@ -78,6 +78,46 @@ Workflow 模板来自 [RBKD-SEC/templates](https://github.com/RBKD-SEC/templates
 | `nuclei_concurrency` | `-c` | 25 | 并行模板/主机数 |
 
 扫描内网敏感目标（认证页面、ICS/SCADA、网络设备）时，建议将 `nuclei_rate_limit_per_min` 设为 30 以下、`nuclei_concurrency` 压到 1-5，避免触发账号锁定。
+
+### 资源治理（ResourceGovernor）
+
+`internal/worker/resource_governor.go` 提供系统级内存/CPU 阈值控制，避免长扫把本机拖死。`Runner.Run`（API 服务器侧任务入口）与 `WorkerServer.executeTask`（远端 worker 侧任务执行）在启动子进程之前都会调用 `governor.Acquire(ctx)`：
+
+- 内存使用率 ≥ `MemoryThresholdPct` → 按 `MemoryPollInterval` 节奏轮询直到水位回落，相当于新任务排队。
+- CPU 使用率 ≥ `CPUThresholdPct` → 一次性 `time.Sleep(CPUDelay)` 后放行，相当于入队速率减半。
+- 采样失败（gopsutil 报错）→ fail-open,放行任务,避免误阻塞。
+- `ctx` 取消时立即返回 `ctx.Err()`,任务被标记失败。
+
+阈值通过环境变量配置，单位与上游工具一致（百分比即百分比，毫秒即毫秒，**代码内不做单位转换**）：
+
+| 变量 | 默认 | 含义 |
+| ---- | ---- | ---- |
+| `ANCHOR_GOVERNOR_ENABLED` | `true` | 关掉则 `Acquire` 直接放行 |
+| `ANCHOR_GOVERNOR_MEM_PCT` | `85` | 内存阈值百分比 (0-100) |
+| `ANCHOR_GOVERNOR_CPU_PCT` | `80` | CPU 阈值百分比 (0-100) |
+| `ANCHOR_GOVERNOR_POLL_MS` | `1000` | 内存阻塞时的轮询间隔(毫秒) |
+| `ANCHOR_GOVERNOR_CPU_DELAY_MS` | `500` | CPU 超阈值时的固定延迟(毫秒) |
+
+系统级指标采样依赖 `github.com/shirou/gopsutil/v3`。`ResourceSampler` 接口允许测试时注入 fake 实现。
+
+### 工具执行白名单（Allowlist）
+
+`internal/toolguard/allowlist.go` 提供外部二进制执行的集中管控。所有 `exec.Command` / `exec.CommandContext` 调用点在创建子进程之前都经过 `Allowlist.Validate(binary, args)` 检查：
+
+1. **二进制白名单** — 只允许预定义的工具名（`subfinder`, `dnsx`, `httpx`, `naabu`, `nmap`, `nuclei`, `cdncheck`, `git`, `sh`, `bash`）。检查基于 `filepath.Base`，因此 `/tmp/evil` 即使伪装成允许的名字也会被拒绝（basename 不在列表中），而 `/usr/local/bin/nuclei` 会被接受（basename `nuclei` 在白名单中）。
+2. **参数安全检查** — 拒绝任何包含 shell 元字符（`;|&><`$(){}[]\n\r`）的参数。`exec.Command` 本身已规避 shell 注入，这层检查是纵深防御：万一参数在未来被拼接到 shell 字符串中，元字符不会穿透。
+
+接入点覆盖全部 5 个 `exec.Command` 调用文件：
+
+| 文件 | 检查位置 |
+|------|----------|
+| `internal/worker/worker.go` | `Runner.Run` 本地回退执行前 |
+| `internal/worker/server.go` | `WorkerServer.executeTask` 子进程启动前 |
+| `internal/health/health.go` | `getVersion` / `getNucleiTemplatePath` 调用前 |
+| `internal/cdn/detector.go` | `CheckIP` / `FilterCDNIPs` 调用前 |
+| `internal/nuclei/custom/git.go` | `ExecCloner.Clone` 调用前 |
+
+`Allowlist.Allow(name)` 支持运行时扩展（测试和自定义工具注册）。新增工具时强制走注册流程：先 `Allow()` 再执行。
 
 ## What Is Not Baseline Yet
 

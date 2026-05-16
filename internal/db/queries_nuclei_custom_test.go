@@ -35,6 +35,7 @@ func TestNucleiCustomSourceCRUD_RoundTrip(t *testing.T) {
 	src := &models.NucleiCustomSource{
 		ID:            "src-1",
 		Name:          "demo",
+		InstallPath:   "demo",
 		Type:          models.NucleiCustomSourceTypeGit,
 		URI:           &uri,
 		Branch:        &branch,
@@ -164,6 +165,7 @@ func TestNucleiCustomSource_NullableFieldsRoundTrip(t *testing.T) {
 	src := &models.NucleiCustomSource{
 		ID:            "upload-1",
 		Name:          "uploaded",
+		InstallPath:   "uploaded",
 		Type:          models.NucleiCustomSourceTypeUpload,
 		Enabled:       true,
 		RoutingPolicy: "manual",
@@ -196,6 +198,7 @@ func TestListNucleiCustomSources_OrderByCreatedAtDesc(t *testing.T) {
 		src := &models.NucleiCustomSource{
 			ID:            id,
 			Name:          id,
+			InstallPath:   id,
 			Type:          models.NucleiCustomSourceTypeFile,
 			Enabled:       true,
 			RoutingPolicy: "manual",

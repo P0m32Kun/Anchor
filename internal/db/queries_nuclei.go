@@ -12,10 +12,10 @@ import (
 func (q *Queries) CreateNucleiCustomSource(s *models.NucleiCustomSource) error {
 	_, err := q.db.Exec(`
 		INSERT INTO nuclei_custom_sources (
-			id, name, type, uri, branch, enabled, routing_policy, status,
+			id, name, install_path, type, uri, branch, enabled, routing_policy, status,
 			last_sync_at, last_validate_at, last_error, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		s.ID, s.Name, string(s.Type), s.URI, s.Branch,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.ID, s.Name, s.InstallPath, string(s.Type), s.URI, s.Branch,
 		boolToInt(s.Enabled), s.RoutingPolicy, string(s.Status),
 		s.LastSyncAt, s.LastValidateAt, s.LastError, s.CreatedAt, s.UpdatedAt)
 	return err
@@ -23,7 +23,7 @@ func (q *Queries) CreateNucleiCustomSource(s *models.NucleiCustomSource) error {
 
 func (q *Queries) GetNucleiCustomSource(id string) (*models.NucleiCustomSource, error) {
 	row := q.db.QueryRow(`
-		SELECT id, name, type, uri, branch, enabled, routing_policy, status,
+		SELECT id, name, install_path, type, uri, branch, enabled, routing_policy, status,
 		       last_sync_at, last_validate_at, last_error, created_at, updated_at
 		FROM nuclei_custom_sources WHERE id = ?`, id)
 	return scanNucleiCustomSource(row)
@@ -50,7 +50,7 @@ func (q *Queries) ListEnabledNucleiCustomSourceIDs() ([]string, error) {
 
 func (q *Queries) ListNucleiCustomSources() ([]*models.NucleiCustomSource, error) {
 	rows, err := q.db.Query(`
-		SELECT id, name, type, uri, branch, enabled, routing_policy, status,
+		SELECT id, name, install_path, type, uri, branch, enabled, routing_policy, status,
 		       last_sync_at, last_validate_at, last_error, created_at, updated_at
 		FROM nuclei_custom_sources ORDER BY created_at DESC`)
 	if err != nil {
@@ -71,10 +71,10 @@ func (q *Queries) ListNucleiCustomSources() ([]*models.NucleiCustomSource, error
 func (q *Queries) UpdateNucleiCustomSource(s *models.NucleiCustomSource) error {
 	_, err := q.db.Exec(`
 		UPDATE nuclei_custom_sources SET
-			name = ?, type = ?, uri = ?, branch = ?, enabled = ?, routing_policy = ?,
+			name = ?, install_path = ?, type = ?, uri = ?, branch = ?, enabled = ?, routing_policy = ?,
 			status = ?, last_sync_at = ?, last_validate_at = ?, last_error = ?, updated_at = ?
 		WHERE id = ?`,
-		s.Name, string(s.Type), s.URI, s.Branch, boolToInt(s.Enabled), s.RoutingPolicy,
+		s.Name, s.InstallPath, string(s.Type), s.URI, s.Branch, boolToInt(s.Enabled), s.RoutingPolicy,
 		string(s.Status), s.LastSyncAt, s.LastValidateAt, s.LastError, s.UpdatedAt, s.ID)
 	return err
 }
@@ -97,7 +97,7 @@ func scanNucleiCustomSource(row scanRow) (*models.NucleiCustomSource, error) {
 	var uri, branch, lastError sql.NullString
 	var lastSyncAt, lastValidateAt sql.NullTime
 	err := row.Scan(
-		&s.ID, &s.Name, &typeStr, &uri, &branch, &enabledInt, &s.RoutingPolicy,
+		&s.ID, &s.Name, &s.InstallPath, &typeStr, &uri, &branch, &enabledInt, &s.RoutingPolicy,
 		&statusStr, &lastSyncAt, &lastValidateAt, &lastError, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {

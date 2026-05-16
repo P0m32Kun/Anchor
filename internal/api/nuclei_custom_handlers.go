@@ -16,6 +16,7 @@ import (
 
 type createNucleiCustomGitRequest struct {
 	Name          string `json:"name"`
+	InstallPath   string `json:"install_path"`
 	URI           string `json:"uri"`
 	Branch        string `json:"branch,omitempty"`
 	RoutingPolicy string `json:"routing_policy,omitempty"` // 可选，默认为 "manual"
@@ -58,7 +59,11 @@ func (s *Server) handleCreateNucleiCustomGitSource(w http.ResponseWriter, r *htt
 	if routingPolicy == "" {
 		routingPolicy = "manual"
 	}
-	src, err := s.nucleiCustomMgr.CreateFromGit(r.Context(), req.Name, req.URI, req.Branch, routingPolicy)
+	installPath := req.InstallPath
+	if installPath == "" {
+		installPath = req.Name
+	}
+	src, err := s.nucleiCustomMgr.CreateFromGit(r.Context(), req.Name, installPath, req.URI, req.Branch, routingPolicy)
 	if err != nil {
 		writeNucleiCustomError(w, err)
 		return
@@ -85,6 +90,10 @@ func (s *Server) handleCreateNucleiCustomUploadSource(w http.ResponseWriter, r *
 	}
 
 	name := r.FormValue("name")
+	installPath := r.FormValue("install_path")
+	if installPath == "" {
+		installPath = name
+	}
 	routingPolicy := r.FormValue("routing_policy")
 	if routingPolicy == "" {
 		routingPolicy = "manual"
@@ -97,7 +106,7 @@ func (s *Server) handleCreateNucleiCustomUploadSource(w http.ResponseWriter, r *
 	}
 	defer file.Close()
 
-	src, err := s.nucleiCustomMgr.CreateFromUpload(r.Context(), name, routingPolicy, header.Filename, file)
+	src, err := s.nucleiCustomMgr.CreateFromUpload(r.Context(), name, installPath, routingPolicy, header.Filename, file)
 	if err != nil {
 		writeNucleiCustomError(w, err)
 		return

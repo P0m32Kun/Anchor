@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/models"
@@ -25,10 +24,11 @@ type BundleManifest struct {
 
 // BundleSourceEntry describes one source included in the bundle.
 type BundleSourceEntry struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Files    []string `json:"files"`
-	Checksum string   `json:"checksum"` // sha256 of the source's file content
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	InstallPath string   `json:"install_path"`
+	Files       []string `json:"files"`
+	Checksum    string   `json:"checksum"` // sha256 of the source's file content
 }
 
 // BuildBundle creates an immutable .tar.gz bundle from all enabled sources.
@@ -74,10 +74,11 @@ func (m *Manager) BuildBundle() (version string, archivePath string, err error) 
 		}
 
 		entries = append(entries, BundleSourceEntry{
-			ID:       src.ID,
-			Name:     src.Name,
-			Files:    filePaths,
-			Checksum: checksum,
+			ID:          src.ID,
+			Name:        src.Name,
+			InstallPath: src.InstallPath,
+			Files:       filePaths,
+			Checksum:    checksum,
 		})
 	}
 
@@ -146,7 +147,8 @@ func (m *Manager) BuildBundle() (version string, archivePath string, err error) 
 }
 
 // createArchive builds the .tar.gz file in tmpDir.
-// Files are organized into templates/ and workflows/ directories in the archive.
+// Files are placed under {install_path}/ so that extracting to ~/nuclei-templates/
+// creates the per-source subdirectories nuclei natively searches.
 func (m *Manager) createArchive(tmpDir string, entries []BundleSourceEntry, manifestJSON []byte) error {
 	archiveFile := filepath.Join(tmpDir, "bundle.tar.gz")
 	f, err := os.Create(archiveFile)
@@ -172,30 +174,22 @@ func (m *Manager) createArchive(tmpDir string, entries []BundleSourceEntry, mani
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
-	// Write source files, organizing into templates/ and workflows/
+	// Write source files under {install_path}/{relative_path}
 	for _, entry := range entries {
+		if entry.InstallPath == "" {
+			continue
+		}
+
 		for _, filePath := range entry.Files {
 			data, err := m.layout.ReadFile(entry.ID, filePath)
 			if err != nil {
 				return fmt.Errorf("read %s/%s: %w", entry.ID, filePath, err)
 			}
 
-			// Determine the archive path based on file location
-			var archivePath string
-			if strings.HasPrefix(filePath, "templates/") {
-				// Keep in templates/ directory
-				archivePath = filePath
-			} else if strings.HasPrefix(filePath, "workflows/") {
-				// Keep in workflows/ directory
-				archivePath = filePath
-			} else if strings.HasPrefix(filePath, "fingerprints/") || strings.HasPrefix(filePath, "http/") ||
-				strings.HasPrefix(filePath, "network/") || strings.HasPrefix(filePath, "javascript/") {
-				// These are template files, put in templates/
-				archivePath = "templates/" + filePath
-			} else {
-				// Skip non-template files (metadata, scripts, etc.)
-				continue
-			}
+			// Archive path: {install_path}/{filePath}
+			// This ensures extraction to ~/nuclei-templates/ creates
+			//  ~/nuclei-templates/{install_path}/network/... etc.
+			archivePath := entry.InstallPath + "/" + filePath
 
 			if err := tw.WriteHeader(&tar.Header{
 				Name: archivePath,
