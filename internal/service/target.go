@@ -180,3 +180,10 @@ func (s *targetService) Import(ctx context.Context, projectID string, targets []
 
 	return result, nil
 }
+
+func (s *targetService) Delete(ctx context.Context, targetID string) error {
+	if err := s.queries.DeleteTarget(targetID); err != nil {
+		return errors.Newf(errors.ErrInternal, "delete target failed: %v", err)
+	}
+	return nil
+}

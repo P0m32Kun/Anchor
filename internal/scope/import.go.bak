@@ -204,6 +204,46 @@ func ParseLine(line string) []ImportTarget {
 }
 
 // expandCommas splits a line by commas and trims whitespace,
+			}
+		} else {
+			// Empty value after colon (e.g. "domain:")
+			hasExplicitType = false
+			content = line
+		}
+	}
+
+	// Expand comma-separated values.
+	parts := expandCommas(content)
+	var targets []ImportTarget
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		typ := explicitType
+		if !hasExplicitType {
+			typ = DetectType(part)
+		}
+
+		// If type is ip, try expanding hyphen ranges.
+		if typ == models.TargetTypeIP {
+			ips, err := expandIPRange(part)
+			if err == nil {
+				for _, ip := range ips {
+					targets = append(targets, ImportTarget{Type: models.TargetTypeIP, Value: ip})
+				}
+				continue
+			}
+		}
+
+		targets = append(targets, ImportTarget{Type: typ, Value: part})
+	}
+
+	return targets
+}
+
 // expandCommas splits a line by commas and trims whitespace,
 // filtering out empty segments.
 func expandCommas(line string) []string {

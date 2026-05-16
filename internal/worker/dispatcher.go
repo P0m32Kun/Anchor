@@ -68,8 +68,8 @@ func (d *Dispatcher) MarkWorkerOffline(workerID string) error {
 }
 
 // DispatchToWorker sends a task to a remote worker and polls until completion.
-// On idle-timeout failure (worker watchdog killed a hung subprocess), the task
-// is retried up to maxDispatchAttempts-1 times before giving up.
+// Retries up to maxDispatchAttempts on unreachable-worker failures (network
+// errors, worker going offline mid-task) so the runner can try another worker.
 func (d *Dispatcher) DispatchToWorker(ctx context.Context, task *models.ScanTask, worker *models.WorkerNode, workdir string, project *models.Project) error {
 	const maxDispatchAttempts = 3
 	for attempt := 1; attempt <= maxDispatchAttempts; attempt++ {
@@ -80,26 +80,16 @@ func (d *Dispatcher) DispatchToWorker(ctx context.Context, task *models.ScanTask
 		if attempt >= maxDispatchAttempts {
 			return err
 		}
-		if !d.wasIdleTimeout(task.ID) {
+		if !isUnreachableError(err) {
 			return err
 		}
-		log.Printf("[dispatcher] task %s idle-killed on attempt %d, retrying (max %d)", task.ID, attempt, maxDispatchAttempts)
+		log.Printf("[dispatcher] task %s worker unreachable on attempt %d, retrying (max %d)", task.ID, attempt, maxDispatchAttempts)
 		if resetErr := d.queries.ResetScanTaskForRetry(task.ID); resetErr != nil {
 			log.Printf("[dispatcher] failed to reset task %s for retry: %v", task.ID, resetErr)
 			return err
 		}
 	}
 	return fmt.Errorf("task %s failed after %d attempts", task.ID, maxDispatchAttempts)
-}
-
-// wasIdleTimeout checks if the most recent task failure was triggered by the
-// worker's idle-output watchdog, in which case a retry is worth attempting.
-func (d *Dispatcher) wasIdleTimeout(taskID string) bool {
-	t, err := d.queries.GetScanTask(taskID)
-	if err != nil || t == nil {
-		return false
-	}
-	return strings.Contains(t.ErrorMessage, "idle-timeout:")
 }
 
 // dispatchOnce sends a single dispatch attempt to a worker and polls for completion.
@@ -138,21 +128,18 @@ func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, wo
 	// Poll for task completion. The server trusts the worker's heartbeat
 	// mechanism: as long as the worker keeps reporting health (the API-server
 	// watchdog marks it offline after ~120s of missed heartbeats), we keep
-	// polling. A hard ceiling acts as a safety net — aligned with the worker's
-	// own RunningTimeout ceiling (3h for naabu / 60min for nuclei) plus
-	// headroom.
+	// polling. No server-side timeout — we trust the tool's own -timeout
+	// parameters to terminate the process when appropriate.
 	const (
 		pollInterval        = 2 * time.Second
 		workerCheckInterval = 30 * time.Second
-		maxPollWindow       = 4 * time.Hour
 	)
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	workerCheck := time.NewTicker(workerCheckInterval)
 	defer workerCheck.Stop()
-	hardDeadline := time.After(maxPollWindow)
 	startTime := time.Now()
-	log.Printf("[dispatcher] polling task %s on worker %s (max %v, heartbeat-aware)", task.ID, worker.ID, maxPollWindow)
+	log.Printf("[dispatcher] polling task %s on worker %s (heartbeat-aware, no server-side timeout)", task.ID, worker.ID)
 
 	for {
 		select {
@@ -180,10 +167,6 @@ func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, wo
 				// Include "worker unreachable" so isUnreachableError matches.
 				return fmt.Errorf("task %s: worker %s heartbeat lost (worker unreachable) after %v", task.ID, worker.ID, time.Since(startTime).Round(time.Second))
 			}
-		case <-hardDeadline:
-			// Hard safety ceiling reached. Worker may still be running — this
-			// is NOT an unreachability error, it's a server-side give-up.
-			return fmt.Errorf("task %s exceeded %v server-side poll deadline on worker %s (worker may still be executing; check worker logs)", task.ID, maxPollWindow, worker.ID)
 		case <-ctx.Done():
 			return fmt.Errorf("task %s cancelled", task.ID)
 		}

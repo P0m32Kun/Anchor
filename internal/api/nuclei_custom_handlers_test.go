@@ -103,6 +103,7 @@ func TestNucleiCustom_FullRoundTrip(t *testing.T) {
 	// create-git
 	createBody, _ := json.Marshal(map[string]string{
 		"name":           "demo",
+		"install_path":  "demo",
 		"uri":            "https://example.com/x.git",
 		"branch":         "main",
 		"routing_policy": "manual",
@@ -207,6 +208,7 @@ func TestNucleiCustom_DisallowedExtensionRejected(t *testing.T) {
 
 	createBody, _ := json.Marshal(map[string]string{
 		"name":           "demo",
+		"install_path":  "demo",
 		"uri":            "https://example.com/x.git",
 		"routing_policy": "manual",
 	})
@@ -235,6 +237,7 @@ func TestNucleiCustom_PatchUnknownFieldRejected(t *testing.T) {
 	})
 	createBody, _ := json.Marshal(map[string]string{
 		"name":           "demo",
+		"install_path":  "demo",
 		"uri":            "https://example.com/x.git",
 		"routing_policy": "manual",
 	})
@@ -258,6 +261,7 @@ func TestNucleiCustom_RefreshNonGitReturns400(t *testing.T) {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
 	_ = mw.WriteField("name", "uploaded")
+	_ = mw.WriteField("install_path", "uploaded")
 	_ = mw.WriteField("routing_policy", "manual")
 	fw, _ := mw.CreateFormFile("file", "x.yaml")
 	_, _ = fw.Write([]byte("id: x\n"))

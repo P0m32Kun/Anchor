@@ -36,6 +36,7 @@ type Finding struct {
 	AssetID         *string         `json:"asset_id" db:"asset_id"`
 	ServiceID       *string         `json:"service_id" db:"service_id"`
 	WebEndpointID   *string         `json:"web_endpoint_id" db:"web_endpoint_id"`
+	RunID           *string         `json:"run_id" db:"run_id"`
 	SourceTool      string          `json:"source_tool" db:"source_tool"`
 	SourceRuleID    string          `json:"source_rule_id" db:"source_rule_id"`
 	DedupKey        string          `json:"dedup_key" db:"dedup_key"`

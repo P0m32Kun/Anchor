@@ -114,7 +114,7 @@ func (c *RemoteClient) StartBundleSync(interval time.Duration) {
 }
 
 // syncSources fetches all enabled custom template sources from the server
-// and syncs each to its own directory ~/templates-{sourceId}/.
+// and syncs each to its own directory under ~/nuclei-templates/.
 func (c *RemoteClient) syncSources() {
 	// Fetch all enabled sources from the server
 	req, _ := http.NewRequest("GET", c.coreURL+"/nuclei/custom/sources", nil)
@@ -133,10 +133,11 @@ func (c *RemoteClient) syncSources() {
 	}
 
 	var sources []struct {
-		ID      string `json:"id"`
-		Name    string `json:"name"`
-		Enabled bool   `json:"enabled"`
-		Status  string `json:"status"`
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		InstallPath string `json:"install_path"`
+		Enabled     bool   `json:"enabled"`
+		Status      string `json:"status"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&sources); err != nil {
 		log.Printf("[worker] decode sources: %v", err)
@@ -148,14 +149,19 @@ func (c *RemoteClient) syncSources() {
 		if !src.Enabled || src.Status != "ready" {
 			continue
 		}
-		if err := c.syncSource(src.ID, src.Name); err != nil {
+		if err := c.syncSource(src.ID, src.InstallPath); err != nil {
 			log.Printf("[worker] sync source %s (%s): %v", src.ID, src.Name, err)
 		}
 	}
 }
 
-// syncSource downloads a single source's files to ~/templates-{sourceId}/.
-func (c *RemoteClient) syncSource(sourceID, sourceName string) error {
+// syncSource downloads a single source's files and extracts them to
+// ~/nuclei-templates/{installPath}/ (nuclei's default search path).
+func (c *RemoteClient) syncSource(sourceID, installPath string) error {
+	if installPath == "" {
+		return fmt.Errorf("source %s has no install_path", sourceID)
+	}
+
 	// Fetch the source bundle as a tar.gz
 	req, _ := http.NewRequest("GET", c.coreURL+"/nuclei/custom/sources/"+sourceID+"/bundle", nil)
 	req.Header.Set("Authorization", "Bearer "+c.token)
@@ -173,15 +179,15 @@ func (c *RemoteClient) syncSource(sourceID, sourceName string) error {
 		return fmt.Errorf("download bundle: %s", resp.Status)
 	}
 
-	// Extract to ~/templates-{sourceId}/
+	// Extract to ~/nuclei-templates/ (archive entries are prefixed with installPath/)
 	home, _ := os.UserHomeDir()
-	targetDir := filepath.Join(home, "templates-"+sourceID)
+	targetDir := filepath.Join(home, "nuclei-templates")
 
 	if err := extractTarGzToDir(resp.Body, targetDir); err != nil {
 		return fmt.Errorf("extract: %w", err)
 	}
 
-	log.Printf("[worker] synced source %s to %s", sourceName, targetDir)
+	log.Printf("[worker] synced source %s -> %s", installPath, targetDir)
 	return nil
 }
 

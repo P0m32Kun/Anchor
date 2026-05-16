@@ -33,18 +33,18 @@ type BundleSourceEntry struct {
 // It fetches the manifest from the server, downloads and extracts new bundles,
 // and atomically switches the "current" symlink.
 //
-// Directory structure (matches official nuclei-templates layout):
+// Directory structure (custom templates live under ~/nuclei-templates/):
 //
-//	~/templates/              ← custom templates root (matches nuclei-templates structure)
-//	~/templates/current/      ← active bundle (symlink to version directory)
-//	~/templates/{version}/    ← version directory
-//	  ├── templates/          ← template files (http/, network/, etc.)
-//	  └── workflows/          ← workflow files
+//	~/nuclei-templates/         ← nuclei default search path
+//	  ├── network/              ← official templates
+//	  ├── http/                 ← official templates
+//	  ├── {install_path}/       ← custom source (per-source subdirectory)
+//	  │   ├── network/
+//	  │   ├── http/
+//	  │   └── workflows/
+//	  └── ...
 //
-//	~/nuclei-templates/       ← official nuclei templates
-//
-// This structure ensures workflow relative paths work correctly:
-//   nuclei -t ~/nuclei-templates -t ~/templates -w workflows/xxx.yaml
+// No -t/-w injection needed — nuclei finds everything natively.
 type BundleSyncer struct {
 	dataDir    string
 	coreURL    string
@@ -68,13 +68,13 @@ func NewBundleSyncer(dataDir, coreURL, apiToken string) *BundleSyncer {
 }
 
 // customTemplatesRoot returns the root directory for custom templates.
-// This is ~/templates/
+// This is ~/nuclei-templates/ — nuclei's default search path.
+// All custom templates live here alongside official templates.
 func (s *BundleSyncer) customTemplatesRoot() string {
 	if s.homeDir != "" {
-		return filepath.Join(s.homeDir, "templates")
+		return filepath.Join(s.homeDir, "nuclei-templates")
 	}
-	// Fallback to dataDir if home dir not available
-	return filepath.Join(s.dataDir, "custom-templates")
+	return filepath.Join(s.dataDir, "nuclei-templates")
 }
 
 // BundlesRoot returns the local bundles directory for metadata and cache.
@@ -244,27 +244,15 @@ func (s *BundleSyncer) switchCurrent(version string) error {
 }
 
 // TemplatesDir returns the path to the templates directory.
-// Returns ~/templates/templates if current/ exists (bundle mode),
-// otherwise returns ~/templates (direct mode).
+// All templates live under ~/nuclei-templates/ directly.
 func (s *BundleSyncer) TemplatesDir() string {
-	currentDir := filepath.Join(s.customTemplatesRoot(), "current", "templates")
-	if _, err := os.Stat(currentDir); err == nil {
-		return currentDir
-	}
-	// Direct mode: templates are in ~/templates directly
 	return s.customTemplatesRoot()
 }
 
 // WorkflowsDir returns the path to the workflows directory.
-// Returns ~/templates/current/workflows if current/ exists (bundle mode),
-// otherwise returns ~/templates/workflows (direct mode).
+// All workflows live under ~/nuclei-templates/{install_path}/workflows.
 func (s *BundleSyncer) WorkflowsDir() string {
-	currentDir := filepath.Join(s.customTemplatesRoot(), "current", "workflows")
-	if _, err := os.Stat(currentDir); err == nil {
-		return currentDir
-	}
-	// Direct mode: workflows are in ~/templates/workflows
-	return filepath.Join(s.customTemplatesRoot(), "workflows")
+	return s.customTemplatesRoot()
 }
 
 // TemplateVersionsJSON returns the JSON string for heartbeat reporting.

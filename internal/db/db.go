@@ -245,6 +245,26 @@ func migrate(db *sql.DB) error {
 		version = 21
 	}
 
+	if version < 22 {
+		if err := migrateV22(db); err != nil {
+			return fmt.Errorf("migrate v22 (nuclei_custom_sources.install_path): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 22"); err != nil {
+			return fmt.Errorf("set user_version 22: %w", err)
+		}
+		version = 22
+	}
+
+	if version < 23 {
+		if err := migrateV23(db); err != nil {
+			return fmt.Errorf("migrate v23 (findings.run_id): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 23"); err != nil {
+			return fmt.Errorf("set user_version 23: %w", err)
+		}
+		version = 23
+	}
+
 	if err := ensureProjectsColumns(db); err != nil {
 		return fmt.Errorf("ensure projects columns: %w", err)
 	}

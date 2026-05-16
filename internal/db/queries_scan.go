@@ -344,6 +344,16 @@ func (q *Queries) ListRawArtifactsByTask(taskID string) ([]*models.RawArtifact, 
 	return list, rows.Err()
 }
 
+func (q *Queries) GetRawArtifact(id string) (*models.RawArtifact, error) {
+	row := q.db.QueryRow(`SELECT id, project_id, task_id, type, path, sha256, size, redaction_status, created_at FROM raw_artifacts WHERE id = ?`, id)
+	a := &models.RawArtifact{}
+	err := row.Scan(&a.ID, &a.ProjectID, &a.TaskID, &a.Type, &a.Path, &a.SHA256, &a.Size, &a.RedactionStatus, &a.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return a, err
+}
+
 // --- Screenshot ---
 
 func (q *Queries) CreateScreenshot(s *models.Screenshot) error {

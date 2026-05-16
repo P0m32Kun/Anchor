@@ -14,20 +14,22 @@ const (
 	StageFingerprint StageID = "fingerprint"
 	StageHTTPX       StageID = "httpx"
 	StageVuln        StageID = "vuln"
-	// Slow-scan stages emitted by SlowScanOrchestrator post-pipeline. They
-	// only show up when the main flow has at least one live web endpoint and
-	// the matching tool is enabled.
-	StageFfuf      StageID = "ffuf"
-	StageURLFinder StageID = "urlfinder"
+	// URL discovery stages — directory brute-force (ffuf) and JS/HTML URL
+	// extraction (urlfinder). Both consume httpx's first-pass output and
+	// feed new URLs into a second httpx → nuclei pass.
+	StageFfuf       StageID = "ffuf"
+	StageURLFinder  StageID = "urlfinder"
+	// Second-pass HTTP probing and vulnerability scanning for URLs
+	// discovered by ffuf / urlfinder.
+	StageHTTPX2 StageID = "httpx_2"
+	StageVuln2  StageID = "vuln_2"
 )
 
 // StageEventCallback is invoked when a pipeline stage changes state.
 type StageEventCallback func(runID string, stage StageID, status string, errMsg string)
 
-// setStage / completeStage / failStage are thin wrappers over p.emitter,
-// preserved so existing Pipeline call sites stay readable. SlowScanOrchestrator
-// uses the same StageEmitter directly via WithStageEmitter to share semantics
-// without reaching into Pipeline.
+// setStage / completeStage / failStage are thin wrappers over p.emitter
+// preserved so existing Pipeline call sites stay readable.
 func (p *Pipeline) setStage(stage StageID)               { p.emitter.Set(stage) }
 func (p *Pipeline) completeStage(stage StageID)          { p.emitter.Complete(stage) }
 func (p *Pipeline) failStage(stage StageID, errMsg string) { p.emitter.Fail(stage, errMsg) }

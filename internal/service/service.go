@@ -41,6 +41,7 @@ type TargetService interface {
 	List(ctx context.Context, projectID string) ([]*models.Target, error)
 	ListPaginated(ctx context.Context, projectID string, p PaginationParams) (*PaginatedList[*models.Target], error)
 	Import(ctx context.Context, projectID string, targets []ImportTarget) (*ImportResult, error)
+	Delete(ctx context.Context, targetID string) error
 }
 
 // FindingService handles finding-related business logic.

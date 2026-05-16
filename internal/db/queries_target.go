@@ -92,6 +92,12 @@ func (q *Queries) ListTargetsByProjectPaginated(projectID string, limit, offset 
 	return list, rows.Err()
 }
 
+// DeleteTarget deletes a target by ID.
+func (q *Queries) DeleteTarget(id string) error {
+	_, err := q.db.Exec(`DELETE FROM targets WHERE id = ?`, id)
+	return err
+}
+
 // --- IP Discovery Results ---
 
 func (q *Queries) CreateIPDiscoveryResult(r *models.IPDiscoveryResult) error {
@@ -193,6 +199,12 @@ func (q *Queries) ListScopeRulesByProjectPaginated(projectID string, limit, offs
 		list = append(list, r)
 	}
 	return list, rows.Err()
+}
+
+// DeleteScopeRule deletes a scope rule by ID.
+func (q *Queries) DeleteScopeRule(id string) error {
+	_, err := q.db.Exec(`DELETE FROM scope_rules WHERE id = ?`, id)
+	return err
 }
 
 func (q *Queries) GetMaxScopeRuleUpdatedAt(projectID string) (time.Time, error) {

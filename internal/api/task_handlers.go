@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/errors"
@@ -140,4 +141,30 @@ func (s *Server) handleListArtifacts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, artifacts)
+}
+
+func (s *Server) handleGetArtifactContent(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "missing artifact id"))
+		return
+	}
+	artifact, err := s.queries.GetRawArtifact(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get artifact failed: %v", err))
+		return
+	}
+	if artifact == nil {
+		writeError(w, http.StatusNotFound, errors.Newf(errors.ErrNotFound, "artifact not found: %s", id))
+		return
+	}
+
+	data, err := os.ReadFile(artifact.Path)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "read artifact file failed: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write(data)
 }
