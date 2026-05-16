@@ -72,13 +72,19 @@ A proposal can replace this plan only when all of the following are true:
 |----|--------|------|------|
 | PR1 | Findings 批量写入缓冲 | Shipped | `709bfff` |
 | PR2 | 资源治理（静态阈值） | Implemented, pending merge | `feat/batch-finding-buffer` (本分支续接) |
-| PR3 | 工具二进制 allowlist + 参数白名单 | Backlog | — |
+| PR3 | 工具二进制 allowlist + 参数白名单 | Implemented, pending merge | `feat/batch-finding-buffer` (本分支续接) |
 
 PR2 的实现细节:
 - `internal/worker/resource_governor.go`:`Acquire(ctx)` 检查系统内存/CPU,内存超阈值轮询阻塞、CPU 超阈值 sleep 固定延迟。
 - 接入点:`Runner.Run`(API 服务器任务入口)与 `WorkerServer.executeTask`(远端 worker 任务执行)。
 - 采样实现:`github.com/shirou/gopsutil/v3`,通过 `ResourceSampler` 接口在测试中注入 fake。
 - 阈值通过 `ANCHOR_GOVERNOR_*` 环境变量配置,详见 `docs/current/architecture.md` 的「资源治理」章节。
+
+PR3 的实现细节:
+- `internal/toolguard/allowlist.go`:`Allowlist` 结构提供二进制白名单 + 参数 shell 元字符检查。
+- `Validate(binary, args)` 基于 `filepath.Base` 检查二进制名，拒绝任何含 shell 元字符的参数。
+- 接入点:全部 5 个 `exec.Command` 调用文件（`worker.go`, `server.go`, `health.go`, `cdn/detector.go`, `nuclei/custom/git.go`）。
+- `Allowlist.Allow(name)` 支持运行时扩展，新增工具强制走注册流程。
 
 ## GSTACK REVIEW REPORT
 

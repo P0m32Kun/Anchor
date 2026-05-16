@@ -12,16 +12,18 @@ import (
 
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/toolguard"
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
 // Checker performs health checks for external tools.
 type Checker struct {
-	queries *db.Queries
+	queries   *db.Queries
+	allowlist *toolguard.Allowlist
 }
 
 func NewChecker(q *db.Queries) *Checker {
-	return &Checker{queries: q}
+	return &Checker{queries: q, allowlist: toolguard.NewAllowlist()}
 }
 
 // CheckAll runs health checks for all required tools.
@@ -85,6 +87,9 @@ func (c *Checker) getVersion(tool, path string) string {
 	}
 	for _, flag := range flags {
 		args := append([]string{path}, flag...)
+		if err := c.allowlist.Validate(args[0], args[1:]); err != nil {
+			continue
+		}
 		cmd := exec.Command(args[0], args[1:]...)
 		out, err := cmd.Output()
 		if err == nil && len(out) > 0 {
@@ -130,6 +135,9 @@ func (c *Checker) checkDNS() bool {
 
 func (c *Checker) getNucleiTemplatePath(binaryPath string) string {
 	// Try to find template directory via nuclei -h or default locations.
+	if err := c.allowlist.Validate(binaryPath, []string{"-h"}); err != nil {
+		return ""
+	}
 	cmd := exec.Command(binaryPath, "-h")
 	out, _ := cmd.Output()
 	_ = out

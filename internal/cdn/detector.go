@@ -7,18 +7,23 @@ import (
 	"strings"
 
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/toolguard"
 )
 
 // Detector detects CDN usage for IPs using cdncheck CLI.
-type Detector struct{}
+type Detector struct {
+	allowlist *toolguard.Allowlist
+}
 
-// NewDetector creates a new CDN detector.
 func NewDetector() *Detector {
-	return &Detector{}
+	return &Detector{allowlist: toolguard.NewAllowlist()}
 }
 
 // CheckIP checks if an IP is behind a CDN.
 func (d *Detector) CheckIP(ctx context.Context, ip string) (models.CDNResult, error) {
+	if err := d.allowlist.Validate("cdncheck", []string{"-i", ip, "-resp"}); err != nil {
+		return models.CDNResult{IP: ip, IsCDN: false}, nil
+	}
 	cmd := exec.CommandContext(ctx, "cdncheck", "-i", ip, "-resp")
 	out, err := cmd.Output()
 	if err != nil {
@@ -48,6 +53,9 @@ func (d *Detector) FilterCDNIPs(ctx context.Context, ips []string) ([]string, []
 
 	// Use cdncheck with JSON output for batch processing
 	input := strings.Join(ips, ",")
+	if err := d.allowlist.Validate("cdncheck", []string{"-i", input, "-jsonl"}); err != nil {
+		return ips, nil, nil
+	}
 	cmd := exec.CommandContext(ctx, "cdncheck", "-i", input, "-jsonl")
 	out, err := cmd.Output()
 	if err != nil {

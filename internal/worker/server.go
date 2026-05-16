@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/P0m32Kun/Anchor/internal/toolguard"
 )
 
 // WorkerServer runs in worker mode, receiving tasks via HTTP and executing them.
@@ -23,6 +25,7 @@ type WorkerServer struct {
 	token      string
 	httpClient *http.Client
 	governor   *ResourceGovernor
+	allowlist  *toolguard.Allowlist
 	procs      map[string]*exec.Cmd
 	mu         sync.Mutex
 }
@@ -34,6 +37,7 @@ func NewWorkerServer(dataDir string, coreURL string, token string) *WorkerServer
 		token:      token,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		governor:   NewResourceGovernor(LoadGovernorConfigFromEnv(), nil),
+		allowlist:  toolguard.NewAllowlist(),
 		procs:      make(map[string]*exec.Cmd),
 	}
 }
@@ -146,6 +150,13 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 	if rateLimit > 0 {
 		command = appendRateLimitArgs(command, tool, rateLimit)
 		log.Printf("[worker] task %s rate limit applied: %d", taskID, rateLimit)
+	}
+
+	// Allowlist: reject unknown binaries or args with shell metacharacters.
+	if err := ws.allowlist.Validate(binary, command[1:]); err != nil {
+		log.Printf("[worker] task %s allowlist rejected command: %v", taskID, err)
+		ws.reportResult(taskID, "failed", nil, fmt.Sprintf("allowlist: %v", err))
+		return
 	}
 
 	cmd := exec.Command(binary, command[1:]...)

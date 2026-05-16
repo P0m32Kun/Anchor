@@ -100,6 +100,25 @@ Workflow 模板来自 [RBKD-SEC/templates](https://github.com/RBKD-SEC/templates
 
 系统级指标采样依赖 `github.com/shirou/gopsutil/v3`。`ResourceSampler` 接口允许测试时注入 fake 实现。
 
+### 工具执行白名单（Allowlist）
+
+`internal/toolguard/allowlist.go` 提供外部二进制执行的集中管控。所有 `exec.Command` / `exec.CommandContext` 调用点在创建子进程之前都经过 `Allowlist.Validate(binary, args)` 检查：
+
+1. **二进制白名单** — 只允许预定义的工具名（`subfinder`, `dnsx`, `httpx`, `naabu`, `nmap`, `nuclei`, `cdncheck`, `git`, `sh`, `bash`）。检查基于 `filepath.Base`，因此 `/tmp/evil` 即使伪装成允许的名字也会被拒绝（basename 不在列表中），而 `/usr/local/bin/nuclei` 会被接受（basename `nuclei` 在白名单中）。
+2. **参数安全检查** — 拒绝任何包含 shell 元字符（`;|&><`$(){}[]\n\r`）的参数。`exec.Command` 本身已规避 shell 注入，这层检查是纵深防御：万一参数在未来被拼接到 shell 字符串中，元字符不会穿透。
+
+接入点覆盖全部 5 个 `exec.Command` 调用文件：
+
+| 文件 | 检查位置 |
+|------|----------|
+| `internal/worker/worker.go` | `Runner.Run` 本地回退执行前 |
+| `internal/worker/server.go` | `WorkerServer.executeTask` 子进程启动前 |
+| `internal/health/health.go` | `getVersion` / `getNucleiTemplatePath` 调用前 |
+| `internal/cdn/detector.go` | `CheckIP` / `FilterCDNIPs` 调用前 |
+| `internal/nuclei/custom/git.go` | `ExecCloner.Clone` 调用前 |
+
+`Allowlist.Allow(name)` 支持运行时扩展（测试和自定义工具注册）。新增工具时强制走注册流程：先 `Allow()` 再执行。
+
 ## What Is Not Baseline Yet
 
 - `docs/refactoring-plan.md` is a backlog/refactor inventory, not the current product architecture.

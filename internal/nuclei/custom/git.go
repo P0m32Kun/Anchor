@@ -8,6 +8,8 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+
+	"github.com/P0m32Kun/Anchor/internal/toolguard"
 )
 
 // Cloner abstracts the git ingest path so the Manager can be tested without
@@ -48,6 +50,11 @@ func (c ExecCloner) Clone(ctx context.Context, url, branch, dest string) error {
 		args = append(args, "--branch", branch)
 	}
 	args = append(args, url, dest)
+
+	// Allowlist: reject unknown binaries or args with shell metacharacters.
+	if err := toolguard.NewAllowlist().Validate(bin, args); err != nil {
+		return fmt.Errorf("custom: allowlist rejected git clone: %w", err)
+	}
 
 	cmd := exec.CommandContext(ctx, bin, args...)
 	var stderr bytes.Buffer

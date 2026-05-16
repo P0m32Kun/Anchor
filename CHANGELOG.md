@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.3.0] - 2026-05-16
+
+### Added
+- Tool execution allowlist (`internal/toolguard/Allowlist`)
+- Binary basename whitelist: only `subfinder`, `dnsx`, `httpx`, `naabu`, `nmap`, `nuclei`, `cdncheck`, `git`, `sh`, `bash` allowed
+- Shell metacharacter rejection in all arguments (`;|&><`$(){}[]\n\r`)
+- Wired into all 5 `exec.Command` call sites: `worker.go`, `server.go`, `health.go`, `cdn/detector.go`, `nuclei/custom/git.go`
+- `Allowlist.Allow(name)` for runtime extension (custom tool registration)
+
+### Tests
+- `TestAllowlist_*` — allowed/rejected binaries, path traversal, shell meta detection, normal args pass-through
+
 ## [0.0.2.0] - 2026-05-16
 
 ### Added

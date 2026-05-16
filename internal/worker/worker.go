@@ -18,6 +18,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/toolguard"
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
@@ -33,6 +34,7 @@ type Runner struct {
 	dataDir    string
 	dispatcher *Dispatcher
 	governor   *ResourceGovernor
+	allowlist  *toolguard.Allowlist
 	procs      map[string]*exec.Cmd
 	doneChs    map[string]chan struct{} // closed when process exits
 	mu         sync.RWMutex
@@ -45,6 +47,7 @@ func NewRunner(q *db.Queries, scopeEng *scope.Engine, dataDir string) *Runner {
 		dataDir:    dataDir,
 		dispatcher: NewDispatcher(q),
 		governor:   NewResourceGovernor(LoadGovernorConfigFromEnv(), nil),
+		allowlist:  toolguard.NewAllowlist(),
 		procs:      make(map[string]*exec.Cmd),
 		doneChs:    make(map[string]chan struct{}),
 	}
@@ -193,6 +196,12 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 
 	// Append rate limit arguments if configured.
 	cmdArgs := appendRateLimitArgs(args[1:], task.Tool, project.RateLimit)
+
+	// Allowlist: reject unknown binaries or args with shell metacharacters.
+	if err := r.allowlist.Validate(binary, cmdArgs); err != nil {
+		_ = r.queries.UpdateScanTaskStatus(task.ID, models.TaskFailed, nil, &now)
+		return fmt.Errorf("task %s failed: allowlist rejected command: %w", taskID, err)
+	}
 
 	cmd := exec.CommandContext(ctx, binary, cmdArgs...)
 	cmd.Dir = workdir
