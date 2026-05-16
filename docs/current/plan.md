@@ -13,6 +13,7 @@ This is the only repository-wide implementation plan that agents should treat as
 ## Current Baseline
 
 - The last clearly completed milestone is `v0.4` ("smart scan pipeline + multi-target-type + Nuclei layered scanning").
+- Post-v0.4 increments (v2.1 selective ingestion PR1-3) merged to main 2026-05-16: batch finding buffer, resource governor, tool execution allowlist.
 - v0.4 acceptance criteria and test mapping live in [`../active/review/v0.4-acceptance.md`](../active/review/v0.4-acceptance.md).
 - If a document conflicts with this file, treat this file as the planning baseline unless the task explicitly says otherwise.
 
@@ -26,7 +27,7 @@ This is the only repository-wide implementation plan that agents should treat as
 | v0.4 scan pipeline | Accepted | Yes | Verified by `docs/active/review/v0.4-acceptance.md`; design doc archived at `docs/archived/v0.4/scan-pipeline.md` (superseded 2026-05-12, see `architecture.md` for current baseline) |
 | Database migration notes for v0.4 | Accepted | Yes | Tied to v0.4; superseded plans now archived |
 | Large-scale refactoring | Backlog | No | See [`../refactoring-plan.md`](../refactoring-plan.md) as an idea pool, not an approved release plan |
-| Design v2.1 selective ingestion | Active | Yes | Selectively absorb high-value pieces from external "pentest-arsenal v2.1" PRD without a rewrite; details below |
+| Design v2.1 selective ingestion | Active | Yes | PR1-3 merged to main (batch buffer, governor, allowlist); PR4 (asset_relations) remains backlog |
 
 ## Rules For New Work
 

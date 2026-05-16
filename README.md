@@ -167,8 +167,9 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 │   ├── report/                # Markdown / JSON 报告生成
 │   ├── scope/                 # Scope Check 引擎
 │   ├── scoring/               # Finding confidence/priority 评分
-│   ├── util/                  # 工具函数（脱敏、ID 生成等）
-│   ├── worker/                # Worker subprocess runner + 远程客户端
+│   ├── toolguard/             # 外部工具执行白名单（binary + arg 安全检查）
+│   ├── util/                  # 工具函数（脱敏、ID 生成、shutdown manager 等）
+│   ├── worker/                # Worker subprocess runner + 远程客户端 + 资源治理
 │   └── workflow/              # 工作流编排（按职责拆分为 5 个文件）
 │       ├── pipeline.go        # Pipeline 结构体、Builder、Run 入口
 │       ├── pipeline_stage.go  # 阶段状态管理
@@ -281,6 +282,12 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 - [x] **Nuclei 速率防爆破**：`-rlm`（每分钟限速）+ `-c`（并发）防止账号锁定
 - [x] **互联网搜索引擎页面**：FOFA / Hunter / Quake 统一搜索 + 全局 API Key 配置
 - [x] **E2E 验收**：5 个 v0.4 目标全部通过测试覆盖（见 `docs/active/review/v0.4-acceptance.md`）
+
+### v0.4.x: 稳定性与治理增量（已合并）
+
+- [x] **Findings 批量写入缓冲**：`FindingBuffer` 容量/超时双触发 flush，消除 N+1 `GetFindingByDedupKey` 查询
+- [x] **资源治理**：`ResourceGovernor` 静态内存/CPU 阈值，内存超阈值轮询阻塞、CPU 超阈值 sleep 延迟
+- [x] **工具执行白名单**：`toolguard.Allowlist` 二进制 basename 白名单 + shell 元字符拒绝，覆盖全部 5 个 `exec.Command` 调用点
 
 ## 外部工具依赖
 
