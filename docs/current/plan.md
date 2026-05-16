@@ -70,9 +70,9 @@ A proposal can replace this plan only when all of the following are true:
 
 | PR | 吸收项 | 状态 | 提交 |
 |----|--------|------|------|
-| PR1 | Findings 批量写入缓冲 | Shipped | `709bfff` |
-| PR2 | 资源治理（静态阈值） | Implemented, pending merge | `feat/batch-finding-buffer` (本分支续接) |
-| PR3 | 工具二进制 allowlist + 参数白名单 | Implemented, pending merge | `feat/batch-finding-buffer` (本分支续接) |
+| PR1 | Findings 批量写入缓冲 | Merged to main | `709bfff` |
+| PR2 | 资源治理（静态阈值） | Merged to main | `410738a` |
+| PR3 | 工具二进制 allowlist + 参数白名单 | Merged to main | `f2818be` |
 
 PR2 的实现细节:
 - `internal/worker/resource_governor.go`:`Acquire(ctx)` 检查系统内存/CPU,内存超阈值轮询阻塞、CPU 超阈值 sleep 固定延迟。
