@@ -67,6 +67,8 @@ func (p *Pipeline) runHTTPXAndNuclei(ctx context.Context, fpResults []fingerprin
 				p.failStage(StageVuln, "nuclei non-web: "+err.Error())
 			}
 		}
+		// Flush findings before creating evidence (FK constraint).
+		p.flushFindingsAndEvidence()
 		p.completeStage(StageVuln)
 	}
 
@@ -83,13 +85,11 @@ func (p *Pipeline) saveNucleiFindings(stdout []byte, urlToEndpoint map[string]*m
 	}
 	for _, nr := range results {
 		dedupKey := fmt.Sprintf("%s|%s|%s", nr.TemplateID, nr.Host, nr.MatcherName)
-		existing, err := p.queries.GetFindingByDedupKey(p.projectID, dedupKey)
-		if err != nil {
+		if p.seenDedupKeys[dedupKey] {
 			continue
 		}
-		if existing != nil {
-			continue
-		}
+		p.seenDedupKeys[dedupKey] = true
+
 		var assetID, webEndpointID *string
 		if urlToEndpoint != nil {
 			if ep, ok := urlToEndpoint[nr.Host]; ok {
@@ -119,13 +119,20 @@ func (p *Pipeline) saveNucleiFindings(stdout []byte, urlToEndpoint map[string]*m
 			CreatedAt:     time.Now().UTC(),
 			UpdatedAt:     time.Now().UTC(),
 		}
-		if err := p.queries.CreateFinding(f); err != nil {
-			log.Printf("[pipeline] create finding %s: %v", nr.Name, err)
-			continue
+		if p.runID != "" {
+			f.RunID = &p.runID
+		}
+		if p.findingBuf != nil {
+			p.findingBuf.Add(f)
+		} else {
+			if err := p.queries.CreateFinding(f); err != nil {
+				log.Printf("[pipeline] create finding %s: %v", nr.Name, err)
+				continue
+			}
 		}
 
-		// Collect evidence inline
-		p.collectNucleiEvidence(f.ID, nr)
+		// Defer evidence creation until after findings are flushed (FK constraint).
+		p.deferredEvidence = append(p.deferredEvidence, deferredEvidence{findingID: f.ID, nr: nr})
 	}
 }
 

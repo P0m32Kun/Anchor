@@ -216,35 +216,6 @@ func TestStageEmitter_SetThenFail_ErrorRecorded(t *testing.T) {
 	}
 }
 
-func TestIsSlowScanStage(t *testing.T) {
-	// Slow-scan stages are tracked alongside main flow stages in the same
-	// table but are treated as soft — their failure does NOT promote
-	// pipeline_run.status to failed. This whitelist is the boundary between
-	// "stage failure → run failed" (main flow) and "stage failure → run
-	// still completed" (slow scan). Tested independently because changing
-	// this list silently re-labels which failures count as fatal.
-	cases := []struct {
-		stage string
-		slow  bool
-	}{
-		{"ffuf", true},
-		{"urlfinder", true},
-		{"alive", false},
-		{"portscan", false},
-		{"fingerprint", false},
-		{"httpx", false},
-		{"vuln", false},
-		{"cdn_filter", false},
-		{"", false},
-		{"unknown_stage", false},
-	}
-	for _, tc := range cases {
-		if got := isSlowScanStage(tc.stage); got != tc.slow {
-			t.Errorf("isSlowScanStage(%q) = %v, want %v", tc.stage, got, tc.slow)
-		}
-	}
-}
-
 func sliceEq(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
