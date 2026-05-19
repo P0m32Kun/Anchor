@@ -177,6 +177,23 @@ func (s *Server) handlePatchFindingTemplate(w http.ResponseWriter, r *http.Reque
 		if changed {
 			contentChanged = true
 		}
+		// 应用层唯一性检查：同 source_tool 下不允许重复 match_key（排除自身）
+		existingList, err := s.queries.ListFindingTemplates(t.SourceTool)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list templates for duplicate check: %v", err))
+			return
+		}
+		for _, existing := range existingList {
+			if existing.ID == t.ID {
+				continue
+			}
+			for _, k := range keys {
+				if containsString(existing.MatchKeys, k) {
+					writeError(w, http.StatusConflict, errors.Newf(errors.ErrConflict, "match_key '%s' already exists for tool '%s'", k, t.SourceTool))
+					return
+				}
+			}
+		}
 		t.MatchKeys = keys
 		t.MatchKey = keys[0] // 兼容老字段
 	}
@@ -264,6 +281,11 @@ func (s *Server) handleAcceptFindingTemplateUpstream(w http.ResponseWriter, r *h
 	}
 	t.SourceTool = strings.TrimSpace(seed.SourceTool)
 	t.MatchKey = strings.TrimSpace(seed.MatchKey)
+	if len(seed.MatchKeys) > 0 {
+		t.MatchKeys = seed.MatchKeys
+	} else if t.MatchKey != "" {
+		t.MatchKeys = []string{t.MatchKey}
+	}
 	t.Title = strings.TrimSpace(seed.Title)
 	t.Severity = strings.TrimSpace(seed.Severity)
 	t.Summary = seed.Summary
