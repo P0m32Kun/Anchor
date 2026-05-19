@@ -89,10 +89,20 @@ func (q *Queries) applyFindingTemplateSeeds(seeds []SeedFindingTemplate) (*SyncR
 
 	for _, s := range seeds {
 		tool := strings.TrimSpace(s.SourceTool)
-		match := strings.TrimSpace(s.MatchKey)
-		if tool == "" || match == "" {
+		// 优先用 MatchKeys，回退到 MatchKey（兼容老文件）
+		keys := make([]string, 0, len(s.MatchKeys))
+		for _, k := range s.MatchKeys {
+			if trimmed := strings.TrimSpace(k); trimmed != "" {
+				keys = append(keys, trimmed)
+			}
+		}
+		if len(keys) == 0 && s.MatchKey != "" {
+			keys = []string{strings.TrimSpace(s.MatchKey)}
+		}
+		if tool == "" || len(keys) == 0 {
 			continue // skip malformed entries quietly
 		}
+		match := keys[0]
 		k := key{tool, match}
 		seenKeys[k] = struct{}{}
 
@@ -112,6 +122,7 @@ func (q *Queries) applyFindingTemplateSeeds(seeds []SeedFindingTemplate) (*SyncR
 				ID:             util.GenerateID(),
 				SourceTool:     tool,
 				MatchKey:       match,
+				MatchKeys:      keys,
 				Title:          strings.TrimSpace(s.Title),
 				Severity:       strings.TrimSpace(s.Severity),
 				Summary:        s.Summary,
@@ -148,6 +159,7 @@ func (q *Queries) applyFindingTemplateSeeds(seeds []SeedFindingTemplate) (*SyncR
 		row.Severity = strings.TrimSpace(s.Severity)
 		row.Summary = s.Summary
 		row.Remediation = s.Remediation
+		row.MatchKeys = keys
 		row.Enabled = enabled
 		row.IsBuiltin = true
 		row.UpdatedAt = now

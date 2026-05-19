@@ -233,5 +233,81 @@ func TestSyncFindingTemplates_EmptyPathNoOp(t *testing.T) {
 	}
 }
 
+func TestSyncFindingTemplates_MatchKeysArray(t *testing.T) {
+	q := New(openTestDB(t))
+	path := writeSeedFile(t, []SeedFindingTemplate{
+		{SourceTool: "nuclei", MatchKeys: []string{"key-a", "key-b", "key-c"}, Title: "多键模板", Severity: "high", Summary: "S", Remediation: "R"},
+	})
+	res, err := q.SyncFindingTemplatesFromFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Inserted != 1 {
+		t.Fatalf("expected 1 insert, got %+v", res)
+	}
+	rows, _ := q.ListBuiltinFindingTemplates()
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	row := rows[0]
+	if row.MatchKey != "key-a" {
+		t.Fatalf("expected MatchKey='key-a', got %q", row.MatchKey)
+	}
+	if len(row.MatchKeys) != 3 || row.MatchKeys[0] != "key-a" || row.MatchKeys[1] != "key-b" || row.MatchKeys[2] != "key-c" {
+		t.Fatalf("expected MatchKeys=[key-a key-b key-c], got %v", row.MatchKeys)
+	}
+}
+
+func TestSyncFindingTemplates_MatchKeysFallbackToMatchKey(t *testing.T) {
+	q := New(openTestDB(t))
+	path := writeSeedFile(t, []SeedFindingTemplate{
+		{SourceTool: "nuclei", MatchKey: "legacy-key", Title: "兼容老文件", Severity: "medium"},
+	})
+	res, err := q.SyncFindingTemplatesFromFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Inserted != 1 {
+		t.Fatalf("expected 1 insert, got %+v", res)
+	}
+	rows, _ := q.ListBuiltinFindingTemplates()
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	row := rows[0]
+	if row.MatchKey != "legacy-key" {
+		t.Fatalf("expected MatchKey='legacy-key', got %q", row.MatchKey)
+	}
+	if len(row.MatchKeys) != 1 || row.MatchKeys[0] != "legacy-key" {
+		t.Fatalf("expected MatchKeys=[legacy-key], got %v", row.MatchKeys)
+	}
+}
+
+func TestSyncFindingTemplates_MatchKeysUpdate(t *testing.T) {
+	q := New(openTestDB(t))
+	pathA := writeSeedFile(t, []SeedFindingTemplate{
+		{SourceTool: "nuclei", MatchKeys: []string{"key-a", "key-b"}, Title: "v1", Severity: "high"},
+	})
+	if _, err := q.SyncFindingTemplatesFromFile(pathA); err != nil {
+		t.Fatal(err)
+	}
+
+	// Upstream adds a third key.
+	pathB := writeSeedFile(t, []SeedFindingTemplate{
+		{SourceTool: "nuclei", MatchKeys: []string{"key-a", "key-b", "key-c"}, Title: "v2", Severity: "critical"},
+	})
+	res, err := q.SyncFindingTemplatesFromFile(pathB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Updated != 1 {
+		t.Fatalf("expected 1 update, got %+v", res)
+	}
+	rows, _ := q.ListBuiltinFindingTemplates()
+	if len(rows[0].MatchKeys) != 3 || rows[0].MatchKeys[2] != "key-c" {
+		t.Fatalf("expected MatchKeys updated to 3 items, got %v", rows[0].MatchKeys)
+	}
+}
+
 // silence unused import warnings when models is referenced indirectly.
 var _ = models.FindingTemplate{}
