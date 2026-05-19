@@ -7,7 +7,7 @@ import (
 
 func TestAllowlist_AllowedBinary(t *testing.T) {
 	a := NewAllowlist()
-	for _, name := range []string{"subfinder", "dnsx", "httpx", "naabu", "nmap", "nuclei", "cdncheck", "git", "sh"} {
+	for _, name := range []string{"subfinder", "dnsx", "httpx", "naabu", "nmap", "nuclei", "cdncheck", "ffuf", "urlfinder", "git", "sh"} {
 		if err := a.Validate(name, nil); err != nil {
 			t.Errorf("%q should be allowed: %v", name, err)
 		}

@@ -305,6 +305,7 @@ func (p *Pipeline) runPostPhase(ctx context.Context, projectID string) {
 	var discoveredURLs []string
 	var mu sync.Mutex
 	var ffufFailures int
+	var urlfinderErr error
 	const maxFfufConcurrency = 5
 	ffufSem := make(chan struct{}, maxFfufConcurrency)
 
@@ -338,6 +339,9 @@ func (p *Pipeline) runPostPhase(ctx context.Context, projectID string) {
 			urls, err := p.runURLFinder(ctx, endpoints)
 			if err != nil {
 				log.Printf("[pipeline] urlfinder: %v", err)
+				mu.Lock()
+				urlfinderErr = err
+				mu.Unlock()
 				return
 			}
 			mu.Lock()
@@ -357,7 +361,11 @@ func (p *Pipeline) runPostPhase(ctx context.Context, projectID string) {
 		}
 	}
 	if wantURLFinder {
-		p.completeStage(StageURLFinder)
+		if urlfinderErr != nil {
+			p.failStage(StageURLFinder, urlfinderErr.Error())
+		} else {
+			p.completeStage(StageURLFinder)
+		}
 	}
 
 	// Feed new URLs through httpx_2 → vuln_2

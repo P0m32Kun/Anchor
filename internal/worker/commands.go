@@ -2,6 +2,7 @@ package worker
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -266,11 +267,15 @@ func BuildNmapAliveCommand(hostFile string) []string {
 	}
 }
 
+// URLFinderOutputPath is the JSON output file urlfinder writes under workdir.
+func URLFinderOutputPath(workdir string) string {
+	return filepath.Join(workdir, "urlfinder-output.json")
+}
+
 // BuildURLFinderCommand builds a pingc0y/URLFinder command for extracting
 // URLs and JS links from web pages to expand the attack surface.
-// inputFile contains one URL per line. workdir is used for the JSON output file.
-// The command writes JSON to a file in workdir and cats it to stdout so the
-// runner can capture it as an artifact.
+// inputFile contains one URL per line. Results are written to
+// URLFinderOutputPath(workdir); the pipeline reads that file after the task completes.
 //
 // Key flags:
 //   -f  batch URL file
@@ -280,17 +285,20 @@ func BuildNmapAliveCommand(hostFile string) []string {
 //   -t  thread count (default 50)
 //   -time  timeout in seconds (default 5)
 func BuildURLFinderCommand(inputFile, workdir string, threads, timeout int) []string {
-	outFile := workdir + "/urlfinder-output.json"
-	cmd := fmt.Sprintf("urlfinder -f %s -s 200,301,302,401,403,405,500 -m 1 -o %s", inputFile, outFile)
+	args := []string{
+		"urlfinder",
+		"-f", inputFile,
+		"-s", "200,301,302,401,403,405,500",
+		"-m", "1",
+		"-o", URLFinderOutputPath(workdir),
+	}
 	if threads > 0 {
-		cmd += fmt.Sprintf(" -t %d", threads)
+		args = append(args, "-t", fmt.Sprintf("%d", threads))
 	}
 	if timeout > 0 {
-		cmd += fmt.Sprintf(" -time %d", timeout)
+		args = append(args, "-time", fmt.Sprintf("%d", timeout))
 	}
-	cmd += " && cat " + outFile
-	// Wrap in sh -c so the shell can handle the && operator.
-	return []string{"sh", "-c", cmd}
+	return args
 }
 
 // appendRateLimitArgs appends tool-specific rate limit flags to the argument list.

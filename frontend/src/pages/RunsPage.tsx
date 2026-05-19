@@ -712,15 +712,15 @@ const STAGE_LABELS: Record<string, string> = {
   fingerprint: "服务指纹",
   httpx: "Web 探活",
   vuln: "漏洞探测",
-  ffuf: "目录爆破 (慢速)",
-  urlfinder: "URL 发现 (慢速)",
+  ffuf: "目录爆破",
+  urlfinder: "URL 发现",
   httpx_2: "Web 探活 (2)",
   vuln_2: "漏洞扫描 (2)",
 };
 
 // mergeStageEvent reduces an SSE pipeline_stage_change event into the local
 // stages array. Existing stage rows get their status flipped; previously
-// unseen stages (the slow-scan urlfinder/ffuf events arrive after the initial
+// unseen stages (post-phase urlfinder/ffuf events arrive after the initial
 // loadRunDetails snapshot is taken) are appended with a tmp- id that gets
 // replaced when pipeline_complete triggers a reload from the server.
 //
