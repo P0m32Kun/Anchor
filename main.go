@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/api"
+	"github.com/P0m32Kun/Anchor/internal/builtin"
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
@@ -85,6 +86,10 @@ func runServer(dataDir string) {
 }
 
 func runWorker(dataDir, coreURL string) {
+	if err := builtin.SyncAll(); err != nil {
+		log.Printf("[worker] builtin sync: %v", err)
+	}
+
 	apiToken := os.Getenv("ANCHOR_API_TOKEN")
 	ws := worker.NewWorkerServer(dataDir, coreURL, apiToken)
 

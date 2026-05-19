@@ -19,6 +19,7 @@ import {
   Modal,
   ConfirmDialog,
   EmptyState,
+  Switch,
 } from "../components";
 import { cn } from "../lib/utils";
 import {
@@ -39,7 +40,9 @@ import {
   Layers,
 } from "lucide-react";
 
-type TabMode = "sources";
+type SourceTab = "builtin" | "custom";
+
+const BUILTIN_READONLY_TITLE = "内置只读";
 
 /** 将显示名转为合法的路径名：小写、空格→连字符、只保留字母数字和-_ */
 function toInstallPath(name: string): string {
@@ -118,7 +121,7 @@ export default function TemplatesPage() {
   const toast = useToast();
   const [sources, setSources] = useState<NucleiCustomSource[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabMode>("sources");
+  const [sourceTab, setSourceTab] = useState<SourceTab>("custom");
   const [expandedSource, setExpandedSource] = useState<string | null>(null);
   const [filesMap, setFilesMap] = useState<Record<string, NucleiCustomFileEntry[]>>({});
   const [filesLoading, setFilesLoading] = useState<Record<string, boolean>>({});
@@ -240,7 +243,11 @@ export default function TemplatesPage() {
 
   async function handleToggleEnabled(src: NucleiCustomSource) {
     try {
-      await api.patchNucleiCustomSource(src.id, { enabled: !src.enabled });
+      if (src.builtin) {
+        await api.patchNucleiCustomSourceEnabled(src.id, !src.enabled);
+      } else {
+        await api.patchNucleiCustomSource(src.id, { enabled: !src.enabled });
+      }
       toast(src.enabled ? "已禁用" : "已启用", "success");
       loadSources();
     } catch (err: any) {
@@ -319,6 +326,11 @@ export default function TemplatesPage() {
     setConfirmOpen(true);
   }
 
+  const filteredSources = sources.filter((src) =>
+    sourceTab === "builtin" ? src.builtin : !src.builtin
+  );
+  const isBuiltinTab = sourceTab === "builtin";
+
   function statusBadge(status: string) {
     switch (status) {
       case "ready":
@@ -357,112 +369,145 @@ export default function TemplatesPage() {
             导入、验证并发布自定义 Nuclei 模板源，Worker 将自动同步并使用。
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setGitModalOpen(true)}>
-            <GitBranch className="mr-2 h-4 w-4" />
-            Git 导入
-          </Button>
-          <Button variant="secondary" onClick={() => setUploadModalOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            上传
-          </Button>
-        </div>
+        {!isBuiltinTab && (
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setGitModalOpen(true)}>
+              <GitBranch className="mr-2 h-4 w-4" />
+              Git 导入
+            </Button>
+            <Button variant="secondary" onClick={() => setUploadModalOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              上传
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 border-b border-white/5 pb-0">
-        {[
-          { key: "sources" as TabMode, label: "模板源", icon: FileCode },
-        ].map((t) => (
+        {(
+          [
+            { key: "builtin" as SourceTab, label: "团队内置" },
+            { key: "custom" as SourceTab, label: "我的自定义" },
+          ] as const
+        ).map((t) => (
           <button
             key={t.key}
-            onClick={() => {
-              setActiveTab(t.key);
-            }}
+            onClick={() => setSourceTab(t.key)}
             className={cn(
-              "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
-              activeTab === t.key
+              "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+              sourceTab === t.key
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
-            <t.icon className="h-4 w-4" />
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* Sources Tab */}
-      {activeTab === "sources" && (
-        <Card className="overflow-hidden">
-          {loading && sources.length === 0 ? (
-            <div className="p-20 text-center text-muted-foreground">加载中...</div>
-          ) : sources.length === 0 ? (
-            <div className="p-20 text-center">
-              <EmptyState
-                title="暂无模板源"
-                description="通过 Git 导入或文件上传添加自定义 Nuclei 模板"
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader className="bg-white/5">
-                <TableRow>
-                  <TableHead className="w-8"></TableHead>
-                  <TableHead>名称</TableHead>
-                  <TableHead>类型</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>同步时间</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sources.map((src) => (
-                  <Fragment key={src.id}>
-                    <TableRow className="group cursor-pointer" onClick={() => loadFiles(src.id)}>
-                      <TableCell>
-                        {expandedSource === src.id ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      <Card className="overflow-hidden">
+        {loading && filteredSources.length === 0 ? (
+          <div className="p-20 text-center text-muted-foreground">加载中...</div>
+        ) : filteredSources.length === 0 ? (
+          <div className="p-20 text-center">
+            <EmptyState
+              title={isBuiltinTab ? "暂无内置模板源" : "暂无模板源"}
+              description={
+                isBuiltinTab
+                  ? "团队内置模板由系统同步，可在此启用或禁用"
+                  : "通过 Git 导入或文件上传添加自定义 Nuclei 模板"
+              }
+            />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader className="bg-white/5">
+              <TableRow>
+                <TableHead className="w-8"></TableHead>
+                <TableHead>名称</TableHead>
+                <TableHead>类型</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>同步时间</TableHead>
+                <TableHead>启用</TableHead>
+                <TableHead className="text-right">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredSources.map((src) => (
+                <Fragment key={src.id}>
+                  <TableRow className="group cursor-pointer" onClick={() => loadFiles(src.id)}>
+                    <TableCell>
+                      {expandedSource === src.id ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {typeIcon(src.type)}
+                        <span className="font-medium">{src.name}</span>
+                        {isBuiltinTab && (
+                          <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px]">
+                            内置
+                          </Badge>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {typeIcon(src.type)}
-                          <span className="font-medium">{src.name}</span>
-                          {!src.enabled && (
-                            <Badge variant="outline" className="text-xs">已禁用</Badge>
+                        {!src.enabled && (
+                          <Badge variant="outline" className="text-xs">已禁用</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground capitalize">{src.type}</span>
+                    </TableCell>
+                    <TableCell>{statusBadge(src.status)}</TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {src.last_sync_at
+                          ? new Date(src.last_sync_at).toLocaleString("zh-CN")
+                          : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {isBuiltinTab ? (
+                        <Switch
+                          checked={src.enabled}
+                          onCheckedChange={() => handleToggleEnabled(src)}
+                          title={src.enabled ? "禁用" : "启用"}
+                        />
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleToggleEnabled(src)}
+                          title={src.enabled ? "禁用" : "启用"}
+                        >
+                          {src.enabled ? (
+                            <ToggleRight className="h-3.5 w-3.5 text-emerald-400" />
+                          ) : (
+                            <ToggleLeft className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs text-muted-foreground capitalize">{src.type}</span>
-                      </TableCell>
-                      <TableCell>{statusBadge(src.status)}</TableCell>
-                      <TableCell>
-                        <span className="text-xs text-muted-foreground">
-                          {src.last_sync_at
-                            ? new Date(src.last_sync_at).toLocaleString("zh-CN")
-                            : "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-1">
-                          {src.type === "git" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRefresh(src.id);
-                              }}
-                              title="刷新"
-                            >
-                              <RefreshCw className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {!isBuiltinTab && src.type === "git" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRefresh(src.id);
+                            }}
+                            title="刷新"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {!isBuiltinTab && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -475,137 +520,123 @@ export default function TemplatesPage() {
                           >
                             <FileCheck className="h-3.5 w-3.5" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleEnabled(src);
-                            }}
-                            title={src.enabled ? "禁用" : "启用"}
-                          >
-                            {src.enabled ? (
-                              <ToggleRight className="h-3.5 w-3.5 text-emerald-400" />
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(src.id, src.name);
+                          }}
+                          disabled={isBuiltinTab}
+                          title={isBuiltinTab ? BUILTIN_READONLY_TITLE : "删除"}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {expandedSource === src.id && (
+                    <TableRow className="bg-white/[0.02]">
+                      <TableCell colSpan={7} className="p-0">
+                        {filesLoading[src.id] ? (
+                          <div className="p-8 text-center text-sm text-muted-foreground">加载文件...</div>
+                        ) : (
+                          <div className="p-4 space-y-1">
+                            {(filesMap[src.id] || []).length === 0 ? (
+                              <div className="text-sm text-muted-foreground py-4 text-center">暂无文件</div>
                             ) : (
-                              <ToggleLeft className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(src.id, src.name);
-                            }}
-                            title="删除"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {expandedSource === src.id && (
-                      <TableRow className="bg-white/[0.02]">
-                        <TableCell colSpan={7} className="p-0">
-                          {filesLoading[src.id] ? (
-                            <div className="p-8 text-center text-sm text-muted-foreground">加载文件...</div>
-                          ) : (
-                            <div className="p-4 space-y-1">
-                              {(filesMap[src.id] || []).length === 0 ? (
-                                <div className="text-sm text-muted-foreground py-4 text-center">暂无文件</div>
-                              ) : (
-                                <div className="grid gap-0.5">
-                                  {flattenTree(
-                                    buildFileTree(filesMap[src.id] || []),
-                                    expandedFolders[src.id] || new Set()
-                                  ).map(({ node, depth }) => {
-                                    const isExpanded = (expandedFolders[src.id] || new Set()).has(node.path);
-                                    const editable =
-                                      !node.isDir &&
-                                      (node.path.endsWith(".yaml") ||
-                                        node.path.endsWith(".yml") ||
-                                        node.path.startsWith("payloads/"));
-                                    return (
-                                      <div
-                                        key={node.path}
-                                        className={cn(
-                                          "flex items-center justify-between rounded-lg pr-3 py-1.5 transition-colors group/file",
-                                          node.isDir ? "cursor-pointer hover:bg-white/5" : "hover:bg-white/5"
-                                        )}
-                                        style={{ paddingLeft: `${12 + depth * 16}px` }}
-                                        onClick={() => node.isDir && toggleFolder(src.id, node.path)}
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          {node.isDir ? (
-                                            <>
-                                              {isExpanded ? (
-                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                              ) : (
-                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                              )}
-                                              <Folder className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                                              <span className="text-sm font-mono truncate">{node.name}</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <span className="w-3.5 shrink-0" />
-                                              <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                              <span className="text-sm font-mono truncate">{node.name}</span>
-                                              <span className="text-xs text-muted-foreground shrink-0">
-                                                {(node.size / 1024).toFixed(1)} KB
-                                              </span>
-                                            </>
-                                          )}
-                                        </div>
-                                        {!node.isDir && (
-                                          <div className="flex gap-1 opacity-0 group-hover/file:opacity-100 transition-opacity shrink-0">
-                                            {editable && (
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 w-7 p-0"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  openFileEditor(src.id, node.path);
-                                                }}
-                                                title="编辑"
-                                              >
-                                                <Edit3 className="h-3 w-3" />
-                                              </Button>
+                              <div className="grid gap-0.5">
+                                {flattenTree(
+                                  buildFileTree(filesMap[src.id] || []),
+                                  expandedFolders[src.id] || new Set()
+                                ).map(({ node, depth }) => {
+                                  const isExpanded = (expandedFolders[src.id] || new Set()).has(node.path);
+                                  const editable =
+                                    !isBuiltinTab &&
+                                    !node.isDir &&
+                                    (node.path.endsWith(".yaml") ||
+                                      node.path.endsWith(".yml") ||
+                                      node.path.startsWith("payloads/"));
+                                  return (
+                                    <div
+                                      key={node.path}
+                                      className={cn(
+                                        "flex items-center justify-between rounded-lg pr-3 py-1.5 transition-colors group/file",
+                                        node.isDir ? "cursor-pointer hover:bg-white/5" : "hover:bg-white/5"
+                                      )}
+                                      style={{ paddingLeft: `${12 + depth * 16}px` }}
+                                      onClick={() => node.isDir && toggleFolder(src.id, node.path)}
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        {node.isDir ? (
+                                          <>
+                                            {isExpanded ? (
+                                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                            ) : (
+                                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                             )}
+                                            <Folder className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                                            <span className="text-sm font-mono truncate">{node.name}</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span className="w-3.5 shrink-0" />
+                                            <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                            <span className="text-sm font-mono truncate">{node.name}</span>
+                                            <span className="text-xs text-muted-foreground shrink-0">
+                                              {(node.size / 1024).toFixed(1)} KB
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                      {!node.isDir && !isBuiltinTab && (
+                                        <div className="flex gap-1 opacity-0 group-hover/file:opacity-100 transition-opacity shrink-0">
+                                          {editable && (
                                             <Button
                                               variant="ghost"
                                               size="sm"
-                                              className="h-7 w-7 p-0 text-rose-400"
+                                              className="h-7 w-7 p-0"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleDeleteFile(src.id, node.path);
+                                                openFileEditor(src.id, node.path);
                                               }}
-                                              title="删除"
+                                              title="编辑"
                                             >
-                                              <Trash2 className="h-3 w-3" />
+                                              <Edit3 className="h-3 w-3" />
                                             </Button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </Card>
-      )}
+                                          )}
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 w-7 p-0 text-rose-400"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteFile(src.id, node.path);
+                                            }}
+                                            title="删除"
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
 
       {/* Git Import Modal */}
       <Modal

@@ -139,6 +139,43 @@ func (s *Server) handleRefreshNucleiCustomSource(w http.ResponseWriter, r *http.
 	writeJSON(w, http.StatusOK, src)
 }
 
+func (s *Server) handlePatchNucleiCustomSourceEnabled(w http.ResponseWriter, r *http.Request) {
+	if s.nucleiCustomMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "id is required"))
+		return
+	}
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	src, err := s.nucleiCustomMgr.GetByID(id)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	if !src.Builtin {
+		writeError(w, http.StatusForbidden, apperrors.New(apperrors.ErrForbidden, "only builtin nuclei sources support enable toggle"))
+		return
+	}
+
+	updated, err := s.nucleiCustomMgr.UpdateEnabled(id, req.Enabled)
+	if err != nil {
+		writeNucleiCustomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
 func (s *Server) handlePatchNucleiCustomSource(w http.ResponseWriter, r *http.Request) {
 	if s.nucleiCustomMgr == nil {
 		writeError(w, http.StatusServiceUnavailable, apperrors.New(apperrors.ErrInternal, "nuclei custom manager not initialised"))
@@ -402,6 +439,14 @@ func writeNucleiCustomError(w http.ResponseWriter, err error) {
 	var appErr *apperrors.AppError
 	if stdErrors.As(err, &appErr) {
 		writeError(w, appErr.StatusCode(), appErr)
+		return
+	}
+	if stdErrors.Is(err, custom.ErrBuiltinReadOnly) {
+		writeError(w, http.StatusForbidden, apperrors.New(apperrors.ErrForbidden, err.Error()))
+		return
+	}
+	if stdErrors.Is(err, custom.ErrNotBuiltin) {
+		writeError(w, http.StatusBadRequest, apperrors.New(apperrors.ErrBadRequest, err.Error()))
 		return
 	}
 	writeError(w, http.StatusInternalServerError, apperrors.Newf(apperrors.ErrInternal, "%v", err))

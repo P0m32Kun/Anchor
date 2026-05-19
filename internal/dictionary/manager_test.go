@@ -90,6 +90,9 @@ func TestManager_CreateAndRead(t *testing.T) {
 	if d.SizeBytes != int64(len(content)) {
 		t.Errorf("size_bytes = %d, want %d", d.SizeBytes, len(content))
 	}
+	if !d.Enabled {
+		t.Error("user-created dictionary should default to enabled")
+	}
 
 	got, err := m.ReadContent(d.ID)
 	if err != nil {

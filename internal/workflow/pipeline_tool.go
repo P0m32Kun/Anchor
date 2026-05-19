@@ -518,6 +518,9 @@ func (p *Pipeline) runFfuf(ctx context.Context, endpoint *models.WebEndpoint) ([
 	if err != nil || dict == nil {
 		return nil, fmt.Errorf("dictionary not found: %s", p.config.FfufDictionaryID)
 	}
+	if !dict.Enabled {
+		return nil, fmt.Errorf("dictionary disabled: %s", p.config.FfufDictionaryID)
+	}
 
 	// Build target URL with FUZZ placeholder
 	base := strings.TrimSuffix(endpoint.URL, "/")

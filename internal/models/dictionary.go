@@ -20,6 +20,7 @@ type Dictionary struct {
 	LineCount   int                `json:"line_count" db:"line_count"`
 	SizeBytes   int64              `json:"size_bytes" db:"size_bytes"`
 	Builtin     bool               `json:"builtin" db:"builtin"`
+	Enabled     bool               `json:"enabled" db:"enabled"`
 	CreatedAt   time.Time          `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time          `json:"updated_at" db:"updated_at"`
 }

@@ -15,7 +15,9 @@ import {
   Modal,
   ConfirmDialog,
   EmptyState,
+  Switch,
 } from "../components";
+import { cn } from "../lib/utils";
 import {
   BookOpen,
   Upload,
@@ -31,6 +33,10 @@ const CATEGORY_OPTIONS: { value: Dictionary["category"]; label: string }[] = [
   { value: "vhost", label: "虚拟主机" },
   { value: "custom", label: "自定义" },
 ];
+
+type SourceTab = "builtin" | "custom";
+
+const BUILTIN_READONLY_TITLE = "内置只读";
 
 function categoryBadge(category: Dictionary["category"]) {
   switch (category) {
@@ -73,6 +79,7 @@ export default function DictionariesPage() {
   const toast = useToast();
   const [dictionaries, setDictionaries] = useState<Dictionary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sourceTab, setSourceTab] = useState<SourceTab>("custom");
 
   // Modals
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -220,6 +227,20 @@ export default function DictionariesPage() {
     setConfirmOpen(true);
   }
 
+  async function handleToggleEnabled(dict: Dictionary) {
+    try {
+      await api.patchDictionaryEnabled(dict.id, !dict.enabled);
+      toast(dict.enabled ? "已禁用" : "已启用", "success");
+      loadDictionaries();
+    } catch (err: any) {
+    }
+  }
+
+  const filteredDictionaries = dictionaries.filter((d) =>
+    sourceTab === "builtin" ? d.builtin : !d.builtin
+  );
+  const isBuiltinTab = sourceTab === "builtin";
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       {/* Header */}
@@ -236,21 +257,49 @@ export default function DictionariesPage() {
             管理扫描使用的字典文件，支持目录扫描、子域名爆破等场景。
           </p>
         </div>
-        <Button variant="secondary" onClick={() => setUploadModalOpen(true)}>
-          <Upload className="mr-2 h-4 w-4" />
-          上传
-        </Button>
+        {!isBuiltinTab && (
+          <Button variant="secondary" onClick={() => setUploadModalOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            上传
+          </Button>
+        )}
+      </div>
+
+      <div className="flex gap-1 border-b border-white/5 pb-0">
+        {(
+          [
+            { key: "builtin" as SourceTab, label: "团队内置" },
+            { key: "custom" as SourceTab, label: "我的自定义" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setSourceTab(t.key)}
+            className={cn(
+              "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+              sourceTab === t.key
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* Table */}
       <Card className="overflow-hidden">
-        {loading && dictionaries.length === 0 ? (
+        {loading && filteredDictionaries.length === 0 ? (
           <div className="p-20 text-center text-muted-foreground">加载中...</div>
-        ) : dictionaries.length === 0 ? (
+        ) : filteredDictionaries.length === 0 ? (
           <div className="p-20 text-center">
             <EmptyState
-              title="暂无字典"
-              description="上传字典文件用于扫描任务中的目录、子域名等爆破场景"
+              title={isBuiltinTab ? "暂无内置字典" : "暂无字典"}
+              description={
+                isBuiltinTab
+                  ? "团队内置字典由系统同步，可在此启用或禁用"
+                  : "上传字典文件用于扫描任务中的目录、子域名等爆破场景"
+              }
             />
           </div>
         ) : (
@@ -261,11 +310,12 @@ export default function DictionariesPage() {
                 <TableHead>分类</TableHead>
                 <TableHead>行数</TableHead>
                 <TableHead>大小</TableHead>
+                {isBuiltinTab && <TableHead>启用</TableHead>}
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dictionaries.map((dict) => (
+              {filteredDictionaries.map((dict) => (
                 <TableRow
                   key={dict.id}
                   className="border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
@@ -274,10 +324,10 @@ export default function DictionariesPage() {
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium flex items-center gap-1.5">
                         {dict.name}
-                        {dict.builtin && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/30">
+                        {isBuiltinTab && (
+                          <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px]">
                             内置
-                          </span>
+                          </Badge>
                         )}
                       </span>
                       {dict.description && (
@@ -298,6 +348,15 @@ export default function DictionariesPage() {
                       {formatSize(dict.size_bytes)}
                     </span>
                   </TableCell>
+                  {isBuiltinTab && (
+                    <TableCell>
+                      <Switch
+                        checked={dict.enabled}
+                        onCheckedChange={() => handleToggleEnabled(dict)}
+                        title={dict.enabled ? "禁用" : "启用"}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <Button
@@ -305,8 +364,8 @@ export default function DictionariesPage() {
                         size="sm"
                         className="h-8 w-8 p-0"
                         onClick={() => openContentEditor(dict)}
-                        disabled={dict.builtin}
-                        title={dict.builtin ? "内置字典只读" : "编辑内容"}
+                        disabled={isBuiltinTab}
+                        title={isBuiltinTab ? BUILTIN_READONLY_TITLE : "编辑内容"}
                       >
                         <FileText className="h-3.5 w-3.5" />
                       </Button>
@@ -315,8 +374,8 @@ export default function DictionariesPage() {
                         size="sm"
                         className="h-8 w-8 p-0"
                         onClick={() => openEditModal(dict)}
-                        disabled={dict.builtin}
-                        title={dict.builtin ? "内置字典只读" : "编辑信息"}
+                        disabled={isBuiltinTab}
+                        title={isBuiltinTab ? BUILTIN_READONLY_TITLE : "编辑信息"}
                       >
                         <Settings2 className="h-3.5 w-3.5" />
                       </Button>
@@ -325,8 +384,8 @@ export default function DictionariesPage() {
                         size="sm"
                         className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300"
                         onClick={() => handleDelete(dict)}
-                        disabled={dict.builtin}
-                        title={dict.builtin ? "内置字典只读" : "删除"}
+                        disabled={isBuiltinTab}
+                        title={isBuiltinTab ? BUILTIN_READONLY_TITLE : "删除"}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

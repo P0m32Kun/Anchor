@@ -50,7 +50,7 @@ func (m *Manager) BuildBundle() (version string, archivePath string, err error) 
 
 	var entries []BundleSourceEntry
 	for _, src := range sources {
-		if !src.Enabled {
+		if !src.Enabled || src.Builtin {
 			continue
 		}
 		files, err := m.layout.WalkFiles(src.ID)

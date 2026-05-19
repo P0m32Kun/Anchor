@@ -18,3 +18,4 @@ export { ErrorBoundary } from "./ErrorBoundary";
 export { default as TemplateEditor } from "./TemplateEditor";
 export type { TemplateFormData } from "./TemplateEditor";
 export { VirtualList } from "./VirtualList";
+export { Switch } from "./Switch";

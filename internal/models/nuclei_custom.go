@@ -29,6 +29,7 @@ type NucleiCustomSource struct {
 	URI             *string                  `json:"uri,omitempty" db:"uri"`
 	Branch          *string                  `json:"branch,omitempty" db:"branch"`
 	Enabled         bool                     `json:"enabled" db:"enabled"`
+	Builtin         bool                     `json:"builtin" db:"builtin"`
 	RoutingPolicy   string                   `json:"routing_policy" db:"routing_policy"`
 	Status          NucleiCustomSourceStatus `json:"status" db:"status"`
 	LastSyncAt      *time.Time               `json:"last_sync_at,omitempty" db:"last_sync_at"`
