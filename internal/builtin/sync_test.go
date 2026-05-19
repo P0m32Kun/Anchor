@@ -1,6 +1,8 @@
 package builtin
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -98,5 +100,15 @@ func TestLoadConfigEnvOverrides(t *testing.T) {
 func TestHeadShortMissingRepo(t *testing.T) {
 	if got := HeadShort(t.TempDir()); got != "" {
 		t.Fatalf("HeadShort on non-repo: got %q, want empty", got)
+	}
+}
+
+func TestSyncRepoSkipsBakedDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "workflows"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := syncRepo("https://example.com/x.git", "main", dir); err != nil {
+		t.Fatalf("syncRepo baked: %v", err)
 	}
 }

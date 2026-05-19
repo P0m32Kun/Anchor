@@ -43,6 +43,10 @@ func SyncAll() error {
 func syncRepo(repo, ref, dir string) error {
 	gitDir := filepath.Join(dir, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		// Dockerfile clones then removes .git; treat existing tree as baked-in.
+		if fi, statErr := os.Stat(dir); statErr == nil && fi.IsDir() {
+			return nil
+		}
 		return exec.Command("git", "clone", "--depth", "1", "--branch", ref, repo, dir).Run()
 	}
 

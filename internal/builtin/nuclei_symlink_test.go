@@ -8,7 +8,12 @@ import (
 
 func TestApplyRBKDNucleiSymlink_EnableCreatesSymlink(t *testing.T) {
 	home := t.TempDir()
+	opt := filepath.Join(home, "opt-rbkd")
 	t.Setenv("HOME", home)
+	t.Setenv("ANCHOR_BUILTIN_TEMPLATES_ROOT", opt)
+	if err := os.MkdirAll(opt, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := ApplyRBKDNucleiSymlink(true); err != nil {
 		t.Fatalf("enable: %v", err)
@@ -27,8 +32,8 @@ func TestApplyRBKDNucleiSymlink_EnableCreatesSymlink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readlink: %v", err)
 	}
-	if target != RBKDTemplatesRoot {
-		t.Fatalf("target = %q, want %q", target, RBKDTemplatesRoot)
+	if target != opt {
+		t.Fatalf("target = %q, want %q", target, opt)
 	}
 }
 
@@ -49,7 +54,7 @@ func TestApplyRBKDNucleiSymlink_DisableRemovesSymlink(t *testing.T) {
 	}
 }
 
-func TestApplyRBKDNucleiSymlink_DisablePreservesDirectory(t *testing.T) {
+func TestApplyRBKDNucleiSymlink_DisableRemovesLegacyDirectory(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -62,11 +67,38 @@ func TestApplyRBKDNucleiSymlink_DisablePreservesDirectory(t *testing.T) {
 		t.Fatalf("disable: %v", err)
 	}
 
-	fi, err := os.Stat(link)
-	if err != nil {
-		t.Fatalf("directory removed unexpectedly: %v", err)
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Fatal("expected legacy bundle directory removed")
 	}
-	if !fi.IsDir() {
-		t.Fatal("expected directory to remain")
+}
+
+func TestApplyRBKDNucleiSymlink_EnableReplacesLegacyDirectory(t *testing.T) {
+	home := t.TempDir()
+	opt := filepath.Join(home, "opt-rbkd")
+	t.Setenv("HOME", home)
+	t.Setenv("ANCHOR_BUILTIN_TEMPLATES_ROOT", opt)
+	if err := os.MkdirAll(opt, 0o755); err != nil {
+		t.Fatalf("mkdir opt: %v", err)
+	}
+
+	link := filepath.Join(home, "nuclei-templates", RBKDInstallPath)
+	if err := os.MkdirAll(link, 0o755); err != nil {
+		t.Fatalf("mkdir legacy: %v", err)
+	}
+
+	if err := ApplyRBKDNucleiSymlink(true); err != nil {
+		t.Fatalf("enable: %v", err)
+	}
+
+	fi, err := os.Lstat(link)
+	if err != nil {
+		t.Fatalf("lstat: %v", err)
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("expected symlink after replacing legacy directory")
+	}
+	target, _ := os.Readlink(link)
+	if target != opt {
+		t.Fatalf("readlink = %q, want %q", target, opt)
 	}
 }
