@@ -16,6 +16,7 @@ type HttpxFingerprint struct {
 	Type        HttpxFingerprintType `json:"type" db:"type"`
 	FilePath    string               `json:"file_path" db:"file_path"`
 	Enabled     bool                 `json:"enabled" db:"enabled"`
+	Builtin     bool                 `json:"builtin" db:"builtin"`
 	CreatedAt   time.Time            `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time            `json:"updated_at" db:"updated_at"`
 }

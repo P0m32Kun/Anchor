@@ -15,7 +15,9 @@ import {
   Modal,
   ConfirmDialog,
   EmptyState,
+  Switch,
 } from "../components";
+import { cn } from "../lib/utils";
 import {
   Upload,
   Trash2,
@@ -27,10 +29,15 @@ import {
   Fingerprint,
 } from "lucide-react";
 
+type SourceTab = "builtin" | "custom";
+
+const BUILTIN_READONLY_TITLE = "内置只读";
+
 export default function HttpxFingerprintsPage() {
   const toast = useToast();
   const [fingerprints, setFingerprints] = useState<HttpxFingerprint[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sourceTab, setSourceTab] = useState<SourceTab>("custom");
 
   // Modals
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -108,7 +115,11 @@ export default function HttpxFingerprintsPage() {
 
   async function handleToggleEnabled(fp: HttpxFingerprint) {
     try {
-      await api.patchHttpxFingerprint(fp.id, { enabled: !fp.enabled });
+      if (fp.builtin) {
+        await api.patchHttpxFingerprintEnabled(fp.id, !fp.enabled);
+      } else {
+        await api.patchHttpxFingerprint(fp.id, { enabled: !fp.enabled });
+      }
       toast(fp.enabled ? "已禁用" : "已启用", "success");
       loadFingerprints();
     } catch (err: any) {
@@ -187,6 +198,11 @@ export default function HttpxFingerprintsPage() {
     setConfirmOpen(true);
   }
 
+  const filteredFingerprints = fingerprints.filter((fp) =>
+    sourceTab === "builtin" ? fp.builtin : !fp.builtin
+  );
+  const isBuiltinTab = sourceTab === "builtin";
+
   function typeBadge(type: string) {
     switch (type) {
       case "favicon":
@@ -222,23 +238,51 @@ export default function HttpxFingerprintsPage() {
             上传并管理 HTTPX 自定义指纹文件，用于 favicon 识别和技术栈检测。
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setUploadModalOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            上传
-          </Button>
-        </div>
+        {!isBuiltinTab && (
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setUploadModalOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              上传
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-1 border-b border-white/5 pb-0">
+        {(
+          [
+            { key: "builtin" as SourceTab, label: "团队内置" },
+            { key: "custom" as SourceTab, label: "我的自定义" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setSourceTab(t.key)}
+            className={cn(
+              "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+              sourceTab === t.key
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* Table */}
       <Card className="overflow-hidden">
-        {loading && fingerprints.length === 0 ? (
+        {loading && filteredFingerprints.length === 0 ? (
           <div className="p-20 text-center text-muted-foreground">加载中...</div>
-        ) : fingerprints.length === 0 ? (
+        ) : filteredFingerprints.length === 0 ? (
           <div className="p-20 text-center">
             <EmptyState
-              title="暂无指纹文件"
-              description="上传自定义 HTTPX 指纹文件以启用 favicon 识别或技术栈检测"
+              title={isBuiltinTab ? "暂无内置指纹" : "暂无指纹文件"}
+              description={
+                isBuiltinTab
+                  ? "团队内置指纹由系统同步，可在此启用或禁用"
+                  : "上传自定义 HTTPX 指纹文件以启用 favicon 识别或技术栈检测"
+              }
             />
           </div>
         ) : (
@@ -248,12 +292,12 @@ export default function HttpxFingerprintsPage() {
                 <TableHead>名称</TableHead>
                 <TableHead>类型</TableHead>
                 <TableHead>描述</TableHead>
-                <TableHead>状态</TableHead>
+                <TableHead>启用</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {fingerprints.map((fp) => (
+              {filteredFingerprints.map((fp) => (
                 <TableRow
                   key={fp.id}
                   className="group border-white/5 bg-white/[0.02]"
@@ -262,6 +306,11 @@ export default function HttpxFingerprintsPage() {
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">{fp.name}</span>
+                      {isBuiltinTab && (
+                        <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px]">
+                          内置
+                        </Badge>
+                      )}
                       {!fp.enabled && (
                         <Badge variant="outline" className="text-xs">
                           已禁用
@@ -276,19 +325,27 @@ export default function HttpxFingerprintsPage() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => handleToggleEnabled(fp)}
-                      title={fp.enabled ? "禁用" : "启用"}
-                    >
-                      {fp.enabled ? (
-                        <ToggleRight className="h-3.5 w-3.5 text-emerald-400" />
-                      ) : (
-                        <ToggleLeft className="h-3.5 w-3.5 text-muted-foreground" />
-                      )}
-                    </Button>
+                    {isBuiltinTab ? (
+                      <Switch
+                        checked={fp.enabled}
+                        onCheckedChange={() => handleToggleEnabled(fp)}
+                        title={fp.enabled ? "禁用" : "启用"}
+                      />
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleToggleEnabled(fp)}
+                        title={fp.enabled ? "禁用" : "启用"}
+                      >
+                        {fp.enabled ? (
+                          <ToggleRight className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <ToggleLeft className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                      </Button>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
@@ -297,7 +354,8 @@ export default function HttpxFingerprintsPage() {
                         size="sm"
                         className="h-8 w-8 p-0"
                         onClick={() => openContentEditor(fp)}
-                        title="编辑内容"
+                        disabled={isBuiltinTab}
+                        title={isBuiltinTab ? BUILTIN_READONLY_TITLE : "编辑内容"}
                       >
                         <Edit3 className="h-3.5 w-3.5" />
                       </Button>
@@ -306,7 +364,8 @@ export default function HttpxFingerprintsPage() {
                         size="sm"
                         className="h-8 w-8 p-0"
                         onClick={() => openEditModal(fp)}
-                        title="编辑信息"
+                        disabled={isBuiltinTab}
+                        title={isBuiltinTab ? BUILTIN_READONLY_TITLE : "编辑信息"}
                       >
                         <Fingerprint className="h-3.5 w-3.5" />
                       </Button>
@@ -315,7 +374,8 @@ export default function HttpxFingerprintsPage() {
                         size="sm"
                         className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300"
                         onClick={() => handleDelete(fp.id, fp.name)}
-                        title="删除"
+                        disabled={isBuiltinTab}
+                        title={isBuiltinTab ? BUILTIN_READONLY_TITLE : "删除"}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

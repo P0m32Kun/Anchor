@@ -69,6 +69,16 @@ func newNucleiCustomTestEnv(t *testing.T, files map[string]string) *nucleiCustom
 	return &nucleiCustomTestEnv{server: server, mux: mux, cloner: cloner}
 }
 
+func countCustomSources(sources []*models.NucleiCustomSource) int {
+	n := 0
+	for _, s := range sources {
+		if !s.Builtin {
+			n++
+		}
+	}
+	return n
+}
+
 func (e *nucleiCustomTestEnv) do(t *testing.T, method, path string, body io.Reader, contentType string) *http.Response {
 	t.Helper()
 	req := httptest.NewRequest(method, path, body)
@@ -86,7 +96,7 @@ func TestNucleiCustom_FullRoundTrip(t *testing.T) {
 		"templates/seed.yaml": "id: seed\n",
 	})
 
-	// list — empty
+	// list — only team builtin from NewServer SeedBuiltin
 	resp := env.do(t, http.MethodGet, "/nuclei/custom/sources", nil, "")
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("initial list status: %d", resp.StatusCode)
@@ -96,8 +106,8 @@ func TestNucleiCustom_FullRoundTrip(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	resp.Body.Close()
-	if len(initial) != 0 {
-		t.Errorf("initial list want 0, got %d", len(initial))
+	if countCustomSources(initial) != 0 {
+		t.Errorf("initial custom sources want 0, got %d (total %d)", countCustomSources(initial), len(initial))
 	}
 
 	// create-git
@@ -128,8 +138,8 @@ func TestNucleiCustom_FullRoundTrip(t *testing.T) {
 	var afterCreate []*models.NucleiCustomSource
 	json.NewDecoder(resp.Body).Decode(&afterCreate)
 	resp.Body.Close()
-	if len(afterCreate) != 1 {
-		t.Errorf("after-create list want 1, got %d", len(afterCreate))
+	if countCustomSources(afterCreate) != 1 {
+		t.Errorf("after-create custom sources want 1, got %d (total %d)", countCustomSources(afterCreate), len(afterCreate))
 	}
 
 	// list-files
@@ -191,13 +201,23 @@ func TestNucleiCustom_FullRoundTrip(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// list — empty again
+	// list — team builtin remains
 	resp = env.do(t, http.MethodGet, "/nuclei/custom/sources", nil, "")
 	var final []*models.NucleiCustomSource
 	json.NewDecoder(resp.Body).Decode(&final)
 	resp.Body.Close()
-	if len(final) != 0 {
-		t.Errorf("final list want 0, got %d", len(final))
+	if countCustomSources(final) != 0 {
+		t.Errorf("final custom sources want 0, got %d (total %d)", countCustomSources(final), len(final))
+	}
+	foundBuiltin := false
+	for _, s := range final {
+		if s.Builtin {
+			foundBuiltin = true
+			break
+		}
+	}
+	if !foundBuiltin {
+		t.Errorf("final list missing team builtin source: %+v", final)
 	}
 }
 

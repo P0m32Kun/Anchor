@@ -1,10 +1,10 @@
 # Anchor Server Runtime Base Image
-# 预装运行时依赖（apt 包 + 字典仓库），极少更新
+# 预装运行时依赖（apt 包 + 团队内置资源仓库），极少更新
 # 首次使用: docker build -f Dockerfile.server-runtime-base -t anchor-server-runtime-base:latest .
 #
 # 更新时机：
 #   - apt 依赖变化时
-#   - dict 仓库更新时（DICT_REF 变化）
+#   - dict / rbkd-templates / finger 仓库更新时（对应 *_REF 变化）
 #   - 安全补丁更新时
 
 FROM debian:bookworm-slim
@@ -21,3 +21,17 @@ ARG DICT_REPO=https://github.com/RBKD-SEC/dict.git
 ARG DICT_REF=main
 RUN git clone --depth 1 --branch ${DICT_REF} ${DICT_REPO} /opt/dict && \
     rm -rf /opt/dict/.git
+
+# Built-in nuclei templates (RBKD-SEC/RBKD-templates). Startup seed registers the
+# builtin source; Worker exposes templates via symlink to /opt/rbkd-templates.
+ARG RBKD_TEMPLATES_REPO=https://github.com/RBKD-SEC/RBKD-templates.git
+ARG RBKD_TEMPLATES_REF=main
+RUN git clone --depth 1 --branch ${RBKD_TEMPLATES_REF} ${RBKD_TEMPLATES_REPO} /opt/rbkd-templates && \
+    rm -rf /opt/rbkd-templates/.git
+
+# Built-in httpx fingerprints (RBKD-SEC/finger). Startup seed registers
+# /opt/finger/finger.json as the builtin tech_detect fingerprint row.
+ARG FINGER_REPO=https://github.com/RBKD-SEC/finger.git
+ARG FINGER_REF=main
+RUN git clone --depth 1 --branch ${FINGER_REF} ${FINGER_REPO} /opt/finger && \
+    rm -rf /opt/finger/.git

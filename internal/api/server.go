@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/P0m32Kun/Anchor/internal/builtin"
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/dictionary"
 	"github.com/P0m32Kun/Anchor/internal/health"
@@ -143,17 +144,29 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	if err := s.dictMgr.EnsureLayout(); err != nil {
 		log.Printf("[server] dictionary layout init: %v (continuing)", err)
 	}
-	builtinDictRoot := os.Getenv("ANCHOR_BUILTIN_DICT_ROOT")
-	if builtinDictRoot == "" {
-		builtinDictRoot = "/opt/dict"
-	}
-	if err := s.dictMgr.SeedBuiltin(builtinDictRoot); err != nil {
-		log.Printf("[server] dictionary builtin seed: %v (continuing)", err)
-	}
 	s.httpxFpMgr = httpxfp.NewManager(queries, dataDir)
 	if err := s.httpxFpMgr.EnsureLayout(); err != nil {
 		log.Printf("[server] httpx fingerprint layout init: %v (continuing)", err)
 	}
+
+	cfg := builtin.LoadConfig()
+	if err := builtin.SyncAll(); err != nil {
+		log.Printf("[server] builtin sync: %v (continuing)", err)
+	}
+	builtinDictRoot := os.Getenv("ANCHOR_BUILTIN_DICT_ROOT")
+	if builtinDictRoot == "" {
+		builtinDictRoot = cfg.DictRoot
+	}
+	if err := s.dictMgr.SeedBuiltin(builtinDictRoot); err != nil {
+		log.Printf("[server] dictionary builtin seed: %v (continuing)", err)
+	}
+	if err := s.httpxFpMgr.SeedBuiltin(cfg.FingerRoot); err != nil {
+		log.Printf("[server] httpx fingerprint builtin seed: %v (continuing)", err)
+	}
+	if err := s.nucleiCustomMgr.SeedBuiltin(); err != nil {
+		log.Printf("[server] nuclei custom builtin seed: %v (continuing)", err)
+	}
+
 	s.markAllWorkersOffline()
 	go s.cleanupStaleWorkers()
 	go s.startWorkdirCleanup()
@@ -321,6 +334,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /nuclei/custom/sources/upload", auth(http.HandlerFunc(s.handleCreateNucleiCustomUploadSource)))
 	mux.Handle("POST /nuclei/custom/sources/{id}/refresh", auth(http.HandlerFunc(s.handleRefreshNucleiCustomSource)))
 	mux.Handle("PATCH /nuclei/custom/sources/{id}", auth(http.HandlerFunc(s.handlePatchNucleiCustomSource)))
+	mux.Handle("PATCH /nuclei/custom/sources/{id}/enabled", auth(http.HandlerFunc(s.handlePatchNucleiCustomSourceEnabled)))
 	mux.Handle("DELETE /nuclei/custom/sources/{id}", auth(http.HandlerFunc(s.handleDeleteNucleiCustomSource)))
 	mux.Handle("GET /nuclei/custom/sources/{id}/files", auth(http.HandlerFunc(s.handleListNucleiCustomFiles)))
 	mux.Handle("GET /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleReadNucleiCustomFile)))
@@ -338,6 +352,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /dictionaries", auth(http.HandlerFunc(s.handleCreateDictionary)))
 	mux.Handle("GET /dictionaries/{id}", auth(http.HandlerFunc(s.handleGetDictionary)))
 	mux.Handle("PATCH /dictionaries/{id}", auth(http.HandlerFunc(s.handlePatchDictionary)))
+	mux.Handle("PATCH /dictionaries/{id}/enabled", auth(http.HandlerFunc(s.handlePatchDictionaryEnabled)))
 	mux.Handle("DELETE /dictionaries/{id}", auth(http.HandlerFunc(s.handleDeleteDictionary)))
 	mux.Handle("GET /dictionaries/{id}/content", auth(http.HandlerFunc(s.handleReadDictionaryContent)))
 	mux.Handle("PUT /dictionaries/{id}/content", auth(http.HandlerFunc(s.handleWriteDictionaryContent)))
@@ -346,6 +361,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /httpx/fingerprints", auth(http.HandlerFunc(s.handleCreateHttpxFingerprint)))
 	mux.Handle("GET /httpx/fingerprints/{id}", auth(http.HandlerFunc(s.handleGetHttpxFingerprint)))
 	mux.Handle("PATCH /httpx/fingerprints/{id}", auth(http.HandlerFunc(s.handlePatchHttpxFingerprint)))
+	mux.Handle("PATCH /httpx/fingerprints/{id}/enabled", auth(http.HandlerFunc(s.handlePatchHttpxFingerprintEnabled)))
 	mux.Handle("DELETE /httpx/fingerprints/{id}", auth(http.HandlerFunc(s.handleDeleteHttpxFingerprint)))
 	mux.Handle("GET /httpx/fingerprints/{id}/content", auth(http.HandlerFunc(s.handleReadHttpxFingerprintContent)))
 	mux.Handle("PUT /httpx/fingerprints/{id}/content", auth(http.HandlerFunc(s.handleWriteHttpxFingerprintContent)))

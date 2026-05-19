@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/P0m32Kun/Anchor/internal/builtin"
 	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
@@ -52,6 +53,11 @@ func (m *Manager) SeedBuiltin(rootDir string) error {
 
 	seen := make(map[string]bool)
 	now := time.Now().UTC()
+	rev := builtin.HeadShort(rootDir)
+	descSuffix := rev
+	if descSuffix != "" {
+		descSuffix = " @ " + rev
+	}
 
 	err = filepath.Walk(rootDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
@@ -91,12 +97,13 @@ func (m *Manager) SeedBuiltin(rootDir string) error {
 		d := &models.Dictionary{
 			ID:          id,
 			Name:        filepath.ToSlash(rel),
-			Description: fmt.Sprintf("RBKD-SEC built-in %s dictionary", topDir),
+			Description: fmt.Sprintf("RBKD-SEC built-in %s%s", topDir, descSuffix),
 			Category:    category,
 			FilePath:    path,
 			LineCount:   countLines(content),
 			SizeBytes:   int64(len(content)),
 			Builtin:     true,
+			Enabled:     true,
 			UpdatedAt:   now,
 		}
 
@@ -113,8 +120,9 @@ func (m *Manager) SeedBuiltin(rootDir string) error {
 			return nil
 		}
 
-		// Preserve CreatedAt across re-seeds.
+		// Preserve CreatedAt and user-disabled state across re-seeds.
 		d.CreatedAt = existing.CreatedAt
+		d.Enabled = existing.Enabled
 		if err := m.q.UpdateDictionary(d); err != nil {
 			log.Printf("[dictionary] seed: update %s: %v", id, err)
 		}

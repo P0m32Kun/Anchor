@@ -125,6 +125,43 @@ func (s *Server) handlePatchDictionary(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
+func (s *Server) handlePatchDictionaryEnabled(w http.ResponseWriter, r *http.Request) {
+	if s.dictMgr == nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New(errors.ErrInternal, "dictionary manager not initialised"))
+		return
+	}
+	id := r.PathValue("id")
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body").WithDetail(err.Error()))
+		return
+	}
+
+	d, err := s.dictMgr.Get(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get dictionary: %v", err))
+		return
+	}
+	if d == nil {
+		writeError(w, http.StatusNotFound, errors.Newf(errors.ErrNotFound, "dictionary %s not found", id))
+		return
+	}
+	if !d.Builtin {
+		writeError(w, http.StatusForbidden, errors.New(errors.ErrForbidden, "only builtin dictionaries support enable toggle"))
+		return
+	}
+
+	updated, err := s.dictMgr.UpdateEnabled(id, req.Enabled)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update enabled: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
 func (s *Server) handleDeleteDictionary(w http.ResponseWriter, r *http.Request) {
 	if s.dictMgr == nil {
 		writeError(w, http.StatusServiceUnavailable, errors.New(errors.ErrInternal, "dictionary manager not initialised"))

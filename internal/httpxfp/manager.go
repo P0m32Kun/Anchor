@@ -62,6 +62,26 @@ func (m *Manager) Get(id string) (*models.HttpxFingerprint, error) {
 	return m.q.GetHttpxFingerprint(id)
 }
 
+func (m *Manager) UpdateEnabled(id string, enabled bool) (*models.HttpxFingerprint, error) {
+	f, err := m.q.GetHttpxFingerprint(id)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil {
+		return nil, fmt.Errorf("fingerprint %s not found", id)
+	}
+	if !f.Builtin {
+		return nil, ErrNotBuiltin
+	}
+	now := time.Now().UTC()
+	if err := m.q.UpdateHttpxFingerprintEnabled(id, enabled, now); err != nil {
+		return nil, err
+	}
+	f.Enabled = enabled
+	f.UpdatedAt = now
+	return f, nil
+}
+
 func (m *Manager) Update(id, name, description string, fpType models.HttpxFingerprintType, enabled bool) (*models.HttpxFingerprint, error) {
 	f, err := m.q.GetHttpxFingerprint(id)
 	if err != nil {
@@ -69,6 +89,9 @@ func (m *Manager) Update(id, name, description string, fpType models.HttpxFinger
 	}
 	if f == nil {
 		return nil, fmt.Errorf("fingerprint %s not found", id)
+	}
+	if f.Builtin {
+		return nil, ErrBuiltinReadOnly
 	}
 	f.Name = name
 	f.Description = description
@@ -88,6 +111,9 @@ func (m *Manager) UpdateContent(id string, content []byte) (*models.HttpxFingerp
 	}
 	if f == nil {
 		return nil, fmt.Errorf("fingerprint %s not found", id)
+	}
+	if f.Builtin {
+		return nil, ErrBuiltinReadOnly
 	}
 	if err := m.layout.WriteFile(id, content); err != nil {
 		return nil, fmt.Errorf("write file: %w", err)
@@ -114,6 +140,9 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	f, err := m.q.GetHttpxFingerprint(id)
 	if err != nil {
 		return err
+	}
+	if f != nil && f.Builtin {
+		return ErrBuiltinReadOnly
 	}
 	if f != nil {
 		_ = m.layout.DeleteFile(id)

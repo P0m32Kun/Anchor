@@ -37,6 +37,7 @@ func (m *Manager) Create(name, description string, category models.DictionaryCat
 		FilePath:    m.layout.FilePath(id),
 		LineCount:   countLines(content),
 		SizeBytes:   int64(len(content)),
+		Enabled:     true,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -53,6 +54,10 @@ func (m *Manager) Create(name, description string, category models.DictionaryCat
 
 func (m *Manager) List(category string) ([]*models.Dictionary, error) {
 	return m.q.ListDictionaries(category)
+}
+
+func (m *Manager) ListEnabled(category string) ([]*models.Dictionary, error) {
+	return m.q.ListEnabledDictionaries(category)
 }
 
 func (m *Manager) Get(id string) (*models.Dictionary, error) {
@@ -99,6 +104,24 @@ func (m *Manager) UpdateContent(id string, content []byte) (*models.Dictionary, 
 
 func (m *Manager) ReadContent(id string) ([]byte, error) {
 	return m.layout.ReadFile(id)
+}
+
+func (m *Manager) UpdateEnabled(id string, enabled bool) (*models.Dictionary, error) {
+	d, err := m.q.GetDictionary(id)
+	if err != nil {
+		return nil, err
+	}
+	if d == nil {
+		return nil, fmt.Errorf("dictionary %s not found", id)
+	}
+	if !d.Builtin {
+		return nil, fmt.Errorf("only builtin dictionaries can be enabled or disabled")
+	}
+	now := time.Now().UTC()
+	if err := m.q.UpdateDictionaryEnabled(id, enabled, now); err != nil {
+		return nil, err
+	}
+	return m.q.GetDictionary(id)
 }
 
 func (m *Manager) Delete(ctx context.Context, id string) error {

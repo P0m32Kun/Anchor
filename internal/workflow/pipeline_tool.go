@@ -466,7 +466,10 @@ func (p *Pipeline) customWorkflowPaths() []string {
 }
 
 func (p *Pipeline) createAndRunTask(ctx context.Context, tool string, args []string) (*models.ScanTask, []byte, error) {
-	taskID := util.GenerateID()
+	return p.createAndRunTaskWithID(ctx, util.GenerateID(), tool, args)
+}
+
+func (p *Pipeline) createAndRunTaskWithID(ctx context.Context, taskID, tool string, args []string) (*models.ScanTask, []byte, error) {
 	now := time.Now().UTC()
 
 	task := &models.ScanTask{
@@ -518,6 +521,9 @@ func (p *Pipeline) runFfuf(ctx context.Context, endpoint *models.WebEndpoint) ([
 	if err != nil || dict == nil {
 		return nil, fmt.Errorf("dictionary not found: %s", p.config.FfufDictionaryID)
 	}
+	if !dict.Enabled {
+		return nil, fmt.Errorf("dictionary disabled: %s", p.config.FfufDictionaryID)
+	}
 
 	// Build target URL with FUZZ placeholder
 	base := strings.TrimSuffix(endpoint.URL, "/")
@@ -559,8 +565,10 @@ func (p *Pipeline) runURLFinder(ctx context.Context, endpoints []*models.WebEndp
 		return nil, nil
 	}
 
-	// Write input file
-	workdir := filepath.Join(p.dataDir, "workdirs", p.projectID, "urlfinder-"+util.GenerateID())
+	// Use the scan-task workdir so remote workers upload urlfinder-output.json
+	// with the rest of the task artifacts (same path as Runner.Run workdir).
+	taskID := util.GenerateID()
+	workdir := filepath.Join(p.dataDir, "workdirs", p.projectID, taskID)
 	if err := os.MkdirAll(workdir, 0750); err != nil {
 		return nil, fmt.Errorf("create workdir: %w", err)
 	}
@@ -569,15 +577,18 @@ func (p *Pipeline) runURLFinder(ctx context.Context, endpoints []*models.WebEndp
 		return nil, fmt.Errorf("write input: %w", err)
 	}
 
-	// Build and run via worker
 	cmd := worker.BuildURLFinderCommand(inputFile, workdir, p.config.URLFinderThreads, p.config.URLFinderTimeout)
-	task, stdout, err := p.createAndRunTask(ctx, "urlfinder", cmd)
+	task, _, err := p.createAndRunTaskWithID(ctx, taskID, "urlfinder", cmd)
 	if err != nil {
 		return nil, err
 	}
 	_ = task
 
-	results, _ := parser.ParseURLFinderOutput(bytes.NewReader(stdout))
+	output, err := p.readURLFinderOutput(task.ID, workdir)
+	if err != nil {
+		return nil, err
+	}
+	results, _ := parser.ParseURLFinderOutput(bytes.NewReader(output))
 	var discovered []string
 	for _, r := range results {
 		if r.URL != "" {
@@ -585,6 +596,23 @@ func (p *Pipeline) runURLFinder(ctx context.Context, endpoints []*models.WebEndp
 		}
 	}
 	return discovered, nil
+}
+
+func (p *Pipeline) readURLFinderOutput(taskID, workdir string) ([]byte, error) {
+	outFile := worker.URLFinderOutputPath(workdir)
+	if data, err := os.ReadFile(outFile); err == nil {
+		return data, nil
+	}
+	artifacts, err := p.queries.ListRawArtifactsByTask(taskID)
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range artifacts {
+		if filepath.Base(a.Path) == "urlfinder-output.json" {
+			return os.ReadFile(a.Path)
+		}
+	}
+	return nil, fmt.Errorf("urlfinder output not found for task %s", taskID)
 }
 
 func (p *Pipeline) readTaskStdout(taskID string) ([]byte, error) {

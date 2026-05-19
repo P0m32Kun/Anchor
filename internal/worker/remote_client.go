@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/P0m32Kun/Anchor/internal/builtin"
 )
 
 // RemoteClient connects a worker node to a core server.
@@ -137,6 +139,7 @@ func (c *RemoteClient) syncSources() {
 		Name        string `json:"name"`
 		InstallPath string `json:"install_path"`
 		Enabled     bool   `json:"enabled"`
+		Builtin     bool   `json:"builtin"`
 		Status      string `json:"status"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&sources); err != nil {
@@ -144,8 +147,13 @@ func (c *RemoteClient) syncSources() {
 		return
 	}
 
-	// Sync each enabled source to its own directory
 	for _, src := range sources {
+		if src.Builtin {
+			if err := builtin.ApplyRBKDNucleiSymlink(src.Enabled); err != nil {
+				log.Printf("[worker] rbkd symlink: %v", err)
+			}
+			continue
+		}
 		if !src.Enabled || src.Status != "ready" {
 			continue
 		}

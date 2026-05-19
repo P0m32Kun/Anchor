@@ -575,6 +575,9 @@ export const api = {
   patchNucleiCustomSource: (id: string, data: { name?: string; enabled?: boolean; routing_policy?: string }, signal?: AbortSignal) =>
     fetchAPI<NucleiCustomSource>(`/nuclei/custom/sources/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
 
+  patchNucleiCustomSourceEnabled: (id: string, enabled: boolean, signal?: AbortSignal) =>
+    fetchAPI<NucleiCustomSource>(`/nuclei/custom/sources/${id}/enabled`, { method: "PATCH", body: JSON.stringify({ enabled }), signal }),
+
   deleteNucleiCustomSource: (id: string, signal?: AbortSignal) =>
     fetchAPI<void>(`/nuclei/custom/sources/${id}`, { method: "DELETE", signal }),
 
@@ -621,6 +624,9 @@ export const api = {
   patchDictionary: (id: string, data: Partial<Omit<Dictionary, "id" | "created_at" | "updated_at" | "file_path" | "line_count" | "size_bytes">>, signal?: AbortSignal) =>
     fetchAPI<Dictionary>(`/dictionaries/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
 
+  patchDictionaryEnabled: (id: string, enabled: boolean, signal?: AbortSignal) =>
+    fetchAPI<Dictionary>(`/dictionaries/${id}/enabled`, { method: "PATCH", body: JSON.stringify({ enabled }), signal }),
+
   deleteDictionary: (id: string, signal?: AbortSignal) =>
     fetchAPI<void>(`/dictionaries/${id}`, { method: "DELETE", signal }),
 
@@ -648,6 +654,9 @@ export const api = {
 
   patchHttpxFingerprint: (id: string, data: Partial<Omit<HttpxFingerprint, "id" | "created_at" | "updated_at" | "file_path">>, signal?: AbortSignal) =>
     fetchAPI<HttpxFingerprint>(`/httpx/fingerprints/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
+
+  patchHttpxFingerprintEnabled: (id: string, enabled: boolean, signal?: AbortSignal) =>
+    fetchAPI<HttpxFingerprint>(`/httpx/fingerprints/${id}/enabled`, { method: "PATCH", body: JSON.stringify({ enabled }), signal }),
 
   deleteHttpxFingerprint: (id: string, signal?: AbortSignal) =>
     fetchAPI<void>(`/httpx/fingerprints/${id}`, { method: "DELETE", signal }),
@@ -767,6 +776,7 @@ export interface Dictionary {
   line_count: number;
   size_bytes: number;
   builtin: boolean;
+  enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -778,6 +788,7 @@ export interface HttpxFingerprint {
   type: "favicon" | "tech_detect";
   file_path: string;
   enabled: boolean;
+  builtin: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -934,6 +945,7 @@ export interface NucleiCustomSource {
   uri?: string;
   branch?: string;
   enabled: boolean;
+  builtin: boolean;
   routing_policy: string;
   status: "draft" | "ready" | "error";
   last_sync_at?: string;

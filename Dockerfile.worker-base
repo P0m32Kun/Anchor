@@ -73,3 +73,17 @@ ARG DICT_REF=main
 RUN git clone --depth 1 --branch ${DICT_REF} ${DICT_REPO} /opt/dict && \
     rm -rf /opt/dict/.git
 
+# Built-in nuclei templates (RBKD-SEC/RBKD-templates). Worker creates symlink
+# from nuclei-templates when the builtin source is enabled; path layout must
+# match the server image, hence /opt/rbkd-templates in both.
+ARG RBKD_TEMPLATES_REPO=https://github.com/RBKD-SEC/RBKD-templates.git
+ARG RBKD_TEMPLATES_REF=main
+RUN git clone --depth 1 --branch ${RBKD_TEMPLATES_REF} ${RBKD_TEMPLATES_REPO} /opt/rbkd-templates && \
+    rm -rf /opt/rbkd-templates/.git
+
+# Built-in httpx fingerprints (RBKD-SEC/finger). Worker reads file_path from the
+# server's startup-time seed; path layout must match, hence /opt/finger in both.
+ARG FINGER_REPO=https://github.com/RBKD-SEC/finger.git
+ARG FINGER_REF=main
+RUN git clone --depth 1 --branch ${FINGER_REF} ${FINGER_REPO} /opt/finger && \
+    rm -rf /opt/finger/.git

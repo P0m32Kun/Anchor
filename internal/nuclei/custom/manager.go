@@ -97,6 +97,29 @@ func (m *Manager) GetByID(id string) (*models.NucleiCustomSource, error) {
 	return src, nil
 }
 
+func (m *Manager) rejectBuiltin(src *models.NucleiCustomSource) error {
+	if src.Builtin {
+		return apperrors.New(apperrors.ErrForbidden, ErrBuiltinReadOnly.Error())
+	}
+	return nil
+}
+
+// UpdateEnabled toggles enabled for a builtin source row.
+func (m *Manager) UpdateEnabled(id string, enabled bool) (*models.NucleiCustomSource, error) {
+	src, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if !src.Builtin {
+		return nil, ErrNotBuiltin
+	}
+	now := time.Now().UTC()
+	if err := m.q.UpdateNucleiCustomSourceEnabled(id, enabled, now); err != nil {
+		return nil, fmt.Errorf("update enabled: %w", err)
+	}
+	return m.GetByID(id)
+}
+
 // CreateFromGit clones a public HTTPS git repo into the source's files/ dir.
 // On success the row is moved to status=ready; on failure the DB row and any
 // partial files are removed before returning.
@@ -242,6 +265,9 @@ func (m *Manager) Refresh(ctx context.Context, id string) (*models.NucleiCustomS
 	if err != nil {
 		return nil, err
 	}
+	if err := m.rejectBuiltin(src); err != nil {
+		return nil, err
+	}
 	if src.Type != models.NucleiCustomSourceTypeGit {
 		return nil, apperrors.New(apperrors.ErrBadRequest, "refresh is only valid for git sources")
 	}
@@ -297,6 +323,9 @@ func (m *Manager) Patch(id string, p SourcePatch) (*models.NucleiCustomSource, e
 	if err != nil {
 		return nil, err
 	}
+	if err := m.rejectBuiltin(src); err != nil {
+		return nil, err
+	}
 	if p.Name != nil {
 		if err := validateName(*p.Name); err != nil {
 			return nil, err
@@ -328,7 +357,11 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if _, err := m.GetByID(id); err != nil {
+	src, err := m.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if err := m.rejectBuiltin(src); err != nil {
 		return err
 	}
 
@@ -352,7 +385,11 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 
 // ListFiles returns all regular files under the source's files/ tree.
 func (m *Manager) ListFiles(id string) ([]models.NucleiCustomFileEntry, error) {
-	if _, err := m.GetByID(id); err != nil {
+	src, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := m.rejectBuiltin(src); err != nil {
 		return nil, err
 	}
 	mu := m.lockFor(id)
@@ -364,7 +401,11 @@ func (m *Manager) ListFiles(id string) ([]models.NucleiCustomFileEntry, error) {
 // ReadFile returns the contents of a single file, gated by the extension
 // policy. Returns *AppError on validation failures and 404 when missing.
 func (m *Manager) ReadFile(id, rel string) ([]byte, error) {
-	if _, err := m.GetByID(id); err != nil {
+	src, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := m.rejectBuiltin(src); err != nil {
 		return nil, err
 	}
 	if err := validateAllowed(rel); err != nil {
@@ -387,7 +428,11 @@ func (m *Manager) ReadFile(id, rel string) ([]byte, error) {
 // any HTTP-level size cap; this method also enforces MaxWriteFileBytes as a
 // defence-in-depth check.
 func (m *Manager) WriteFile(id, rel string, data []byte) error {
-	if _, err := m.GetByID(id); err != nil {
+	src, err := m.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if err := m.rejectBuiltin(src); err != nil {
 		return err
 	}
 	if err := validateAllowed(rel); err != nil {
@@ -407,7 +452,11 @@ func (m *Manager) WriteFile(id, rel string, data []byte) error {
 
 // DeleteFile removes a single file inside the source.
 func (m *Manager) DeleteFile(id, rel string) error {
-	if _, err := m.GetByID(id); err != nil {
+	src, err := m.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if err := m.rejectBuiltin(src); err != nil {
 		return err
 	}
 	if err := validateAllowed(rel); err != nil {
@@ -497,7 +546,11 @@ func nullableStr(s string) *string {
 // ValidateSource validates all templates in a single source. Returns validation
 // results including any workflow reference errors.
 func (m *Manager) ValidateSource(id string) (*models.NucleiCustomValidationResult, error) {
-	if _, err := m.GetByID(id); err != nil {
+	src, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := m.rejectBuiltin(src); err != nil {
 		return nil, err
 	}
 
@@ -547,7 +600,6 @@ func (m *Manager) ValidateSource(id string) (*models.NucleiCustomValidationResul
 
 	// Update validation timestamp
 	now := time.Now().UTC()
-	src, _ := m.GetByID(id)
 	src.LastValidateAt = &now
 	if !result.OK {
 		errMsg := strings.Join(result.Errors, "; ")
@@ -581,7 +633,7 @@ func (m *Manager) ValidateAll() ([]*models.NucleiCustomValidationResult, error) 
 
 	results := make([]*models.NucleiCustomValidationResult, 0, len(sources))
 	for _, src := range sources {
-		if !src.Enabled {
+		if !src.Enabled || src.Builtin {
 			continue
 		}
 		r, err := m.ValidateSource(src.ID)
@@ -601,8 +653,11 @@ func (m *Manager) ValidateAll() ([]*models.NucleiCustomValidationResult, error) 
 // This is used by workers to sync individual sources to ~/templates-{sourceId}/.
 // Returns version (content hash) and archive path.
 func (m *Manager) BuildSourceBundle(sourceID string) (version string, archivePath string, err error) {
-	_, err = m.GetByID(sourceID)
+	src, err := m.GetByID(sourceID)
 	if err != nil {
+		return "", "", err
+	}
+	if err := m.rejectBuiltin(src); err != nil {
 		return "", "", err
 	}
 

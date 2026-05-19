@@ -18,17 +18,19 @@ type Allowlist struct {
 func NewAllowlist() *Allowlist {
 	return &Allowlist{
 		binaries: map[string]struct{}{
-			"subfinder": {},
-			"dnsx":      {},
-			"httpx":     {},
-			"naabu":     {},
-			"nmap":      {},
-			"nuclei":    {},
-			"cdncheck":  {},
-			"git":       {},
-			"git.exe":   {},
-			"sh":        {},
-			"bash":      {},
+			"subfinder":  {},
+			"dnsx":       {},
+			"httpx":      {},
+			"naabu":      {},
+			"nmap":       {},
+			"nuclei":     {},
+			"cdncheck":   {},
+			"ffuf":       {},
+			"urlfinder":  {},
+			"git":        {},
+			"git.exe":    {},
+			"sh":         {},
+			"bash":       {},
 		},
 	}
 }

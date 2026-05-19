@@ -190,6 +190,65 @@ func TestNucleiCustomSource_NullableFieldsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestUpdateNucleiCustomSourceEnabled_OnlyBuiltin(t *testing.T) {
+	q := New(openTestDB(t))
+	now := time.Now().UTC().Truncate(time.Second)
+
+	builtin := &models.NucleiCustomSource{
+		ID:            "builtin:rbkd-templates",
+		Name:          "RBKD Templates",
+		InstallPath:   "RBKD-templates",
+		Type:          models.NucleiCustomSourceTypeGit,
+		Enabled:       true,
+		Builtin:       true,
+		RoutingPolicy: "manual",
+		Status:        models.NucleiCustomSourceStatusReady,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := q.CreateNucleiCustomSource(builtin); err != nil {
+		t.Fatalf("create builtin: %v", err)
+	}
+
+	user := &models.NucleiCustomSource{
+		ID:            "user-src",
+		Name:          "user",
+		InstallPath:   "user",
+		Type:          models.NucleiCustomSourceTypeFile,
+		Enabled:       true,
+		RoutingPolicy: "manual",
+		Status:        models.NucleiCustomSourceStatusReady,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := q.CreateNucleiCustomSource(user); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	updatedAt := now.Add(time.Hour)
+	if err := q.UpdateNucleiCustomSourceEnabled("builtin:rbkd-templates", false, updatedAt); err != nil {
+		t.Fatalf("update builtin enabled: %v", err)
+	}
+	got, err := q.GetNucleiCustomSource("builtin:rbkd-templates")
+	if err != nil || got == nil {
+		t.Fatalf("get builtin: %v", err)
+	}
+	if got.Enabled {
+		t.Error("builtin should be disabled")
+	}
+
+	if err := q.UpdateNucleiCustomSourceEnabled("user-src", false, updatedAt); err != nil {
+		t.Fatalf("update user enabled: %v", err)
+	}
+	userGot, err := q.GetNucleiCustomSource("user-src")
+	if err != nil || userGot == nil {
+		t.Fatalf("get user: %v", err)
+	}
+	if !userGot.Enabled {
+		t.Error("non-builtin row must not be updated by UpdateNucleiCustomSourceEnabled")
+	}
+}
+
 func TestListNucleiCustomSources_OrderByCreatedAtDesc(t *testing.T) {
 	q := New(openTestDB(t))
 	base := time.Now().UTC().Truncate(time.Second)

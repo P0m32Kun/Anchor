@@ -39,15 +39,31 @@
 | `task_handlers.go` | `POST /scan-plans`, `/scan-plans/{id}/approve`, `/scan-plans/dry-run`, `GET /scan-tasks/{id}`, `POST /scan-tasks/{id}/cancel`, `POST /tasks/run`, `GET /tasks/{id}/artifacts`, `/artifacts/content` | `queries`, `worker` | 扫描计划 + 单任务执行 |
 | `worker_handlers.go` | `GET /workers`, `POST /workers/register`, `POST /workers/{id}/heartbeat`, `GET /workers/{id}/tasks/poll`, `POST /tasks/{id}/result`, `POST /workers/{id}/revoke`, `DELETE /workers/{id}` | `queries`, `dataDir`, **`taskQueue`**, **`taskResults`**, **`mu`** | 远程 worker 节点管理 + 任务长轮询 + 结果回报 |
 | `engine_handlers.go` | `GET/POST/DELETE /engines/credentials[/{engine}]`, `GET /engines/search`, `/engines/quota` | `queries` | FOFA/Hunter/Quake 等情报引擎统一接入 |
-| `nuclei_custom_handlers.go` | `GET/POST/PATCH/DELETE /nuclei/custom/sources[/{id}][/...]`, `/files`, `/validate`, `/publish`, `/manifest`, `/bundles/{version}` | `nucleiCustomMgr` | 自定义 Nuclei 模板源管理(本包第二大,~408 行) |
-| `dictionary_handlers.go` | `GET/POST/PATCH/DELETE /dictionaries[/{id}][/content]` | `dictMgr` | 字典管理(ffuf 等使用) |
-| `httpx_fingerprint_handlers.go` | `GET/POST/PATCH/DELETE /httpx/fingerprints[/{id}][/content]` | `httpxFpMgr` | HTTPX 指纹规则管理 |
+| `nuclei_custom_handlers.go` | `GET/POST/PATCH/DELETE /nuclei/custom/sources[/{id}][/...]`, `PATCH /nuclei/custom/sources/{id}/enabled`, `/files`, `/validate`, `/publish`, `/manifest`, `/bundles/{version}` | `nucleiCustomMgr` | Nuclei 模板源；内置只读，见下表 |
+| `dictionary_handlers.go` | `GET/POST/PATCH/DELETE /dictionaries[/{id}][/content]`, `PATCH /dictionaries/{id}/enabled` | `dictMgr` | 字典管理(ffuf 等)；内置只读，见下表 |
+| `httpx_fingerprint_handlers.go` | `GET/POST/PATCH/DELETE /httpx/fingerprints[/{id}][/content]`, `PATCH /httpx/fingerprints/{id}/enabled` | `httpxFpMgr` | HTTPX 指纹；内置只读，见下表 |
 | `slow_scan_handlers.go` | `GET /projects/{id}/slow-scans`, `GET/POST /slow-scans/{id}[/cancel]` | `queries`, `worker` | 长耗时扫描任务管理 |
 | `sse.go` | `GET /projects/{id}/events`(挂在 `handleProjectSSE`) | **`sseClients`**, **`mu`** | SSE 通道辅助;事件由 `report_handlers` / worker 推 |
 | `pagination.go` | — | — | 分页参数解析工具,无 handler |
 | `workdir_cleanup.go` | — | `queries`, `dataDir` | 后台 goroutine,定期清理过期工作目录;由 `Server.startWorkdirCleanup` 启动 |
 
 **加粗字段** = 任务分发与 SSE 子系统,改时四件套(`sseClients` / `taskQueue` / `taskResults` / `mu`)绑死,不要单改一个。
+
+---
+
+## 团队内置资源 — 启用开关 PATCH
+
+`NewServer()` 启动顺序：`builtin.SyncAll()` → 各 Manager `SeedBuiltin()`（见 `server.go` ~152–168）。Worker 侧 `main.runWorker` 亦先 `SyncAll()`，再经 `remote_client.syncSources()` 管理 RBKD symlink。
+
+内置行 (`builtin=1`) **禁止** 内容/元数据 PATCH、DELETE；启用/禁用走专用端点，请求体 `{"enabled": true|false}`：
+
+| 端点 | Handler | 仅 builtin | 自定义源启用方式 |
+|------|---------|------------|------------------|
+| `PATCH /dictionaries/{id}/enabled` | `handlePatchDictionaryEnabled` | ✓（403 非 builtin） | `PATCH /dictionaries/{id}` 改元数据；扫描仅列 `enabled=1` |
+| `PATCH /httpx/fingerprints/{id}/enabled` | `handlePatchHttpxFingerprintEnabled` | ✓（manager `ErrNotBuiltin`） | `PATCH /httpx/fingerprints/{id}` 含 `enabled` 字段 |
+| `PATCH /nuclei/custom/sources/{id}/enabled` | `handlePatchNucleiCustomSourceEnabled` | ✓（403 非 builtin） | `PATCH /nuclei/custom/sources/{id}` 含 `enabled` 字段 |
+
+内置 nuclei 源禁用后 Worker 移除 `~/nuclei-templates/RBKD-templates` symlink，tags/workflow 均不加载 RBKD；自定义 nuclei 源仍走 bundle sync。
 
 ---
 
