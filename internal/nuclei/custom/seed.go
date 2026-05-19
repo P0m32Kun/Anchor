@@ -59,12 +59,35 @@ func (m *Manager) SeedBuiltin() error {
 		if err := m.q.UpdateNucleiCustomSource(src); err != nil {
 			return fmt.Errorf("update builtin nuclei source: %w", err)
 		}
-		return nil
+		return m.disableConflictingCustomSources(src.InstallPath)
 	}
 
 	src.CreatedAt = now
 	if err := m.q.CreateNucleiCustomSource(src); err != nil {
 		return fmt.Errorf("create builtin nuclei source: %w", err)
+	}
+	return m.disableConflictingCustomSources(src.InstallPath)
+}
+
+// disableConflictingCustomSources turns off legacy user-imported sources that
+// share the team builtin install_path so the worker does not bundle-sync over
+// the symlink-managed directory.
+func (m *Manager) disableConflictingCustomSources(installPath string) error {
+	sources, err := m.q.ListNucleiCustomSources()
+	if err != nil {
+		return fmt.Errorf("list nuclei sources: %w", err)
+	}
+	now := time.Now().UTC()
+	for _, s := range sources {
+		if s.Builtin || s.InstallPath != installPath || !s.Enabled {
+			continue
+		}
+		s.Enabled = false
+		s.UpdatedAt = now
+		if err := m.q.UpdateNucleiCustomSource(s); err != nil {
+			return fmt.Errorf("disable duplicate source %s: %w", s.ID, err)
+		}
+		log.Printf("[nuclei-custom] disabled duplicate custom source %q (install_path=%s); team builtin is authoritative", s.Name, installPath)
 	}
 	return nil
 }

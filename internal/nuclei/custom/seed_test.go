@@ -89,6 +89,25 @@ func TestManager_BuiltinSource_ReadOnly(t *testing.T) {
 	}
 }
 
+func TestManager_SeedBuiltin_DisablesDuplicateInstallPath(t *testing.T) {
+	m, _ := newTestManager(t, &fakeCloner{})
+
+	dup, err := m.CreateFromGit(context.Background(), "legacy", "RBKD-templates", "https://example.com/x.git", "main", "manual")
+	if err != nil {
+		t.Fatalf("create duplicate: %v", err)
+	}
+	if err := m.SeedBuiltin(); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	got, err := m.GetByID(dup.ID)
+	if err != nil {
+		t.Fatalf("get duplicate: %v", err)
+	}
+	if got.Enabled {
+		t.Error("duplicate install_path source should be disabled after builtin seed")
+	}
+}
+
 func TestManager_BuildBundle_SkipsBuiltin(t *testing.T) {
 	cloner := &fakeCloner{files: map[string]string{"templates/a.yaml": "id: a\n"}}
 	m, _ := newTestManager(t, cloner)
