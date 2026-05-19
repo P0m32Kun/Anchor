@@ -13,13 +13,13 @@ import (
 )
 
 type findingTemplatePayload struct {
-	SourceTool  *string `json:"source_tool,omitempty"`
-	MatchKey    *string `json:"match_key,omitempty"`
-	Title       *string `json:"title,omitempty"`
-	Severity    *string `json:"severity,omitempty"`
-	Summary     *string `json:"summary,omitempty"`
-	Remediation *string `json:"remediation,omitempty"`
-	Enabled     *bool   `json:"enabled,omitempty"`
+	SourceTool  *string   `json:"source_tool,omitempty"`
+	MatchKeys   *[]string `json:"match_keys,omitempty"`
+	Title       *string   `json:"title,omitempty"`
+	Severity    *string   `json:"severity,omitempty"`
+	Summary     *string   `json:"summary,omitempty"`
+	Remediation *string   `json:"remediation,omitempty"`
+	Enabled     *bool     `json:"enabled,omitempty"`
 }
 
 func validSeverity(s string) bool {
@@ -48,15 +48,40 @@ func (s *Server) handleCreateFindingTemplate(w http.ResponseWriter, r *http.Requ
 	}
 
 	sourceTool := strings.TrimSpace(deref(req.SourceTool))
-	matchKey := strings.TrimSpace(deref(req.MatchKey))
 	if sourceTool == "" {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "source_tool is required"))
 		return
 	}
-	if matchKey == "" {
-		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "match_key is required"))
+
+	var matchKeys []string
+	if req.MatchKeys != nil {
+		for _, k := range *req.MatchKeys {
+			k = strings.TrimSpace(k)
+			if k != "" {
+				matchKeys = append(matchKeys, k)
+			}
+		}
+	}
+	if len(matchKeys) == 0 {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "match_keys is required (at least one non-empty key)"))
 		return
 	}
+
+	// 应用层唯一性检查：同 source_tool 下不允许重复 match_key
+	existingList, err := s.queries.ListFindingTemplates(sourceTool)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list templates for duplicate check: %v", err))
+		return
+	}
+	for _, existing := range existingList {
+		for _, k := range matchKeys {
+			if containsString(existing.MatchKeys, k) {
+				writeError(w, http.StatusConflict, errors.Newf(errors.ErrConflict, "match_key '%s' already exists for tool '%s'", k, sourceTool))
+				return
+			}
+		}
+	}
+
 	severity := strings.TrimSpace(deref(req.Severity))
 	if !validSeverity(severity) {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "severity must be info/low/medium/high/critical or empty"))
@@ -67,7 +92,8 @@ func (s *Server) handleCreateFindingTemplate(w http.ResponseWriter, r *http.Requ
 	t := &models.FindingTemplate{
 		ID:          util.GenerateID(),
 		SourceTool:  sourceTool,
-		MatchKey:    matchKey,
+		MatchKey:    matchKeys[0], // 兼容老字段
+		MatchKeys:   matchKeys,
 		Title:       strings.TrimSpace(deref(req.Title)),
 		Severity:    severity,
 		Summary:     deref(req.Summary),
@@ -126,16 +152,33 @@ func (s *Server) handlePatchFindingTemplate(w http.ResponseWriter, r *http.Reque
 		}
 		t.SourceTool = v
 	}
-	if req.MatchKey != nil {
-		v := strings.TrimSpace(*req.MatchKey)
-		if v == "" {
-			writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "match_key cannot be empty"))
+	if req.MatchKeys != nil {
+		var keys []string
+		for _, k := range *req.MatchKeys {
+			k = strings.TrimSpace(k)
+			if k != "" {
+				keys = append(keys, k)
+			}
+		}
+		if len(keys) == 0 {
+			writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "match_keys cannot be empty (at least one non-empty key)"))
 			return
 		}
-		if v != t.MatchKey {
+		// 检查是否变更
+		changed := len(keys) != len(t.MatchKeys)
+		if !changed {
+			for i, k := range keys {
+				if k != t.MatchKeys[i] {
+					changed = true
+					break
+				}
+			}
+		}
+		if changed {
 			contentChanged = true
 		}
-		t.MatchKey = v
+		t.MatchKeys = keys
+		t.MatchKey = keys[0] // 兼容老字段
 	}
 	if req.Title != nil {
 		v := strings.TrimSpace(*req.Title)
@@ -267,6 +310,15 @@ func (s *Server) handleExportFindingTemplates(w http.ResponseWriter, r *http.Req
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	enc.Encode(seeds)
+}
+
+func containsString(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 func deref(p *string) string {
