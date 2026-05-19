@@ -13,16 +13,17 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
-// SeedFindingTemplate is the on-disk JSON shape of a single template entry in
-// docs/templates/vuln-templates.json. Field semantics mirror models.FindingTemplate.
+// SeedFindingTemplate 是 docs/templates/vuln-templates.json 中单条记录的形态。
+// MatchKey 保留以兼容老文件；MatchKeys 优先。
 type SeedFindingTemplate struct {
-	SourceTool  string `json:"source_tool"`
-	MatchKey    string `json:"match_key"`
-	Title       string `json:"title,omitempty"`
-	Severity    string `json:"severity,omitempty"`
-	Summary     string `json:"summary,omitempty"`
-	Remediation string `json:"remediation,omitempty"`
-	Enabled     *bool  `json:"enabled,omitempty"` // defaults to true when nil
+	SourceTool  string   `json:"source_tool"`
+	MatchKey    string   `json:"match_key,omitempty"`    // 兼容老文件
+	MatchKeys   []string `json:"match_keys,omitempty"`   // 新形态
+	Title       string   `json:"title,omitempty"`
+	Severity    string   `json:"severity,omitempty"`
+	Summary     string   `json:"summary,omitempty"`
+	Remediation string   `json:"remediation,omitempty"`
+	Enabled     *bool    `json:"enabled,omitempty"` // 默认 true
 }
 
 // SyncResult summarises a sync run so callers (and tests) can verify behaviour.
