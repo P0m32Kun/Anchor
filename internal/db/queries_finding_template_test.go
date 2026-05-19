@@ -125,4 +125,40 @@ func TestGetFindingTemplateForFinding_PriorityFallback(t *testing.T) {
 	if err != nil || tpl != nil {
 		t.Fatalf("empty tool short-circuit: got %+v err %v", tpl, err)
 	}
+
+	// Multi-match keys: a template with multiple MatchKeys should match ANY of them.
+	multiKeyTpl := &models.FindingTemplate{
+		ID:          "multi",
+		SourceTool:  "nuclei",
+		MatchKey:    "first-key",
+		MatchKeys:   []string{"matched-template-x", "title-key-z", "third-key"},
+		Title:       "T-multi",
+		Severity:    "high",
+		Summary:     "summary multi",
+		Remediation: "fix multi",
+		Enabled:     true,
+		CreatedAt:   time.Now().UTC().Truncate(time.Second),
+		UpdatedAt:   time.Now().UTC().Truncate(time.Second),
+	}
+	if err := q.CreateFindingTemplate(multiKeyTpl); err != nil {
+		t.Fatal(err)
+	}
+
+	// Hit the first key via sourceRuleID (Tier 1).
+	tpl, err = q.GetFindingTemplateForFinding("nuclei", "matched-template-x", "")
+	if err != nil || tpl == nil || tpl.ID != "multi" {
+		t.Fatalf("multi-key tier1 first key: got %+v err %v", tpl, err)
+	}
+
+	// Hit the second key via title (Tier 2).
+	tpl, err = q.GetFindingTemplateForFinding("nuclei", "", "title-key-z")
+	if err != nil || tpl == nil || tpl.ID != "multi" {
+		t.Fatalf("multi-key tier2 second key: got %+v err %v", tpl, err)
+	}
+
+	// Hit the third key via sourceRuleID.
+	tpl, err = q.GetFindingTemplateForFinding("nuclei", "third-key", "")
+	if err != nil || tpl == nil || tpl.ID != "multi" {
+		t.Fatalf("multi-key tier1 third key: got %+v err %v", tpl, err)
+	}
 }
