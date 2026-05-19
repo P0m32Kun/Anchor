@@ -359,6 +359,7 @@ export interface Finding {
   status: string;
   summary?: string;
   remediation?: string;
+  matched_template?: string;
   created_at: string;
   updated_at: string;
 }
@@ -491,9 +492,6 @@ export const api = {
 
   exportReportMD: (projectId: string, signal?: AbortSignal) =>
     fetchBlob(`/projects/${projectId}/reports/export.md`, { signal }),
-
-  exportReportJSON: (projectId: string, signal?: AbortSignal) =>
-    fetchBlob(`/projects/${projectId}/reports/export.json`, { signal }),
 
   // --- Runs ---
   getRun: (id: string, signal?: AbortSignal) =>
