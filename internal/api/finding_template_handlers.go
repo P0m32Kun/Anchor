@@ -296,7 +296,7 @@ func (s *Server) handleExportFindingTemplates(w http.ResponseWriter, r *http.Req
 		enabled := t.Enabled
 		seeds = append(seeds, db.SeedFindingTemplate{
 			SourceTool:  t.SourceTool,
-			MatchKey:    t.MatchKey,
+			MatchKeys:   t.MatchKeys,
 			Title:       t.Title,
 			Severity:    t.Severity,
 			Summary:     t.Summary,
