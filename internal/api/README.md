@@ -34,7 +34,7 @@
 | `finding_handlers.go` | `GET /projects/{id}/findings`, `GET/PATCH /findings/{id}[...]`, `POST /findings/{id}/evidence`, `PATCH /findings/batch-status`, `GET /findings/{id}/curl` | `findingSvc` | 发现 CRUD + 状态变更 + 证据上传 |
 | `finding_template_handlers.go` | `GET/POST/PATCH/DELETE /finding-templates[/{id}]`, `/finding-templates/export`, `/finding-templates/{id}/accept-upstream` | `queries` | 漏洞知识库模板 |
 | `retest_handlers.go` | `POST /findings/{id}/retest`, `GET /findings/{id}/retests` | `queries`, `rawDB` | 复测;唯一使用 `rawDB` 的 handler |
-| `report_handlers.go` | `GET /projects/{id}/reports/export.{md,json}`, `POST/GET/DELETE /runs/{runId}/report`, `/reports[/{reportId}][/download]` | `queries`, `dataDir`, **`sseClients`**, **`mu`** | 报告导出/生成/下载;触碰 SSE |
+| `report_handlers.go` | `GET /projects/{id}/reports/export.md` | `queries` | 同步报告导出(Markdown) |
 | `archive_handlers.go` | `POST /projects/{id}/archive`, `GET /projects/{id}/archive/download` | `queries`, `dataDir` | 项目归档打包导出 |
 | `task_handlers.go` | `POST /scan-plans`, `/scan-plans/{id}/approve`, `/scan-plans/dry-run`, `GET /scan-tasks/{id}`, `POST /scan-tasks/{id}/cancel`, `POST /tasks/run`, `GET /tasks/{id}/artifacts`, `/artifacts/content` | `queries`, `worker` | 扫描计划 + 单任务执行 |
 | `worker_handlers.go` | `GET /workers`, `POST /workers/register`, `POST /workers/{id}/heartbeat`, `GET /workers/{id}/tasks/poll`, `POST /tasks/{id}/result`, `POST /workers/{id}/revoke`, `DELETE /workers/{id}` | `queries`, `dataDir`, **`taskQueue`**, **`taskResults`**, **`mu`** | 远程 worker 节点管理 + 任务长轮询 + 结果回报 |
@@ -55,12 +55,12 @@
 
 | 字段 | 消费 handler 文件 | 改动 blast |
 |---|---|---|
-| `queries` | 16 文件(几乎全包) | **巨大** |
-| `dataDir` | 8 文件 | **大** |
+| `queries` | 15 文件(几乎全包) | **巨大** |
+| `dataDir` | 7 文件 | **大** |
 | `scopeEng` | 4 文件:pipeline / run / scope / workflow | 中等 |
 | `worker` | 5 文件:pipeline / run / slow_scan / task / workflow | 中等 |
-| `mu` | 4 文件:run / report / sse / worker(与下面三件套绑死) | 中等 |
-| `sseClients` | 2 文件:report / sse | 小 |
+| `mu` | 3 文件:run / sse / worker(与下面三件套绑死) | 中等 |
+| `sseClients` | 1 文件:sse | 小 |
 | `taskQueue` | 2 文件:run / worker | 小 |
 | `taskResults` | 1 文件:worker | 小 |
 | `rawDB` | 1 文件:retest | 极小 |
