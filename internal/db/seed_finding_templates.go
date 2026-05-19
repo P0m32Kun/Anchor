@@ -13,16 +13,17 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
-// SeedFindingTemplate is the on-disk JSON shape of a single template entry in
-// docs/templates/vuln-templates.json. Field semantics mirror models.FindingTemplate.
+// SeedFindingTemplate 是 docs/templates/vuln-templates.json 中单条记录的形态。
+// MatchKey 保留以兼容老文件；MatchKeys 优先。
 type SeedFindingTemplate struct {
-	SourceTool  string `json:"source_tool"`
-	MatchKey    string `json:"match_key"`
-	Title       string `json:"title,omitempty"`
-	Severity    string `json:"severity,omitempty"`
-	Summary     string `json:"summary,omitempty"`
-	Remediation string `json:"remediation,omitempty"`
-	Enabled     *bool  `json:"enabled,omitempty"` // defaults to true when nil
+	SourceTool  string   `json:"source_tool"`
+	MatchKey    string   `json:"match_key,omitempty"`    // 兼容老文件
+	MatchKeys   []string `json:"match_keys,omitempty"`   // 新形态
+	Title       string   `json:"title,omitempty"`
+	Severity    string   `json:"severity,omitempty"`
+	Summary     string   `json:"summary,omitempty"`
+	Remediation string   `json:"remediation,omitempty"`
+	Enabled     *bool    `json:"enabled,omitempty"` // 默认 true
 }
 
 // SyncResult summarises a sync run so callers (and tests) can verify behaviour.
@@ -88,10 +89,20 @@ func (q *Queries) applyFindingTemplateSeeds(seeds []SeedFindingTemplate) (*SyncR
 
 	for _, s := range seeds {
 		tool := strings.TrimSpace(s.SourceTool)
-		match := strings.TrimSpace(s.MatchKey)
-		if tool == "" || match == "" {
+		// 优先用 MatchKeys，回退到 MatchKey（兼容老文件）
+		keys := make([]string, 0, len(s.MatchKeys))
+		for _, k := range s.MatchKeys {
+			if trimmed := strings.TrimSpace(k); trimmed != "" {
+				keys = append(keys, trimmed)
+			}
+		}
+		if len(keys) == 0 && s.MatchKey != "" {
+			keys = []string{strings.TrimSpace(s.MatchKey)}
+		}
+		if tool == "" || len(keys) == 0 {
 			continue // skip malformed entries quietly
 		}
+		match := keys[0]
 		k := key{tool, match}
 		seenKeys[k] = struct{}{}
 
@@ -111,6 +122,7 @@ func (q *Queries) applyFindingTemplateSeeds(seeds []SeedFindingTemplate) (*SyncR
 				ID:             util.GenerateID(),
 				SourceTool:     tool,
 				MatchKey:       match,
+				MatchKeys:      keys,
 				Title:          strings.TrimSpace(s.Title),
 				Severity:       strings.TrimSpace(s.Severity),
 				Summary:        s.Summary,
@@ -147,6 +159,7 @@ func (q *Queries) applyFindingTemplateSeeds(seeds []SeedFindingTemplate) (*SyncR
 		row.Severity = strings.TrimSpace(s.Severity)
 		row.Summary = s.Summary
 		row.Remediation = s.Remediation
+		row.MatchKeys = keys
 		row.Enabled = enabled
 		row.IsBuiltin = true
 		row.UpdatedAt = now

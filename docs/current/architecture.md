@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-16
+last_updated: 2026-05-19
 scope: runtime-baseline
 ---
 
@@ -19,6 +19,8 @@ This file describes the current repository baseline that agents should assume un
 - Scan execution: worker processes running external security tools (subfinder, dnsx, httpx, naabu, nmap, cdncheck, nuclei)
 - Pipeline configuration: mode-driven (`external`/`internal`) tool selection, per-tool speed params (rate limit, threads, timeout), port range presets
 - Global engine credentials: FOFA/Hunter/Quake API keys stored in `engine_credentials` table, configured via `/engines/keys`
+- Vulnerability dictionary: `finding_templates` table stores knowledge entries (title, severity, summary, remediation) matched against findings at report time; seeded from repo JSON (`is_builtin=1`) or created in UI (`is_builtin=0`)
+- Report generation: synchronous Markdown export only; findings are aggregated by matched dictionary entry (`ReportSection`) before rendering
 
 ## Baseline Workflow
 
@@ -99,6 +101,49 @@ Workflow 模板来自 [RBKD-SEC/templates](https://github.com/RBKD-SEC/templates
 | `ANCHOR_GOVERNOR_CPU_DELAY_MS` | `500` | CPU 超阈值时的固定延迟(毫秒) |
 
 系统级指标采样依赖 `github.com/shirou/gopsutil/v3`。`ResourceSampler` 接口允许测试时注入 fake 实现。
+
+### 漏洞辞典（FindingTemplate）
+
+`finding_templates` 表已从「字段覆盖工具」升级为「漏洞辞典」。每个词条代表一类已知漏洞，包含 title、severity、summary、remediation 四个可覆盖字段，以及一个 `match_keys` 字符串数组用于匹配 findings。
+
+**匹配逻辑（两级精确匹配）**
+
+`GetFindingTemplateForFinding(sourceTool, sourceRuleID, title)` 按以下优先级查找启用的词条：
+
+1. **Tier 1 — source_ruleID 匹配**：遍历该工具的全部启用词条，检查 `match_keys` 中是否精确包含 `finding.SourceRuleID`。
+2. **Tier 2 — title 匹配**：若 Tier 1 未命中，检查 `match_keys` 中是否精确包含 `finding.Title`（兜底）。
+
+一个词条可挂多个 `match_keys`（chip 输入），因此同一漏洞类型可以覆盖不同工具报告的不同 ruleID 或 title。
+
+**来源与版本管理**
+
+| 字段 | 含义 |
+|------|------|
+| `is_builtin` | `true` = 来自仓库种子 JSON；`false` = UI 创建 |
+| `user_modified` | `true` = 内置词条被本地编辑过，阻止自动覆盖 |
+| `builtin_payload` | 最新上游版本的 JSON，用于「上游有更新」提示和「接受上游」操作 |
+
+**报告渲染时的字段覆盖**
+
+模板字段非空时优先使用模板值，空时自动回退到 finding 自身值：
+
+| 字段 | 回退行为 |
+|------|---------|
+| title | 模板空 → 使用 `finding.Title` |
+| severity | 模板空 → 使用 `finding.Severity` |
+| summary | 模板空 → 使用 `finding.Summary` |
+| remediation | 模板空 → 使用 `finding.Remediation` |
+
+### 报告渲染（按词条聚合 Sections）
+
+报告不再按单个 finding 平铺渲染，而是先按词条聚合为 `ReportSection`：
+
+- **命中词条**：同一 `FindingTemplate` 下的所有 findings 合并为一个 Section，标题和描述只出现一次，受影响资产以表格形式列出多行。
+- **未命中**：每个 finding 单独成一个 Section，标题使用原始 finding 值，描述和修复建议区域提示「该漏洞类型尚未在辞典中维护」。
+
+Sections 按 severity 倒序排列；同级 severity 时命中词条排在未命中前面。
+
+报告生成是同步的：前端点击「导出报告」直接调用 `handleExportReportMD`，后端即时生成 Markdown 并返回下载。异步报告流程（Report 模型、后台生成、状态轮询）已完全删除。
 
 ### 工具执行白名单（Allowlist）
 

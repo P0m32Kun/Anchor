@@ -133,28 +133,16 @@ func GenerateMarkdown(data *ReportData) string {
 		sb.WriteString("\n")
 	}
 
-	// --- 4. 漏洞详情(按严重程度倒序) ---
+	// --- 4. 漏洞详情(按 severity 倒序,使用 Sections 聚合渲染) ---
 	sb.WriteString("## 三、漏洞详情\n\n")
-	if totalFindings == 0 {
+
+	if len(data.Sections) == 0 {
 		sb.WriteString("*无漏洞记录。*\n\n")
 	} else {
-		bySeverity := groupBySeverity(data.Findings)
 		num := 0
-		for _, sev := range []models.FindingSeverity{
-			models.SeverityCritical,
-			models.SeverityHigh,
-			models.SeverityMedium,
-			models.SeverityLow,
-			models.SeverityInfo,
-		} {
-			group := bySeverity[sev]
-			if len(group) == 0 {
-				continue
-			}
-			for _, rf := range group {
-				num++
-				writeFindingDetailCN(&sb, num, rf)
-			}
+		for _, section := range data.Sections {
+			num++
+			writeSectionCN(&sb, num, section)
 		}
 	}
 
@@ -203,26 +191,33 @@ func formatSeverityBar(counts map[models.FindingSeverity]int) string {
 	return strings.Join(parts, "　·　")
 }
 
-// writeFindingDetailCN renders a single finding in the human-friendly layout.
-// Sections: emoji+severity+title heading → description → affected IP:Port table → remediation → footer metadata.
-// When rf.Template is non-nil, its non-empty fields override the finding's title / severity / summary / remediation.
-func writeFindingDetailCN(sb *strings.Builder, num int, rf *ReportFinding) {
-	f := rf.Finding
+// writeSectionCN 渲染一个章节:命中词条合并一节,或未命中单条一节。
+// 当 Template 字段非空时优先使用模板值,否则回退到 finding 自身值。
+func writeSectionCN(sb *strings.Builder, num int, section *ReportSection) {
+	rf0 := section.Findings[0]
+	f0 := rf0.Finding
 
-	title := pickFromTemplate(rf, func(t *models.FindingTemplate) string { return t.Title }, f.Title)
-	severity := models.FindingSeverity(pickFromTemplate(rf, func(t *models.FindingTemplate) string { return t.Severity }, string(f.Severity)))
-	summary := pickFromTemplate(rf, func(t *models.FindingTemplate) string { return t.Summary }, f.Summary)
-	remediation := pickFromTemplate(rf, func(t *models.FindingTemplate) string { return t.Remediation }, f.Remediation)
+	// 标题:模板优先,空则回退
+	title := f0.Title
+	if section.Template != nil && strings.TrimSpace(section.Template.Title) != "" {
+		title = section.Template.Title
+	}
+
+	// severity:模板优先,空则回退
+	severity := f0.Severity
+	if section.Template != nil && strings.TrimSpace(section.Template.Severity) != "" {
+		severity = models.FindingSeverity(section.Template.Severity)
+	}
 
 	fmt.Fprintf(sb, "### %d. %s %s · %s\n\n",
-		num,
-		severityEmojiOf(severity),
-		severityLabelCN(severity),
-		escapeMDTable(title),
-	)
+		num, severityEmojiOf(severity), severityLabelCN(severity), escapeMDTable(title))
 
-	// 漏洞描述
+	// 漏洞描述:模板优先,空则回退
 	sb.WriteString("**漏洞描述**\n\n")
+	summary := f0.Summary
+	if section.Template != nil && strings.TrimSpace(section.Template.Summary) != "" {
+		summary = section.Template.Summary
+	}
 	if strings.TrimSpace(summary) != "" {
 		sb.WriteString(summary)
 		sb.WriteString("\n\n")
@@ -230,83 +225,86 @@ func writeFindingDetailCN(sb *strings.Builder, num int, rf *ReportFinding) {
 		sb.WriteString("*暂无描述。*\n\n")
 	}
 
-	// 涉及 IP:Port
-	sb.WriteString("**涉及 IP:Port**\n\n")
-	writeAffectedTargets(sb, rf)
-	sb.WriteString("\n")
+	// 受影响资产
+	sb.WriteString("**受影响资产**\n\n")
+	writeAffectedAssetsTable(sb, section)
 
-	// 修复建议
+	// 修复建议:模板优先,空则回退
 	sb.WriteString("**修复建议**\n\n")
+	remediation := ""
+	if section.Template != nil {
+		remediation = section.Template.Remediation
+	}
+	if strings.TrimSpace(remediation) == "" {
+		remediation = f0.Remediation
+	}
 	if strings.TrimSpace(remediation) != "" {
 		sb.WriteString(remediation)
 		sb.WriteString("\n\n")
 	} else {
-		sb.WriteString("*暂无修复建议，请咨询安全团队进一步分析。*\n\n")
+		if section.Template != nil {
+			sb.WriteString("*暂无修复建议。*\n\n")
+		} else {
+			sb.WriteString("*暂无修复建议 — 该漏洞类型尚未在辞典中维护。可在「漏洞模板」页补充。*\n\n")
+		}
 	}
 
-	// 底部元数据小字
-	meta := []string{}
-	if f.SourceTool != "" {
-		meta = append(meta, "检测来源："+escapeMDTable(f.SourceTool))
+	// 底部元数据
+	var meta []string
+	if section.Template != nil {
+		meta = append(meta, "套用词条")
 	}
-	if f.SourceRuleID != "" {
-		meta = append(meta, "规则："+escapeMDTable(f.SourceRuleID))
+	meta = append(meta, fmt.Sprintf("检测来源:%s", f0.SourceTool))
+	if len(section.Findings) > 1 && section.Template != nil {
+		meta = append(meta, fmt.Sprintf("命中 %d 项", len(section.Findings)))
 	}
-	if f.Confidence > 0 {
-		meta = append(meta, fmt.Sprintf("置信度 %d%%", f.Confidence))
+	if section.Template == nil {
+		meta = append(meta, "未套词条")
+		if f0.SourceRuleID != "" {
+			meta = append(meta, fmt.Sprintf("规则:%s", escapeMDTable(f0.SourceRuleID)))
+		}
 	}
-	meta = append(meta, "状态："+statusLabelCN(f.Status))
-	if rf.Template != nil {
-		meta = append(meta, "已套用模板")
-	}
+	meta = append(meta, "状态:"+statusLabelCN(f0.Status))
 	fmt.Fprintf(sb, "> %s\n\n", strings.Join(meta, " · "))
 
 	sb.WriteString("---\n\n")
 }
 
-// pickFromTemplate returns the template's non-empty field value if a template
-// is matched, otherwise the fallback value from the finding itself.
-func pickFromTemplate(rf *ReportFinding, get func(*models.FindingTemplate) string, fallback string) string {
-	if rf.Template != nil {
-		if v := strings.TrimSpace(get(rf.Template)); v != "" {
-			return v
+// writeAffectedAssetsTable 渲染受影响资产表格。
+// 命中词条:多行表格;未命中:单行表格。
+func writeAffectedAssetsTable(sb *strings.Builder, section *ReportSection) {
+	sb.WriteString("| 资产 | 端口 | 访问地址 | 工具规则 |\n")
+	sb.WriteString("|---|---|---|---|\n")
+
+	for _, rf := range section.Findings {
+		assetVal := "—"
+		if rf.Asset != nil {
+			assetVal = escapeMDTable(rf.Asset.Value)
 		}
-	}
-	return fallback
-}
 
-// writeAffectedTargets renders the IP:Port section as a compact table.
-// Falls back to a plain "*暂无具体目标信息。*" line when nothing is known.
-func writeAffectedTargets(sb *strings.Builder, rf *ReportFinding) {
-	if rf.Asset == nil && rf.WebEndpoint == nil {
-		sb.WriteString("*暂无具体目标信息。*\n")
-		return
-	}
-
-	sb.WriteString("| 资产 | 端口 | 访问地址 |\n")
-	sb.WriteString("|---|---|---|\n")
-
-	assetVal := "—"
-	if rf.Asset != nil {
-		assetVal = escapeMDTable(rf.Asset.Value)
-	}
-
-	portVal := "—"
-	urlVal := "—"
-	if rf.WebEndpoint != nil {
-		if rf.WebEndpoint.Port != nil {
-			portVal = fmt.Sprintf("%d", *rf.WebEndpoint.Port)
-		} else if rf.WebEndpoint.Scheme == "https" {
-			portVal = "443"
-		} else if rf.WebEndpoint.Scheme == "http" {
-			portVal = "80"
+		portVal := "—"
+		urlVal := "—"
+		if rf.WebEndpoint != nil {
+			if rf.WebEndpoint.Port != nil {
+				portVal = fmt.Sprintf("%d", *rf.WebEndpoint.Port)
+			} else if rf.WebEndpoint.Scheme == "https" {
+				portVal = "443"
+			} else if rf.WebEndpoint.Scheme == "http" {
+				portVal = "80"
+			}
+			if rf.WebEndpoint.URL != "" {
+				urlVal = escapeMDTable(rf.WebEndpoint.URL)
+			}
 		}
-		if rf.WebEndpoint.URL != "" {
-			urlVal = escapeMDTable(rf.WebEndpoint.URL)
-		}
-	}
 
-	fmt.Fprintf(sb, "| %s | %s | %s |\n", assetVal, portVal, urlVal)
+		ruleVal := "—"
+		if rf.Finding.SourceRuleID != "" {
+			ruleVal = escapeMDTable(rf.Finding.SourceRuleID)
+		}
+
+		fmt.Fprintf(sb, "| %s | %s | %s | %s |\n", assetVal, portVal, urlVal, ruleVal)
+	}
+	sb.WriteString("\n")
 }
 
 // severityCountMap counts findings by severity.
@@ -327,22 +325,3 @@ func statusCountMap(findings []*ReportFinding) map[models.FindingStatus]int {
 	return counts
 }
 
-// filterByStatus returns findings matching a given status. Kept for html.go template.
-func filterByStatus(findings []*ReportFinding, status models.FindingStatus) []*ReportFinding {
-	var result []*ReportFinding
-	for _, rf := range findings {
-		if rf.Finding.Status == status {
-			result = append(result, rf)
-		}
-	}
-	return result
-}
-
-// groupBySeverity buckets findings by severity, preserving input ordering inside each bucket.
-func groupBySeverity(findings []*ReportFinding) map[models.FindingSeverity][]*ReportFinding {
-	groups := make(map[models.FindingSeverity][]*ReportFinding)
-	for _, rf := range findings {
-		groups[rf.Finding.Severity] = append(groups[rf.Finding.Severity], rf)
-	}
-	return groups
-}

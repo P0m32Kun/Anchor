@@ -18,21 +18,23 @@ import {
   Badge
 } from "../components";
 import { useStore } from "../lib/store";
-import { 
-  FileText, 
-  Download, 
-  Eye, 
-  FileJson, 
-  FileCode, 
-  CheckCircle2, 
+import {
+  FileText,
+  Download,
+  Eye,
+  FileCode,
+  CheckCircle2,
   ShieldCheck,
   AlertTriangle,
   Info,
   ListOrdered,
   BookOpen,
   ArrowRight,
-  X
+  X,
+  Tag,
+  CircleDot
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 
 interface FindingDetail {
@@ -84,7 +86,7 @@ function downloadWithAnchor(blob: Blob, filename: string): void {
   }
 }
 
-const SEVERITY_META: Record<string, { label: string; icon: any; color: string; bg: string }> = {
+const SEVERITY_META: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   critical: { label: "严重", icon: AlertTriangle, color: "text-rose-500", bg: "bg-rose-500/10 border-rose-500/20" },
   high: { label: "高危", icon: ShieldCheck, color: "text-orange-500", bg: "bg-orange-500/10 border-orange-500/20" },
   medium: { label: "中危", icon: ShieldCheck, color: "text-amber-500", bg: "bg-amber-500/10 border-amber-500/20" },
@@ -95,6 +97,7 @@ const SEVERITY_META: Record<string, { label: string; icon: any; color: string; b
 export default function ReportsPage() {
   const projectId = useProjectId();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [findings, setFindings] = useState<FindingDetail[]>([]);
   const loading = useStore((state) => state.reportsLoading);
@@ -173,17 +176,17 @@ export default function ReportsPage() {
     }
   }, [projectId]);
 
-  const handleExport = async (format: "md" | "json") => {
+  const handleExportMD = async () => {
     if (!projectId) return;
     if (findings.length === 0) {
       toast("无 findings 可导出", "warning");
       return;
     }
     try {
-      setExporting(format);
+      setExporting("md");
       setReportsError(null);
-      const blob = format === "md" ? await api.exportReportMD(projectId) : await api.exportReportJSON(projectId);
-      const filename = `report_${projectId}.${format}`;
+      const blob = await api.exportReportMD(projectId);
+      const filename = `report_${projectId}.md`;
       if (isTauri()) {
         const saved = await saveWithTauriDialog(blob, filename);
         if (saved) toast("导出成功", "success");
@@ -192,7 +195,7 @@ export default function ReportsPage() {
         toast("下载已启动", "success");
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : `Export ${format.toUpperCase()} failed`;
+      const msg = e instanceof Error ? e.message : "Export MD failed";
       setReportsError(msg);
       toast("导出失败：" + msg, "error");
     } finally {
@@ -212,6 +215,14 @@ export default function ReportsPage() {
       counts[s] = (counts[s] || 0) + 1;
     }
     return counts;
+  }, [findings]);
+
+  const coverageStats = useMemo(() => {
+    const total = findings.length;
+    const covered = findings.filter((fd) => !!fd.finding.matched_template).length;
+    const uncovered = total - covered;
+    const percentage = total > 0 ? Math.round((covered / total) * 100) : 0;
+    return { total, covered, uncovered, percentage };
   }, [findings]);
 
   if (!projectId) {
@@ -250,11 +261,43 @@ export default function ReportsPage() {
                 <Eye className="mr-2 h-4 w-4" />
                 预览 Markdown
             </Button>
-            <Button variant="primary" size="sm" onClick={() => handleExport("md")} loading={exporting === 'md'}>
+            <Button variant="primary" size="sm" onClick={handleExportMD} loading={exporting === 'md'}>
                 <Download className="mr-2 h-4 w-4" />
                 导出 MD
             </Button>
         </div>
+      </div>
+
+      {/* 覆盖率统计 */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="bg-muted/30 border-none shadow-sm">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <BookOpen className="h-5 w-5 mb-2 text-primary" />
+            <div className="text-[10px] font-bold uppercase opacity-60 mb-1">总 Findings</div>
+            <div className="text-2xl font-bold tabular-nums text-foreground">{coverageStats.total}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-emerald-500/5 border-emerald-500/20 shadow-sm">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <Tag className="h-5 w-5 mb-2 text-emerald-500" />
+            <div className="text-[10px] font-bold uppercase opacity-60 mb-1">已套词条</div>
+            <div className="text-2xl font-bold tabular-nums text-emerald-500">{coverageStats.covered}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-amber-500/5 border-amber-500/20 shadow-sm">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <CircleDot className="h-5 w-5 mb-2 text-amber-500" />
+            <div className="text-[10px] font-bold uppercase opacity-60 mb-1">未套词条</div>
+            <div className="text-2xl font-bold tabular-nums text-amber-500">{coverageStats.uncovered}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-primary/5 border-primary/20 shadow-sm">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <CheckCircle2 className="h-5 w-5 mb-2 text-primary" />
+            <div className="text-[10px] font-bold uppercase opacity-60 mb-1">覆盖率</div>
+            <div className="text-2xl font-bold tabular-nums text-primary">{coverageStats.percentage}%</div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-6 md:grid-cols-5">
@@ -300,10 +343,25 @@ export default function ReportsPage() {
                         >
                             <CardHeader className="p-4 pb-2">
                                 <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 flex-wrap">
                                         <span className="text-xs font-mono text-muted-foreground">{idx + 1}.</span>
                                         <SeverityBadge severity={fd.finding.severity} />
                                         <h3 className="font-bold text-foreground">{fd.finding.title}</h3>
+                                        {fd.finding.matched_template ? (
+                                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px]">
+                                                <Tag className="h-3 w-3 mr-1" />
+                                                已套词条
+                                            </Badge>
+                                        ) : (
+                                            <button
+                                                onClick={() => navigate('/vuln-templates')}
+                                                className="inline-flex items-center px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] hover:bg-amber-500/20 transition-colors cursor-pointer"
+                                                title="前往漏洞模板页面创建词条"
+                                            >
+                                                <CircleDot className="h-3 w-3 mr-1" />
+                                                未套词条
+                                            </button>
+                                        )}
                                     </div>
                                     <StatusBadge status={fd.finding.status} />
                                 </div>
@@ -382,22 +440,15 @@ export default function ReportsPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                    <Button variant="outline" className="w-full justify-between group" onClick={() => handleExport("md")} loading={exporting === 'md'}>
+                    <Button variant="outline" className="w-full justify-between group" onClick={handleExportMD} loading={exporting === 'md'}>
                         <div className="flex items-center">
                             <FileCode className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary" />
                             <span>Markdown (.md)</span>
                         </div>
                         <ArrowRight className="h-3 w-3 opacity-50 group-hover:translate-x-1 transition-transform" />
                     </Button>
-                    <Button variant="outline" className="w-full justify-between group" onClick={() => handleExport("json")} loading={exporting === 'json'}>
-                        <div className="flex items-center">
-                            <FileJson className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                            <span>JSON Data (.json)</span>
-                        </div>
-                        <ArrowRight className="h-3 w-3 opacity-50 group-hover:translate-x-1 transition-transform" />
-                    </Button>
                     <p className="text-[10px] text-muted-foreground px-1 leading-relaxed">
-                        Markdown 格式适用于人工润色排版。JSON 格式适用于与其他自动化风险管理平台集成。
+                        Markdown 格式适用于人工润色排版和交付。
                     </p>
                 </CardContent>
             </Card>
@@ -460,7 +511,7 @@ export default function ReportsPage() {
             </div>
             <div className="p-4 border-t bg-muted/30 flex justify-end gap-3">
                 <Button variant="ghost" size="sm" onClick={() => setShowPreview(false)}>取消</Button>
-                <Button variant="primary" size="sm" onClick={() => handleExport("md")}>
+                <Button variant="primary" size="sm" onClick={handleExportMD}>
                     <Download className="mr-2 h-4 w-4" />
                     下载此版本 (.md)
                 </Button>

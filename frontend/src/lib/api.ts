@@ -359,6 +359,7 @@ export interface Finding {
   status: string;
   summary?: string;
   remediation?: string;
+  matched_template?: string;
   created_at: string;
   updated_at: string;
 }
@@ -492,9 +493,6 @@ export const api = {
   exportReportMD: (projectId: string, signal?: AbortSignal) =>
     fetchBlob(`/projects/${projectId}/reports/export.md`, { signal }),
 
-  exportReportJSON: (projectId: string, signal?: AbortSignal) =>
-    fetchBlob(`/projects/${projectId}/reports/export.json`, { signal }),
-
   // --- Runs ---
   getRun: (id: string, signal?: AbortSignal) =>
     fetchAPI<Run>(`/runs/${id}`, { signal }),
@@ -604,27 +602,6 @@ export const api = {
   getNucleiCustomManifest: (signal?: AbortSignal) =>
     fetchAPI<NucleiCustomManifest>("/nuclei/custom/manifest", { signal }),
 
-  // --- Reports ---
-  createReport: (runId: string, title?: string, signal?: AbortSignal) =>
-    fetchAPI<Report>(`/runs/${runId}/report`, { method: "POST", body: title ? JSON.stringify({ title }) : undefined, signal }),
-
-  getReport: (reportId: string, signal?: AbortSignal) =>
-    fetchAPI<Report>(`/reports/${reportId}`, { signal }),
-
-  getReportByRun: (runId: string, signal?: AbortSignal, skipGlobalError?: boolean) =>
-    fetchAPI<Report>(`/runs/${runId}/report`, { signal, skipGlobalError }),
-
-  deleteReport: (reportId: string, signal?: AbortSignal) =>
-    fetchAPI<{ status: string }>(`/reports/${reportId}`, { method: "DELETE", signal }),
-
-  listReports: (cursor?: string, signal?: AbortSignal) =>
-    fetchAPI<{ items: Report[]; has_more: boolean }>(`/reports${cursor ? `?cursor=${cursor}` : ""}`, { signal }),
-
-  downloadReport: (reportId: string) => {
-    const base = getApiBase();
-    window.open(`${base}/reports/${reportId}/download`, "_blank");
-  },
-
   // --- Dictionaries ---
   listDictionaries: (category?: string, signal?: AbortSignal) =>
     fetchAPI<Dictionary[]>(buildQueryString("/dictionaries", { category }), { signal }),
@@ -710,20 +687,6 @@ export interface Run {
   started_at?: string;
   finished_at?: string;
   created_at: string;
-}
-
-export interface Report {
-  id: string;
-  run_id: string;
-  status: "generating" | "partial" | "complete" | "failed";
-  title?: string;
-  finding_count: number;
-  evidence_count: number;
-  file_path?: string;
-  file_size_bytes: number;
-  error_message?: string;
-  created_at: string;
-  completed_at?: string;
 }
 
 export interface ToolTemplate {
@@ -822,7 +785,7 @@ export interface HttpxFingerprint {
 export interface FindingTemplate {
   id: string;
   source_tool: string;
-  match_key: string;
+  match_keys: string[];
   title: string;
   severity: "" | "info" | "low" | "medium" | "high" | "critical";
   summary: string;
@@ -830,7 +793,7 @@ export interface FindingTemplate {
   enabled: boolean;
   is_builtin: boolean;
   user_modified: boolean;
-  builtin_payload: string;
+  builtin_payload?: string;
   created_at: string;
   updated_at: string;
 }

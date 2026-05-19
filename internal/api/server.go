@@ -37,7 +37,7 @@ import (
 type Server struct {
 	// queries: 持久化层。绝大多数 handler 都直接使用,改签名前慎重。
 	// 消费者: archive / asset / dashboard / engine / finding_template /
-	//   pipeline / report / retest / run / scope / slow_scan / task /
+	//   pipeline / retest / run / scope / slow_scan / task /
 	//   worker / workdir_cleanup / workflow / handlers
 	queries *db.Queries
 
@@ -58,7 +58,7 @@ type Server struct {
 	health *health.Checker
 
 	// dataDir: 数据/产物目录根路径。
-	// 消费者: archive / handlers / pipeline / report / run /
+	// 消费者: archive / handlers / pipeline / run /
 	//   worker / workdir_cleanup / workflow
 	dataDir string
 
@@ -66,7 +66,7 @@ type Server struct {
 	// 受 mu 保护,跨 goroutine 读写。
 
 	// sseClients: project_id -> client_id -> event chan。
-	// 消费者: report_handlers.go / sse.go
+	// 消费者: sse.go
 	sseClients map[string]map[string]chan []byte
 
 	// taskQueue: worker_id -> 待派发任务 chan。
@@ -78,7 +78,7 @@ type Server struct {
 	taskResults map[string]chan map[string]interface{}
 
 	// mu: 保护 sseClients / taskQueue / taskResults 的并发访问。
-	// 消费者: run / report / sse / worker
+	// 消费者: run / sse / worker
 	mu sync.Mutex
 
 	// 任务分发与 SSE 子系统 ↑↑↑
@@ -298,14 +298,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /health/check", auth(http.HandlerFunc(s.handleHealthCheck)))
 	mux.Handle("GET /projects/{id}/events", auth(http.HandlerFunc(s.handleProjectSSE)))
 	mux.Handle("GET /projects/{id}/reports/export.md", auth(http.HandlerFunc(s.handleExportReportMD)))
-	mux.Handle("GET /projects/{id}/reports/export.json", auth(http.HandlerFunc(s.handleExportReportJSON)))
-	// Report engine
-	mux.Handle("POST /runs/{runId}/report", auth(http.HandlerFunc(s.handleCreateReport)))
-	mux.Handle("GET /runs/{runId}/report", auth(http.HandlerFunc(s.handleGetReportByRun)))
-	mux.Handle("GET /reports/{reportId}", auth(http.HandlerFunc(s.handleGetReport)))
-	mux.Handle("GET /reports/{reportId}/download", auth(http.HandlerFunc(s.handleDownloadReport)))
-	mux.Handle("DELETE /reports/{reportId}", auth(http.HandlerFunc(s.handleDeleteReport)))
-	mux.Handle("GET /reports", auth(http.HandlerFunc(s.handleListReports)))
 	mux.Handle("POST /projects/{id}/archive", auth(http.HandlerFunc(s.handleCreateArchive)))
 	mux.Handle("GET /projects/{id}/archive/download", auth(http.HandlerFunc(s.handleDownloadArchive)))
 	mux.Handle("GET /tool-templates", auth(http.HandlerFunc(s.handleListToolTemplates)))

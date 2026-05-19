@@ -20,7 +20,12 @@ import "time"
 type FindingTemplate struct {
 	ID             string    `json:"id" db:"id"`
 	SourceTool     string    `json:"source_tool" db:"source_tool"`
-	MatchKey       string    `json:"match_key" db:"match_key"`
+	// MatchKeys 是内存中的匹配键列表(一个词条可挂多个)。
+	// MatchKeysJSON 是数据库存储格式(JSON 编码的字符串数组)。
+	// 老字段 MatchKey 保留一个 release 以兼容回滚;新代码只读写 MatchKeys/MatchKeysJSON。
+	MatchKeys      []string `json:"match_keys" db:"-"`
+	MatchKeysJSON  string   `json:"-"            db:"match_keys"`
+	MatchKey       string   `json:"match_key"    db:"match_key"`
 	Title          string    `json:"title" db:"title"`
 	Severity       string    `json:"severity" db:"severity"`
 	Summary        string    `json:"summary" db:"summary"`

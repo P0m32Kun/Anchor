@@ -26,7 +26,7 @@ import {
 } from "../components";
 import { useToast } from "../components/Toast";
 import { getApiBase } from "../lib/config";
-import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig, Report } from "../lib/api";
+import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
 import {
   Play,
@@ -42,8 +42,6 @@ import {
   ArrowRight,
   FileText,
   Download,
-  ChevronDown,
-  Trash2,
   Copy,
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -76,8 +74,6 @@ export default function RunsPage() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTargetRun, setCancelTargetRun] = useState<PipelineRun | null>(null);
-  const [reports, setReports] = useState<Map<string, Report>>(new Map());
-  const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
 
   const [inspectingTask, setInspectingTask] = useState<ScanTask | null>(null);
   const [inspectingLogs, setInspectingLogs] = useState<string>("");
@@ -115,38 +111,6 @@ export default function RunsPage() {
     undefined
   );
 
-  // Track runs that have been checked for reports (even if no report exists)
-  // to avoid repeated 404 calls after each poll cycle.
-  const [checkedReportRuns, setCheckedReportRuns] = useState<Set<string>>(new Set());
-
-  // Reset checked set when project changes
-  useEffect(() => {
-    setCheckedReportRuns(new Set());
-  }, [projectId]);
-
-  // Load existing reports for runs
-  useEffect(() => {
-    if (!runs.length) return;
-    runs.forEach(async (run) => {
-      if (reports.has(run.id) || generatingReports.has(run.id) || checkedReportRuns.has(run.id)) return;
-      if (run.status !== 'completed' && run.status !== 'failed') return;
-      try {
-        const rpt = await api.getReportByRun(run.id, undefined, true);
-        if (rpt) {
-          setReports((prev) => new Map(prev).set(run.id, rpt));
-          if (rpt.status === 'generating') {
-            setGeneratingReports((prev) => new Set(prev).add(run.id));
-          }
-        } else {
-          // Mark as checked so we don't retry; 404 is expected for runs without reports.
-          setCheckedReportRuns((prev) => new Set(prev).add(run.id));
-        }
-      } catch (err) {
-        // ignore 404 — report doesn't exist yet, mark as checked
-        setCheckedReportRuns((prev) => new Set(prev).add(run.id));
-      }
-    });
-  }, [runs, reports.size, generatingReports.size, checkedReportRuns.size]);
 
   const {
     loading: targetsLoading,
@@ -225,20 +189,6 @@ export default function RunsPage() {
         loadRuns();
         if (selectedRun && msg.run_id === selectedRun) {
           loadRunDetails(selectedRun);
-        }
-      }
-      if (msg.event === "report_progress") {
-        const reportMsg = msg as { report_id: string; run_id: string; status: string; title?: string };
-        if (reportMsg.status === "complete" || reportMsg.status === "failed") {
-          setGeneratingReports((prev) => { const next = new Set(prev); next.delete(reportMsg.run_id); return next; });
-          api.getReport(reportMsg.report_id).then((r) => {
-            setReports((prev) => new Map(prev).set(reportMsg.run_id, r));
-          }).catch(() => {});
-          if (reportMsg.status === "complete") {
-            toast("报告生成完成", "success");
-          } else {
-            toast("报告生成失败", "error");
-          }
         }
       }
     },
@@ -342,39 +292,8 @@ export default function RunsPage() {
     }
   };
 
-  const handleGenerateReport = async (runId: string) => {
-    if (generatingReports.has(runId)) return;
-    setGeneratingReports((prev) => new Set(prev).add(runId));
-    try {
-      const rpt = await api.createReport(runId);
-      setReports((prev) => new Map(prev).set(runId, rpt));
-      
-      if (rpt.status === "complete") {
-        setGeneratingReports((prev) => { const next = new Set(prev); next.delete(runId); return next; });
-        toast("报告已生成", "success");
-      } else if (rpt.status === "failed") {
-        setGeneratingReports((prev) => { const next = new Set(prev); next.delete(runId); return next; });
-        toast(rpt.error_message || "报告生成失败", "error");
-      }
-      // If "generating", wait for SSE callback.
-    } catch (err) {
-      setGeneratingReports((prev) => { const next = new Set(prev); next.delete(runId); return next; });
-      const msg = err instanceof Error ? err.message : "请求生成报告失败";
-      toast(msg, "error");
-    }
-  };
-
-  const handleDeleteReport = async (runId: string) => {
-    const rpt = reports.get(runId);
-    if (!rpt) return;
-    try {
-      await api.deleteReport(rpt.id);
-      setReports((prev) => { const next = new Map(prev); next.delete(runId); return next; });
-      toast("报告已删除", "success");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "删除报告失败";
-      toast(msg, "error");
-    }
+  const handleViewReport = (_runId: string) => {
+    window.location.href = `/reports?projectId=${projectId}`;
   };
 
   const handleInspectTask = async (task: ScanTask) => {
@@ -530,14 +449,18 @@ export default function RunsPage() {
                                     </div>
                                 </div>
                                 {(run.status === 'completed' || run.status === 'failed') && (
-                                    <ReportButton
-                                        runId={run.id}
-                                        report={reports.get(run.id)}
-                                        generating={generatingReports.has(run.id)}
-                                        onGenerate={() => handleGenerateReport(run.id)}
-                                        onDownload={(reportId) => api.downloadReport(reportId)}
-                                        onDelete={() => handleDeleteReport(run.id)}
-                                    />
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 gap-1.5 text-xs"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleViewReport(run.id);
+                                        }}
+                                    >
+                                        <FileText className="h-3.5 w-3.5" />
+                                        查看报告
+                                    </Button>
                                 )}
                                 {canCancel(run.status) && (
                                     <Button
@@ -713,136 +636,6 @@ export default function RunsPage() {
         onClose={() => setInspectingTask(null)}
       />
     </div>
-  );
-}
-
-// --- Report Button Component ---
-
-function ReportButton({
-  runId: _runId,
-  report,
-  generating,
-  onGenerate,
-  onDownload,
-  onDelete,
-}: {
-  runId: string;
-  report?: Report;
-  generating: boolean;
-  onGenerate: () => void;
-  onDownload: (reportId: string) => void;
-  onDelete: () => void;
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  if (generating) {
-    return (
-      <Button variant="ghost" size="sm" disabled className="h-8 gap-1.5 text-xs">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        生成中
-      </Button>
-    );
-  }
-
-  if (report && report.status === "complete") {
-    return (
-      <div className="relative" ref={menuRef}>
-        <div className="flex">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 text-xs rounded-r-none border-r border-border"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDownload(report.id);
-            }}
-          >
-            <Download className="h-3.5 w-3.5" />
-            下载
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-7 rounded-l-none px-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenuOpen(!menuOpen);
-            }}
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-md border border-border bg-popover shadow-md">
-            <button
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDownload(report.id);
-                setMenuOpen(false);
-              }}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              HTML 报告
-            </button>
-            <button
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-                setMenuOpen(false);
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              删除报告
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (report && report.status === "failed") {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 gap-1.5 text-xs text-destructive hover:bg-destructive/10"
-        onClick={(e) => {
-          e.stopPropagation();
-          onGenerate();
-        }}
-      >
-        <AlertCircle className="h-3.5 w-3.5" />
-        重试
-      </Button>
-    );
-  }
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="h-8 gap-1.5 text-xs"
-      onClick={(e) => {
-        e.stopPropagation();
-        onGenerate();
-      }}
-    >
-      <FileText className="h-3.5 w-3.5" />
-      生成报告
-    </Button>
   );
 }
 

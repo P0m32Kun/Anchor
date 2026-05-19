@@ -3,6 +3,7 @@ package report
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/db"
@@ -19,6 +20,10 @@ type ReportData struct {
 	Findings     []*ReportFinding      // confirmed + accepted_risk
 	ToolVersions []*models.ToolInvocation
 	GeneratedAt  time.Time
+
+	// Sections 是按词条聚合后的章节列表,已按 severity 倒序。
+	// 用于 Markdown 渲染的「三、漏洞详情」段。
+	Sections []*ReportSection
 }
 
 // ReportFinding wraps a Finding with its related Asset, WebEndpoint, Evidence,
@@ -31,6 +36,15 @@ type ReportFinding struct {
 	WebEndpoint  *models.WebEndpoint // nullable
 	EvidenceList []*models.Evidence
 	Template     *models.FindingTemplate // nullable
+}
+
+// ReportSection 是「漏洞详情」章节单元。
+//   - 命中词条: Template 非 nil,Findings 是同词条下的多个 finding
+//   - 未命中:    Template 为 nil,Findings 切片长度恰好为 1
+type ReportSection struct {
+	Template *models.FindingTemplate // nil = 未命中(同位混排原始块)
+	Severity models.FindingSeverity  // 用于排序,命中时 = template.severity,未命中 = finding.severity
+	Findings []*ReportFinding
 }
 
 // Aggregate collects all report data from the database for a given project.
@@ -112,7 +126,7 @@ func Aggregate(ctx context.Context, q *db.Queries, project *models.Project) (*Re
 
 		// Match against the vulnerability template knowledge base.
 		// Errors are non-fatal — templates are an enhancement, not a requirement.
-		if tmpl, terr := q.GetFindingTemplateForFinding(f.SourceTool, f.SourceRuleID, f.MatchedTemplate, f.Title); terr == nil {
+		if tmpl, terr := q.GetFindingTemplateForFinding(f.SourceTool, f.SourceRuleID, f.Title); terr == nil {
 			rf.Template = tmpl
 		}
 
@@ -125,6 +139,51 @@ func Aggregate(ctx context.Context, q *db.Queries, project *models.Project) (*Re
 		return nil, fmt.Errorf("list tool invocations: %w", err)
 	}
 	data.ToolVersions = toolInvs
+
+	// --- 分桶:把 findings 按词条聚合 ---
+	buckets := make(map[string][]*ReportFinding)
+	var unmatched []*ReportFinding
+	for _, rf := range data.Findings {
+		if rf.Template != nil {
+			buckets[rf.Template.ID] = append(buckets[rf.Template.ID], rf)
+		} else {
+			unmatched = append(unmatched, rf)
+		}
+	}
+
+	sections := make([]*ReportSection, 0, len(buckets)+len(unmatched))
+	for _, findings := range buckets {
+		if len(findings) == 0 {
+			continue
+		}
+		t := findings[0].Template
+		sev := models.FindingSeverity(t.Severity)
+		if sev == "" {
+			sev = findings[0].Finding.Severity
+		}
+		sections = append(sections, &ReportSection{Template: t, Severity: sev, Findings: findings})
+	}
+	for _, rf := range unmatched {
+		sections = append(sections, &ReportSection{Template: nil, Severity: rf.Finding.Severity, Findings: []*ReportFinding{rf}})
+	}
+
+	// 按 severity 倒序排序;同级时命中排在未命中前
+	severityRank := map[models.FindingSeverity]int{
+		models.SeverityCritical: 5,
+		models.SeverityHigh:     4,
+		models.SeverityMedium:   3,
+		models.SeverityLow:      2,
+		models.SeverityInfo:     1,
+	}
+	sort.SliceStable(sections, func(i, j int) bool {
+		if severityRank[sections[i].Severity] != severityRank[sections[j].Severity] {
+			return severityRank[sections[i].Severity] > severityRank[sections[j].Severity]
+		}
+		// 同级:命中(Template != nil)排在未命中前面
+		return (sections[i].Template != nil) && (sections[j].Template == nil)
+	})
+
+	data.Sections = sections
 
 	return data, nil
 }

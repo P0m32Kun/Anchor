@@ -10,7 +10,7 @@ import (
 
 // findingColumns is the canonical column list for the findings table.
 // Keep this in sync with the schema and scanFinding.
-const findingColumns = "id, project_id, asset_id, service_id, web_endpoint_id, run_id, source_tool, source_rule_id, dedup_key, title, severity, confidence, priority, status, summary, remediation, created_at, updated_at"
+const findingColumns = "id, project_id, asset_id, service_id, web_endpoint_id, run_id, source_tool, source_rule_id, dedup_key, title, severity, confidence, priority, status, summary, remediation, raw_request, raw_response, matched_template, created_at, updated_at"
 
 // findingInsertArgs returns the VALUES arguments for a single finding.
 func findingInsertArgs(f *models.Finding) []any {
@@ -18,6 +18,7 @@ func findingInsertArgs(f *models.Finding) []any {
 		f.ID, f.ProjectID, f.AssetID, f.ServiceID, f.WebEndpointID, f.RunID,
 		f.SourceTool, f.SourceRuleID, f.DedupKey, f.Title, f.Severity,
 		f.Confidence, f.Priority, f.Status, f.Summary, f.Remediation,
+		f.RawRequest, f.RawResponse, f.MatchedTemplate,
 		f.CreatedAt, f.UpdatedAt,
 	}
 }
@@ -26,7 +27,7 @@ func findingInsertArgs(f *models.Finding) []any {
 
 func (q *Queries) CreateFinding(f *models.Finding) error {
 	_, err := q.db.Exec(
-		"INSERT INTO findings ("+findingColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO findings ("+findingColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		findingInsertArgs(f)...)
 	return err
 }
@@ -203,7 +204,8 @@ func scanFinding(row interface {
 }) (*models.Finding, error) {
 	f := &models.Finding{}
 	var assetID, serviceID, webEndpointID, runID sql.NullString
-	err := row.Scan(&f.ID, &f.ProjectID, &assetID, &serviceID, &webEndpointID, &runID, &f.SourceTool, &f.SourceRuleID, &f.DedupKey, &f.Title, &f.Severity, &f.Confidence, &f.Priority, &f.Status, &f.Summary, &f.Remediation, &f.CreatedAt, &f.UpdatedAt)
+	var rawRequest, rawResponse, matchedTemplate sql.NullString
+	err := row.Scan(&f.ID, &f.ProjectID, &assetID, &serviceID, &webEndpointID, &runID, &f.SourceTool, &f.SourceRuleID, &f.DedupKey, &f.Title, &f.Severity, &f.Confidence, &f.Priority, &f.Status, &f.Summary, &f.Remediation, &rawRequest, &rawResponse, &matchedTemplate, &f.CreatedAt, &f.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -214,6 +216,9 @@ func scanFinding(row interface {
 	f.ServiceID = nullableString(serviceID)
 	f.WebEndpointID = nullableString(webEndpointID)
 	f.RunID = nullableString(runID)
+	f.RawRequest = rawRequest.String
+	f.RawResponse = rawResponse.String
+	f.MatchedTemplate = matchedTemplate.String
 	return f, nil
 }
 

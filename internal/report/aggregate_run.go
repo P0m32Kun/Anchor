@@ -3,6 +3,7 @@ package report
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/db"
@@ -105,7 +106,7 @@ func AggregateByRunWithBatchEvidence(ctx context.Context, q *db.Queries, runID s
 		}
 		rf.EvidenceList = evidenceMap[f.ID]
 		// Match against vulnerability template knowledge base; errors are non-fatal.
-		if tmpl, terr := q.GetFindingTemplateForFinding(f.SourceTool, f.SourceRuleID, f.MatchedTemplate, f.Title); terr == nil {
+		if tmpl, terr := q.GetFindingTemplateForFinding(f.SourceTool, f.SourceRuleID, f.Title); terr == nil {
 			rf.Template = tmpl
 		}
 		data.Findings = append(data.Findings, rf)
@@ -116,6 +117,51 @@ func AggregateByRunWithBatchEvidence(ctx context.Context, q *db.Queries, runID s
 	if err != nil {
 		return nil, nil, fmt.Errorf("list tool invocations: %w", err)
 	}
+
+	// --- 分桶:把 findings 按词条聚合 ---
+	buckets := make(map[string][]*ReportFinding)
+	var unmatched []*ReportFinding
+	for _, rf := range data.Findings {
+		if rf.Template != nil {
+			buckets[rf.Template.ID] = append(buckets[rf.Template.ID], rf)
+		} else {
+			unmatched = append(unmatched, rf)
+		}
+	}
+
+	sections := make([]*ReportSection, 0, len(buckets)+len(unmatched))
+	for _, findings := range buckets {
+		if len(findings) == 0 {
+			continue
+		}
+		t := findings[0].Template
+		sev := models.FindingSeverity(t.Severity)
+		if sev == "" {
+			sev = findings[0].Finding.Severity
+		}
+		sections = append(sections, &ReportSection{Template: t, Severity: sev, Findings: findings})
+	}
+	for _, rf := range unmatched {
+		sections = append(sections, &ReportSection{Template: nil, Severity: rf.Finding.Severity, Findings: []*ReportFinding{rf}})
+	}
+
+	// 按 severity 倒序排序;同级时命中排在未命中前
+	severityRank := map[models.FindingSeverity]int{
+		models.SeverityCritical: 5,
+		models.SeverityHigh:     4,
+		models.SeverityMedium:   3,
+		models.SeverityLow:      2,
+		models.SeverityInfo:     1,
+	}
+	sort.SliceStable(sections, func(i, j int) bool {
+		if severityRank[sections[i].Severity] != severityRank[sections[j].Severity] {
+			return severityRank[sections[i].Severity] > severityRank[sections[j].Severity]
+		}
+		// 同级:命中(Template != nil)排在未命中前面
+		return (sections[i].Template != nil) && (sections[j].Template == nil)
+	})
+
+	data.Sections = sections
 
 	return data, run, nil
 }
