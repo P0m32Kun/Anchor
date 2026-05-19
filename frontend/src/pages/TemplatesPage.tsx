@@ -132,7 +132,7 @@ export default function TemplatesPage() {
   const [confirmConfig, setConfirmConfig] = useState({ title: "", onConfirm: () => {} });
 
   // Form state
-  const [gitForm, setGitForm] = useState({ name: "", install_path: "", uri: "", branch: "" });
+  const [gitForm, setGitForm] = useState({ name: "", install_path: "RBKD-templates", uri: "", branch: "" });
   const [uploadForm, setUploadForm] = useState({ name: "", install_path: "", file: null as File | null });
 
   // File editing
@@ -198,13 +198,13 @@ export default function TemplatesPage() {
     try {
       await api.createNucleiCustomGitSource({
         name: gitForm.name.trim(),
-        install_path: gitForm.install_path.trim() || toInstallPath(gitForm.name),
+        install_path: gitForm.install_path.trim() || "RBKD-templates",
         uri: gitForm.uri.trim(),
         branch: gitForm.branch.trim() || undefined,
       });
       toast("Git模板源创建成功", "success");
       setGitModalOpen(false);
-      setGitForm({ name: "", install_path: "", uri: "", branch: "" });
+      setGitForm({ name: "", install_path: "RBKD-templates", uri: "", branch: "" });
       loadSources();
     } catch (err: any) {
     }
@@ -610,7 +610,7 @@ export default function TemplatesPage() {
       {/* Git Import Modal */}
       <Modal
         open={gitModalOpen}
-        onClose={() => { setGitModalOpen(false); setGitForm({ name: "", install_path: "", uri: "", branch: "" }); }}
+        onClose={() => { setGitModalOpen(false); setGitForm({ name: "", install_path: "RBKD-templates", uri: "", branch: "" }); }}
         title="从 Git 导入模板源"
         description="克隆一个公开的 Git 仓库作为模板源"
         footer={
@@ -625,7 +625,7 @@ export default function TemplatesPage() {
             <label className="text-sm font-medium mb-1.5 block">名称</label>
             <Input
               value={gitForm.name}
-              onChange={(e) => setGitForm((p) => ({ ...p, name: e.target.value, install_path: p.install_path || toInstallPath(e.target.value) }))}
+              onChange={(e) => setGitForm((p) => ({ ...p, name: e.target.value }))}
               placeholder="例如: RBKD-SEC Templates"
             />
           </div>
@@ -633,13 +633,13 @@ export default function TemplatesPage() {
             <label className="text-sm font-medium mb-1.5 block">
               安装路径
               <span className="text-[10px] text-muted-foreground ml-1">
-                (~nuclei-templates/下的目录名，默认由名称自动生成)
+                (~nuclei-templates/下的目录名)
               </span>
             </label>
             <Input
               value={gitForm.install_path}
               onChange={(e) => setGitForm((p) => ({ ...p, install_path: e.target.value }))}
-              placeholder="r bkd-templates"
+              placeholder="RBKD-templates"
             />
           </div>
           <div>
