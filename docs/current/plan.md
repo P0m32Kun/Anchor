@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-16
+last_updated: 2026-05-18
 scope: repository-wide
 ---
 
@@ -93,13 +93,16 @@ PR3 的实现细节:
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR (PLAN) | 8 proposals, 3 accepted, 5 deferred |
 | Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found | 27 missed problems |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | issues_open (PLAN) | 16 issues, 2 critical gaps |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | CLEAR | 16 issues resolved, 2 critical gaps fixed |
 | Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL) | score: 4/10 → 8/10, 6 decisions |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
 
 - **CODEX:** 27 missed problems including buffer durability (SIGKILL/OOM), SQLite write contention, resource governance overbuilt, allowlist environment attack surface, asset relation taxonomy issues
 - **CROSS-MODEL:** Buffer persistence — review recommended shutdown hook, Codex argued for durable staging (pipeline boundary flush accepted). Resource governance — review recommended dynamic thresholds, Codex argued for static limits (accepted).
+- **CRITICAL GAPS FIXED (2026-05-18):**
+  1. **buffer flush silent loss** — `FindingBuffer.flushLocked()` now clears `b.buf` only after successful `BatchInsertFindings`; on failure, findings are retained and retried via timer (`flushTimerCallback` restarts timer on error). Tests: `TestFindingBuffer_FlushFailureRetainsData`, `TestFindingBuffer_TimerRetryAfterFailure`.
+  2. **SIGKILL finding loss** — Reduced flush interval from 5s to 2s in `Pipeline.Run()`, shrinking the unflushed data window. SIGKILL itself remains uncatchable; mitigation is shorter flush interval + pipeline boundary flush (already in place).
 - **UNRESOLVED:** 0
-- **VERDICT:** Eng Review NOT CLEARED — 2 critical gaps flagged (buffer flush silent loss, SIGKILL finding loss). Issues resolved: scope reduced to 3 PRs, 16 architecture/code-quality/test/performance issues addressed.
+- **VERDICT:** Eng Review CLEARED — all critical gaps fixed, 16 architecture/code-quality/test/performance issues addressed, scope held at 3 PRs.
 
-*Last reviewed: 2026-05-16, commit 1500bed*
+*Last reviewed: 2026-05-18*

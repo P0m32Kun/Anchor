@@ -9,7 +9,7 @@ import (
 )
 
 // FindingBuffer batches finding inserts to reduce database round-trips.
-// Flush triggers on capacity (default 500) or timeout (default 5s).
+// Flush triggers on capacity or timeout.
 // Deduplication happens in-memory by dedup_key and INSERT OR IGNORE handles
 // cross-boundary duplicates at the DB level.
 type FindingBuffer struct {
@@ -86,16 +86,24 @@ func (b *FindingBuffer) Close() error {
 }
 
 // flushTimerCallback is invoked by time.AfterFunc.
+// If the flush fails, findings remain in the buffer and the timer is
+// restarted so a retry will occur on the next interval.
 func (b *FindingBuffer) flushTimerCallback() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.closed {
 		return
 	}
-	b.flushLocked()
+	if err := b.flushLocked(); err != nil {
+		// Restart timer so we retry on the next interval.
+		if !b.closed && len(b.buf) > 0 {
+			b.timer = time.AfterFunc(b.flushInterval, b.flushTimerCallback)
+		}
+	}
 }
 
 // flushLocked performs the actual DB write. Caller must hold b.mu.
+// On failure, findings are retained in the buffer so they can be retried.
 func (b *FindingBuffer) flushLocked() error {
 	if len(b.buf) == 0 {
 		return nil
@@ -107,7 +115,6 @@ func (b *FindingBuffer) flushLocked() error {
 	}
 
 	findings := b.buf
-	b.buf = nil
 
 	// In-memory dedup by dedup_key (keep first occurrence).
 	seen := make(map[string]bool, len(findings))
@@ -124,5 +131,7 @@ func (b *FindingBuffer) flushLocked() error {
 		log.Printf("[finding_buffer] batch insert %d findings: %v", len(deduped), err)
 		return err
 	}
+
+	b.buf = nil
 	return nil
 }

@@ -232,6 +232,87 @@ func TestFindingBuffer_Dedup(t *testing.T) {
 	}
 }
 
+func TestFindingBuffer_FlushFailureRetainsData(t *testing.T) {
+	rawDB := openTestDB(t)
+	q := New(rawDB)
+	createTestProject(t, q)
+	now := time.Now().UTC()
+
+	buf := NewFindingBuffer(q, 100, 5*time.Second)
+	f := &models.Finding{
+		ID: "f-fail-1", ProjectID: "proj-1", AssetID: nil, ServiceID: nil, WebEndpointID: nil,
+		SourceTool: "nuclei", SourceRuleID: "r1", DedupKey: "dk-fail-1", Title: "Fail",
+		Severity: models.SeverityHigh, Confidence: 80, Priority: 70, Status: models.FindingNew,
+		Summary: "s", Remediation: "r", CreatedAt: now, UpdatedAt: now,
+	}
+	buf.Add(f)
+
+	// Make DB read-only so flush fails.
+	if _, err := rawDB.Exec("PRAGMA query_only = ON"); err != nil {
+		t.Fatalf("set query_only: %v", err)
+	}
+
+	if err := buf.Flush(); err == nil {
+		t.Fatal("expected flush to fail")
+	}
+
+	// Restore write access and retry.
+	if _, err := rawDB.Exec("PRAGMA query_only = OFF"); err != nil {
+		t.Fatalf("unset query_only: %v", err)
+	}
+	if err := buf.Flush(); err != nil {
+		t.Fatalf("retry flush: %v", err)
+	}
+
+	got, _ := q.GetFinding(f.ID)
+	if got == nil {
+		t.Fatal("finding should exist after retry flush")
+	}
+}
+
+func TestFindingBuffer_TimerRetryAfterFailure(t *testing.T) {
+	rawDB := openTestDB(t)
+	q := New(rawDB)
+	createTestProject(t, q)
+	now := time.Now().UTC()
+
+	buf := NewFindingBuffer(q, 100, 100*time.Millisecond)
+	f := &models.Finding{
+		ID: "f-timer-1", ProjectID: "proj-1", AssetID: nil, ServiceID: nil, WebEndpointID: nil,
+		SourceTool: "nuclei", SourceRuleID: "r1", DedupKey: "dk-timer-1", Title: "TimerRetry",
+		Severity: models.SeverityHigh, Confidence: 80, Priority: 70, Status: models.FindingNew,
+		Summary: "s", Remediation: "r", CreatedAt: now, UpdatedAt: now,
+	}
+
+	// Make DB read-only before adding, so timer flush will fail.
+	if _, err := rawDB.Exec("PRAGMA query_only = ON"); err != nil {
+		t.Fatalf("set query_only: %v", err)
+	}
+
+	buf.Add(f)
+
+	// Wait for timer to fire and fail.
+	time.Sleep(200 * time.Millisecond)
+
+	// Data should still be in buffer (not lost).
+	if got, _ := q.GetFinding(f.ID); got != nil {
+		t.Fatal("finding should not exist while DB is read-only")
+	}
+
+	// Restore write access — the retry timer should eventually flush.
+	if _, err := rawDB.Exec("PRAGMA query_only = OFF"); err != nil {
+		t.Fatalf("unset query_only: %v", err)
+	}
+
+	// Wait for retry timer to fire.
+	time.Sleep(200 * time.Millisecond)
+
+	got, _ := q.GetFinding(f.ID)
+	if got == nil {
+		t.Fatal("finding should exist after timer retry flush")
+	}
+}
+
 func TestFindingBuffer_CloseFlushes(t *testing.T) {
 	rawDB := openTestDB(t)
 	q := New(rawDB)

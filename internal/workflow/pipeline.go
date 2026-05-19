@@ -133,7 +133,7 @@ func (p *Pipeline) checkTools() []string {
 // Run executes the pipeline for a project.
 func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 	p.projectID = projectID
-	p.findingBuf = db.NewFindingBuffer(p.queries, 500, 5*time.Second)
+	p.findingBuf = db.NewFindingBuffer(p.queries, 500, 2*time.Second)
 	p.seenDedupKeys = make(map[string]bool)
 	p.deferredEvidence = nil
 	defer p.flushFindingsAndEvidence()
