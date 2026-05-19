@@ -55,16 +55,7 @@ func (s *Server) handleCreateArchive(w http.ResponseWriter, r *http.Request) {
 		fw.Write([]byte(mdData))
 	}
 
-	// 2. Add JSON report
-	if err == nil {
-		jsonData, err := report.GenerateJSON(reportData)
-		if err == nil {
-			fw, _ := zw.Create("report.json")
-			fw.Write(jsonData)
-		}
-	}
-
-	// 3. Add screenshots
+	// 2. Add screenshots
 	screenshots, _ := s.queries.ListScreenshotsByProject(projectID)
 	for _, sc := range screenshots {
 		data, err := os.ReadFile(sc.OriginalPath)
@@ -75,7 +66,7 @@ func (s *Server) handleCreateArchive(w http.ResponseWriter, r *http.Request) {
 		fw.Write(data)
 	}
 
-	// 4. Add scope snapshot
+	// 3. Add scope snapshot
 	scopeRules, _ := s.queries.ListScopeRulesByProject(projectID)
 	if len(scopeRules) > 0 {
 		fw, _ := zw.Create("scope_rules.txt")
@@ -84,7 +75,7 @@ func (s *Server) handleCreateArchive(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 5. Add tool versions snapshot
+	// 4. Add tool versions snapshot
 	fw, _ := zw.Create("tool_versions.txt")
 	fmt.Fprintln(fw, "Tool Versions Snapshot")
 	fmt.Fprintln(fw, "=====================")
