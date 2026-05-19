@@ -105,7 +105,7 @@ func AggregateByRunWithBatchEvidence(ctx context.Context, q *db.Queries, runID s
 		}
 		rf.EvidenceList = evidenceMap[f.ID]
 		// Match against vulnerability template knowledge base; errors are non-fatal.
-		if tmpl, terr := q.GetFindingTemplateForFinding(f.SourceTool, f.SourceRuleID, f.MatchedTemplate, f.Title); terr == nil {
+		if tmpl, terr := q.GetFindingTemplateForFinding(f.SourceTool, f.SourceRuleID, f.Title); terr == nil {
 			rf.Template = tmpl
 		}
 		data.Findings = append(data.Findings, rf)

@@ -112,7 +112,7 @@ func Aggregate(ctx context.Context, q *db.Queries, project *models.Project) (*Re
 
 		// Match against the vulnerability template knowledge base.
 		// Errors are non-fatal — templates are an enhancement, not a requirement.
-		if tmpl, terr := q.GetFindingTemplateForFinding(f.SourceTool, f.SourceRuleID, f.MatchedTemplate, f.Title); terr == nil {
+		if tmpl, terr := q.GetFindingTemplateForFinding(f.SourceTool, f.SourceRuleID, f.Title); terr == nil {
 			rf.Template = tmpl
 		}
 

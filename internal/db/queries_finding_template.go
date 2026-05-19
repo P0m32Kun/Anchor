@@ -101,32 +101,71 @@ func (q *Queries) DeleteFindingTemplate(id string) error {
 	return err
 }
 
-// GetFindingTemplateForFinding looks up an enabled template for a finding,
-// trying the match keys in priority order: ruleID → matchedTemplate → title.
-// Returns (nil, nil) when no matching enabled template exists.
-func (q *Queries) GetFindingTemplateForFinding(sourceTool, ruleID, matchedTemplate, title string) (*models.FindingTemplate, error) {
+// listEnabledTemplatesByTool 读取某工具的所有启用词条。
+func (q *Queries) listEnabledTemplatesByTool(sourceTool string) ([]*models.FindingTemplate, error) {
+	rows, err := q.db.Query(`
+		SELECT id, source_tool, match_key, match_keys, title, severity, summary, remediation,
+		       enabled, is_builtin, user_modified, builtin_payload, created_at, updated_at
+		FROM finding_templates
+		WHERE source_tool = ? AND enabled = 1`, sourceTool)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*models.FindingTemplate
+	for rows.Next() {
+		t, err := scanFindingTemplate(rows)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, t)
+	}
+	return list, rows.Err()
+}
+
+// containsExact 判断 key 是否在 keys 列表中(精确匹配)。
+func containsExact(keys []string, key string) bool {
+	for _, k := range keys {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+
+// GetFindingTemplateForFinding 查找匹配 finding 的启用词条。
+// 匹配优先级: source_rule_id → title(都为精确字符串匹配)。
+// 返回 (nil, nil) 表示未找到。
+func (q *Queries) GetFindingTemplateForFinding(sourceTool, sourceRuleID, title string) (*models.FindingTemplate, error) {
 	tool := strings.TrimSpace(sourceTool)
 	if tool == "" {
 		return nil, nil
 	}
-	for _, key := range []string{ruleID, matchedTemplate, title} {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		row := q.db.QueryRow(`
-			SELECT id, source_tool, match_key, match_keys, title, severity, summary, remediation, enabled, is_builtin, user_modified, builtin_payload, created_at, updated_at
-			FROM finding_templates
-			WHERE source_tool = ? AND match_key = ? AND enabled = 1
-			LIMIT 1`, tool, key)
-		t, err := scanFindingTemplate(row)
-		if err != nil {
-			return nil, err
-		}
-		if t != nil {
-			return t, nil
+
+	templates, err := q.listEnabledTemplatesByTool(tool)
+	if err != nil {
+		return nil, err
+	}
+
+	// Tier 1: 按 source_ruleID 匹配
+	if k := strings.TrimSpace(sourceRuleID); k != "" {
+		for _, t := range templates {
+			if containsExact(t.MatchKeys, k) {
+				return t, nil
+			}
 		}
 	}
+
+	// Tier 2: 按 title 匹配(兜底)
+	if k := strings.TrimSpace(title); k != "" {
+		for _, t := range templates {
+			if containsExact(t.MatchKeys, k) {
+				return t, nil
+			}
+		}
+	}
+
 	return nil, nil
 }
 

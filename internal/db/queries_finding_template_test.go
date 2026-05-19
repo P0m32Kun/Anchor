@@ -13,6 +13,7 @@ func makeTpl(id, tool, key string, enabled bool) *models.FindingTemplate {
 		ID:          id,
 		SourceTool:  tool,
 		MatchKey:    key,
+		MatchKeys:   []string{key},
 		Title:       "T-" + id,
 		Severity:    "high",
 		Summary:     "summary " + id,
@@ -78,37 +79,28 @@ func TestFindingTemplate_DuplicateUniqueIndex(t *testing.T) {
 func TestGetFindingTemplateForFinding_PriorityFallback(t *testing.T) {
 	q := New(openTestDB(t))
 
-	// Seed three enabled templates for the same tool, different match keys.
+	// Seed two enabled templates for the same tool, different match keys.
 	if err := q.CreateFindingTemplate(makeTpl("a", "nuclei", "rule-id-x", true)); err != nil {
-		t.Fatal(err)
-	}
-	if err := q.CreateFindingTemplate(makeTpl("b", "nuclei", "matched-template-x", true)); err != nil {
 		t.Fatal(err)
 	}
 	if err := q.CreateFindingTemplate(makeTpl("c", "nuclei", "Title X", true)); err != nil {
 		t.Fatal(err)
 	}
 
-	// ruleID wins over matchedTemplate and title.
-	tpl, err := q.GetFindingTemplateForFinding("nuclei", "rule-id-x", "matched-template-x", "Title X")
+	// Tier 1: ruleID wins over title.
+	tpl, err := q.GetFindingTemplateForFinding("nuclei", "rule-id-x", "Title X")
 	if err != nil || tpl == nil || tpl.ID != "a" {
 		t.Fatalf("ruleID priority: got %+v err %v", tpl, err)
 	}
 
-	// Falls back to matchedTemplate when ruleID missing.
-	tpl, err = q.GetFindingTemplateForFinding("nuclei", "", "matched-template-x", "Title X")
-	if err != nil || tpl == nil || tpl.ID != "b" {
-		t.Fatalf("matchedTemplate priority: got %+v err %v", tpl, err)
-	}
-
-	// Falls back to title when both missing.
-	tpl, err = q.GetFindingTemplateForFinding("nuclei", "", "", "Title X")
+	// Tier 2: Falls back to title when ruleID missing.
+	tpl, err = q.GetFindingTemplateForFinding("nuclei", "", "Title X")
 	if err != nil || tpl == nil || tpl.ID != "c" {
 		t.Fatalf("title fallback: got %+v err %v", tpl, err)
 	}
 
 	// No match returns (nil, nil).
-	tpl, err = q.GetFindingTemplateForFinding("nuclei", "nope", "nope", "Nope")
+	tpl, err = q.GetFindingTemplateForFinding("nuclei", "nope", "Nope")
 	if err != nil || tpl != nil {
 		t.Fatalf("no match: got %+v err %v", tpl, err)
 	}
@@ -117,19 +109,19 @@ func TestGetFindingTemplateForFinding_PriorityFallback(t *testing.T) {
 	if err := q.CreateFindingTemplate(makeTpl("d", "hydra", "ssh-weakpass", false)); err != nil {
 		t.Fatal(err)
 	}
-	tpl, err = q.GetFindingTemplateForFinding("hydra", "ssh-weakpass", "", "")
+	tpl, err = q.GetFindingTemplateForFinding("hydra", "ssh-weakpass", "")
 	if err != nil || tpl != nil {
 		t.Fatalf("disabled should be skipped: got %+v err %v", tpl, err)
 	}
 
 	// Different source_tool does not bleed across.
-	tpl, err = q.GetFindingTemplateForFinding("sqlmap", "rule-id-x", "", "")
+	tpl, err = q.GetFindingTemplateForFinding("sqlmap", "rule-id-x", "")
 	if err != nil || tpl != nil {
 		t.Fatalf("source_tool isolation: got %+v err %v", tpl, err)
 	}
 
 	// Empty source_tool returns (nil, nil) without querying.
-	tpl, err = q.GetFindingTemplateForFinding("", "rule-id-x", "matched-template-x", "Title X")
+	tpl, err = q.GetFindingTemplateForFinding("", "rule-id-x", "Title X")
 	if err != nil || tpl != nil {
 		t.Fatalf("empty tool short-circuit: got %+v err %v", tpl, err)
 	}
