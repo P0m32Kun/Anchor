@@ -382,19 +382,9 @@ func (p *Pipeline) feedToHttpxNuclei(ctx context.Context, urls []string, existin
 		return
 	}
 
-	// Deduplicate against existing web endpoints
-	existingSet := make(map[string]bool, len(existingEndpoints))
-	for _, ep := range existingEndpoints {
-		existingSet[ep.URL] = true
-	}
-	var newURLs []string
-	for _, u := range urls {
-		if !existingSet[u] {
-			newURLs = append(newURLs, u)
-		}
-	}
+	newURLs := filterURLsForSecondaryScan(urls, existingEndpoints)
 	if len(newURLs) == 0 {
-		log.Printf("[pipeline] all %d discovered URLs already exist, skipping", len(urls))
+		log.Printf("[pipeline] all %d discovered URLs already covered (url or origin), skipping", len(urls))
 		return
 	}
 	log.Printf("[pipeline] feeding %d new URLs to httpx/nuclei (deduped from %d)", len(newURLs), len(urls))
@@ -483,7 +473,8 @@ func (p *Pipeline) feedToHttpxNuclei(ctx context.Context, urls []string, existin
 	for tagKey, urls := range groups {
 		tags := strings.Split(tagKey, ",")
 		targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei2-%s.txt", util.GenerateID()))
-		if err := os.WriteFile(targetFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
+		scanURLs := dedupHTTPTargetsByOrigin(dedupStrings(urls))
+		if err := os.WriteFile(targetFile, []byte(strings.Join(scanURLs, "\n")), 0640); err != nil {
 			continue
 		}
 

@@ -337,8 +337,9 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 
 		// Tag-based scan (if tags or both mode)
 		if useTags {
+			scanURLs := dedupHTTPTargetsByOrigin(dedupStrings(urls))
 			targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
-			if err := os.WriteFile(targetFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
+			if err := os.WriteFile(targetFile, []byte(strings.Join(scanURLs, "\n")), 0640); err != nil {
 				continue
 			}
 			if abs, err := filepath.Abs(targetFile); err == nil {
@@ -358,8 +359,9 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 			for _, tag := range tags {
 				for _, wfPath := range wfPaths {
 					wfFile := filepath.Join(wfPath, tag+".yaml")
+					scanURLs := dedupHTTPTargetsByOrigin(dedupStrings(urls))
 					targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
-					if err := os.WriteFile(targetFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
+					if err := os.WriteFile(targetFile, []byte(strings.Join(scanURLs, "\n")), 0640); err != nil {
 						continue
 					}
 					if abs, err := filepath.Abs(targetFile); err == nil {
@@ -404,8 +406,9 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Nm
 	for tag, targets := range groups {
 		// Tag-based scan
 		if useTags {
+			scanTargets := dedupHTTPTargetsByOrigin(dedupStrings(targets))
 			targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
-			if err := os.WriteFile(targetFile, []byte(strings.Join(targets, "\n")), 0640); err != nil {
+			if err := os.WriteFile(targetFile, []byte(strings.Join(scanTargets, "\n")), 0640); err != nil {
 				continue
 			}
 			if abs, err := filepath.Abs(targetFile); err == nil {
@@ -424,8 +427,9 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Nm
 		if useWf {
 			for _, wfPath := range wfPaths {
 				wfFile := filepath.Join(wfPath, tag+".yaml")
+				scanTargets := dedupHTTPTargetsByOrigin(dedupStrings(targets))
 				targetFile := filepath.Join(p.dataDir, "workdirs", p.projectID, fmt.Sprintf("nuclei-%s.txt", util.GenerateID()))
-				if err := os.WriteFile(targetFile, []byte(strings.Join(targets, "\n")), 0640); err != nil {
+				if err := os.WriteFile(targetFile, []byte(strings.Join(scanTargets, "\n")), 0640); err != nil {
 					continue
 				}
 				if abs, err := filepath.Abs(targetFile); err == nil {

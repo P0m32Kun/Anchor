@@ -432,12 +432,6 @@ func (w *WebScreeningWorkflow) saveEvidenceArtifact(workdir, projectID, taskID, 
 	return w.queries.CreateEvidence(ev)
 }
 
-func computeDedupKey(templateID, host, matcherName string) string {
-	h := sha256.New()
-	fmt.Fprintf(h, "%s|%s|%s", templateID, host, matcherName)
-	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
 func writeTargetsFile(dataDir, projectID string, urls []string) (string, error) {
 	workdir := filepath.Join(dataDir, "workdirs", projectID, "screening")
 	if err := os.MkdirAll(workdir, 0750); err != nil {

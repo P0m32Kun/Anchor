@@ -38,7 +38,7 @@ func (p *Pipeline) runHTTPXAndNuclei(ctx context.Context, fpResults []fingerprin
 	for _, t := range extraHTTPXTargets {
 		httpxTargets = append(httpxTargets, t)
 	}
-	httpxTargets = dedupStrings(httpxTargets)
+	httpxTargets = dedupHTTPTargetsByOrigin(dedupStrings(httpxTargets))
 
 	var webEndpoints []*models.WebEndpoint
 	if len(httpxTargets) > 0 {
@@ -84,7 +84,7 @@ func (p *Pipeline) saveNucleiFindings(stdout []byte, urlToEndpoint map[string]*m
 		log.Printf("[saveNucleiFindings] parse error line=%d msg=%s", pe.Line, pe.Message)
 	}
 	for _, nr := range results {
-		dedupKey := fmt.Sprintf("%s|%s|%s", nr.TemplateID, nr.Host, nr.MatcherName)
+		dedupKey := computeDedupKey(nr.TemplateID, nr.Host, nr.MatcherName)
 		if p.seenDedupKeys[dedupKey] {
 			continue
 		}

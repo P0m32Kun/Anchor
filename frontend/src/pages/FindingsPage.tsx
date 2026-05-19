@@ -34,6 +34,7 @@ import {
   Plus
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { dedupeFindingsForDisplay } from "../lib/finding-dedup";
 
 const statusLabels: Record<string, string> = {
   pending_review: "待审核",
@@ -141,8 +142,10 @@ export default function FindingsPage() {
     }
   };
 
+  const displayFindings = useMemo(() => dedupeFindingsForDisplay(findings), [findings]);
+
   const filteredFindings = useMemo(() => {
-    let result = findings;
+    let result = displayFindings;
     if (statusFilter) result = result.filter((f) => f.status === statusFilter);
     if (severityFilter) result = result.filter((f) => f.severity === severityFilter);
     if (debouncedKeyword.trim()) {
@@ -150,7 +153,7 @@ export default function FindingsPage() {
       result = result.filter((f) => f.title.toLowerCase().includes(kw) || (f.summary && f.summary.toLowerCase().includes(kw)));
     }
     return result;
-  }, [findings, statusFilter, severityFilter, debouncedKeyword]);
+  }, [displayFindings, statusFilter, severityFilter, debouncedKeyword]);
 
   if (!projectId) {
     return (
@@ -195,7 +198,9 @@ export default function FindingsPage() {
                <div className="flex items-center gap-2">
                   <Badge variant="outline" className="h-10 px-4 rounded-md border-border bg-card shadow-sm text-xs text-muted-foreground">
                     <History className="h-3.5 w-3.5 mr-2" />
-                    共 {findings.length} 条记录
+                    {displayFindings.length === findings.length
+                      ? `共 ${findings.length} 条记录`
+                      : `共 ${displayFindings.length} 条（已去重，原始 ${findings.length} 条）`}
                   </Badge>
                </div>
             </div>

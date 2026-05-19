@@ -341,7 +341,7 @@ func (w *AssetDiscoveryWorkflow) runPostDiscovery(ctx context.Context, projectID
 			}
 		}
 	}
-	httpxTargets = dedupStrings(httpxTargets)
+	httpxTargets = dedupHTTPTargetsByOrigin(dedupStrings(httpxTargets))
 
 	httpxHostFile, err := writeHostsFile(w.dataDir, projectID, httpxTargets)
 	if err != nil {
