@@ -15,4 +15,6 @@ export { default as ConfirmDialog } from "./ConfirmDialog";
 export { default as ScanModal } from "./ScanModal";
 export type { ScanMode } from "./ScanModal";
 export { ErrorBoundary } from "./ErrorBoundary";
+export { default as TemplateEditor } from "./TemplateEditor";
+export type { TemplateFormData } from "./TemplateEditor";
 export { VirtualList } from "./VirtualList";

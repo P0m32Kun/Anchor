@@ -4,59 +4,20 @@ import { getApiToken } from "../lib/config";
 import {
   useToast,
   Button,
-  Input,
-  Card,
   Badge,
+  Card,
   Table,
   TableHeader,
   TableBody,
   TableRow,
   TableHead,
   TableCell,
-  Modal,
   ConfirmDialog,
   EmptyState,
+  TemplateEditor,
+  type TemplateFormData,
 } from "../components";
 import { ShieldAlert, Plus, Trash2, Settings2, Download, RotateCcw, Lock } from "lucide-react";
-
-const SOURCE_TOOL_OPTIONS = [
-  "nuclei",
-  "sqlmap",
-  "hydra",
-  "httpx",
-  "dnsx",
-  "ffuf",
-  "其他",
-];
-
-const SEVERITY_OPTIONS: { value: FindingTemplate["severity"]; label: string }[] = [
-  { value: "", label: "保留 finding 原值" },
-  { value: "critical", label: "严重 critical" },
-  { value: "high", label: "高危 high" },
-  { value: "medium", label: "中危 medium" },
-  { value: "low", label: "低危 low" },
-  { value: "info", label: "信息 info" },
-];
-
-type TemplateForm = {
-  source_tool: string;
-  match_key: string;
-  title: string;
-  severity: FindingTemplate["severity"];
-  summary: string;
-  remediation: string;
-  enabled: boolean;
-};
-
-const EMPTY_FORM: TemplateForm = {
-  source_tool: "nuclei",
-  match_key: "",
-  title: "",
-  severity: "",
-  summary: "",
-  remediation: "",
-  enabled: true,
-};
 
 function severityBadge(s: FindingTemplate["severity"]) {
   if (!s) return <Badge variant="outline">—</Badge>;
@@ -84,8 +45,7 @@ export default function VulnTemplatesPage() {
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<TemplateForm>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
+  const [editInitial, setEditInitial] = useState<Partial<TemplateFormData>>({});
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({ title: "", onConfirm: () => {} });
@@ -114,15 +74,15 @@ export default function VulnTemplatesPage() {
 
   function openCreate() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setEditInitial({});
     setEditorOpen(true);
   }
 
   function openEdit(t: FindingTemplate) {
     setEditingId(t.id);
-    setForm({
+    setEditInitial({
       source_tool: t.source_tool,
-      match_key: t.match_key,
+      match_keys: t.match_keys,
       title: t.title,
       severity: t.severity,
       summary: t.summary,
@@ -132,8 +92,8 @@ export default function VulnTemplatesPage() {
     setEditorOpen(true);
   }
 
-  async function handleSave() {
-    if (!form.source_tool.trim() || !form.match_key.trim()) {
+  async function handleSave(form: TemplateFormData) {
+    if (!form.source_tool.trim() || form.match_keys.length === 0) {
       toast("检测工具与匹配键不能为空", "warning");
       return;
     }
@@ -141,13 +101,12 @@ export default function VulnTemplatesPage() {
       toast("模板至少填写一项覆盖字段(标题/严重等级/描述/修复)", "warning");
       return;
     }
-    setSaving(true);
     try {
-      const payload = {
+      const payload: Partial<Omit<FindingTemplate, "id" | "created_at" | "updated_at">> = {
         source_tool: form.source_tool.trim(),
-        match_key: form.match_key.trim(),
+        match_keys: form.match_keys,
         title: form.title.trim(),
-        severity: form.severity,
+        severity: form.severity as FindingTemplate["severity"],
         summary: form.summary,
         remediation: form.remediation,
         enabled: form.enabled,
@@ -162,14 +121,14 @@ export default function VulnTemplatesPage() {
       setEditorOpen(false);
       load();
     } catch (err: any) {
-    } finally {
-      setSaving(false);
+      toast(err?.message || "保存失败", "error");
     }
   }
 
   function handleDelete(t: FindingTemplate) {
+    const keys = t.match_keys.join(", ");
     setConfirmConfig({
-      title: `删除模板 "${t.match_key}"？`,
+      title: `删除模板 "${keys}"？`,
       onConfirm: async () => {
         try {
           await api.deleteFindingTemplate(t.id);
@@ -177,6 +136,7 @@ export default function VulnTemplatesPage() {
           setConfirmOpen(false);
           load();
         } catch (err: any) {
+          toast(err?.message || "删除失败", "error");
         }
       },
     });
@@ -189,6 +149,7 @@ export default function VulnTemplatesPage() {
       toast(t.enabled ? "已禁用" : "已启用", "success");
       load();
     } catch (err: any) {
+      toast(err?.message || "操作失败", "error");
     }
   }
 
@@ -198,6 +159,7 @@ export default function VulnTemplatesPage() {
       toast("已应用上游版本", "success");
       load();
     } catch (err: any) {
+      toast(err?.message || "操作失败", "error");
     }
   }
 
@@ -208,7 +170,6 @@ export default function VulnTemplatesPage() {
       window.open(url, "_blank");
       return;
     }
-    // 鉴权下载,用 fetch + blob 触发浏览器下载
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => {
         if (!r.ok) throw new Error(`导出失败:${r.status}`);
@@ -223,7 +184,7 @@ export default function VulnTemplatesPage() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(u);
-        toast("已下载 JSON", "success");
+        toast("已下载 JSON (match_keys 数组格式)", "success");
       })
       .catch((e) => toast(e.message || "导出失败", "error"));
   }
@@ -238,11 +199,11 @@ export default function VulnTemplatesPage() {
           </div>
           <h1 className="text-3xl font-black tracking-tight text-foreground">漏洞模板</h1>
           <p className="text-muted-foreground mt-1">
-            为高频漏洞维护中文标题、描述与修复建议;生成报告时按「检测工具 + 匹配键」精确套用,非空字段覆盖 finding 原值。
+            为高频漏洞维护中文标题、描述与修复建议；生成报告时按「检测工具 + 匹配键」精确套用，非空字段覆盖 finding 原值。
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportAll}>
+          <Button variant="outline" onClick={handleExportAll} title="导出 JSON，match_keys 为数组格式">
             <Download className="mr-2 h-4 w-4" />
             导出 JSON
           </Button>
@@ -260,7 +221,7 @@ export default function VulnTemplatesPage() {
           <div className="p-20 text-center">
             <EmptyState
               title="暂无模板"
-              description="新增模板后,扫描产生的相同漏洞将在报告中自动套用您的标准描述与修复建议"
+              description="新增模板后，扫描产生的相同漏洞将在报告中自动套用您的标准描述与修复建议"
             />
           </div>
         ) : (
@@ -305,7 +266,13 @@ export default function VulnTemplatesPage() {
                     <Badge variant="outline" className="font-mono">{t.source_tool}</Badge>
                   </TableCell>
                   <TableCell>
-                    <span className="font-mono text-xs">{t.match_key}</span>
+                    <div className="flex flex-wrap gap-1">
+                      {t.match_keys.map((k) => (
+                        <span key={k} className="px-1.5 py-0.5 text-[10px] bg-primary/10 text-primary rounded">
+                          {k}
+                        </span>
+                      ))}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <span className="text-sm">{t.title || <span className="text-muted-foreground">—</span>}</span>
@@ -331,7 +298,7 @@ export default function VulnTemplatesPage() {
                           size="sm"
                           className="h-8 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
                           onClick={() => acceptUpstream(t)}
-                          title="放弃本地修改,应用上游(仓库)版本"
+                          title="放弃本地修改，应用上游(仓库)版本"
                         >
                           <RotateCcw className="mr-1 h-3.5 w-3.5" />
                           <span className="text-[10px]">应用上游</span>
@@ -366,102 +333,13 @@ export default function VulnTemplatesPage() {
         )}
       </Card>
 
-      <Modal
+      <TemplateEditor
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
-        title={editingId ? "编辑模板" : "新增模板"}
-        description="匹配键可填:nuclei 的 template-id、其他工具的规则 ID,或漏洞标题精确文本"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setEditorOpen(false)} disabled={saving}>
-              取消
-            </Button>
-            <Button onClick={handleSave} loading={saving}>{editingId ? "保存" : "创建"}</Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">检测工具 *</label>
-              <select
-                value={form.source_tool}
-                onChange={(e) => setForm((p) => ({ ...p, source_tool: e.target.value }))}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
-              >
-                {SOURCE_TOOL_OPTIONS.map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">严重等级</label>
-              <select
-                value={form.severity}
-                onChange={(e) => setForm((p) => ({ ...p, severity: e.target.value as FindingTemplate["severity"] }))}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
-              >
-                {SEVERITY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">匹配键 *</label>
-            <Input
-              value={form.match_key}
-              onChange={(e) => setForm((p) => ({ ...p, match_key: e.target.value }))}
-              placeholder="例如:exposed-git 或 SQL 注入漏洞 (登录接口)"
-            />
-            <p className="text-[10px] text-muted-foreground mt-1">
-              生成报告时按 finding 的 source_rule_id → matched_template → title 顺序与此键精确匹配,命中即用。
-            </p>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">模板标题</label>
-            <Input
-              value={form.title}
-              onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-              placeholder="留空则保留 finding 原标题"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">漏洞描述</label>
-            <textarea
-              value={form.summary}
-              onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))}
-              placeholder="留空则保留 finding 原描述"
-              rows={4}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 resize-y"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">修复建议</label>
-            <textarea
-              value={form.remediation}
-              onChange={(e) => setForm((p) => ({ ...p, remediation: e.target.value }))}
-              placeholder="留空则保留 finding 原修复建议"
-              rows={4}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 resize-y"
-            />
-          </div>
-
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={form.enabled}
-              onChange={(e) => setForm((p) => ({ ...p, enabled: e.target.checked }))}
-              className="h-4 w-4"
-            />
-            启用该模板(禁用后报告不会套用)
-          </label>
-        </div>
-      </Modal>
+        onSave={handleSave}
+        initialData={editInitial}
+        title="模板"
+      />
 
       <ConfirmDialog
         open={confirmOpen}
