@@ -27,6 +27,8 @@ func NewAllowlist() *Allowlist {
 			"cdncheck":   {},
 			"ffuf":       {},
 			"urlfinder":  {},
+			"gau":        {},
+			"katana":     {},
 			"git":        {},
 			"git.exe":    {},
 			"sh":         {},

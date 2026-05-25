@@ -286,6 +286,27 @@ func (p *Pipeline) runPostPhase(ctx context.Context, projectID string) {
 		return
 	}
 
+	// Collect URLs from all sources for the second-pass httpx → nuclei round.
+	var discoveredURLs []string
+	var mu sync.Mutex
+
+	// Katana crawl (runs before ffuf/urlfinder to feed additional targets)
+	wantKatana := p.config.EnableKatana
+	if wantKatana {
+		allURLs := make([]string, len(endpoints))
+		for i, ep := range endpoints {
+			allURLs[i] = ep.URL
+		}
+		crawlURLs, err := p.runKatana(ctx, allURLs)
+		if err != nil {
+			log.Printf("[pipeline] katana: %v", err)
+		} else if len(crawlURLs) > 0 {
+			mu.Lock()
+			discoveredURLs = append(discoveredURLs, crawlURLs...)
+			mu.Unlock()
+		}
+	}
+
 	wantFfuf := p.config.EnableFfuf && p.config.FfufDictionaryID != ""
 	wantURLFinder := p.config.EnableURLFinder
 	if !wantFfuf && !wantURLFinder {
@@ -300,10 +321,7 @@ func (p *Pipeline) runPostPhase(ctx context.Context, projectID string) {
 		p.setStage(StageURLFinder)
 	}
 
-	// Concurrent fan-out: ffuf per-endpoint + urlfinder batch
 	var wg sync.WaitGroup
-	var discoveredURLs []string
-	var mu sync.Mutex
 	var ffufFailures int
 	var urlfinderErr error
 	const maxFfufConcurrency = 5

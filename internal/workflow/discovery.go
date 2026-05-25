@@ -112,7 +112,7 @@ func (w *AssetDiscoveryWorkflow) runDomainChain(ctx context.Context, projectID s
 			continue
 		}
 
-		subfinderTask, err := w.createAndRunTask(ctx, projectID, dt.ID, "subfinder", worker.BuildSubfinderCommand(dt.Value, 0, 0, 0))
+		subfinderTask, err := w.createAndRunTask(ctx, projectID, dt.ID, "subfinder", worker.BuildSubfinderCommand(dt.Value, 0, 0, 0, ""))
 		if err != nil {
 			continue
 		}

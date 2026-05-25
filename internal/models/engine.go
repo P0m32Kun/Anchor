@@ -50,6 +50,19 @@ type PipelineConfig struct {
 	EnableURLFinder  bool   `json:"enable_urlfinder"`
 	URLFinderThreads int    `json:"urlfinder_threads"`       // default 50
 	URLFinderTimeout int    `json:"urlfinder_timeout"`       // seconds, default 10
+	// External-scan-only fields
+	EnablePassiveSearch      bool   `json:"enable_passive_search"`
+	EnablePassiveCert        bool   `json:"enable_passive_cert"`
+	EnablePassiveURL         bool   `json:"enable_passive_url"`
+	SubfinderMode            string `json:"subfinder_mode"`             // passive | active | off
+	EnableKatana             bool   `json:"enable_katana"`
+	KatanaMaxDepth           int    `json:"katana_max_depth"`
+	KatanaRateLimit          int    `json:"katana_rate_limit"`
+	FfufTier                 string `json:"ffuf_tier"`                  // small | medium | off
+	SkipPortscanOnCDNHost    bool   `json:"skip_portscan_on_cdn_host"`
+	NucleiRequireFingerprint bool   `json:"nuclei_require_fingerprint"`
+	PassiveSearchResultLimit int    `json:"passive_search_result_limit"`
+	PassiveSearchConcurrency int    `json:"passive_search_concurrency"`
 }
 
 func DefaultPipelineConfig() PipelineConfig {
@@ -89,4 +102,32 @@ func DefaultPipelineConfig() PipelineConfig {
 		URLFinderThreads: 20,
 		URLFinderTimeout: 10,
 	}
+}
+
+// DefaultExternalPipelineConfig returns the baseline configuration for
+// external-mode scans — deliberately more conservative on port range,
+// rate-limiting, and scan depth than the internal default.
+func DefaultExternalPipelineConfig() PipelineConfig {
+	cfg := DefaultPipelineConfig()
+	cfg.PortRange = "top100"
+	cfg.NaabuRate = 300
+	cfg.NaabuThreads = 50
+	cfg.NucleiScanDepth = "workflow"
+	cfg.NucleiRateLimit = 20
+	cfg.NucleiConcurrency = 5
+	cfg.NucleiRateLimitPerMinute = 30
+	cfg.FfufRateLimit = 4
+	cfg.EnablePassiveSearch = true
+	cfg.EnablePassiveCert = true
+	cfg.EnablePassiveURL = true
+	cfg.SubfinderMode = "passive"
+	cfg.EnableKatana = true
+	cfg.KatanaMaxDepth = 2
+	cfg.KatanaRateLimit = 10
+	cfg.FfufTier = "small"
+	cfg.SkipPortscanOnCDNHost = true
+	cfg.NucleiRequireFingerprint = true
+	cfg.PassiveSearchResultLimit = 500
+	cfg.PassiveSearchConcurrency = 3
+	return cfg
 }

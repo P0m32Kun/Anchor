@@ -10,7 +10,6 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/parser"
 	"github.com/P0m32Kun/Anchor/internal/resolve"
-	"github.com/P0m32Kun/Anchor/internal/search"
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
@@ -52,102 +51,49 @@ func (p *Pipeline) runFlow(ctx context.Context, group targetGroup) error {
 	}
 }
 
-// runCompanyFlow: FOFA search → expand to domains/ips → route to respective flows.
+// runCompanyFlow: passive search (FOFA + Hunter + Quake) → expand to
+// domains/ips → route to respective flows for each company target.
 func (p *Pipeline) runCompanyFlow(ctx context.Context, targets []*models.Target) error {
-	p.setStage(StageSearch)
-
-	if !p.config.EnableFOFA || p.fofa == nil {
-		log.Printf("FOFA disabled or not configured, skipping company targets")
-		p.completeStage(StageSearch)
-		return nil
-	}
-
 	var flowErr error
 	for _, t := range targets {
-		results, err := p.fofa.SearchCompany(ctx, t.Value)
-		if err != nil {
-			log.Printf("fofa search for %s: %v", t.Value, err)
-			p.failStage(StageSearch, err.Error())
-			continue
-		}
-
-		var domains, ips []string
-		for _, r := range results {
-			if search.IsDomain(r.Host) {
-				domains = append(domains, r.Host)
-			}
-			if r.IP != "" {
-				ips = append(ips, r.IP)
+		if err := p.runPassiveSearch(ctx, t.Value); err != nil {
+			log.Printf("passive search for %s: %v", t.Value, err)
+			if flowErr == nil {
+				flowErr = err
 			}
 		}
-
-		domains = dedupStrings(domains)
-		ips = dedupStrings(ips)
-
-		log.Printf("company %s: found %d domains, %d ips from FOFA", t.Value, len(domains), len(ips))
-
-		for _, d := range domains {
-			target := &models.Target{
-				ID:        util.GenerateID(),
-				ProjectID: p.projectID,
-				Type:      models.TargetTypeDomain,
-				Value:     d,
-				Source:    "fofa",
-				Status:    "active",
-				CreatedAt: time.Now().UTC(),
-			}
-			if err := p.queries.CreateTarget(target); err != nil {
-				log.Printf("[pipeline] save fofa domain target: %v", err)
-			}
-		}
-		for _, ip := range ips {
-			target := &models.Target{
-				ID:        util.GenerateID(),
-				ProjectID: p.projectID,
-				Type:      models.TargetTypeIP,
-				Value:     ip,
-				Source:    "fofa",
-				Status:    "active",
-				CreatedAt: time.Now().UTC(),
-			}
-			if err := p.queries.CreateTarget(target); err != nil {
-				log.Printf("[pipeline] save fofa ip target: %v", err)
-			}
-		}
-
-		if len(domains) > 0 {
-			if err := p.runDomainFlow(ctx, makeTargets(domains, models.TargetTypeDomain)); err != nil {
-				log.Printf("domain flow from company: %v", err)
-				if flowErr == nil {
-					flowErr = err
-				}
-			}
-		}
-		if len(ips) > 0 {
-			if err := p.runIPFlow(ctx, makeTargets(ips, models.TargetTypeIP)); err != nil {
-				log.Printf("ip flow from company: %v", err)
-				if flowErr == nil {
-					flowErr = err
-				}
-			}
-		}
-	}
-
-	if flowErr == nil {
-		p.completeStage(StageSearch)
 	}
 	return flowErr
 }
 
-// runDomainFlow: Subfinder → DNS → CDN → Naabu → nmap -sV → split Web/nonWeb → httpx → Nuclei.
+// runDomainFlow: PassiveCert → PassiveURL → Subfinder → DNS → CDN → Naabu → nmap -sV → split Web/nonWeb → httpx → Nuclei.
 func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) error {
 	p.setStage(StageSubdomain)
 
 	domains := extractTargetValues(targets)
 
+	// S1: Passive certificate transparency subdomain discovery
+	for _, d := range domains {
+		if err := p.runPassiveCert(ctx, d); err != nil {
+			log.Printf("passive cert %s: %v", d, err)
+		}
+	}
+
+	// S1b: Passive URL history collection
+	for _, d := range domains {
+		urls, err := p.runPassiveURL(ctx, d)
+		if err != nil {
+			log.Printf("passive url %s: %v", d, err)
+		} else {
+			_ = urls // stored in memory for post-phase URL discovery
+		}
+	}
+
 	// S2: Subdomain discovery
 	var allDomains []string
-	if p.config.EnableSubfinder {
+	if p.config.SubfinderMode == "off" || !p.config.EnableSubfinder {
+		allDomains = domains
+	} else if p.config.EnableSubfinder {
 		for _, domain := range domains {
 			subs, err := p.runSubfinder(ctx, domain)
 			if err != nil {

@@ -213,9 +213,13 @@ func (s *Server) handleGetPipelineRunStages(w http.ResponseWriter, r *http.Reque
 
 // buildConfigForMode returns a PipelineConfig for external/internal scan modes.
 // Speed parameters are loaded from the request body; defaults are applied for zero values.
+// For external mode, the baseline is DefaultExternalPipelineConfig; for internal it is DefaultPipelineConfig.
 func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineConfig {
-	// Apply defaults for any zero speed values.
+	// Select baseline by mode.
 	defaults := models.DefaultPipelineConfig()
+	if mode == "external" {
+		defaults = models.DefaultExternalPipelineConfig()
+	}
 	if cfg.PortRange == "" {
 		cfg.PortRange = defaults.PortRange
 	}

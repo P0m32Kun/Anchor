@@ -21,8 +21,13 @@ const HighRiskPorts = "21,22,23,25,53,80,81,88,110,135,139,143,389,443,445,465,5
 
 // BuildSubfinderCommand builds a Subfinder command for the given domain.
 // Output goes to stdout as JSONL so the worker can capture it as an artifact.
-func BuildSubfinderCommand(domain string, rateLimit, threads, timeout int) []string {
+// When mode is "passive", the -passive flag is added so subfinder only
+// uses passive sources (no active probing).
+func BuildSubfinderCommand(domain string, rateLimit, threads, timeout int, mode string) []string {
 	args := []string{"subfinder", "-d", domain, "-oJ"}
+	if mode == "passive" {
+		args = append(args, "-passive")
+	}
 	if rateLimit > 0 {
 		args = append(args, "-rate-limit", fmt.Sprintf("%d", rateLimit))
 	}
@@ -297,6 +302,21 @@ func BuildURLFinderCommand(inputFile, workdir string, threads, timeout int) []st
 	}
 	if timeout > 0 {
 		args = append(args, "-time", fmt.Sprintf("%d", timeout))
+	}
+	return args
+}
+
+// BuildKatanaCommand builds a Katana web crawler command.
+// listFile contains seed URLs (one per line). depth controls crawl depth.
+// rateLimit controls requests per second.
+// Output is JSONL to stdout.
+func BuildKatanaCommand(listFile string, depth, rateLimit int) []string {
+	args := []string{"katana", "-list", listFile, "-json"}
+	if depth > 0 {
+		args = append(args, "-depth", fmt.Sprintf("%d", depth))
+	}
+	if rateLimit > 0 {
+		args = append(args, "-rate-limit", fmt.Sprintf("%d", rateLimit))
 	}
 	return args
 }

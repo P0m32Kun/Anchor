@@ -23,6 +23,10 @@ const (
 	// discovered by ffuf / urlfinder.
 	StageHTTPX2 StageID = "httpx_2"
 	StageVuln2  StageID = "vuln_2"
+	// External-scan-only stages
+	StagePassiveCert StageID = "passive_cert" // crt.sh certificate transparency subdomain discovery
+	StagePassiveURL  StageID = "passive_url"  // gau historical URL collection
+	StageCrawl       StageID = "crawl"        // Katana web crawling
 )
 
 // StageEventCallback is invoked when a pipeline stage changes state.

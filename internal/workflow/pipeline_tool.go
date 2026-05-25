@@ -28,7 +28,7 @@ func (p *Pipeline) runSubfinder(ctx context.Context, domain string) ([]string, e
 		return nil, fmt.Errorf("scope denied")
 	}
 
-	task, stdout, err := p.createAndRunTask(ctx, "subfinder", worker.BuildSubfinderCommand(domain, p.config.SubfinderRateLimit, p.config.SubfinderThreads, p.config.SubfinderTimeout))
+	task, stdout, err := p.createAndRunTask(ctx, "subfinder", worker.BuildSubfinderCommand(domain, p.config.SubfinderRateLimit, p.config.SubfinderThreads, p.config.SubfinderTimeout, p.config.SubfinderMode))
 	if err != nil {
 		return nil, err
 	}
@@ -317,6 +317,9 @@ func (p *Pipeline) mergeFingerprintFiles(fingerprints []*models.HttpxFingerprint
 func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndpoint) error {
 	groups := nuclei.GroupEndpointsByTags(endpoints)
 	if len(groups) == 0 {
+		if p.config.NucleiRequireFingerprint && len(endpoints) > 0 {
+			log.Printf("[pipeline] nuclei web: skipped %d endpoints (no fingerprint, nuclei_require_fingerprint=true)", len(endpoints))
+		}
 		return nil
 	}
 

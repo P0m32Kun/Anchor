@@ -5,6 +5,7 @@ import { Input } from "./Input";
 import {
   PipelineConfig,
   DEFAULT_PIPELINE_CONFIG,
+  DEFAULT_EXTERNAL_PIPELINE_CONFIG,
   DEFAULT_HIGH_RISK_PORTS,
   TP_PRESET_VALUES,
   TP_PRESET_LABELS,
@@ -20,14 +21,15 @@ export type ScanMode = "external" | "internal";
 const SCAN_CONFIG_STORAGE_KEY = "anchor.scanModal.config";
 const SCAN_MODE_STORAGE_KEY = "anchor.scanModal.mode";
 
-function loadStoredConfig(): PipelineConfig {
+function loadStoredConfig(mode: ScanMode): PipelineConfig {
+  const base = mode === "external" ? DEFAULT_EXTERNAL_PIPELINE_CONFIG : DEFAULT_PIPELINE_CONFIG;
   try {
     const raw = localStorage.getItem(SCAN_CONFIG_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_PIPELINE_CONFIG };
+    if (!raw) return { ...base };
     const parsed = JSON.parse(raw) as Partial<PipelineConfig>;
-    return { ...DEFAULT_PIPELINE_CONFIG, ...parsed };
+    return { ...base, ...parsed };
   } catch {
-    return { ...DEFAULT_PIPELINE_CONFIG };
+    return { ...base };
   }
 }
 
@@ -200,7 +202,7 @@ function decodePortRange(raw: string): {
 export default function ScanModal({ open, onClose, onStart, loading, projectId }: ScanModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mode, setMode] = useState<ScanMode>(() => loadStoredMode());
-  const [config, setConfig] = useState<PipelineConfig>(() => loadStoredConfig());
+  const [config, setConfig] = useState<PipelineConfig>(() => loadStoredConfig(loadStoredMode()));
 
   // Merge project pipeline config on mount so saved settings (e.g.
   // nuclei_scan_depth) are honoured even when localStorage is stale.
@@ -258,6 +260,8 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   const handleSelectMode = (m: ScanMode) => {
     setMode(m);
     localStorage.setItem(SCAN_MODE_STORAGE_KEY, m);
+    // When switching mode, reload config from the mode-appropriate defaults.
+    setConfig(loadStoredConfig(m));
   };
 
   const handleNext = () => {
@@ -271,8 +275,9 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   };
 
   const handleResetDefaults = () => {
-    setConfig({ ...DEFAULT_PIPELINE_CONFIG });
-    const reset = decodePortRange(DEFAULT_PIPELINE_CONFIG.port_range);
+    const base = mode === "external" ? DEFAULT_EXTERNAL_PIPELINE_CONFIG : DEFAULT_PIPELINE_CONFIG;
+    setConfig({ ...base });
+    const reset = decodePortRange(base.port_range);
     setPortMode(reset.mode);
     setTpValue(reset.tpValue);
     setPValue(reset.pValue);

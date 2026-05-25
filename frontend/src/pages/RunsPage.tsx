@@ -716,6 +716,9 @@ const STAGE_LABELS: Record<string, string> = {
   urlfinder: "URL 发现",
   httpx_2: "Web 探活 (2)",
   vuln_2: "漏洞扫描 (2)",
+  passive_cert: "证书子域",
+  passive_url: "历史 URL",
+  crawl: "站点爬虫",
 };
 
 // mergeStageEvent reduces an SSE pipeline_stage_change event into the local

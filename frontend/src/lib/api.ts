@@ -765,6 +765,19 @@ export interface PipelineConfig {
   enable_urlfinder: boolean;
   urlfinder_threads: number;
   urlfinder_timeout: number;
+  // External-scan-only fields
+  enable_passive_search: boolean;
+  enable_passive_cert: boolean;
+  enable_passive_url: boolean;
+  subfinder_mode: string; // passive | active | off
+  enable_katana: boolean;
+  katana_max_depth: number;
+  katana_rate_limit: number;
+  ffuf_tier: string; // small | medium | off
+  skip_portscan_on_cdn_host: boolean;
+  nuclei_require_fingerprint: boolean;
+  passive_search_result_limit: number;
+  passive_search_concurrency: number;
 }
 
 export interface Dictionary {
@@ -871,6 +884,42 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   enable_urlfinder: true,
   urlfinder_threads: 20,
   urlfinder_timeout: 10,
+  enable_passive_search: false,
+  enable_passive_cert: false,
+  enable_passive_url: false,
+  subfinder_mode: "active",
+  enable_katana: false,
+  katana_max_depth: 2,
+  katana_rate_limit: 10,
+  ffuf_tier: "off",
+  skip_portscan_on_cdn_host: false,
+  nuclei_require_fingerprint: false,
+  passive_search_result_limit: 500,
+  passive_search_concurrency: 3,
+};
+
+export const DEFAULT_EXTERNAL_PIPELINE_CONFIG: PipelineConfig = {
+  ...DEFAULT_PIPELINE_CONFIG,
+  port_range: "top100",
+  naabu_rate: 300,
+  naabu_threads: 50,
+  nuclei_scan_depth: "workflow",
+  nuclei_rate_limit: 20,
+  nuclei_concurrency: 5,
+  nuclei_rate_limit_per_min: 30,
+  ffuf_rate_limit: 4,
+  enable_passive_search: true,
+  enable_passive_cert: true,
+  enable_passive_url: true,
+  subfinder_mode: "passive",
+  enable_katana: true,
+  katana_max_depth: 2,
+  katana_rate_limit: 10,
+  ffuf_tier: "small",
+  skip_portscan_on_cdn_host: true,
+  nuclei_require_fingerprint: true,
+  passive_search_result_limit: 500,
+  passive_search_concurrency: 3,
 };
 
 // Mirrors internal/worker/commands.go:HighRiskPorts — curated list of high-value
