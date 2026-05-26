@@ -161,14 +161,15 @@ func readTaskStdout(db ScanTaskDB, taskID string) ([]byte, error) {
 }
 
 // joinArgs joins argv into a command template string for storage.
+// The worker.Run(CommandTemplate) expects argv[0] to be the binary name.
 func joinArgs(argv []string) string {
 	if len(argv) == 0 {
 		return ""
 	}
-	// Skip binary name (argv[0])
-	rest := argv[1:]
+	// Include binary name (argv[0]) so worker.Run can parse it back:
+	//   args[0] → binary, args[1:] → flags
 	var out string
-	for i, s := range rest {
+	for i, s := range argv {
 		if i > 0 {
 			out += " "
 		}
