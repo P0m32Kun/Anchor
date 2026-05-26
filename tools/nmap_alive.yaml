@@ -1,0 +1,15 @@
+id: nmap_alive
+binary: nmap
+description: Host discovery via ICMP/TCP probes (nmap -sn)
+output:
+  format: greppable
+parameters:
+  host_file:
+    type: path
+    required: true
+    flag: "-iL"
+literals:
+  - ["-sn"]
+  - ["-n"]
+  - ["-T4"]
+  - ["-oG", "-"]

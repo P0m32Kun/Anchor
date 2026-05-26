@@ -1,0 +1,50 @@
+id: nuclei
+binary: nuclei
+description: Vulnerability scanner based on YAML templates
+output:
+  format: jsonl
+parameters:
+  target_file:
+    type: path
+    required: true
+    flag: "-l"
+  profile:
+    type: enum
+    values: ["light", "standard", "deep"]
+    default: "standard"
+    value_flags:
+      light:
+        - ["-severity", "critical,high"]
+        - ["-timeout", "3"]
+      standard:
+        - ["-severity", "critical,high,medium"]
+        - ["-timeout", "5"]
+      deep:
+        - ["-severity", "critical,high,medium,low,info"]
+        - ["-timeout", "10"]
+  tags:
+    type: string_list
+    flag: "-tags"
+  scan_depth:
+    type: enum
+    values: ["tags", "workflow", "both"]
+    default: "tags"
+  workflow_dir:
+    type: path
+    flag: "-w"
+  template_path:
+    type: path
+    flag: "-w"
+    # takes precedence over scan_depth+workflow_dir when set
+  concurrency:
+    type: int
+    flag: "-c"
+  rate_limit_per_min:
+    type: int
+    flag: "-rlm"
+  rate_limit:
+    type: int
+    flag: "-rl"
+literals:
+  - ["-jsonl"]
+  # NOTE: -stats -si 30 intentionally removed per design §2.1#1

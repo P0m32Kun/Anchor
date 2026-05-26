@@ -1,43 +1,31 @@
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+# Agent Guidelines
 
-This project is indexed by GitNexus as **Anchor** (8919 symbols, 18859 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+## Role
 
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+Senior Go engineer working on Anchor — a security scanner orchestration platform. You understand Go concurrency patterns, SQLite nuances, and Tauri/React desktop apps. You write clean, well-tested code and prefer explicit error handling over panics.
 
-## Always Do
+## Project Context
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+Anchor is a desktop application (Tauri + React frontend, Go backend) that orchestrates security scanning tools (Nuclei, ffuf, naabu, etc.) with SQLite persistence and real-time WebSocket updates.
 
-## Never Do
+## Key Principles
 
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+1. **Prefer explicit over implicit** — No magic. If something needs to happen, make it visible in the code.
+2. **Fail fast with clear errors** — Return errors up the stack with context, don't swallow them.
+3. **Test the edge cases** — Empty inputs, concurrent access, resource limits. If it's not tested, it's broken.
+4. **Keep handlers thin** — Business logic belongs in services/managers, not HTTP handlers.
+5. **Document as you go** — When you change a struct field or add a route, update the README reverse index in the same commit.
 
-## Resources
+## Code Style
 
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/Anchor/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/Anchor/clusters` | All functional areas |
-| `gitnexus://repo/Anchor/processes` | All execution flows |
-| `gitnexus://repo/Anchor/process/{name}` | Step-by-step execution trace |
+- Use `gofmt` + `goimports` automatically
+- Error messages start with lowercase, no punctuation: `return fmt.Errorf("failed to open database: %w", err)`
+- Context propagation: always pass `ctx context.Context` as the first parameter
+- No global state in production code
 
-## CLI
+## Testing
 
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
-
-<!-- gitnexus:end -->
+- Unit tests for pure functions and business logic
+- Integration tests for database operations (use temp DB)
+- E2E tests for critical user flows
+- Mock external services (HTTP clients, tool executors), not the database

@@ -3,11 +3,13 @@ package toolguard
 import (
 	"strings"
 	"testing"
+
+	"github.com/P0m32Kun/Anchor/internal/toolregistry"
 )
 
 func TestAllowlist_AllowedBinary(t *testing.T) {
 	a := NewAllowlist()
-	for _, name := range []string{"subfinder", "dnsx", "httpx", "naabu", "nmap", "nuclei", "cdncheck", "ffuf", "urlfinder", "git", "sh"} {
+	for _, name := range []string{"subfinder", "dnsx", "httpx", "naabu", "nmap", "nuclei", "cdncheck", "ffuf", "katana", "gau", "git", "sh"} {
 		if err := a.Validate(name, nil); err != nil {
 			t.Errorf("%q should be allowed: %v", name, err)
 		}
@@ -81,6 +83,53 @@ func TestAllowlist_AllowRegister(t *testing.T) {
 	a.Allow("custom-tool")
 	if err := a.Validate("custom-tool", nil); err != nil {
 		t.Fatalf("expected custom-tool to be allowed after Allow: %v", err)
+	}
+}
+
+func TestNewAllowlistFromBinaries_MatchHardcoded(t *testing.T) {
+	reg := toolregistry.DefaultRegistry()
+	a := NewAllowlistFromBinaries(reg.Binaries())
+
+	// Registry-derived allowlist should accept all scanning tools.
+	for _, name := range []string{"subfinder", "dnsx", "httpx", "naabu", "nuclei", "cdncheck", "ffuf", "gau", "katana"} {
+		if err := a.Validate(name, nil); err != nil {
+			t.Errorf("registry allowlist should accept %q: %v", name, err)
+		}
+	}
+
+	// nmap appears twice (nmap_alive, nmap_service) but only once in binaries set.
+	if err := a.Validate("nmap", nil); err != nil {
+		t.Errorf("registry allowlist should accept nmap: %v", err)
+	}
+
+	// System binaries should also be accepted.
+	for _, name := range []string{"git", "sh", "bash"} {
+		if err := a.Validate(name, nil); err != nil {
+			t.Errorf("registry allowlist should accept system binary %q: %v", name, err)
+		}
+	}
+
+	// Unknown binary should be rejected.
+	if err := a.Validate("curl", nil); err == nil {
+		t.Fatal("registry allowlist should reject curl")
+	}
+}
+
+func TestNewAllowlistFromBinaries_EquivalentToHardcoded(t *testing.T) {
+	reg := toolregistry.DefaultRegistry()
+	derived := NewAllowlistFromBinaries(reg.Binaries())
+	hardcoded := NewAllowlist()
+
+	// Derived from registry must contain all tool binaries that the
+	// hardcoded allowlist has (excluding system binaries).
+	hardcodedBins := []string{"subfinder", "dnsx", "httpx", "naabu", "nmap", "nuclei", "cdncheck", "ffuf", "gau", "katana"}
+	for _, name := range hardcodedBins {
+		if err := derived.Validate(name, nil); err != nil {
+			t.Errorf("derived allowlist missing %q (present in hardcoded): %v", name, err)
+		}
+		if err := hardcoded.Validate(name, nil); err != nil {
+			t.Errorf("hardcoded allowlist missing %q: %v", name, err)
+		}
 	}
 }
 

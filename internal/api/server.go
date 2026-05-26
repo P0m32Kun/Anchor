@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -78,9 +79,14 @@ type Server struct {
 	// 消费者: worker_handlers.go
 	taskResults map[string]chan map[string]interface{}
 
-	// mu: 保护 sseClients / taskQueue / taskResults 的并发访问。
+	// mu: 保护 sseClients / taskQueue / taskResults / pipelineCancels 的并发访问。
 	// 消费者: run / sse / worker
 	mu sync.Mutex
+
+	// pipelineCancels: runID -> cancel func。用于在用户点击强制停止时
+	// 取消 pipeline goroutine 的 context，让流水线在下一个 stage 前退出。
+	// 消费者: pipeline_handlers.go
+	pipelineCancels map[string]context.CancelFunc
 
 	// 任务分发与 SSE 子系统 ↑↑↑
 
@@ -128,9 +134,10 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 		worker:      worker.NewRunner(queries, scopeEng, dataDir),
 		health:      health.NewChecker(queries),
 		dataDir:     dataDir,
-		sseClients:  make(map[string]map[string]chan []byte),
-		taskQueue:   make(map[string]chan *models.ScanTask),
-		taskResults: make(map[string]chan map[string]interface{}),
+		sseClients:      make(map[string]map[string]chan []byte),
+		taskQueue:       make(map[string]chan *models.ScanTask),
+		taskResults:     make(map[string]chan map[string]interface{}),
+		pipelineCancels: make(map[string]context.CancelFunc),
 		apiToken:    token,
 		projectSvc:  service.NewProjectService(queries),
 		targetSvc:   service.NewTargetService(queries, rawDB, scopeEng),
@@ -304,8 +311,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /scan-plans/dry-run", auth(http.HandlerFunc(s.handleDryRun)))
 	mux.Handle("GET /scan-tasks/{id}", auth(http.HandlerFunc(s.handleGetTask)))
 	mux.Handle("POST /scan-tasks/{id}/cancel", auth(http.HandlerFunc(s.handleCancelTask)))
-	mux.Handle("POST /tasks/run", auth(http.HandlerFunc(s.handleRunTask)))
+	// POST /tasks/run removed — all tool execution goes through toolrun.Invoke
 	mux.Handle("GET /tasks/{id}/artifacts", auth(http.HandlerFunc(s.handleListArtifacts)))
+	mux.Handle("GET /tasks/{id}/artifacts/{artifactId}/content", auth(http.HandlerFunc(s.handleGetArtifactContentRange)))
+	mux.Handle("GET /tasks/{id}/output", auth(http.HandlerFunc(s.handleGetTaskOutput)))
 	mux.Handle("GET /artifacts/content", auth(http.HandlerFunc(s.handleGetArtifactContent)))
 	mux.Handle("GET /health/tools", auth(http.HandlerFunc(s.handleToolHealth)))
 	mux.Handle("POST /health/check", auth(http.HandlerFunc(s.handleHealthCheck)))

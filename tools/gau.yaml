@@ -1,0 +1,10 @@
+id: gau
+binary: gau
+description: Historical URL collector (Wayback Machine / AlienVault)
+output:
+  format: text
+parameters:
+  domain:
+    type: string
+    required: true
+    # positional: no flag, appended as last arg

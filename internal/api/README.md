@@ -36,7 +36,7 @@
 | `retest_handlers.go` | `POST /findings/{id}/retest`, `GET /findings/{id}/retests` | `queries`, `rawDB` | 复测;唯一使用 `rawDB` 的 handler |
 | `report_handlers.go` | `GET /projects/{id}/reports/export.md` | `queries` | 同步报告导出(Markdown) |
 | `archive_handlers.go` | `POST /projects/{id}/archive`, `GET /projects/{id}/archive/download` | `queries`, `dataDir` | 项目归档打包导出 |
-| `task_handlers.go` | `POST /scan-plans`, `/scan-plans/{id}/approve`, `/scan-plans/dry-run`, `GET /scan-tasks/{id}`, `POST /scan-tasks/{id}/cancel`, `POST /tasks/run`, `GET /tasks/{id}/artifacts`, `/artifacts/content` | `queries`, `worker` | 扫描计划 + 单任务执行 |
+| `task_handlers.go`, `task_output_handlers.go` | `POST /scan-plans`, `/scan-plans/{id}/approve`, `/scan-plans/dry-run`, `GET /scan-tasks/{id}`, `POST /scan-tasks/{id}/cancel`, `POST /tasks/run`, `GET /tasks/{id}/artifacts`, `GET /tasks/{id}/output`, `/artifacts/content` | `queries`, `worker` | 扫描计划 + 单任务执行；`/output` 为运行中任务的增量 stdout/stderr |
 | `worker_handlers.go` | `GET /workers`, `POST /workers/register`, `POST /workers/{id}/heartbeat`, `GET /workers/{id}/tasks/poll`, `POST /tasks/{id}/result`, `POST /workers/{id}/revoke`, `DELETE /workers/{id}` | `queries`, `dataDir`, **`taskQueue`**, **`taskResults`**, **`mu`** | 远程 worker 节点管理 + 任务长轮询 + 结果回报 |
 | `engine_handlers.go` | `GET/POST/DELETE /engines/credentials[/{engine}]`, `GET /engines/search`, `/engines/quota` | `queries` | FOFA/Hunter/Quake 等情报引擎统一接入 |
 | `nuclei_custom_handlers.go` | `GET/POST/PATCH/DELETE /nuclei/custom/sources[/{id}][/...]`, `PATCH /nuclei/custom/sources/{id}/enabled`, `/files`, `/validate`, `/publish`, `/manifest`, `/bundles/{version}` | `nucleiCustomMgr` | Nuclei 模板源；内置只读，见下表 |

@@ -106,32 +106,58 @@ func (s *targetService) Import(ctx context.Context, projectID string, targets []
 	}
 
 	if len(rules) == 0 {
-		var suggested []ScopeRuleSuggestion
-		seen := make(map[string]bool)
-		for _, t := range targets {
-			key := string(t.Type) + ":" + t.Value
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-			suggested = append(suggested, ScopeRuleSuggestion{
-				Action: "include",
-				Type:   string(t.Type),
-				Value:  t.Value,
-			})
+		suggested := buildSuggestedScopeRules(targets)
+		if len(suggested) > 0 {
+			return &ImportResult{
+				NeedsScopeConfirmation: true,
+				Message:                "当前项目未设置授权范围，是否将导入的目标自动加入授权范围？",
+				SuggestedRules:         suggested,
+			}, nil
 		}
-		return &ImportResult{
-			NeedsScopeConfirmation: true,
-			Message:                "当前项目未设置授权范围，是否将导入的目标自动加入授权范围？",
-			SuggestedRules:         suggested,
-		}, nil
 	}
 
+	// 与 Create 一致：导入阶段不做 scope 校验，授权边界在 dry-run / 扫描流水线 enforced。
+	return s.importTargets(projectID, targets)
+}
+
+func buildSuggestedScopeRules(targets []ImportTarget) []ScopeRuleSuggestion {
+	var suggested []ScopeRuleSuggestion
+	seen := make(map[string]bool)
+	for _, t := range targets {
+		// company 目标在流水线中直接透传，不需要 include scope 规则。
+		if t.Type == models.TargetTypeCompany {
+			continue
+		}
+		key := string(t.Type) + ":" + t.Value
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		suggestedType := string(t.Type)
+		suggestedValue := t.Value
+		if t.Type == models.TargetTypeIP {
+			suggestedType = string(models.TargetTypeCIDR)
+			suggestedValue = t.Value + "/32"
+		}
+		suggested = append(suggested, ScopeRuleSuggestion{
+			Action: "include",
+			Type:   suggestedType,
+			Value:  suggestedValue,
+		})
+	}
+	return suggested
+}
+
+func (s *targetService) importTargets(projectID string, targets []ImportTarget) (*ImportResult, error) {
 	now := time.Now().UTC()
 	result := &ImportResult{}
 	var toInsert []*models.Target
 
 	for _, pt := range targets {
+		if pt.Value == "" {
+			result.Errors++
+			continue
+		}
 		exists, dbErr := s.queries.TargetExistsByValue(projectID, pt.Value)
 		if dbErr != nil {
 			result.Errors++
@@ -151,19 +177,6 @@ func (s *targetService) Import(ctx context.Context, projectID string, targets []
 			Status:    "active",
 			CreatedAt: now,
 		}
-
-		decision, chkErr := s.scopeEng.Check(ctx, projectID, t)
-		if chkErr != nil {
-			result.Errors++
-			continue
-		}
-
-		if decision.Decision == models.ScopeDeny {
-			result.Denied++
-			result.DeniedTargets = append(result.DeniedTargets, DeniedTarget{Value: t.Value, Reason: decision.Reason})
-			continue
-		}
-
 		toInsert = append(toInsert, t)
 		result.Targets = append(result.Targets, t)
 		result.Imported++

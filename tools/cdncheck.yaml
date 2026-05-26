@@ -1,0 +1,14 @@
+id: cdncheck
+binary: cdncheck
+description: CDN/proxy classification for IPs
+output:
+  format: jsonl
+parameters:
+  ips:
+    type: string
+    required: true
+    flag: "-i"
+literals:
+  - ["-jsonl"]
+  - ["-silent"]
+  - ["-duc"]

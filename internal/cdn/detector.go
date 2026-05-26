@@ -2,7 +2,7 @@ package cdn
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"os/exec"
 	"strings"
 
@@ -22,13 +22,12 @@ func NewDetector() *Detector {
 // CheckIP checks if an IP is behind a CDN.
 func (d *Detector) CheckIP(ctx context.Context, ip string) (models.CDNResult, error) {
 	if err := d.allowlist.Validate("cdncheck", []string{"-i", ip, "-resp"}); err != nil {
-		return models.CDNResult{IP: ip, IsCDN: false}, nil
+		return models.CDNResult{}, fmt.Errorf("cdncheck allowlist: %w", err)
 	}
 	cmd := exec.CommandContext(ctx, "cdncheck", "-i", ip, "-resp")
 	out, err := cmd.Output()
 	if err != nil {
-		// If cdncheck fails, assume not CDN
-		return models.CDNResult{IP: ip, IsCDN: false}, nil
+		return models.CDNResult{}, fmt.Errorf("cdncheck: %w", err)
 	}
 
 	output := strings.TrimSpace(string(out))
@@ -48,57 +47,18 @@ func (d *Detector) CheckIP(ctx context.Context, ip string) (models.CDNResult, er
 // FilterCDNIPs checks a list of IPs and returns non-CDN IPs and CDN results.
 func (d *Detector) FilterCDNIPs(ctx context.Context, ips []string) ([]string, []models.CDNResult, error) {
 	if len(ips) == 0 {
-		return nil, nil, nil
+		return nil, nil, fmt.Errorf("no IPs to classify")
 	}
 
-	// Use cdncheck with JSON output for batch processing
 	input := strings.Join(ips, ",")
 	if err := d.allowlist.Validate("cdncheck", []string{"-i", input, "-jsonl"}); err != nil {
-		return ips, nil, nil
+		return nil, nil, fmt.Errorf("cdncheck allowlist: %w", err)
 	}
 	cmd := exec.CommandContext(ctx, "cdncheck", "-i", input, "-jsonl")
 	out, err := cmd.Output()
 	if err != nil {
-		// If cdncheck fails, return all IPs as non-CDN
-		return ips, nil, nil
+		return nil, nil, fmt.Errorf("cdncheck: %w", err)
 	}
 
-	var cdnResults []models.CDNResult
-	cdnIPSet := make(map[string]bool)
-
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		var result struct {
-			IP       string `json:"ip"`
-			CDN      bool   `json:"cdn"`
-			Provider string `json:"provider"`
-			Type     string `json:"type"`
-		}
-		if err := json.Unmarshal([]byte(line), &result); err != nil {
-			continue
-		}
-
-		if result.CDN {
-			cdnResults = append(cdnResults, models.CDNResult{
-				IP:       result.IP,
-				IsCDN:    true,
-				Provider: result.Provider,
-				Type:     result.Type,
-			})
-			cdnIPSet[result.IP] = true
-		}
-	}
-
-	var nonCDNIPs []string
-	for _, ip := range ips {
-		if !cdnIPSet[ip] {
-			nonCDNIPs = append(nonCDNIPs, ip)
-		}
-	}
-
-	return nonCDNIPs, cdnResults, nil
+	return ParseJSONLOutput(out, ips)
 }

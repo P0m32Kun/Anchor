@@ -85,6 +85,11 @@ func (q *Queries) SetScanTaskRunning(id string, startedAt time.Time) error {
 	return err
 }
 
+func (q *Queries) SetScanTaskWorker(id, workerID string) error {
+	_, err := q.db.Exec(`UPDATE scan_tasks SET worker_id = ? WHERE id = ?`, workerID, id)
+	return err
+}
+
 // ResetScanTaskForRetry clears terminal state on a task so it can be re-dispatched.
 // Used by the dispatcher to retry tasks that were idle-killed by the worker watchdog.
 func (q *Queries) ResetScanTaskForRetry(id string) error {

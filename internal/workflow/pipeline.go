@@ -24,6 +24,8 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/resolve"
 	"github.com/P0m32Kun/Anchor/internal/scope"
 	"github.com/P0m32Kun/Anchor/internal/search"
+	"github.com/P0m32Kun/Anchor/internal/toolregistry"
+	"github.com/P0m32Kun/Anchor/internal/toolrun"
 	"github.com/P0m32Kun/Anchor/internal/util"
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
@@ -53,6 +55,7 @@ type Pipeline struct {
 	findingBuf       *db.FindingBuffer
 	seenDedupKeys    map[string]bool
 	deferredEvidence []deferredEvidence
+	tools            *toolregistry.Registry
 }
 
 // deferredEvidence holds nuclei evidence data to be created after findings are flushed.
@@ -81,6 +84,12 @@ func NewPipeline(queries *db.Queries, runner *worker.Runner, scopeEng *scope.Eng
 // WithConfig sets the pipeline configuration.
 func (p *Pipeline) WithConfig(cfg models.PipelineConfig) *Pipeline {
 	p.config = cfg
+	return p
+}
+
+// WithTools sets the tool registry for argv generation and allowlist enforcement.
+func (p *Pipeline) WithTools(reg *toolregistry.Registry) *Pipeline {
+	p.tools = reg
 	return p
 }
 
@@ -228,14 +237,14 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 		}
 	}
 
-	// Post-phase: run URL discovery (ffuf + urlfinder) against first-pass
+	// Post-phase: Katana crawl + ffuf against first-pass
 	// web endpoints, then feed any new URLs through a second httpx → nuclei
 	// round. This runs regardless of whether the main flow had failures —
 	// scanning should be as complete as possible. The run status is determined
 	// by ALL stages equally after everything finishes.
 	p.runPostPhase(ctx, projectID)
 
-	// Final status settlement: query all stages (including ffuf/urlfinder/
+	// Final status settlement: query all stages (including ffuf/crawl/
 	// httpx_2/vuln_2) and determine run outcome. Any failed stage fails
 	// the run, including the second pass.
 	if p.runID != "" {
@@ -276,23 +285,18 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 	return flowErr
 }
 
-// runPostPhase runs URL discovery tools (ffuf + urlfinder) against first-pass
-// web endpoints, then feeds newly discovered URLs through a second httpx → nuclei
-// round (httpx_2 / vuln_2 stages). This is the natural continuation of the
-// pipeline — not a "slow scan" concept, just more pipeline stages.
+// runPostPhase runs Katana (optional) and ffuf (optional) against first-pass web
+// endpoints, then feeds newly discovered URLs through httpx_2 → vuln_2.
 func (p *Pipeline) runPostPhase(ctx context.Context, projectID string) {
 	endpoints, err := p.queries.ListWebEndpointsByProject(projectID)
 	if err != nil || len(endpoints) == 0 {
 		return
 	}
 
-	// Collect URLs from all sources for the second-pass httpx → nuclei round.
 	var discoveredURLs []string
 	var mu sync.Mutex
 
-	// Katana crawl (runs before ffuf/urlfinder to feed additional targets)
-	wantKatana := p.config.EnableKatana
-	if wantKatana {
+	if p.config.EnableKatana {
 		allURLs := make([]string, len(endpoints))
 		for i, ep := range endpoints {
 			allURLs[i] = ep.URL
@@ -307,86 +311,51 @@ func (p *Pipeline) runPostPhase(ctx context.Context, projectID string) {
 		}
 	}
 
-	wantFfuf := p.config.EnableFfuf && p.config.FfufDictionaryID != ""
-	wantURLFinder := p.config.EnableURLFinder
-	if !wantFfuf && !wantURLFinder {
-		return
+	wantFfuf := p.ffufTierActive()
+	ffufDictID := p.resolveFfufDictionaryID()
+	if wantFfuf && ffufDictID == "" {
+		wantFfuf = false
 	}
 
-	// Emit stages for parallel URL discovery
 	if wantFfuf {
 		p.setStage(StageFfuf)
-	}
-	if wantURLFinder {
-		p.setStage(StageURLFinder)
-	}
+		var wg sync.WaitGroup
+		var ffufFailures, ffufAttempts int
+		const maxFfufConcurrency = 5
+		ffufSem := make(chan struct{}, maxFfufConcurrency)
 
-	var wg sync.WaitGroup
-	var ffufFailures int
-	var urlfinderErr error
-	const maxFfufConcurrency = 5
-	ffufSem := make(chan struct{}, maxFfufConcurrency)
-
-	for _, ep := range endpoints {
-		if !wantFfuf {
-			break
+		for _, ep := range endpoints {
+			if !p.shouldFfufEndpoint(ep) {
+				continue
+			}
+			wg.Add(1)
+			ffufAttempts++
+			ffufSem <- struct{}{}
+			go func(endpoint *models.WebEndpoint) {
+				defer wg.Done()
+				defer func() { <-ffufSem }()
+				urls, err := p.runFfuf(ctx, endpoint, ffufDictID)
+				if err != nil {
+					log.Printf("[pipeline] ffuf %s: %v", endpoint.URL, err)
+					mu.Lock()
+					ffufFailures++
+					mu.Unlock()
+					return
+				}
+				mu.Lock()
+				discoveredURLs = append(discoveredURLs, urls...)
+				mu.Unlock()
+			}(ep)
 		}
-		wg.Add(1)
-		ffufSem <- struct{}{}
-		go func(endpoint *models.WebEndpoint) {
-			defer wg.Done()
-			defer func() { <-ffufSem }()
-			urls, err := p.runFfuf(ctx, endpoint)
-			if err != nil {
-				log.Printf("[pipeline] ffuf %s: %v", endpoint.URL, err)
-				mu.Lock()
-				ffufFailures++
-				mu.Unlock()
-				return
-			}
-			mu.Lock()
-			discoveredURLs = append(discoveredURLs, urls...)
-			mu.Unlock()
-		}(ep)
-	}
 
-	if wantURLFinder {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			urls, err := p.runURLFinder(ctx, endpoints)
-			if err != nil {
-				log.Printf("[pipeline] urlfinder: %v", err)
-				mu.Lock()
-				urlfinderErr = err
-				mu.Unlock()
-				return
-			}
-			mu.Lock()
-			discoveredURLs = append(discoveredURLs, urls...)
-			mu.Unlock()
-		}()
-	}
-
-	wg.Wait()
-
-	// Complete URL discovery stages
-	if wantFfuf {
+		wg.Wait()
 		if ffufFailures > 0 {
-			p.failStage(StageFfuf, fmt.Sprintf("%d/%d endpoints failed", ffufFailures, len(endpoints)))
+			p.failStage(StageFfuf, fmt.Sprintf("%d/%d endpoints failed", ffufFailures, ffufAttempts))
 		} else {
 			p.completeStage(StageFfuf)
 		}
 	}
-	if wantURLFinder {
-		if urlfinderErr != nil {
-			p.failStage(StageURLFinder, urlfinderErr.Error())
-		} else {
-			p.completeStage(StageURLFinder)
-		}
-	}
 
-	// Feed new URLs through httpx_2 → vuln_2
 	if len(discoveredURLs) > 0 {
 		unique := dedupStrings(discoveredURLs)
 		p.feedToHttpxNuclei(ctx, unique, endpoints)
@@ -427,15 +396,23 @@ func (p *Pipeline) feedToHttpxNuclei(ctx context.Context, urls []string, existin
 
 	// --- httpx_2 stage ---
 	p.setStage(StageHTTPX2)
-	cmd := worker.BuildHttpxCommand(hostFile, p.config.HttpxRateLimit, p.config.HttpxThreads, customFpFile)
-	task, stdout, err := p.createAndRunTask(ctx, "httpx", cmd)
-	if err != nil {
-		p.failStage(StageHTTPX2, err.Error())
+	resHT := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "httpx",
+		Params: toolregistry.RenderParams{
+			"host_file":      hostFile,
+			"rate_limit":     p.config.HttpxRateLimit,
+			"threads":        p.config.HttpxThreads,
+			"custom_fp_file": customFpFile,
+		},
+	})
+	if resHT.Err != nil {
+		p.failStage(StageHTTPX2, resHT.Err.Error())
 		return
 	}
-	_ = task
 
-	endpoints := parser.ParseHttpxOutput(bytes.NewReader(stdout))
+	endpoints := parser.ParseHttpxOutput(bytes.NewReader(resHT.Stdout))
 	var savedEndpoints []*models.WebEndpoint
 	for _, ep := range endpoints {
 		host := ep.Host
@@ -496,16 +473,26 @@ func (p *Pipeline) feedToHttpxNuclei(ctx context.Context, urls []string, existin
 			continue
 		}
 
-		cmd := worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit,
-			p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency,
-			tags, p.config.NucleiScanDepth, "", "")
-		_, nucleiStdout, err := p.createAndRunTask(ctx, "nuclei", cmd)
-		if err != nil {
-			log.Printf("[pipeline] vuln_2 nuclei error for tags %s: %v", tagKey, err)
-			vulnErr = err
+		resNU := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+			ProjectID: p.projectID,
+			RunID:     &p.runID,
+			ToolID:    "nuclei",
+			Params: toolregistry.RenderParams{
+				"target_file":       targetFile,
+				"profile":           "deep",
+				"tags":              tags,
+				"scan_depth":        p.config.NucleiScanDepth,
+				"concurrency":       p.config.NucleiConcurrency,
+				"rate_limit":        p.config.NucleiRateLimit,
+				"rate_limit_per_min": p.config.NucleiRateLimitPerMinute,
+			},
+		})
+		if resNU.Err != nil {
+			log.Printf("[pipeline] vuln_2 nuclei error for tags %s: %v", tagKey, resNU.Err)
+			vulnErr = resNU.Err
 			continue
 		}
-		p.saveNucleiFindings(nucleiStdout, urlToEndpoint, nil)
+		p.saveNucleiFindings(resNU.Stdout, urlToEndpoint, nil)
 	}
 
 	// Flush findings before creating evidence (FK constraint).

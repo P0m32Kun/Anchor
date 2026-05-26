@@ -14,13 +14,11 @@ const (
 	StageFingerprint StageID = "fingerprint"
 	StageHTTPX       StageID = "httpx"
 	StageVuln        StageID = "vuln"
-	// URL discovery stages — directory brute-force (ffuf) and JS/HTML URL
-	// extraction (urlfinder). Both consume httpx's first-pass output and
-	// feed new URLs into a second httpx → nuclei pass.
-	StageFfuf       StageID = "ffuf"
-	StageURLFinder  StageID = "urlfinder"
+	// Post-phase URL discovery: Katana crawl (StageCrawl) and directory brute-force (ffuf).
+	StageFfuf      StageID = "ffuf"
+	StageURLFinder StageID = "urlfinder" // legacy runs only; replaced by Katana
 	// Second-pass HTTP probing and vulnerability scanning for URLs
-	// discovered by ffuf / urlfinder.
+	// discovered by Katana / ffuf.
 	StageHTTPX2 StageID = "httpx_2"
 	StageVuln2  StageID = "vuln_2"
 	// External-scan-only stages

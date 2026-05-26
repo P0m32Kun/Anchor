@@ -3,6 +3,7 @@ package workflow
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"net"
@@ -11,12 +12,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/P0m32Kun/Anchor/internal/cdn"
 	"github.com/P0m32Kun/Anchor/internal/fingerprint"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/nuclei"
 	"github.com/P0m32Kun/Anchor/internal/parser"
+	"github.com/P0m32Kun/Anchor/internal/toolregistry"
+	"github.com/P0m32Kun/Anchor/internal/toolrun"
 	"github.com/P0m32Kun/Anchor/internal/util"
-	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
 // --- Tool execution helpers ---
@@ -28,13 +31,42 @@ func (p *Pipeline) runSubfinder(ctx context.Context, domain string) ([]string, e
 		return nil, fmt.Errorf("scope denied")
 	}
 
-	task, stdout, err := p.createAndRunTask(ctx, "subfinder", worker.BuildSubfinderCommand(domain, p.config.SubfinderRateLimit, p.config.SubfinderThreads, p.config.SubfinderTimeout, p.config.SubfinderMode))
-	if err != nil {
-		return nil, err
+	// If the user provided a custom provider-config, write it to a temp file
+	// whose absolute path is embedded in the command. The dispatcher's
+	// collectInputFiles will automatically sync it to remote workers.
+	providerConfigPath := ""
+	if p.config.SubfinderProviderConfig != "" {
+		workdir := filepath.Join(p.dataDir, "workdirs", p.projectID)
+		_ = os.MkdirAll(workdir, 0750)
+		tmpFile := filepath.Join(workdir, fmt.Sprintf("subfinder-provider-%s.yaml", util.GenerateID()))
+		if err := os.WriteFile(tmpFile, []byte(p.config.SubfinderProviderConfig), 0640); err != nil {
+			log.Printf("[pipeline] write subfinder provider config: %v", err)
+		} else {
+			abs, err := filepath.Abs(tmpFile)
+			if err == nil {
+				providerConfigPath = abs
+			}
+		}
 	}
-	_ = task
 
-	subs := parser.ParseSubfinderOutput(bytes.NewReader(stdout))
+	res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "subfinder",
+		Params: toolregistry.RenderParams{
+			"domain":              domain,
+			"rate_limit":          p.config.SubfinderRateLimit,
+			"threads":             p.config.SubfinderThreads,
+			"timeout":             p.config.SubfinderTimeout,
+			"mode":                p.config.SubfinderMode,
+			"provider_config_path": providerConfigPath,
+		},
+	})
+	if res.Err != nil {
+		return nil, res.Err
+	}
+
+	subs := parser.ParseSubfinderOutput(bytes.NewReader(res.Stdout))
 	return subs, nil
 }
 
@@ -54,13 +86,19 @@ func (p *Pipeline) runNmapAlive(ctx context.Context, hosts []string) ([]string, 
 		hostFile = abs
 	}
 
-	task, stdout, err := p.createAndRunTask(ctx, "nmap", worker.BuildNmapAliveCommand(hostFile))
-	if err != nil {
-		return nil, err
+	res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "nmap_alive",
+		Params: toolregistry.RenderParams{
+			"host_file": hostFile,
+		},
+	})
+	if res.Err != nil {
+		return nil, res.Err
 	}
-	_ = task
 
-	alive := parser.ParseNmapAlive(bytes.NewReader(stdout))
+	alive := parser.ParseNmapAlive(bytes.NewReader(res.Stdout))
 	log.Printf("[pipeline] nmap alive: input=%d alive=%d for project %s", len(hosts), len(alive), p.projectID)
 	return alive, nil
 }
@@ -82,14 +120,24 @@ func (p *Pipeline) runNaabu(ctx context.Context, hosts []string) ([]parser.PortI
 		hostFile = abs
 	}
 
-	task, stdout, err := p.createAndRunTask(ctx, "naabu", worker.BuildNaabuCommand(hostFile, p.config.PortRange, p.config.NaabuRate, p.config.NaabuThreads, p.config.NaabuTimeout))
-	if err != nil {
-		return nil, err
+	res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "naabu",
+		Params: toolregistry.RenderParams{
+			"host_file":  hostFile,
+			"port_range": p.config.PortRange,
+			"rate":       p.config.NaabuRate,
+			"threads":    p.config.NaabuThreads,
+			"timeout":    p.config.NaabuTimeout,
+		},
+	})
+	if res.Err != nil {
+		return nil, res.Err
 	}
-	_ = task
 
-	ports := parser.ParseNaabuOutput(bytes.NewReader(stdout))
-	log.Printf("[pipeline] naabu parsed %d ports for project %s (stdout len=%d)", len(ports), p.projectID, len(stdout))
+	ports := parser.ParseNaabuOutput(bytes.NewReader(res.Stdout))
+	log.Printf("[pipeline] naabu parsed %d ports for project %s", len(ports), p.projectID)
 	for _, port := range ports {
 		ipAsset, _, err := p.merger.MergeOrCreateAsset(p.projectID, "ip", port.IP, "naabu")
 		if err != nil {
@@ -136,14 +184,25 @@ func (p *Pipeline) runNmapServiceScan(ctx context.Context, ports []parser.PortIn
 		hostFile = abs
 	}
 
-	cmd := worker.BuildNmapServiceScanCommand(hostFile, portList, p.config.NmapServiceTimeout)
-	task, stdout, err := p.createAndRunTask(ctx, "nmap", cmd)
-	if err != nil {
-		return nil, err
+	portsStr := make([]string, len(portList))
+	for i, p := range portList {
+		portsStr[i] = fmt.Sprintf("%d", p)
 	}
-	_ = task
+	res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "nmap_service",
+		Params: toolregistry.RenderParams{
+			"host_file":    hostFile,
+			"ports":        portsStr,
+			"host_timeout": p.config.NmapServiceTimeout,
+		},
+	})
+	if res.Err != nil {
+		return nil, res.Err
+	}
 
-	results := fingerprint.ParseNmapXMLOutput(string(stdout))
+	results := fingerprint.ParseNmapXMLOutput(string(res.Stdout))
 	log.Printf("[pipeline] nmap -sV: input=%d ports on %d hosts, results=%d for project %s", len(ports), len(hosts), len(results), p.projectID)
 	return results, nil
 }
@@ -164,14 +223,22 @@ func (p *Pipeline) runDNSx(ctx context.Context, domains []string) ([]models.DNSR
 		hostFile = abs
 	}
 
-	cmd := worker.BuildDNSxCommand(hostFile, nil, p.config.DNSxRateLimit, p.config.DNSxThreads, p.config.DNSxTimeout)
-	task, stdout, err := p.createAndRunTask(ctx, "dnsx", cmd)
-	if err != nil {
-		return nil, err
+	res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "dnsx",
+		Params: toolregistry.RenderParams{
+			"host_file":  hostFile,
+			"rate_limit": p.config.DNSxRateLimit,
+			"threads":    p.config.DNSxThreads,
+			"timeout":    p.config.DNSxTimeout,
+		},
+	})
+	if res.Err != nil {
+		return nil, res.Err
 	}
-	_ = task
 
-	results := parser.ParseDNSxOutput(bytes.NewReader(stdout))
+	results := parser.ParseDNSxOutput(bytes.NewReader(res.Stdout))
 	var records []models.DNSRecord
 	for domain, rec := range results {
 		records = append(records, models.DNSRecord{
@@ -182,6 +249,27 @@ func (p *Pipeline) runDNSx(ctx context.Context, domains []string) ([]models.DNSR
 		})
 	}
 	return records, nil
+}
+
+// runCDNCheck runs cdncheck via the worker so stdout is persisted as a scan task
+// (visible under the cdn_filter stage in Runs UI).
+func (p *Pipeline) runCDNCheck(ctx context.Context, ips []string) ([]string, []models.CDNResult, error) {
+	if len(ips) == 0 {
+		return nil, nil, fmt.Errorf("no IPs to classify (DNS produced no A/AAAA records)")
+	}
+	input := strings.Join(ips, ",")
+	res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "cdncheck",
+		Params: toolregistry.RenderParams{
+			"ips": input,
+		},
+	})
+	if res.Err != nil {
+		return nil, nil, fmt.Errorf("cdncheck: %w", res.Err)
+	}
+	return cdn.ParseJSONLOutput(res.Stdout, ips)
 }
 
 func (p *Pipeline) runHttpx(ctx context.Context, hosts []string) ([]*models.WebEndpoint, error) {
@@ -207,18 +295,27 @@ func (p *Pipeline) runHttpx(ctx context.Context, hosts []string) ([]*models.WebE
 		// Continue without custom fingerprints
 	}
 
-	task, stdout, err := p.createAndRunTask(ctx, "httpx", worker.BuildHttpxCommand(hostFile, p.config.HttpxRateLimit, p.config.HttpxThreads, customFpFile))
-	if err != nil {
-		return nil, err
+	res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "httpx",
+		Params: toolregistry.RenderParams{
+			"host_file":      hostFile,
+			"rate_limit":     p.config.HttpxRateLimit,
+			"threads":        p.config.HttpxThreads,
+			"custom_fp_file": customFpFile,
+		},
+	})
+	if res.Err != nil {
+		return nil, res.Err
 	}
-	_ = task
 
 	// Clean up temporary fingerprint file
 	if customFpFile != "" {
 		defer os.Remove(customFpFile)
 	}
 
-	endpoints := parser.ParseHttpxOutput(bytes.NewReader(stdout))
+	endpoints := parser.ParseHttpxOutput(bytes.NewReader(res.Stdout))
 	var saved []*models.WebEndpoint
 	for _, ep := range endpoints {
 		host := ep.Host
@@ -348,12 +445,24 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 			if abs, err := filepath.Abs(targetFile); err == nil {
 				targetFile = abs
 			}
-			task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, tags, scanDepth, DefaultWorkflowDir, ""))
-			if err != nil {
-				log.Printf("nuclei tags task for %s: %v", tagKey, err)
+			res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+				ProjectID: p.projectID,
+				RunID:     &p.runID,
+				ToolID:    "nuclei",
+				Params: toolregistry.RenderParams{
+					"target_file":       targetFile,
+					"profile":           "deep",
+					"tags":              tags,
+					"scan_depth":        scanDepth,
+					"concurrency":       p.config.NucleiConcurrency,
+					"rate_limit":        p.config.NucleiRateLimit,
+					"rate_limit_per_min": p.config.NucleiRateLimitPerMinute,
+				},
+			})
+			if res.Err != nil {
+				log.Printf("nuclei tags task for %s: %v", tagKey, res.Err)
 			} else {
-				_ = task
-				p.saveNucleiFindings(stdout, urlToEndpoint, nil)
+				p.saveNucleiFindings(res.Stdout, urlToEndpoint, nil)
 			}
 		}
 
@@ -370,12 +479,23 @@ func (p *Pipeline) runNucleiWeb(ctx context.Context, endpoints []*models.WebEndp
 					if abs, err := filepath.Abs(targetFile); err == nil {
 						targetFile = abs
 					}
-					task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, nil, scanDepth, DefaultWorkflowDir, wfFile))
-					if err != nil {
-						log.Printf("nuclei wf task %s for tag %s: %v", wfFile, tag, err)
+					res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+						ProjectID: p.projectID,
+						RunID:     &p.runID,
+						ToolID:    "nuclei",
+						Params: toolregistry.RenderParams{
+							"target_file":       targetFile,
+							"profile":           "deep",
+							"concurrency":       p.config.NucleiConcurrency,
+							"rate_limit":        p.config.NucleiRateLimit,
+							"rate_limit_per_min": p.config.NucleiRateLimitPerMinute,
+							"template_path":     wfFile,
+						},
+					})
+					if res.Err != nil {
+						log.Printf("nuclei wf task %s for tag %s: %v", wfFile, tag, res.Err)
 					} else {
-						_ = task
-						p.saveNucleiFindings(stdout, urlToEndpoint, nil)
+						p.saveNucleiFindings(res.Stdout, urlToEndpoint, nil)
 					}
 				}
 			}
@@ -417,12 +537,24 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Nm
 			if abs, err := filepath.Abs(targetFile); err == nil {
 				targetFile = abs
 			}
-			task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, []string{tag}, scanDepth, DefaultWorkflowDir, ""))
-			if err != nil {
-				log.Printf("nuclei tags task for %s: %v", tag, err)
+			res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+				ProjectID: p.projectID,
+				RunID:     &p.runID,
+				ToolID:    "nuclei",
+				Params: toolregistry.RenderParams{
+					"target_file":       targetFile,
+					"profile":           "deep",
+					"tags":              []string{tag},
+					"scan_depth":        scanDepth,
+					"concurrency":       p.config.NucleiConcurrency,
+					"rate_limit":        p.config.NucleiRateLimit,
+					"rate_limit_per_min": p.config.NucleiRateLimitPerMinute,
+				},
+			})
+			if res.Err != nil {
+				log.Printf("nuclei tags task for %s: %v", tag, res.Err)
 			} else {
-				_ = task
-				p.saveNucleiFindings(stdout, nil, nil)
+				p.saveNucleiFindings(res.Stdout, nil, nil)
 			}
 		}
 
@@ -438,12 +570,23 @@ func (p *Pipeline) runNucleiNonWeb(ctx context.Context, results []fingerprint.Nm
 				if abs, err := filepath.Abs(targetFile); err == nil {
 					targetFile = abs
 				}
-				task, stdout, err := p.createAndRunTask(ctx, "nuclei", worker.BuildNucleiCommand(targetFile, "deep", p.config.NucleiRateLimit, p.config.NucleiRateLimitPerMinute, p.config.NucleiConcurrency, nil, scanDepth, DefaultWorkflowDir, wfFile))
-				if err != nil {
-					log.Printf("nuclei wf task %s for tag %s: %v", wfFile, tag, err)
+				res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+					ProjectID: p.projectID,
+					RunID:     &p.runID,
+					ToolID:    "nuclei",
+					Params: toolregistry.RenderParams{
+						"target_file":       targetFile,
+						"profile":           "deep",
+						"concurrency":       p.config.NucleiConcurrency,
+						"rate_limit":        p.config.NucleiRateLimit,
+						"rate_limit_per_min": p.config.NucleiRateLimitPerMinute,
+						"template_path":     wfFile,
+					},
+				})
+				if res.Err != nil {
+					log.Printf("nuclei wf task %s for tag %s: %v", wfFile, tag, res.Err)
 				} else {
-					_ = task
-					p.saveNucleiFindings(stdout, nil, nil)
+					p.saveNucleiFindings(res.Stdout, nil, nil)
 				}
 			}
 		}
@@ -473,10 +616,13 @@ func (p *Pipeline) customWorkflowPaths() []string {
 }
 
 func (p *Pipeline) createAndRunTask(ctx context.Context, tool string, args []string) (*models.ScanTask, []byte, error) {
-	return p.createAndRunTaskWithID(ctx, util.GenerateID(), tool, args)
+	return p.legacyCreateAndRunTask(ctx, util.GenerateID(), tool, args)
 }
 
-func (p *Pipeline) createAndRunTaskWithID(ctx context.Context, taskID, tool string, args []string) (*models.ScanTask, []byte, error) {
+// legacyCreateAndRunTask is the original implementation preserved for
+// callers that still pass args directly (nuclei multi-round, discovery.go).
+// Phase 3 will convert remaining callers to Registry.Render + toolrun.Invoke.
+func (p *Pipeline) legacyCreateAndRunTask(ctx context.Context, taskID, tool string, args []string) (*models.ScanTask, []byte, error) {
 	now := time.Now().UTC()
 
 	task := &models.ScanTask{
@@ -489,7 +635,6 @@ func (p *Pipeline) createAndRunTaskWithID(ctx context.Context, taskID, tool stri
 		CreatedAt:       now,
 	}
 
-	// Record active custom bundle version for nuclei tasks
 	if tool == "nuclei" {
 		if version, err := p.queries.GetActiveNucleiCustomBundleVersion(); err == nil && version != "" {
 			task.NucleiCustomBundleVersion = &version
@@ -500,14 +645,12 @@ func (p *Pipeline) createAndRunTaskWithID(ctx context.Context, taskID, tool stri
 		return nil, nil, fmt.Errorf("create scan task: %w", err)
 	}
 
-	// Run task synchronously via worker
 	if err := p.runner.Run(ctx, task.ID); err != nil {
 		log.Printf("[pipeline] task %s (%s) run error: %v", task.ID, tool, err)
 		stdout, _ := p.readTaskStdout(task.ID)
 		return task, stdout, err
 	}
 
-	// Read stdout artifact
 	stdout, err := p.readTaskStdout(task.ID)
 	if err != nil {
 		log.Printf("[pipeline] task %s (%s) read stdout: %v", task.ID, tool, err)
@@ -518,18 +661,17 @@ func (p *Pipeline) createAndRunTaskWithID(ctx context.Context, taskID, tool stri
 
 // runFfuf runs a single ffuf brute-force against one web endpoint.
 // Returns discovered URLs (url_list2).
-func (p *Pipeline) runFfuf(ctx context.Context, endpoint *models.WebEndpoint) ([]string, error) {
-	if !p.config.EnableFfuf || p.config.FfufDictionaryID == "" {
+func (p *Pipeline) runFfuf(ctx context.Context, endpoint *models.WebEndpoint, dictID string) ([]string, error) {
+	if !p.config.EnableFfuf || dictID == "" {
 		return nil, nil
 	}
 
-	// Get dictionary
-	dict, err := p.queries.GetDictionary(p.config.FfufDictionaryID)
+	dict, err := p.queries.GetDictionary(dictID)
 	if err != nil || dict == nil {
-		return nil, fmt.Errorf("dictionary not found: %s", p.config.FfufDictionaryID)
+		return nil, fmt.Errorf("dictionary not found: %s", dictID)
 	}
 	if !dict.Enabled {
-		return nil, fmt.Errorf("dictionary disabled: %s", p.config.FfufDictionaryID)
+		return nil, fmt.Errorf("dictionary disabled: %s", dictID)
 	}
 
 	// Build target URL with FUZZ placeholder
@@ -537,14 +679,22 @@ func (p *Pipeline) runFfuf(ctx context.Context, endpoint *models.WebEndpoint) ([
 	targetURL := base + "/FUZZ"
 
 	// Build and run via worker
-	cmd := worker.BuildFfufCommand(targetURL, dict.FilePath, p.config.FfufRateLimit, p.config.FfufTimeout)
-	task, stdout, err := p.createAndRunTask(ctx, "ffuf", cmd)
-	if err != nil {
-		return nil, err
+	res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "ffuf",
+		Params: toolregistry.RenderParams{
+			"target":     targetURL,
+			"wordlist":   dict.FilePath,
+			"rate_limit": p.config.FfufRateLimit,
+			"timeout":    p.config.FfufTimeout,
+		},
+	})
+	if res.Err != nil {
+		return nil, res.Err
 	}
-	_ = task
 
-	results, _ := parser.ParseFfufOutput(bytes.NewReader(stdout))
+	results, _ := parser.ParseFfufOutput(bytes.NewReader(res.Stdout))
 	var urls []string
 	for _, r := range results {
 		if r.URL != "" {
@@ -554,72 +704,57 @@ func (p *Pipeline) runFfuf(ctx context.Context, endpoint *models.WebEndpoint) ([
 	return urls, nil
 }
 
-// runURLFinder runs pingc0y/URLFinder in batch mode against all web endpoints.
-// Returns discovered URLs (url_list3).
-func (p *Pipeline) runURLFinder(ctx context.Context, endpoints []*models.WebEndpoint) ([]string, error) {
-	if !p.config.EnableURLFinder {
-		return nil, nil
-	}
-
-	// Collect endpoint URLs
-	var urls []string
-	for _, ep := range endpoints {
-		if ep.URL != "" {
-			urls = append(urls, ep.URL)
-		}
-	}
-	if len(urls) == 0 {
-		return nil, nil
-	}
-
-	// Use the scan-task workdir so remote workers upload urlfinder-output.json
-	// with the rest of the task artifacts (same path as Runner.Run workdir).
+// recordPassiveTask creates a completed ScanTask with a stdout artifact for
+// passive/API-based pipeline steps (FOFA, Hunter, Quake, crt.sh, gau). These
+// steps don't invoke external tools via the worker — they call HTTP APIs
+// directly — so there is no real subprocess stdout. This helper synthesises a
+// task+artifact pair so the frontend can display the raw API response in the
+// pipeline detail view for auditability.
+func (p *Pipeline) recordPassiveTask(tool string, summary string, data []byte) {
 	taskID := util.GenerateID()
+	now := time.Now().UTC()
+
+	task := &models.ScanTask{
+		ID:              taskID,
+		ProjectID:       p.projectID,
+		RunID:           &p.runID,
+		Tool:            tool,
+		CommandTemplate: summary,
+		Status:          models.TaskCompleted,
+		CreatedAt:       now,
+		StartedAt:       &now,
+		FinishedAt:      &now,
+	}
+	if err := p.queries.CreateScanTask(task); err != nil {
+		log.Printf("[pipeline] record passive task %s: %v", tool, err)
+		return
+	}
+
+	// Save stdout artifact so it's fetchable via /tasks/{id}/artifacts
 	workdir := filepath.Join(p.dataDir, "workdirs", p.projectID, taskID)
-	if err := os.MkdirAll(workdir, 0750); err != nil {
-		return nil, fmt.Errorf("create workdir: %w", err)
-	}
-	inputFile := filepath.Join(workdir, "input.txt")
-	if err := os.WriteFile(inputFile, []byte(strings.Join(urls, "\n")), 0640); err != nil {
-		return nil, fmt.Errorf("write input: %w", err)
+	_ = os.MkdirAll(workdir, 0750)
+	filename := fmt.Sprintf("stdout_%d.json", time.Now().UnixNano())
+	path := filepath.Join(workdir, filename)
+	if err := os.WriteFile(path, data, 0640); err != nil {
+		log.Printf("[pipeline] write passive artifact %s: %v", tool, err)
+		return
 	}
 
-	cmd := worker.BuildURLFinderCommand(inputFile, workdir, p.config.URLFinderThreads, p.config.URLFinderTimeout)
-	task, _, err := p.createAndRunTaskWithID(ctx, taskID, "urlfinder", cmd)
-	if err != nil {
-		return nil, err
+	sum := sha256.Sum256(data)
+	a := &models.RawArtifact{
+		ID:              util.GenerateID(),
+		ProjectID:       p.projectID,
+		TaskID:          &taskID,
+		Type:            models.ArtifactStdout,
+		Path:            path,
+		SHA256:          fmt.Sprintf("%x", sum),
+		Size:            int64(len(data)),
+		RedactionStatus: "unchecked",
+		CreatedAt:       now,
 	}
-	_ = task
-
-	output, err := p.readURLFinderOutput(task.ID, workdir)
-	if err != nil {
-		return nil, err
+	if err := p.queries.CreateRawArtifact(a); err != nil {
+		log.Printf("[pipeline] create passive artifact %s: %v", tool, err)
 	}
-	results, _ := parser.ParseURLFinderOutput(bytes.NewReader(output))
-	var discovered []string
-	for _, r := range results {
-		if r.URL != "" {
-			discovered = append(discovered, r.URL)
-		}
-	}
-	return discovered, nil
-}
-
-func (p *Pipeline) readURLFinderOutput(taskID, workdir string) ([]byte, error) {
-	outFile := worker.URLFinderOutputPath(workdir)
-	if data, err := os.ReadFile(outFile); err == nil {
-		return data, nil
-	}
-	artifacts, err := p.queries.ListRawArtifactsByTask(taskID)
-	if err != nil {
-		return nil, err
-	}
-	for _, a := range artifacts {
-		if filepath.Base(a.Path) == "urlfinder-output.json" {
-			return os.ReadFile(a.Path)
-		}
-	}
-	return nil, fmt.Errorf("urlfinder output not found for task %s", taskID)
 }
 
 func (p *Pipeline) readTaskStdout(taskID string) ([]byte, error) {

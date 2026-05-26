@@ -14,7 +14,7 @@ import {
   api,
 } from "../lib/api";
 import { cn } from "../lib/utils";
-import { Zap, Globe, Shield, Gauge, Cpu, CheckCircle2, RotateCcw, ChevronRight, Search } from "lucide-react";
+import { Zap, Globe, Shield, Gauge, Cpu, CheckCircle2, RotateCcw, ChevronRight, ChevronDown, Search } from "lucide-react";
 
 export type ScanMode = "external" | "internal";
 
@@ -58,7 +58,7 @@ const MODE_OPTIONS: {
     mode: "external",
     label: "外网扫描",
     description: "面向互联网的资产发现与漏洞检测",
-    tools: ["FOFA", "Subfinder", "DNSx", "CDNCheck", "nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Ffuf", "URLFinder"],
+    tools: ["FOFA", "Subfinder", "DNSx", "CDNCheck", "nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Katana", "Ffuf"],
     icon: Globe,
     color: "text-blue-400",
   },
@@ -66,7 +66,7 @@ const MODE_OPTIONS: {
     mode: "internal",
     label: "内网扫描",
     description: "内网资产端口、服务与漏洞检测",
-    tools: ["nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Ffuf", "URLFinder"],
+    tools: ["nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Katana", "Ffuf"],
     icon: Shield,
     color: "text-emerald-400",
   },
@@ -581,43 +581,57 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
                 )}
               </div>
 
-              {/* URLFinder toggle */}
+              {/* Katana crawl */}
               <div className="space-y-3">
                 <button
-                  onClick={() => setConfig((prev) => ({ ...prev, enable_urlfinder: !prev.enable_urlfinder }))}
+                  onClick={() => setConfig((prev) => ({ ...prev, enable_katana: !prev.enable_katana }))}
                   className={cn(
                     "w-full text-left p-3 rounded-xl border text-xs transition-all duration-200",
-                    config.enable_urlfinder
+                    config.enable_katana
                       ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
                       : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"
                   )}
                 >
-                  <div className="font-bold text-foreground">URLFinder</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">从页面中提取 URL 与 JS 链接,扩展攻击面</div>
+                  <div className="font-bold text-foreground">Katana</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">站点爬虫（含 JS 端点解析），扩展 URL 攻击面</div>
                 </button>
 
-                {config.enable_urlfinder && (
+                {config.enable_katana && (
                   <div className="p-4 rounded-2xl border border-white/5 bg-white/[0.01] space-y-4">
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-medium text-muted-foreground">线程数</label>
-                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 20</span>
+                        <label className="text-[10px] font-medium text-muted-foreground">爬取深度</label>
+                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 2</span>
+                      </div>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={config.katana_max_depth}
+                        onChange={(e) => updateConfig("katana_max_depth", e.target.value)}
+                        className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-medium text-muted-foreground">速率限制</label>
+                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 10 req/s</span>
                       </div>
                       <div className="relative">
                         <Input
                           type="number"
                           min={1}
-                          max={100}
-                          value={config.urlfinder_threads}
-                          onChange={(e) => updateConfig("urlfinder_threads", e.target.value)}
+                          max={200}
+                          value={config.katana_rate_limit}
+                          onChange={(e) => updateConfig("katana_rate_limit", e.target.value)}
                           className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
                         />
-                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">threads</span>
+                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">req/s</span>
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-medium text-muted-foreground">超时</label>
+                        <label className="text-[10px] font-medium text-muted-foreground">请求超时</label>
                         <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 10秒</span>
                       </div>
                       <div className="relative">
@@ -625,8 +639,8 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
                           type="number"
                           min={1}
                           max={120}
-                          value={config.urlfinder_timeout}
-                          onChange={(e) => updateConfig("urlfinder_timeout", e.target.value)}
+                          value={config.katana_timeout}
+                          onChange={(e) => updateConfig("katana_timeout", e.target.value)}
                           className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
                         />
                         <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">秒</span>
@@ -679,6 +693,40 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
                     </div>
                 ))}
              </div>
+
+             {/* Subfinder Provider Config (external mode only) */}
+             {mode === "external" && (
+               <div className="space-y-2">
+                 <button
+                   type="button"
+                   onClick={() => setConfig((prev) => ({ ...prev, subfinder_provider_config: prev.subfinder_provider_config ? "" : "# 展开以编辑" }))}
+                   className="w-full text-left flex items-center gap-2 text-[10px] font-bold text-muted-foreground hover:text-primary transition-colors"
+                 >
+                   {config.subfinder_provider_config ? (
+                     <ChevronDown className="h-3 w-3" />
+                   ) : (
+                     <ChevronRight className="h-3 w-3" />
+                   )}
+                   Subfinder Provider Config (可选)
+                 </button>
+                 {config.subfinder_provider_config && (
+                   <div className="animate-in fade-in slide-in-from-top-1 duration-150 space-y-1.5">
+                     <textarea
+                       aria-label="Subfinder Provider Config YAML"
+                       value={config.subfinder_provider_config === "# 展开以编辑" ? "" : config.subfinder_provider_config}
+                       onChange={(e) => setConfig((prev) => ({ ...prev, subfinder_provider_config: e.target.value }))}
+                       rows={8}
+                       spellCheck={false}
+                       placeholder={`# 粘贴 subfinder provider-config.yaml 内容\n# 例如:\n# securitytrails:\n#   - YOUR_API_KEY\n# 留空则使用 worker 默认配置\n# (~/.config/subfinder/provider-config.yaml)`}
+                       className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/5 text-[11px] font-mono text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/30 resize-y leading-relaxed"
+                     />
+                     <p className="text-[10px] text-muted-foreground/60">
+                       粘贴 provider-config.yaml 内容，留空则使用 worker 默认配置 (~/.config/subfinder/provider-config.yaml)
+                     </p>
+                   </div>
+                 )}
+               </div>
+             )}
           </div>
 
           <div className="flex items-center justify-between pt-6 border-t border-white/5">

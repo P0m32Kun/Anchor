@@ -1,0 +1,26 @@
+id: katana
+binary: katana
+description: Web crawler for URL discovery
+output:
+  format: jsonl
+parameters:
+  list_file:
+    type: path
+    required: true
+    flag: "-list"
+  depth:
+    type: int
+    flag: "-depth"
+  rate_limit:
+    type: int
+    flag: "-rate-limit"
+  timeout:
+    type: int
+    flag: "-timeout"
+literals:
+  - ["-jsonl"]
+  - ["-silent"]
+  - ["-jc"]
+  - ["-fs", "rdn"]
+  - ["-ob"]
+  - ["-or"]

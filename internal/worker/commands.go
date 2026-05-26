@@ -2,7 +2,6 @@ package worker
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 )
 
@@ -23,10 +22,15 @@ const HighRiskPorts = "21,22,23,25,53,80,81,88,110,135,139,143,389,443,445,465,5
 // Output goes to stdout as JSONL so the worker can capture it as an artifact.
 // When mode is "passive", the -passive flag is added so subfinder only
 // uses passive sources (no active probing).
-func BuildSubfinderCommand(domain string, rateLimit, threads, timeout int, mode string) []string {
+// providerConfigPath, if non-empty, is passed as -pc so subfinder uses the
+// specified provider-config.yaml instead of the default.
+func BuildSubfinderCommand(domain string, rateLimit, threads, timeout int, mode, providerConfigPath string) []string {
 	args := []string{"subfinder", "-d", domain, "-oJ"}
 	if mode == "passive" {
 		args = append(args, "-passive")
+	}
+	if providerConfigPath != "" {
+		args = append(args, "-pc", providerConfigPath)
 	}
 	if rateLimit > 0 {
 		args = append(args, "-rate-limit", fmt.Sprintf("%d", rateLimit))
@@ -246,9 +250,10 @@ func BuildDNSxCommand(hostFile string, recordTypes []string, rateLimit, threads,
 }
 
 // BuildCDNCheckCommand builds a cdncheck command for CDN detection.
-// ips should be comma-separated.
+// ips should be comma-separated (goflags splits on commas).
+// -silent keeps banner/update noise off stdout; -duc skips update check in pipelines.
 func BuildCDNCheckCommand(ips string) []string {
-	return []string{"cdncheck", "-i", ips, "-jsonl"}
+	return []string{"cdncheck", "-i", ips, "-jsonl", "-silent", "-duc"}
 }
 
 // BuildNmapAliveCommand builds an nmap host-discovery command that reads
@@ -272,51 +277,29 @@ func BuildNmapAliveCommand(hostFile string) []string {
 	}
 }
 
-// URLFinderOutputPath is the JSON output file urlfinder writes under workdir.
-func URLFinderOutputPath(workdir string) string {
-	return filepath.Join(workdir, "urlfinder-output.json")
-}
-
-// BuildURLFinderCommand builds a pingc0y/URLFinder command for extracting
-// URLs and JS links from web pages to expand the attack surface.
-// inputFile contains one URL per line. Results are written to
-// URLFinderOutputPath(workdir); the pipeline reads that file after the task completes.
-//
-// Key flags:
-//   -f  batch URL file
-//   -s  status code filter (all = show all)
-//   -m  crawl mode (1=normal, 2=deep+JS, 3=deep+JS+crawl-JS-files)
-//   -o  output file path
-//   -t  thread count (default 50)
-//   -time  timeout in seconds (default 5)
-func BuildURLFinderCommand(inputFile, workdir string, threads, timeout int) []string {
-	args := []string{
-		"urlfinder",
-		"-f", inputFile,
-		"-s", "200,301,302,401,403,405,500",
-		"-m", "1",
-		"-o", URLFinderOutputPath(workdir),
-	}
-	if threads > 0 {
-		args = append(args, "-t", fmt.Sprintf("%d", threads))
-	}
-	if timeout > 0 {
-		args = append(args, "-time", fmt.Sprintf("%d", timeout))
-	}
-	return args
-}
-
-// BuildKatanaCommand builds a Katana web crawler command.
+// BuildKatanaCommand builds a Katana web crawler command for post-phase URL discovery.
 // listFile contains seed URLs (one per line). depth controls crawl depth.
-// rateLimit controls requests per second.
-// Output is JSONL to stdout.
-func BuildKatanaCommand(listFile string, depth, rateLimit int) []string {
-	args := []string{"katana", "-list", listFile, "-json"}
+// rateLimit is requests per second; timeoutSec is per-request timeout in seconds.
+//
+// -jc parses/crawls endpoints referenced from JavaScript (replaces pingc0y URLFinder).
+// -fs rdn keeps crawl within registrable domain of each seed.
+// -ob/-or shrink JSONL payloads; stdout is parsed by parser.ParseKatanaJSONL.
+func BuildKatanaCommand(listFile string, depth, rateLimit, timeoutSec int) []string {
+	args := []string{
+		"katana", "-list", listFile,
+		"-jsonl", "-silent",
+		"-jc",
+		"-fs", "rdn",
+		"-ob", "-or",
+	}
 	if depth > 0 {
 		args = append(args, "-depth", fmt.Sprintf("%d", depth))
 	}
 	if rateLimit > 0 {
 		args = append(args, "-rate-limit", fmt.Sprintf("%d", rateLimit))
+	}
+	if timeoutSec > 0 {
+		args = append(args, "-timeout", fmt.Sprintf("%d", timeoutSec))
 	}
 	return args
 }

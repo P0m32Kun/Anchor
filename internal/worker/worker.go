@@ -207,10 +207,20 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 	cmd.Dir = workdir
 	cmd.Env = os.Environ()
 
-	// Capture stdout/stderr with size limit.
-	var stdoutBuf, stderrBuf limitedBuffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
+	stdoutW, err := newTaskOutputWriter(workdir, "stdout")
+	if err != nil {
+		_ = r.queries.UpdateScanTaskStatus(task.ID, models.TaskFailed, nil, &now)
+		return fmt.Errorf("prepare stdout: %w", err)
+	}
+	defer stdoutW.Close()
+	stderrW, err := newTaskOutputWriter(workdir, "stderr")
+	if err != nil {
+		_ = r.queries.UpdateScanTaskStatus(task.ID, models.TaskFailed, nil, &now)
+		return fmt.Errorf("prepare stderr: %w", err)
+	}
+	defer stderrW.Close()
+	cmd.Stdout = stdoutW
+	cmd.Stderr = stderrW
 
 	// Record and persist invocation.
 	inv := &models.ToolInvocation{
@@ -265,13 +275,13 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 	_ = r.queries.UpdateToolInvocation(task.ID, finishedAt, exitCode)
 
 	// Save artifacts.
-	if stdoutBuf.Len() > 0 {
-		if err := r.saveArtifact(task.ProjectID, task.ID, models.ArtifactStdout, workdir, stdoutBuf.Bytes()); err != nil {
+	if stdoutW.Len() > 0 {
+		if err := r.saveArtifact(task.ProjectID, task.ID, models.ArtifactStdout, workdir, stdoutW.Bytes()); err != nil {
 			// Log but don't fail the whole task.
 		}
 	}
-	if stderrBuf.Len() > 0 {
-		if err := r.saveArtifact(task.ProjectID, task.ID, models.ArtifactStderr, workdir, stderrBuf.Bytes()); err != nil {
+	if stderrW.Len() > 0 {
+		if err := r.saveArtifact(task.ProjectID, task.ID, models.ArtifactStderr, workdir, stderrW.Bytes()); err != nil {
 			// Log but don't fail.
 		}
 	}
@@ -281,7 +291,7 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 	if exitCode != 0 {
 		status = models.TaskFailed
 	}
-	if stdoutBuf.truncated || stderrBuf.truncated {
+	if stdoutW.Truncated() || stderrW.Truncated() {
 		status = models.TaskPartialSuccess
 	}
 
@@ -290,7 +300,7 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 	}
 
 	if status == models.TaskFailed {
-		stderr := string(stderrBuf.Bytes())
+		stderr := string(stderrW.Bytes())
 		if len(stderr) > 500 {
 			stderr = stderr[:500] + "..."
 		}

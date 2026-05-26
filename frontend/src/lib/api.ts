@@ -233,8 +233,15 @@ export interface ImportResult {
   denied: number;
   errors: number;
   expanded?: number;
-  targets: Target[];
-  denied_targets: { value: string; reason: string }[];
+  targets?: Target[];
+  denied_targets?: { value: string; reason: string }[];
+  needs_scope_confirmation?: boolean;
+  message?: string;
+  suggested_rules?: {
+    action: "include" | "exclude";
+    type: string;
+    value: string;
+  }[];
 }
 
 export interface DryRunResult {
@@ -452,6 +459,19 @@ export const api = {
 
   getArtifactContent: (artifactId: string, signal?: AbortSignal) =>
     request(`/artifacts/content?id=${artifactId}`, { signal }).then((res) => res.text()),
+
+  getTaskOutput: (
+    taskId: string,
+    params: { stream?: "stdout" | "stderr"; offset?: number },
+    signal?: AbortSignal
+  ) =>
+    fetchAPI<{ stream: string; offset: number; content: string; done: boolean }>(
+      buildQueryString(`/tasks/${taskId}/output`, {
+        stream: params.stream ?? "stdout",
+        offset: params.offset ?? 0,
+      }),
+      { signal }
+    ),
 
   listToolHealth: (signal?: AbortSignal) => fetchAPI<ToolHealth[]>("/health/tools", { signal }),
 
@@ -762,9 +782,7 @@ export interface PipelineConfig {
   ffuf_rate_limit: number;
   ffuf_timeout: number;
   ffuf_dictionary_id: string;
-  enable_urlfinder: boolean;
-  urlfinder_threads: number;
-  urlfinder_timeout: number;
+  katana_timeout: number;
   // External-scan-only fields
   enable_passive_search: boolean;
   enable_passive_cert: boolean;
@@ -778,6 +796,7 @@ export interface PipelineConfig {
   nuclei_require_fingerprint: boolean;
   passive_search_result_limit: number;
   passive_search_concurrency: number;
+  subfinder_provider_config: string;
 }
 
 export interface Dictionary {
@@ -881,21 +900,20 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   ffuf_rate_limit: 6,
   ffuf_timeout: 30,
   ffuf_dictionary_id: "",
-  enable_urlfinder: true,
-  urlfinder_threads: 20,
-  urlfinder_timeout: 10,
+  enable_katana: true,
+  katana_max_depth: 2,
+  katana_rate_limit: 10,
+  katana_timeout: 10,
   enable_passive_search: false,
   enable_passive_cert: false,
   enable_passive_url: false,
   subfinder_mode: "active",
-  enable_katana: false,
-  katana_max_depth: 2,
-  katana_rate_limit: 10,
   ffuf_tier: "off",
   skip_portscan_on_cdn_host: false,
   nuclei_require_fingerprint: false,
   passive_search_result_limit: 500,
   passive_search_concurrency: 3,
+  subfinder_provider_config: "",
 };
 
 export const DEFAULT_EXTERNAL_PIPELINE_CONFIG: PipelineConfig = {
@@ -912,9 +930,7 @@ export const DEFAULT_EXTERNAL_PIPELINE_CONFIG: PipelineConfig = {
   enable_passive_cert: true,
   enable_passive_url: true,
   subfinder_mode: "passive",
-  enable_katana: true,
-  katana_max_depth: 2,
-  katana_rate_limit: 10,
+  katana_timeout: 10,
   ffuf_tier: "small",
   skip_portscan_on_cdn_host: true,
   nuclei_require_fingerprint: true,

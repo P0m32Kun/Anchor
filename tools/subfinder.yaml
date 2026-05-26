@@ -1,0 +1,28 @@
+id: subfinder
+binary: subfinder
+description: Subdomain discovery via passive/active sources
+output:
+  format: jsonl
+parameters:
+  domain:
+    type: string
+    required: true
+    flag: "-d"
+  rate_limit:
+    type: int
+    flag: "-rate-limit"
+  threads:
+    type: int
+    flag: "-t"
+  timeout:
+    type: int
+    flag: "-timeout"
+  mode:
+    type: enum
+    values: ["passive", "active", "off"]
+    # "passive" appends -passive; "active"/"off" omit it
+  provider_config_path:
+    type: path
+    flag: "-pc"
+literals:
+  - ["-oJ"]

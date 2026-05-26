@@ -68,6 +68,13 @@ func (p *Pipeline) runCompanyFlow(ctx context.Context, targets []*models.Target)
 
 // runDomainFlow: PassiveCert → PassiveURL → Subfinder → DNS → CDN → Naabu → nmap -sV → split Web/nonWeb → httpx → Nuclei.
 func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) error {
+	// Check for cancellation before starting work.
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	p.setStage(StageSubdomain)
 
 	domains := extractTargetValues(targets)
@@ -141,21 +148,25 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 		}
 	}
 
-	// S4: CDN filtering (skipped entirely when disabled — no stage record is
-	// created so the UI doesn't show a misleading "CDN 过滤 0.0s" row in
-	// modes like internal scan where CDN filtering doesn't apply).
+	// S4: CDN classification — UI stage when EnableCDNFilter; port-scan skip when
+	// SkipPortscanOnCDNHost (external preset). Either flag triggers cdncheck.
 	allIPs := resolve.ExtractAllIPs(dnsRecords)
 	var nonCDNIPs []string
 	var cdnDomains []string
 	var cdnResults []models.CDNResult
-	if p.config.EnableCDNFilter {
-		p.setStage(StageCDNFilter)
-		nonCDNIPs, cdnResults, err = p.cdnDet.FilterCDNIPs(ctx, allIPs)
+	classifyCDN := p.config.EnableCDNFilter || p.config.SkipPortscanOnCDNHost
+	if classifyCDN {
+		if p.config.EnableCDNFilter {
+			p.setStage(StageCDNFilter)
+		}
+		nonCDNIPs, cdnResults, err = p.runCDNCheck(ctx, allIPs)
 		if err != nil {
 			log.Printf("cdn filter: %v", err)
-			p.failStage(StageCDNFilter, err.Error())
+			if p.config.EnableCDNFilter {
+				p.failStage(StageCDNFilter, err.Error())
+			}
 			nonCDNIPs = allIPs
-		} else {
+		} else if p.config.EnableCDNFilter {
 			p.completeStage(StageCDNFilter)
 		}
 		for _, cdn := range cdnResults {
@@ -170,18 +181,23 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 	} else {
 		nonCDNIPs = allIPs
 	}
+	portScanIPs := ipsForPortScan(allIPs, nonCDNIPs, classifyCDN, p.config.SkipPortscanOnCDNHost)
+	if p.config.SkipPortscanOnCDNHost && classifyCDN && len(allIPs) > 0 && len(portScanIPs) < len(allIPs) {
+		log.Printf("[pipeline] skip_portscan_on_cdn_host: port scan on %d/%d IPs (%d CDN skipped)",
+			len(portScanIPs), len(allIPs), len(allIPs)-len(portScanIPs))
+	}
 
 	// S4.5: Alive check via nmap (filters dead IPs so naabu only scans live hosts)
 	p.setStage(StageAlive)
-	aliveIPs, aliveErr := p.runNmapAlive(ctx, nonCDNIPs)
+	aliveIPs, aliveErr := p.runNmapAlive(ctx, portScanIPs)
 	if aliveErr != nil {
 		log.Printf("nmap alive: %v", aliveErr)
 		p.failStage(StageAlive, aliveErr.Error())
 		// Don't fall back to all IPs on error — skip port scan entirely
 		aliveIPs = nil
 	} else {
-		if len(aliveIPs) == 0 && len(nonCDNIPs) > 0 {
-			log.Printf("[pipeline] nmap reported 0 alive hosts out of %d inputs, skipping port scan", len(nonCDNIPs))
+		if len(aliveIPs) == 0 && len(portScanIPs) > 0 {
+			log.Printf("[pipeline] nmap reported 0 alive hosts out of %d inputs, skipping port scan", len(portScanIPs))
 			// No fallback: naabu would waste time scanning dead hosts
 		}
 		p.completeStage(StageAlive)
@@ -234,20 +250,30 @@ func (p *Pipeline) runDomainFlow(ctx context.Context, targets []*models.Target) 
 
 // runIPFlow: CDN → Naabu → nmap -sV → split → httpx → Nuclei.
 func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) error {
+	// Check for cancellation before starting work.
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	ips := extractTargetValues(targets)
 
-	// CDN filter (skipped entirely when disabled — no stage record so the UI
-	// doesn't show a misleading "CDN 过滤 0.0s" row in internal scan mode).
 	var nonCDNIPs []string
-	if p.config.EnableCDNFilter {
-		p.setStage(StageCDNFilter)
+	classifyCDN := p.config.EnableCDNFilter || p.config.SkipPortscanOnCDNHost
+	if classifyCDN {
+		if p.config.EnableCDNFilter {
+			p.setStage(StageCDNFilter)
+		}
 		var cdnResults []models.CDNResult
 		var err error
-		nonCDNIPs, cdnResults, err = p.cdnDet.FilterCDNIPs(ctx, ips)
+		nonCDNIPs, cdnResults, err = p.runCDNCheck(ctx, ips)
 		if err != nil {
 			log.Printf("cdn filter: %v", err)
-			p.failStage(StageCDNFilter, err.Error())
-		} else {
+			if p.config.EnableCDNFilter {
+				p.failStage(StageCDNFilter, err.Error())
+			}
+		} else if p.config.EnableCDNFilter {
 			p.completeStage(StageCDNFilter)
 		}
 		for _, cdn := range cdnResults {
@@ -261,18 +287,22 @@ func (p *Pipeline) runIPFlow(ctx context.Context, targets []*models.Target) erro
 	} else {
 		nonCDNIPs = ips
 	}
+	portScanIPs := ipsForPortScan(ips, nonCDNIPs, classifyCDN, p.config.SkipPortscanOnCDNHost)
+	if p.config.SkipPortscanOnCDNHost && classifyCDN && len(ips) > 0 && len(portScanIPs) < len(ips) {
+		log.Printf("[pipeline] skip_portscan_on_cdn_host: port scan on %d/%d IPs", len(portScanIPs), len(ips))
+	}
 
 	// Alive check via nmap
 	p.setStage(StageAlive)
-	aliveIPs, aliveErr := p.runNmapAlive(ctx, nonCDNIPs)
+	aliveIPs, aliveErr := p.runNmapAlive(ctx, portScanIPs)
 	if aliveErr != nil {
 		log.Printf("nmap alive: %v", aliveErr)
 		p.failStage(StageAlive, aliveErr.Error())
 		// Don't fall back to all IPs on error — skip port scan entirely
 		aliveIPs = nil
 	} else {
-		if len(aliveIPs) == 0 && len(nonCDNIPs) > 0 {
-			log.Printf("[pipeline] nmap reported 0 alive hosts out of %d inputs, skipping port scan", len(nonCDNIPs))
+		if len(aliveIPs) == 0 && len(portScanIPs) > 0 {
+			log.Printf("[pipeline] nmap reported 0 alive hosts out of %d inputs, skipping port scan", len(portScanIPs))
 			// No fallback: naabu would waste time scanning dead hosts
 		}
 		p.completeStage(StageAlive)

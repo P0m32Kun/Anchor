@@ -2,13 +2,18 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/parser"
 	"github.com/P0m32Kun/Anchor/internal/passive"
 	"github.com/P0m32Kun/Anchor/internal/search"
+	"github.com/P0m32Kun/Anchor/internal/toolregistry"
+	"github.com/P0m32Kun/Anchor/internal/toolrun"
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
@@ -45,10 +50,22 @@ func (p *Pipeline) runPassiveSearch(ctx context.Context, companyName string) err
 		}
 	}
 
+	// 3. Quake
+	if p.config.EnablePassiveSearch {
+		domains, ips, err := p.quakeSearchCompany(ctx, companyName)
+		if err != nil {
+			log.Printf("[passive] quake: %v", err)
+			errs = append(errs, fmt.Errorf("quake: %w", err))
+		} else {
+			allDomains = append(allDomains, domains...)
+			allIPs = append(allIPs, ips...)
+		}
+	}
+
 	allDomains = dedupStrings(allDomains)
 	allIPs = dedupStrings(allIPs)
 
-	log.Printf("[passive] company %q: FOFA+Hunter found %d domains, %d IPs",
+	log.Printf("[passive] company %q: passive search found %d domains, %d IPs",
 		companyName, len(allDomains), len(allIPs))
 
 	// Persist as targets and route to downstream flows.
@@ -68,7 +85,7 @@ func (p *Pipeline) runPassiveSearch(ctx context.Context, companyName string) err
 		}
 	}
 
-	if len(errs) > 0 && allDomains == nil && allIPs == nil {
+	if len(errs) > 0 && len(allDomains) == 0 && len(allIPs) == 0 {
 		// All engines failed and nothing was found.
 		p.failStage(StageSearch, fmt.Sprintf("all passive search engines failed: %v", errs))
 		return fmt.Errorf("passive search: %v", errs)
@@ -99,6 +116,14 @@ func (p *Pipeline) fofaExpandCompany(ctx context.Context, name string) (domains,
 	domains = dedupStrings(domains)
 	ips = dedupStrings(ips)
 	p.persistSearchResults(domains, ips, "fofa")
+
+	// Record response for auditability in the pipeline detail view.
+	if payload, err := json.MarshalIndent(results, "", "  "); err == nil {
+		p.recordPassiveTask("fofa",
+			fmt.Sprintf("FOFA company search: %q", name),
+			payload)
+	}
+
 	return domains, ips, nil
 }
 
@@ -131,6 +156,58 @@ func (p *Pipeline) hunterSearchCompany(ctx context.Context, name string) (domain
 	domains = dedupStrings(domains)
 	ips = dedupStrings(ips)
 	p.persistSearchResults(domains, ips, "hunter")
+
+	if payload, err := json.MarshalIndent(results, "", "  "); err == nil {
+		p.recordPassiveTask("hunter",
+			fmt.Sprintf("Hunter company search: %q", name),
+			payload)
+	}
+
+	return domains, ips, nil
+}
+
+// quakeSearchCompany loads the Quake credential and runs a company-oriented query.
+func (p *Pipeline) quakeSearchCompany(ctx context.Context, name string) (domains, ips []string, _ error) {
+	cred, err := p.queries.GetEngineCredential("quake")
+	if err != nil {
+		log.Printf("[passive] quake credential lookup: %v", err)
+		return nil, nil, nil
+	}
+	if cred == nil || cred.APIKey == "" {
+		return nil, nil, nil
+	}
+	client := search.NewQuakeClient(cred.APIKey)
+	escaped := strings.ReplaceAll(name, `"`, `\"`)
+	query := fmt.Sprintf(`cert:"%s" OR title:"%s"`, escaped, escaped)
+	limit := p.config.PassiveSearchResultLimit
+	if limit < 1 {
+		limit = 100
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	results, err := client.Search(ctx, query, 0, limit)
+	if err != nil {
+		return nil, nil, fmt.Errorf("quake search: %w", err)
+	}
+	for _, r := range results {
+		if search.IsDomain(r.Domain) {
+			domains = append(domains, r.Domain)
+		}
+		if r.IP != "" {
+			ips = append(ips, r.IP)
+		}
+	}
+	domains = dedupStrings(domains)
+	ips = dedupStrings(ips)
+	p.persistSearchResults(domains, ips, "quake")
+
+	if payload, err := json.MarshalIndent(results, "", "  "); err == nil {
+		p.recordPassiveTask("quake",
+			fmt.Sprintf("Quake search: %q", name),
+			payload)
+	}
+
 	return domains, ips, nil
 }
 
@@ -212,6 +289,14 @@ func (p *Pipeline) runPassiveCert(ctx context.Context, rootDomain string) error 
 		persisted++
 	}
 	log.Printf("[passive] crt.sh: %d/%d subdomains in scope for %s", persisted, len(subs), rootDomain)
+
+	// Record crt.sh response for auditability.
+	if payload, err := json.MarshalIndent(subs, "", "  "); err == nil {
+		p.recordPassiveTask("crt",
+			fmt.Sprintf("crt.sh subdomains for %s (%d found, %d in scope)", rootDomain, len(subs), persisted),
+			payload)
+	}
+
 	p.completeStage(StagePassiveCert)
 	return nil
 }
@@ -224,13 +309,36 @@ func (p *Pipeline) runPassiveURL(ctx context.Context, rootDomain string) ([]stri
 	}
 	p.setStage(StagePassiveURL)
 
-	urls, err := passive.RunGau(ctx, rootDomain)
+	res := toolrun.Invoke(ctx, p.queries, p.runner, p.tools, toolrun.InvokeInput{
+		ProjectID: p.projectID,
+		RunID:     &p.runID,
+		ToolID:    "gau",
+		Params: toolregistry.RenderParams{
+			"domain": rootDomain,
+		},
+	})
+	if res.Err != nil {
+		log.Printf("[passive] gau for %s: %v", rootDomain, res.Err)
+		p.failStage(StagePassiveURL, res.Err.Error())
+		return nil, res.Err
+	}
+
+	urls, err := parser.ParseGauOutputBytes(res.Stdout)
 	if err != nil {
-		log.Printf("[passive] gau for %s: %v", rootDomain, err)
+		log.Printf("[passive] parse gau for %s: %v", rootDomain, err)
 		p.failStage(StagePassiveURL, err.Error())
 		return nil, err
 	}
+
 	log.Printf("[passive] gau: collected %d URLs for %s", len(urls), rootDomain)
+
+	// Record gau response for auditability.
+	if payload, err := json.MarshalIndent(urls, "", "  "); err == nil {
+		p.recordPassiveTask("gau",
+			fmt.Sprintf("gau historical URLs for %s (%d collected)", rootDomain, len(urls)),
+			payload)
+	}
+
 	p.completeStage(StagePassiveURL)
 	return urls, nil
 }

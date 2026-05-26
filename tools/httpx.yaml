@@ -1,0 +1,23 @@
+id: httpx
+binary: httpx
+description: Web endpoint probing with technology detection
+output:
+  format: jsonl
+parameters:
+  host_file:
+    type: path
+    required: true
+    flag: "-l"
+  rate_limit:
+    type: int
+    flag: "-rate-limit"
+  threads:
+    type: int
+    flag: "-threads"
+  custom_fp_file:
+    type: path
+    flag: "-cff"
+literals:
+  - ["-json"]
+  - ["-follow-redirects"]
+  - ["-td"]

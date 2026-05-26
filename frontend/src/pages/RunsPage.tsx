@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { api, PAGE_ALL } from "../lib/api";
 import { useStore } from "../lib/store";
-import { useResource, useSSE, usePolling } from "../hooks";
+import { useResource, useSSE, usePolling, useTaskLiveOutput } from "../hooks";
 import {
   EmptyState,
   useProjectId,
@@ -43,6 +43,9 @@ import {
   FileText,
   Download,
   Copy,
+  ChevronDown,
+  ChevronRight,
+  Eye,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -79,6 +82,11 @@ export default function RunsPage() {
   const [inspectingLogs, setInspectingLogs] = useState<string>("");
   const [logsLoading, setLogsLoading] = useState(false);
   const [logViewMode, setLogViewMode] = useState<"raw" | "parsed">("parsed");
+
+  // Inline task output expansion state
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [expandedTaskLogs, setExpandedTaskLogs] = useState<Record<string, string>>({});
+  const [expandedTaskLoading, setExpandedTaskLoading] = useState<Record<string, boolean>>({});
 
   const lastToastErrorRef = useRef<string | null>(null);
 
@@ -296,9 +304,67 @@ export default function RunsPage() {
     window.location.href = `/reports?projectId=${projectId}`;
   };
 
+  const inspectingLive =
+    !!inspectingTask &&
+    (inspectingTask.status === "running" || inspectingTask.status === "queued");
+  const { text: inspectingLiveLogs, loading: inspectingLiveLoading } = useTaskLiveOutput(
+    inspectingTask,
+    inspectingLive
+  );
+
+  const expandedTask = expandedTaskId ? tasks.find((t) => t.id === expandedTaskId) ?? null : null;
+  const expandedLive =
+    !!expandedTask &&
+    (expandedTask.status === "running" || expandedTask.status === "queued");
+  const { text: expandedLiveLogs, loading: expandedLiveLoading } = useTaskLiveOutput(
+    expandedTask,
+    expandedLive
+  );
+
+  // Keep modal task status in sync when run details refresh.
+  useEffect(() => {
+    if (!inspectingTask) return;
+    const fresh = tasks.find((t) => t.id === inspectingTask.id);
+    if (fresh && fresh.status !== inspectingTask.status) {
+      setInspectingTask(fresh);
+    }
+  }, [tasks, inspectingTask]);
+
+  // After a live task finishes, load full artifacts once.
+  useEffect(() => {
+    if (!inspectingTask || inspectingLive) return;
+    if (inspectingLogs !== "" || logsLoading) return;
+    void (async () => {
+      setLogsLoading(true);
+      try {
+        const artifacts = await api.listArtifacts(inspectingTask.id);
+        const stdout = artifacts.find((a) => a.type === "stdout");
+        const stderr = artifacts.find((a) => a.type === "stderr");
+        const targetArtifact = stdout || stderr;
+        if (targetArtifact) {
+          const content = await api.getArtifactContent(targetArtifact.id);
+          setInspectingLogs(content);
+        } else {
+          setInspectingLogs("(无日志输出)");
+        }
+      } catch (err) {
+        setInspectingLogs(
+          "加载日志失败: " + (err instanceof Error ? err.message : String(err))
+        );
+      } finally {
+        setLogsLoading(false);
+      }
+    })();
+  }, [inspectingTask?.id, inspectingTask?.status, inspectingLive]);
+
   const handleInspectTask = async (task: ScanTask) => {
     setInspectingTask(task);
     setInspectingLogs("");
+    setLogViewMode("raw");
+    if (task.status === "running" || task.status === "queued") {
+      setLogsLoading(false);
+      return;
+    }
     setLogsLoading(true);
     try {
       const artifacts = await api.listArtifacts(task.id);
@@ -318,6 +384,40 @@ export default function RunsPage() {
       setInspectingLogs("加载日志失败: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setLogsLoading(false);
+    }
+  };
+
+  // Toggle inline task output expansion (fetch artifact lazily).
+  const toggleTaskExpand = async (task: ScanTask) => {
+    if (expandedTaskId === task.id) {
+      setExpandedTaskId(null);
+      return;
+    }
+    setExpandedTaskId(task.id);
+    if (task.status === "running" || task.status === "queued") {
+      return;
+    }
+    if (expandedTaskLogs[task.id] !== undefined) return; // already cached
+
+    setExpandedTaskLoading((prev) => ({ ...prev, [task.id]: true }));
+    try {
+      const artifacts = await api.listArtifacts(task.id);
+      const stdout = artifacts.find(a => a.type === 'stdout');
+      const stderr = artifacts.find(a => a.type === 'stderr');
+      const targetArtifact = stdout || stderr;
+      if (targetArtifact) {
+        const content = await api.getArtifactContent(targetArtifact.id);
+        // Truncate to first 50 lines for inline preview
+        const lines = content.split('\n');
+        const preview = lines.slice(0, 50).join('\n');
+        setExpandedTaskLogs((prev) => ({ ...prev, [task.id]: preview + (lines.length > 50 ? '\n...' : '') }));
+      } else {
+        setExpandedTaskLogs((prev) => ({ ...prev, [task.id]: '(无日志输出)' }));
+      }
+    } catch (err) {
+      setExpandedTaskLogs((prev) => ({ ...prev, [task.id]: '加载失败: ' + (err instanceof Error ? err.message : String(err)) }));
+    } finally {
+      setExpandedTaskLoading((prev) => ({ ...prev, [task.id]: false }));
     }
   };
 
@@ -545,50 +645,110 @@ export default function RunsPage() {
                                                         </span>
                                                     </div>
                                                     <div className={cn(
-                                                        "text-[10px] mt-0.5 font-medium truncate",
+                                                        "text-[10px] mt-0.5 font-medium",
+                                                        !s.error && "truncate",
                                                         s.status === 'completed' ? 'text-brand-success' :
                                                         s.status === 'running' ? 'text-primary' :
                                                         s.status === 'failed' ? 'text-destructive' :
                                                         'text-muted-foreground'
                                                     )}>
                                                         {s.status.toUpperCase()}
-                                                        {s.error && <span className="ml-2 font-mono text-destructive opacity-80">— {s.error}</span>}
                                                     </div>
+                                                    {s.error && (
+                                                        <p className="text-[10px] mt-1 font-mono text-destructive/90 whitespace-pre-wrap break-all">
+                                                            {s.error}
+                                                        </p>
+                                                    )}
+                                                    {stageTasks.length === 0 && s.status !== 'pending' && !s.error && (
+                                                        <p className="text-[10px] mt-1 text-muted-foreground">
+                                                            此阶段无 cdncheck 子任务（可能尚未执行或 run 无 stage 记录）
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                             {stageTasks.length > 0 && (
                                                 <div className="pl-14 pr-4 pb-3 -mt-1 space-y-1.5">
-                                                    {stageTasks.map((task) => (
-                                                        <div 
-                                                            key={task.id} 
-                                                            className="flex items-center justify-between gap-3 text-[11px] py-1 border-l border-border/40 pl-3 hover:bg-primary/[0.03] cursor-pointer transition-colors group/task"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleInspectTask(task);
-                                                            }}
-                                                        >
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <span className="px-1.5 py-0.5 rounded bg-muted font-mono font-bold text-muted-foreground text-[10px] group-hover/task:bg-primary/10 group-hover/task:text-primary transition-colors">
-                                                                    {task.tool}
-                                                                </span>
-                                                                <span className="font-mono text-muted-foreground opacity-50 truncate">#{task.id.slice(-6)}</span>
-                                                                <span className="font-mono text-muted-foreground/70 text-[10px]">
-                                                                    {formatTaskDuration(task)}
-                                                                </span>
+                                                    {stageTasks.map((task) => {
+                                                        const isExpanded = expandedTaskId === task.id;
+                                                        const taskLive =
+                                                          task.status === "running" ||
+                                                          task.status === "queued";
+                                                        const isLoading = taskLive
+                                                          ? expandedLiveLoading
+                                                          : expandedTaskLoading[task.id];
+                                                        const logs = taskLive
+                                                          ? expandedLiveLogs
+                                                          : expandedTaskLogs[task.id];
+                                                        return (
+                                                        <div key={task.id}>
+                                                            <div
+                                                                className="flex items-center justify-between gap-3 text-[11px] py-1 border-l border-border/40 pl-3 hover:bg-primary/[0.03] cursor-pointer transition-colors group/task"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    toggleTaskExpand(task);
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    {isExpanded
+                                                                        ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
+                                                                        : <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0 group-hover/task:text-muted-foreground transition-colors" />
+                                                                    }
+                                                                    <span className="px-1.5 py-0.5 rounded bg-muted font-mono font-bold text-muted-foreground text-[10px] group-hover/task:bg-primary/10 group-hover/task:text-primary transition-colors">
+                                                                        {task.tool}
+                                                                    </span>
+                                                                    <span className="font-mono text-muted-foreground opacity-50 truncate">#{task.id.slice(-6)}</span>
+                                                                    <span className="font-mono text-muted-foreground/70 text-[10px]">
+                                                                        {formatTaskDuration(task)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <Badge variant={
+                                                                        task.status === 'completed' ? 'success' :
+                                                                        task.status === 'failed' ? 'destructive' :
+                                                                        task.status === 'running' ? 'info' :
+                                                                        'secondary'
+                                                                    } className="h-4 px-1 text-[9px] shrink-0">
+                                                                        {task.status}
+                                                                    </Badge>
+                                                                    <Terminal className="h-3 w-3 text-muted-foreground/30 group-hover/task:text-primary transition-colors" />
+                                                                </div>
                                                             </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Badge variant={
-                                                                    task.status === 'completed' ? 'success' :
-                                                                    task.status === 'failed' ? 'destructive' :
-                                                                    task.status === 'running' ? 'info' :
-                                                                    'secondary'
-                                                                } className="h-4 px-1 text-[9px] shrink-0">
-                                                                    {task.status}
-                                                                </Badge>
-                                                                <Terminal className="h-3 w-3 text-muted-foreground/30 group-hover/task:text-primary transition-colors" />
-                                                            </div>
+                                                            {/* Inline output preview */}
+                                                            {isExpanded && (
+                                                                <div className="ml-6 mt-1 mb-2 border-l border-primary/20 pl-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                                                                    {isLoading && (!logs || logs === "") ? (
+                                                                        <div className="flex items-center gap-2 py-2">
+                                                                            <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                                                                            <span className="text-[10px] text-muted-foreground">
+                                                                              {taskLive ? "等待工具输出…" : "加载中..."}
+                                                                            </span>
+                                                                        </div>
+                                                                    ) : logs !== undefined ? (
+                                                                        <div className="space-y-1.5">
+                                                                            {taskLive && (
+                                                                              <span className="text-[9px] font-bold uppercase tracking-wider text-brand-success">
+                                                                                实时输出
+                                                                              </span>
+                                                                            )}
+                                                                            <pre className="text-[10px] font-mono text-muted-foreground bg-black/20 rounded-md p-2 overflow-x-auto max-h-[200px] overflow-y-auto leading-relaxed whitespace-pre-wrap break-all">
+                                                                                {logs || (taskLive ? "(尚无输出，工具可能仍在启动)" : "")}
+                                                                            </pre>
+                                                                            <button
+                                                                                className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium transition-colors"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleInspectTask(task);
+                                                                                }}
+                                                                            >
+                                                                                <Eye className="h-3 w-3" />
+                                                                                查看完整日志
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    ))}
+                                                    )})}
                                                 </div>
                                             )}
                                         </div>
@@ -629,11 +789,15 @@ export default function RunsPage() {
 
       <TaskDetailsModal
         task={inspectingTask}
-        logs={inspectingLogs}
-        loading={logsLoading}
+        logs={inspectingLive ? inspectingLiveLogs : inspectingLogs}
+        loading={inspectingLive ? inspectingLiveLoading : logsLoading}
+        live={inspectingLive}
         viewMode={logViewMode}
         onViewModeChange={setLogViewMode}
-        onClose={() => setInspectingTask(null)}
+        onClose={() => {
+          setInspectingTask(null);
+          setInspectingLogs("");
+        }}
       />
     </div>
   );
@@ -655,6 +819,9 @@ const STAGE_TOOL_ALLOWLIST: Record<string, string[]> = {
   urlfinder: ["urlfinder"],
   httpx_2: ["httpx"],
   vuln_2: ["nuclei"],
+  search: ["fofa", "hunter", "quake"],
+  passive_cert: ["crt"],
+  passive_url: ["gau"],
 };
 
 function tasksInStage(stage: PipelineRunStage, allTasks: ScanTask[]): ScanTask[] {
@@ -1115,6 +1282,91 @@ function TaskParsedView({ task, logs }: { task: ScanTask; logs: string }) {
       );
     }
 
+    case "fofa":
+    case "hunter":
+    case "quake": {
+      const data = tryParseJSONL<any>(lines);
+      // Single-element JSON array? Parse as a whole.
+      const items = (data.length === 0 && lines.length > 0)
+        ? (() => { try { const parsed = JSON.parse(logs); return Array.isArray(parsed) ? parsed : [parsed]; } catch { return []; } })()
+        : data;
+      return (
+        <TableContainer>
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead className="text-[10px] uppercase font-bold">HOST</TableHead>
+                <TableHead className="w-[140px] text-[10px] uppercase font-bold">IP</TableHead>
+                <TableHead className="w-[70px] text-[10px] uppercase font-bold text-center">PORT</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold pr-6">TITLE / SERVER</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item: any, idx: number) => (
+                <TableRow key={idx} className="hover:bg-muted/30 transition-colors border-border/40">
+                  <TableCell className="font-mono text-[11px] text-primary py-3 max-w-[250px] truncate">{item.host || item.domain || "-"}</TableCell>
+                  <TableCell className="font-mono text-[11px] py-3">{item.ip || "-"}</TableCell>
+                  <TableCell className="text-center py-3">
+                    <Badge variant="secondary" className="h-5 px-1.5 font-mono text-[10px]">{item.port || "-"}</Badge>
+                  </TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground pr-6 py-3 max-w-[200px] truncate">
+                    {item.title || item.server || "-"}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {items.length === 0 && (
+                <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground text-xs">无结果 (API 返回空或查询无匹配)</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      );
+    }
+
+    case "crt": {
+      const subdomains: string[] = (() => {
+        try { const parsed = JSON.parse(logs); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+      })();
+      return (
+        <div className="p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">证书透明度子域名</h5>
+            <Badge variant="secondary" className="font-mono text-[10px]">{subdomains.length}</Badge>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {subdomains.map((d, i) => (
+              <div key={i} className="px-3 py-2 bg-muted/30 rounded-lg border border-border/40 font-mono text-[11px] text-primary truncate hover:border-primary/30 transition-all cursor-default">{d}</div>
+            ))}
+          </div>
+          {subdomains.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-8">无子域名发现</p>
+          )}
+        </div>
+      );
+    }
+
+    case "gau": {
+      const urls: string[] = (() => {
+        try { const parsed = JSON.parse(logs); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+      })();
+      return (
+        <div className="p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">历史 URL</h5>
+            <Badge variant="secondary" className="font-mono text-[10px]">{urls.length}</Badge>
+          </div>
+          <div className="max-h-[400px] overflow-y-auto space-y-1">
+            {urls.map((u, i) => (
+              <div key={i} className="px-3 py-1.5 rounded font-mono text-[10px] text-muted-foreground hover:bg-muted/30 truncate">{u}</div>
+            ))}
+          </div>
+          {urls.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-8">无历史 URL</p>
+          )}
+        </div>
+      );
+    }
+
     default:
       return (
         <div className="p-20 text-center flex flex-col items-center gap-4">
@@ -1139,6 +1391,7 @@ function TaskDetailsModal({
   task,
   logs,
   loading,
+  live,
   viewMode,
   onViewModeChange,
   onClose,
@@ -1146,6 +1399,7 @@ function TaskDetailsModal({
   task: ScanTask | null;
   logs: string;
   loading: boolean;
+  live?: boolean;
   viewMode: "raw" | "parsed";
   onViewModeChange: (mode: "raw" | "parsed") => void;
   onClose: () => void;
@@ -1305,15 +1559,19 @@ function TaskDetailsModal({
               "relative min-h-[450px] rounded-xl border border-border/50 overflow-hidden shadow-sm transition-all",
               viewMode === "raw" ? "bg-[#0d1117] ring-1 ring-white/5" : "bg-card"
           )}>
-            {loading ? (
+            {loading && !(live && logs) ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/60 backdrop-blur-md z-10">
                 <div className="relative">
                   <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
                   <Activity className="h-5 w-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-sm font-bold text-foreground">正在拉取扫描结果</span>
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-tighter">Syncing from worker node...</span>
+                  <span className="text-sm font-bold text-foreground">
+                    {live ? "等待工具输出" : "正在拉取扫描结果"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-tighter">
+                    {live ? "每 2 秒刷新 stdout/stderr" : "Syncing from worker node..."}
+                  </span>
                 </div>
               </div>
             ) : viewMode === "raw" ? (
@@ -1325,7 +1583,9 @@ function TaskDetailsModal({
                 ) : (
                   <div className="flex flex-col h-[400px] items-center justify-center text-muted-foreground gap-3">
                     <Terminal className="h-10 w-10 opacity-10" />
-                    <span className="italic opacity-50 text-sm">NO LOG OUTPUT RECORDED</span>
+                    <span className="italic opacity-50 text-sm">
+                      {live ? "尚无输出（工具可能仍在启动）" : "NO LOG OUTPUT RECORDED"}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1339,7 +1599,13 @@ function TaskDetailsModal({
 
         <div className="flex items-center justify-between pt-4 border-t border-border/50">
           <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
-            {loading ? "Waiting for response..." : (logs ? `Received ${Math.round(logs.length / 1024)} KB data` : "No data available")}
+            {live
+              ? `实时输出 · ${Math.round(logs.length / 1024)} KB`
+              : loading
+                ? "Waiting for response..."
+                : logs
+                  ? `Received ${Math.round(logs.length / 1024)} KB data`
+                  : "No data available"}
           </div>
           <div className="flex gap-3">
             {logs && !loading && (

@@ -1,0 +1,24 @@
+id: dnsx
+binary: dnsx
+description: DNS resolution tool
+output:
+  format: jsonl
+parameters:
+  host_file:
+    type: path
+    required: true
+    flag: "-l"
+  record_types:
+    type: string_list
+    # empty → defaults to ["a","aaaa","cname"]
+  rate_limit:
+    type: int
+    flag: "-rl"
+  threads:
+    type: int
+    flag: "-t"
+  timeout:
+    type: int
+    flag: "-timeout"
+literals:
+  - ["-json"]

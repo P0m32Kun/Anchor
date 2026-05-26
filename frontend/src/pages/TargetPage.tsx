@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse, type ScopeRule, PAGE_ALL } from "../lib/api";
+import { api, APIError, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse, type ScopeRule, PAGE_ALL, friendlyMessage } from "../lib/api";
 import { useStore } from "../lib/store";
 import { useResource } from "../hooks";
 import {
@@ -91,7 +91,71 @@ function ProjectInfo({ project }: { project: Project }) {
   );
 }
 
-function FileImport({ projectId, onImported }: { projectId: string; onImported: () => void }) {
+function StatItem({ label, value, color = "text-muted-foreground" }: { label: string; value: number; color?: string }) {
+    return (
+        <div className="rounded-lg bg-background/50 p-2 border border-border/50">
+            <div className="text-[10px] font-bold text-muted-foreground uppercase leading-none mb-1.5">{label}</div>
+            <div className={cn("text-lg font-bold tabular-nums leading-none", color)}>{value}</div>
+        </div>
+    )
+}
+
+type PendingImportConfirm = {
+  message: string;
+  suggested_rules: NonNullable<ImportResult["suggested_rules"]>;
+  file: File;
+};
+
+function ImportResultCard({ result, onClose }: { result: ImportResult; onClose: () => void }) {
+  const deniedTargets = result.denied_targets ?? [];
+  return (
+    <Card className="bg-muted/30 border-dashed animate-in slide-in-from-top-2 duration-300">
+      <CardHeader className="py-3 px-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-brand-success" />
+            导入报告
+          </CardTitle>
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <StatItem label="成功" value={result.imported ?? 0} color="text-brand-success" />
+          <StatItem label="总目标" value={result.expanded ?? 0} color="text-brand-primary" />
+          <StatItem label="重复" value={result.duplicates ?? 0} />
+          <StatItem label="拒绝" value={result.denied ?? 0} color="text-brand-warning" />
+          <StatItem label="错误" value={result.errors ?? 0} color="text-brand-danger" />
+        </div>
+        {deniedTargets.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-border/50">
+            <div className="text-xs font-semibold text-brand-warning mb-2 uppercase tracking-tight">Scope Denied:</div>
+            <div className="space-y-1.5 max-h-32 overflow-auto pr-2 custom-scrollbar">
+              {deniedTargets.map((d, i) => (
+                <div key={i} className="text-xs flex items-center justify-between p-2 rounded bg-background/50 border border-border/50">
+                  <code className="text-brand-warning font-mono">{d.value}</code>
+                  <span className="text-muted-foreground italic text-[10px]">{d.reason}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function FileImport({
+  projectId,
+  onImported,
+  onScopeConfirm,
+}: {
+  projectId: string;
+  onImported: () => void;
+  onScopeConfirm: (pending: PendingImportConfirm) => void;
+}) {
   const [dragOver, setDragOver] = useState(false);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -108,21 +172,33 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
       setResult(null);
       try {
         const res = await api.importTargets(projectId, file);
+        if (res.needs_scope_confirmation) {
+          onScopeConfirm({
+            message: res.message ?? "当前项目未设置授权范围，是否将导入的目标自动加入授权范围？",
+            suggested_rules: res.suggested_rules ?? [],
+            file,
+          });
+          return;
+        }
         setResult(res);
         onImported();
-        toast(`导入完成: 成功 ${res.imported} 个`, "success");
+        toast(`导入完成: 成功 ${res.imported ?? 0} 个`, "success");
       } catch (err) {
+        const apiErr = err instanceof APIError ? err : new APIError(err instanceof Error ? err.message : "导入失败");
+        toast(friendlyMessage(apiErr), "error");
       } finally {
         setImporting(false);
         setDragOver(false);
       }
     },
-    [projectId, onImported, toast],
+    [projectId, onImported, onScopeConfirm, toast],
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+      e.stopPropagation();
+      setDragOver(false);
       const file = e.dataTransfer.files[0];
       if (file) handleFile(file);
     },
@@ -132,13 +208,25 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
   return (
     <div className="space-y-4">
       <div
-        onDragOver={(e) => {
+        onDragEnter={(e) => {
           e.preventDefault();
+          e.stopPropagation();
           setDragOver(true);
         }}
-        onDragLeave={() => setDragOver(false)}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setDragOver(false);
+          }
+        }}
         onDrop={handleDrop}
-        onClick={() => fileRef.current?.click()}
+        onClick={() => !importing && fileRef.current?.click()}
         className={cn(
             "relative group border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all",
             importing ? "opacity-50 cursor-not-allowed" : "hover:border-primary/50 hover:bg-primary/[0.02]",
@@ -172,54 +260,9 @@ function FileImport({ projectId, onImported }: { projectId: string; onImported: 
         </div>
       </div>
 
-      {result && (
-        <Card className="bg-muted/30 border-dashed animate-in slide-in-from-top-2 duration-300">
-          <CardHeader className="py-3 px-4">
-            <div className="flex items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-brand-success" />
-                    导入报告
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setResult(null)}>
-                    <X className="h-3 w-3" />
-                </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <StatItem label="成功" value={result.imported} color="text-brand-success" />
-              <StatItem label="总目标" value={result.expanded ?? 0} color="text-brand-primary" />
-              <StatItem label="重复" value={result.duplicates} />
-              <StatItem label="拒绝" value={result.denied} color="text-brand-warning" />
-              <StatItem label="错误" value={result.errors} color="text-brand-danger" />
-            </div>
-            {result.denied_targets.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <div className="text-xs font-semibold text-brand-warning mb-2 uppercase tracking-tight">Scope Denied:</div>
-                <div className="space-y-1.5 max-h-32 overflow-auto pr-2 custom-scrollbar">
-                    {result.denied_targets.map((d, i) => (
-                    <div key={i} className="text-xs flex items-center justify-between p-2 rounded bg-background/50 border border-border/50">
-                        <code className="text-brand-warning font-mono">{d.value}</code>
-                        <span className="text-muted-foreground italic text-[10px]">{d.reason}</span>
-                    </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {result && <ImportResultCard result={result} onClose={() => setResult(null)} />}
     </div>
   );
-}
-
-function StatItem({ label, value, color = "text-muted-foreground" }: { label: string; value: number; color?: string }) {
-    return (
-        <div className="rounded-lg bg-background/50 p-2 border border-border/50">
-            <div className="text-[10px] font-bold text-muted-foreground uppercase leading-none mb-1.5">{label}</div>
-            <div className={cn("text-lg font-bold tabular-nums leading-none", color)}>{value}</div>
-        </div>
-    )
 }
 
 export default function TargetPage() {
@@ -281,6 +324,9 @@ export default function TargetPage() {
     pendingValue: string;
   } | null>(null);
   const [scopeConfirmLoading, setScopeConfirmLoading] = useState(false);
+  const [pendingImportConfirm, setPendingImportConfirm] = useState<PendingImportConfirm | null>(null);
+  const [importConfirmLoading, setImportConfirmLoading] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   const [addingTarget, setAddingTarget] = useState(false);
   const [addingScope, setAddingScope] = useState(false);
@@ -296,9 +342,40 @@ export default function TargetPage() {
       return;
     }
     if (addingTarget) return;
+
+    const lines = targetValue
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (lines.length > 1) {
+      setAddingTarget(true);
+      try {
+        const file = new File([`${lines.join("\n")}\n`], "targets.txt", { type: "text/plain" });
+        const res = await api.importTargets(projectId, file);
+        if (res.needs_scope_confirmation) {
+          setPendingImportConfirm({
+            message: res.message ?? "当前项目未设置授权范围，是否将导入的目标自动加入授权范围？",
+            suggested_rules: res.suggested_rules ?? [],
+            file,
+          });
+          return;
+        }
+        setImportResult(res);
+        setTargetValue("");
+        await loadTargets();
+        await loadScopeRules();
+        toast(`导入完成: 成功 ${res.imported ?? 0} 个`, "success");
+      } catch (err) {
+      } finally {
+        setAddingTarget(false);
+      }
+      return;
+    }
+
     setAddingTarget(true);
     try {
-      const res = await api.createTarget(projectId, { type: targetType, value: targetValue });
+      const res = await api.createTarget(projectId, { type: targetType, value: lines[0] });
       if ("needs_scope_confirmation" in res && res.needs_scope_confirmation) {
         setPendingScopeConfirm({
           message: res.message,
@@ -315,6 +392,36 @@ export default function TargetPage() {
     } catch (err) {
     } finally {
       setAddingTarget(false);
+    }
+  };
+
+  const handleConfirmImportScope = async () => {
+    if (!pendingImportConfirm || !projectId) return;
+    setImportConfirmLoading(true);
+    try {
+      for (const rule of pendingImportConfirm.suggested_rules) {
+        await api.createScopeRule({
+          project_id: projectId,
+          action: rule.action,
+          type: rule.type,
+          value: rule.value,
+        });
+      }
+      await new Promise((r) => setTimeout(r, 500));
+      await loadScopeRules();
+      const res = await api.importTargets(projectId, pendingImportConfirm.file);
+      if (res.needs_scope_confirmation) {
+        toast("Scope 规则已添加，但导入仍需要确认，请手动检查。", "warning");
+        return;
+      }
+      setImportResult(res);
+      setTargetValue("");
+      await loadTargets();
+      toast(`导入完成: 成功 ${res.imported ?? 0} 个`, "success");
+    } catch (err) {
+    } finally {
+      setImportConfirmLoading(false);
+      setPendingImportConfirm(null);
     }
   };
 
@@ -537,8 +644,8 @@ export default function TargetPage() {
         <aside className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg">添加单个目标</CardTitle>
-                    <CardDescription>支持 IP, CIDR, 域名, URL 等类型。</CardDescription>
+                    <CardTitle className="text-lg">添加目标</CardTitle>
+                    <CardDescription>支持 IP, CIDR, 域名, URL；每行一个可批量添加。</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <form onSubmit={addTarget} className="space-y-3">
@@ -553,10 +660,12 @@ export default function TargetPage() {
                                 <option value="ip">IP</option>
                                 <option value="cidr">CIDR</option>
                             </Select>
-                            <Input
-                                placeholder="example.com"
+                            <textarea
+                                placeholder={"example.com 或 192.168.1.1（每行一个）"}
                                 value={targetValue}
                                 onChange={(e) => setTargetValue(e.target.value)}
+                                rows={3}
+                                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono resize-y"
                             />
                         </div>
                         <Button type="submit" variant="primary" loading={addingTarget} className="w-full">
@@ -572,7 +681,16 @@ export default function TargetPage() {
                     <CardTitle className="text-lg">批量导入</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <FileImport projectId={currentProject.id} onImported={() => { loadTargets(); loadScopeRules(); }} />
+                    <FileImport
+                      projectId={currentProject.id}
+                      onImported={() => { loadTargets(); loadScopeRules(); }}
+                      onScopeConfirm={setPendingImportConfirm}
+                    />
+                    {importResult && (
+                      <div className="mt-4">
+                        <ImportResultCard result={importResult} onClose={() => setImportResult(null)} />
+                      </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -748,6 +866,21 @@ export default function TargetPage() {
            </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={!!pendingImportConfirm}
+        onClose={() => setPendingImportConfirm(null)}
+        onConfirm={handleConfirmImportScope}
+        title="自动修正 Scope（批量导入）"
+        description={
+          pendingImportConfirm
+            ? `${pendingImportConfirm.message} 将添加 ${pendingImportConfirm.suggested_rules.length} 条 include 规则并继续导入。`
+            : ""
+        }
+        confirmText="添加并导入"
+        cancelText="取消"
+        loading={importConfirmLoading}
+      />
 
       <ConfirmDialog
         open={scopeConfirmOpen}

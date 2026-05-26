@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 )
 
 // QuakeClient is a client for the 360 Quake API.
@@ -59,11 +61,16 @@ type QuakeResult struct {
 }
 
 // NewQuakeClient creates a new Quake client.
+// Base URL defaults to https://quake.360.net; override with QUAKE_BASE_URL for tests.
 func NewQuakeClient(apiKey string) *QuakeClient {
+	baseURL := "https://quake.360.net"
+	if override := os.Getenv("QUAKE_BASE_URL"); override != "" {
+		baseURL = strings.TrimRight(override, "/")
+	}
 	return &QuakeClient{
 		baseClient: baseClient{client: defaultHTTPClient},
 		apiKey:     apiKey,
-		baseURL:    "https://quake.360.net",
+		baseURL:    baseURL,
 	}
 }
 

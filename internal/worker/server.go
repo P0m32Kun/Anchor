@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/toolguard"
@@ -27,6 +28,7 @@ type WorkerServer struct {
 	governor   *ResourceGovernor
 	allowlist  *toolguard.Allowlist
 	procs      map[string]*exec.Cmd
+	workdirs   map[string]string // taskID -> workdir for live output tail
 	mu         sync.Mutex
 }
 
@@ -39,6 +41,7 @@ func NewWorkerServer(dataDir string, coreURL string, token string) *WorkerServer
 		governor:   NewResourceGovernor(LoadGovernorConfigFromEnv(), nil),
 		allowlist:  toolguard.NewAllowlist(),
 		procs:      make(map[string]*exec.Cmd),
+		workdirs:   make(map[string]string),
 	}
 }
 
@@ -49,7 +52,9 @@ func (ws *WorkerServer) SetGovernor(g *ResourceGovernor) {
 
 func (ws *WorkerServer) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /tasks", ws.handleTask)
+	mux.HandleFunc("POST /tasks/{id}/cancel", ws.handleCancelTask)
 	mux.HandleFunc("POST /tasks/{id}/progress", ws.handleProgress)
+	mux.HandleFunc("GET /tasks/{id}/output", ws.handleTaskOutput)
 	mux.HandleFunc("POST /tasks/{id}/result", ws.handleResult)
 	mux.HandleFunc("GET /health", ws.handleHealth)
 	mux.HandleFunc("GET /files/{path...}", ws.handleFile)
@@ -164,22 +169,38 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 	cmd.Env = os.Environ()
 	cmd.WaitDelay = 30 * time.Second // Go 1.20+: force-close unresponsive IO after exit
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
+	stdoutW, err := newTaskOutputWriter(workdir, "stdout")
+	if err != nil {
+		log.Printf("[worker] task %s stdout writer: %v", taskID, err)
+		ws.reportResult(taskID, "failed", nil, fmt.Sprintf("prepare stdout: %v", err))
+		return
+	}
+	defer stdoutW.Close()
+	stderrW, err := newTaskOutputWriter(workdir, "stderr")
+	if err != nil {
+		log.Printf("[worker] task %s stderr writer: %v", taskID, err)
+		ws.reportResult(taskID, "failed", nil, fmt.Sprintf("prepare stderr: %v", err))
+		return
+	}
+	defer stderrW.Close()
+
+	cmd.Stdout = stdoutW
+	cmd.Stderr = stderrW
 
 	ws.mu.Lock()
 	ws.procs[taskID] = cmd
+	ws.workdirs[taskID] = workdir
 	ws.mu.Unlock()
 
 	log.Printf("[worker] task %s exec: %s %v", taskID, binary, command[1:])
 
 	startTime := time.Now()
-	err := cmd.Run()
+	err = cmd.Run()
 	elapsed := time.Since(startTime)
 
 	ws.mu.Lock()
 	delete(ws.procs, taskID)
+	delete(ws.workdirs, taskID)
 	ws.mu.Unlock()
 
 	exitCode := 0
@@ -195,24 +216,24 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 		log.Printf("[worker] task %s exited cleanly elapsed=%v", taskID, elapsed.Round(time.Second))
 	}
 
-	log.Printf("[worker] task %s stdout=%dB stderr=%dB", taskID, stdoutBuf.Len(), stderrBuf.Len())
+	log.Printf("[worker] task %s stdout=%dB stderr=%dB", taskID, stdoutW.Len(), stderrW.Len())
 
 	// Collect artifacts
 	artifacts := []map[string]interface{}{}
 
 	// stdout artifact
-	if stdoutBuf.Len() > 0 {
+	if stdoutW.Len() > 0 {
 		artifacts = append(artifacts, map[string]interface{}{
 			"type": "stdout",
-			"data": stdoutBuf.Bytes(),
+			"data": stdoutW.Bytes(),
 		})
 	}
 
 	// stderr artifact
-	if stderrBuf.Len() > 0 {
+	if stderrW.Len() > 0 {
 		artifacts = append(artifacts, map[string]interface{}{
 			"type": "stderr",
-			"data": stderrBuf.Bytes(),
+			"data": stderrW.Bytes(),
 		})
 	}
 
@@ -242,19 +263,11 @@ func (ws *WorkerServer) executeTask(ctx context.Context, taskID, tool string, co
 		})
 	}
 
-	// Write stdout/stderr to workdir so Server can parse tool output.
-	if stdoutBuf.Len() > 0 {
-		os.WriteFile(filepath.Join(workdir, "stdout.txt"), stdoutBuf.Bytes(), 0640)
-	}
-	if stderrBuf.Len() > 0 {
-		os.WriteFile(filepath.Join(workdir, "stderr.txt"), stderrBuf.Bytes(), 0640)
-	}
-
 	status := "completed"
 	errorMsg := ""
 	if err != nil && exitCode != 0 {
 		status = "failed"
-		stderrData := stderrBuf.Bytes()
+		stderrData := stderrW.Bytes()
 		if len(stderrData) > 0 {
 			errorMsg = string(stderrData)
 			if len(errorMsg) > 500 {
@@ -320,8 +333,94 @@ func (ws *WorkerServer) handleProgress(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (ws *WorkerServer) handleTaskOutput(w http.ResponseWriter, r *http.Request) {
+	taskID := r.PathValue("id")
+	stream := r.URL.Query().Get("stream")
+	offsetStr := r.URL.Query().Get("offset")
+
+	stream, err := validateOutputStream(stream)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var offset int64
+	if offsetStr != "" {
+		if _, err := fmt.Sscanf(offsetStr, "%d", &offset); err != nil {
+			http.Error(w, "invalid offset", http.StatusBadRequest)
+			return
+		}
+	}
+
+	ws.mu.Lock()
+	workdir := ws.workdirs[taskID]
+	ws.mu.Unlock()
+	if workdir == "" {
+		workdir = filepath.Join(ws.dataDir, "workdirs", taskID)
+	}
+
+	content, next, atEOF, err := ReadTaskOutput(workdir, stream, offset)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ws.mu.Lock()
+	_, running := ws.procs[taskID]
+	ws.mu.Unlock()
+	done := atEOF && !running
+
+	writeJSON(w, map[string]interface{}{
+		"stream":  stream,
+		"offset":  next,
+		"content": content,
+		"done":    done,
+	})
+}
+
+func writeJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
 func (ws *WorkerServer) handleResult(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
+}
+
+func (ws *WorkerServer) handleCancelTask(w http.ResponseWriter, r *http.Request) {
+	taskID := r.PathValue("id")
+	ws.mu.Lock()
+	cmd, ok := ws.procs[taskID]
+	ws.mu.Unlock()
+
+	if !ok || cmd == nil || cmd.Process == nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"status": "not_found"})
+		return
+	}
+
+	// Send SIGTERM, wait briefly, then SIGKILL.
+	_ = cmd.Process.Signal(syscall.SIGTERM)
+
+	done := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		_ = cmd.Process.Kill()
+		<-done
+	}
+
+	ws.mu.Lock()
+	delete(ws.procs, taskID)
+	ws.mu.Unlock()
+
+	log.Printf("[worker] task %s cancelled by server request", taskID)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})
 }
 
 func (ws *WorkerServer) handleHealth(w http.ResponseWriter, r *http.Request) {

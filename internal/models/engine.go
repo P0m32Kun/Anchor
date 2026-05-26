@@ -47,9 +47,6 @@ type PipelineConfig struct {
 	FfufRateLimit    int    `json:"ffuf_rate_limit"`        // rps
 	FfufTimeout      int    `json:"ffuf_timeout"`           // seconds
 	FfufDictionaryID string `json:"ffuf_dictionary_id"`     // optional
-	EnableURLFinder  bool   `json:"enable_urlfinder"`
-	URLFinderThreads int    `json:"urlfinder_threads"`       // default 50
-	URLFinderTimeout int    `json:"urlfinder_timeout"`       // seconds, default 10
 	// External-scan-only fields
 	EnablePassiveSearch      bool   `json:"enable_passive_search"`
 	EnablePassiveCert        bool   `json:"enable_passive_cert"`
@@ -58,11 +55,18 @@ type PipelineConfig struct {
 	EnableKatana             bool   `json:"enable_katana"`
 	KatanaMaxDepth           int    `json:"katana_max_depth"`
 	KatanaRateLimit          int    `json:"katana_rate_limit"`
+	KatanaTimeout            int    `json:"katana_timeout"` // per-request seconds
 	FfufTier                 string `json:"ffuf_tier"`                  // small | medium | off
 	SkipPortscanOnCDNHost    bool   `json:"skip_portscan_on_cdn_host"`
 	NucleiRequireFingerprint bool   `json:"nuclei_require_fingerprint"`
 	PassiveSearchResultLimit int    `json:"passive_search_result_limit"`
 	PassiveSearchConcurrency int    `json:"passive_search_concurrency"`
+	// SubfinderProviderConfig is an optional YAML string for subfinder's
+	// provider-config.yaml. When non-empty, the pipeline writes it to a temp
+	// file and passes -pc <path> to subfinder. The file is automatically
+	// synced to remote workers via the dispatcher's input_files mechanism.
+	// Leave empty to use the worker's default (~/.config/subfinder/provider-config.yaml).
+	SubfinderProviderConfig string `json:"subfinder_provider_config,omitempty"`
 }
 
 func DefaultPipelineConfig() PipelineConfig {
@@ -98,9 +102,10 @@ func DefaultPipelineConfig() PipelineConfig {
 		FfufRateLimit:    6, // rps
 		FfufTimeout:      30,
 		FfufDictionaryID: "",
-		EnableURLFinder:  true,
-		URLFinderThreads: 20,
-		URLFinderTimeout: 10,
+		EnableKatana:    true,
+		KatanaMaxDepth:  2,
+		KatanaRateLimit: 10,
+		KatanaTimeout:   10,
 	}
 }
 
@@ -124,6 +129,7 @@ func DefaultExternalPipelineConfig() PipelineConfig {
 	cfg.EnableKatana = true
 	cfg.KatanaMaxDepth = 2
 	cfg.KatanaRateLimit = 10
+	cfg.KatanaTimeout = 10
 	cfg.FfufTier = "small"
 	cfg.SkipPortscanOnCDNHost = true
 	cfg.NucleiRequireFingerprint = true

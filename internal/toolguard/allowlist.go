@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+// systemBinaries are non-scanning utilities that Worker may need for
+// builtin sync or lifecycle scripts. These are NOT declared in tools/*.yaml
+// but must still pass the allowlist gate.
+var systemBinaries = []string{"git", "git.exe", "sh", "bash"}
+
 // Allowlist gates execution of external binaries. It validates both the
 // binary name (via basename, so /tmp/nuclei is rejected even if nuclei is
 // allowed) and arguments (shell metacharacters are rejected).
@@ -26,7 +31,6 @@ func NewAllowlist() *Allowlist {
 			"nuclei":     {},
 			"cdncheck":   {},
 			"ffuf":       {},
-			"urlfinder":  {},
 			"gau":        {},
 			"katana":     {},
 			"git":        {},
@@ -35,6 +39,21 @@ func NewAllowlist() *Allowlist {
 			"bash":       {},
 		},
 	}
+}
+
+// NewAllowlistFromBinaries returns an Allowlist derived from a list of
+// binary names (typically from toolregistry.Registry.Binaries()),
+// avoiding the hardcoded binary list. System utilities (git, sh, bash)
+// are added automatically.
+func NewAllowlistFromBinaries(binaries []string) *Allowlist {
+	bins := make(map[string]struct{})
+	for _, b := range binaries {
+		bins[b] = struct{}{}
+	}
+	for _, s := range systemBinaries {
+		bins[s] = struct{}{}
+	}
+	return &Allowlist{binaries: bins}
 }
 
 // Validate returns an error if binary is not on the allowlist or if any

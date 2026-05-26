@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-19
+last_updated: 2026-05-26
 scope: runtime-baseline
 ---
 
@@ -30,18 +30,33 @@ The stable product narrative remains:
 
 实际执行管线（当前已实现）：
 
+**内网 (`internal`)** — 以主动发现为主：
+
 ```
-目标导入 → 分类 → (FOFA/Subfinder) → DNSx 解析 → CDN 过滤 → Naabu 端口扫描 → nmap -sV 服务指纹 → httpx Web 探活 → Nuclei 漏洞扫描
+目标导入 → nmap alive → Naabu → nmap -sV → httpx → (Katana/ffuf) → Nuclei
 ```
 
-扫描模式由前端 `ScanModal` 选择：
+**外网 (`external`)** — 五阶段 preset（`DefaultExternalPipelineConfig()` + `buildConfigForMode("external")`）：
 
-- **外网扫描 (`external`)**：启用全部工具链（FOFA → Subfinder → DNSx → CDNCheck → Naabu → nmap -sV → HTTPX → Nuclei）
-- **内网扫描 (`internal`)**：仅启用 Naabu → nmap -sV → HTTPX → Nuclei
+| 阶段 | 内容 | 主要工具 |
+|------|------|----------|
+| P1 被动资产 | 搜索引擎 + 证书/历史 URL | FOFA、Hunter、Quake、`passive_cert`（crt.sh）、`passive_url`（gau） |
+| P2 解析降噪 | 子域 + DNS + CDN | Subfinder（默认 passive）、dnsx、cdncheck |
+| P3 受限主动 | **仍做端口扫描**，默认 top100、降 Naabu 速率 | nmap alive → Naabu → nmap -sV；`skip_portscan_on_cdn_host` 为 true 时不扫 CDN IP |
+| P4 Web 慢扩面 | 探活 + 爬虫/目录 | httpx → Katana（`-jc` JS 端点）→ ffuf（`ffuf_tier` small/medium/off）→ httpx_2 |
+| P5 精 POC | 指纹驱动 | Nuclei workflow 默认；`nuclei_require_fingerprint` 为 true 时无指纹跳过 |
+
+```
+company → passive_search(FOFA+Hunter+Quake) → domain/ip 分流
+domain  → P1 passive_cert/url → P2 subfinder/DNS/CDN → P3 端口 → P4 Web → P5 Nuclei
+url     → 跳过 P3，直接 P4/P5
+```
+
+扫描模式由前端 `ScanModal` 选择；外网模式加载 `DEFAULT_EXTERNAL_PIPELINE_CONFIG`（`port_range: top100`、`nuclei_scan_depth: workflow` 等）。
 
 各工具的速率限制、并发线程、超时参数在 `ScanModal` Step 2 中配置，通过 `POST /projects/{id}/scan` 的 `config` 字段传递。端口范围支持 top100 / top1000 / high-risk / full / custom 五种预设。
 
-FOFA 凭证不再绑定到项目，而是从全局 `engine_credentials` 表读取。Hunter 和 Quake 通过独立的 `/engines/search` API 调用，结果统一为 `SearchResult` 格式。
+引擎凭证在全局 `engine_credentials` 表配置（`/engines/keys`）。**Pipeline 被动搜索**在 `runPassiveSearch` 中并行调用 FOFA、Hunter、Quake（fail-soft，单引擎失败不阻断）。Engines 页手动搜索仍保留，供 Pipeline 外调研。
 
 ### 多目标类型与 Company 目标自动展开
 

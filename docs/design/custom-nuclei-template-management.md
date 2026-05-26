@@ -439,13 +439,13 @@ Phase 4 also resolves the refs execution strategy noted in §11 (per-ref task vs
 4. Add worker sync status display.
 5. Add frontend typecheck and E2E coverage.
 
-## 14. GitNexus / Change Protocol
+## 14. CodeGraph / Change Protocol
 
 Before editing any function, class, or method, follow repository instructions:
 
 ```bash
-npx gitnexus status
-npx gitnexus impact <symbol> --direction upstream --depth 3 --include-tests
+codegraph status
+codegraph impact <symbol>
 ```
 
 Known high-risk area:
@@ -453,12 +453,6 @@ Known high-risk area:
 - `BuildNucleiCommand` currently has CRITICAL upstream impact because it feeds the official Nuclei scan path.
 
 Prefer adding a new custom command builder instead of widening `BuildNucleiCommand` immediately. If `BuildNucleiCommand` must change, warn the user before editing and add focused regression tests for the official scan path.
-
-Before committing:
-
-```bash
-npx gitnexus detect-changes
-```
 
 ## 15. Acceptance Criteria
 

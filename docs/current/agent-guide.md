@@ -24,20 +24,15 @@ Do not treat archived plans, review notes, redirect files, or proposal documents
 
 For code changes:
 
-1. Check GitNexus freshness with `npx gitnexus status`.
+1. Check CodeGraph freshness with `codegraph status`.
 2. Before editing a function, class, or method, run:
 
    ```bash
-   npx gitnexus impact <symbol> --direction upstream --depth 3 --include-tests
+   codegraph impact <symbol>
    ```
 
-3. If GitNexus reports HIGH or CRITICAL risk, stop and warn the user before editing.
+3. If CodeGraph reports HIGH or CRITICAL risk, stop and warn the user before editing.
 4. Prefer small, isolated changes with matching tests.
-5. Before committing, run:
-
-   ```bash
-   npx gitnexus detect-changes
-   ```
 
 For documentation-only changes, keep edits scoped to the current document map and avoid changing product claims without checking implementation or tests.
 
@@ -76,6 +71,6 @@ If E2E cannot run because Docker, browsers, or external tools are missing, repor
 ## Agent-Friendly Defaults
 
 - Prefer current docs over historical docs.
-- Prefer GitNexus query/context/impact over raw text search for unfamiliar code.
+- Prefer CodeGraph search/context/impact over raw text search for unfamiliar code.
 - Keep interfaces boring and explicit; optimize for the next agent being able to find the owner, invariant, and test.
 - When changing behavior, update the relevant E2E test in the same change.

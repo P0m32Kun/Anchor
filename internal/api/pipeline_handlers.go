@@ -10,6 +10,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/errors"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/util"
+	"github.com/P0m32Kun/Anchor/internal/toolregistry"
 	"github.com/P0m32Kun/Anchor/internal/workflow"
 )
 
@@ -50,11 +51,23 @@ func (s *Server) handleRunPipeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	s.mu.Lock()
+	s.pipelineCancels[runID] = cancel
+	s.mu.Unlock()
+
 	go func() {
-		ctx := context.Background()
+		defer func() {
+			s.mu.Lock()
+			delete(s.pipelineCancels, runID)
+			s.mu.Unlock()
+			cancel()
+		}()
+
 		pipeline := workflow.NewPipeline(s.queries, s.worker, s.scopeEng, s.dataDir).
 			WithConfig(cfg).
 			WithRunID(runID).
+			WithTools(toolregistry.DefaultRegistry()).
 			WithStageCallback(func(rid string, stage workflow.StageID, status, errMsg string) {
 				s.broadcastProjectSSE(projectID, map[string]interface{}{
 					"event":   "pipeline_stage_change",
@@ -351,12 +364,25 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Launch pipeline in background
+	// Launch pipeline in background with a cancelable context so the
+	// force-stop handler can signal the pipeline goroutine to exit.
+	ctx, cancel := context.WithCancel(context.Background())
+	s.mu.Lock()
+	s.pipelineCancels[runID] = cancel
+	s.mu.Unlock()
+
 	go func() {
-		ctx := context.Background()
+		defer func() {
+			s.mu.Lock()
+			delete(s.pipelineCancels, runID)
+			s.mu.Unlock()
+			cancel()
+		}()
+
 		pipeline := workflow.NewPipeline(s.queries, s.worker, s.scopeEng, s.dataDir).
 			WithConfig(cfg).
 			WithRunID(runID).
+			WithTools(toolregistry.DefaultRegistry()).
 			WithStageCallback(func(rid string, stage workflow.StageID, status, errMsg string) {
 				s.broadcastProjectSSE(projectID, map[string]interface{}{
 					"event":   "pipeline_stage_change",
@@ -454,6 +480,15 @@ func (s *Server) handleCancelPipelineRun(w http.ResponseWriter, r *http.Request)
 	}
 
 	s.queries.UpdatePipelineRunStatus(runID, "cancelled")
+
+	// Cancel the pipeline goroutine's context so it exits at the next stage
+	// boundary instead of continuing to run remaining stages.
+	s.mu.Lock()
+	if cancel, ok := s.pipelineCancels[runID]; ok {
+		cancel()
+		delete(s.pipelineCancels, runID)
+	}
+	s.mu.Unlock()
 
 	s.broadcastProjectSSE(projectID, map[string]interface{}{
 		"event":  "pipeline_complete",

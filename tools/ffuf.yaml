@@ -1,0 +1,24 @@
+id: ffuf
+binary: ffuf
+description: Directory/endpoint fuzzer
+output:
+  format: jsonl
+parameters:
+  target:
+    type: string
+    required: true
+    flag: "-u"
+  wordlist:
+    type: path
+    required: true
+    flag: "-w"
+  rate_limit:
+    type: int
+    flag: "-rate"
+  timeout:
+    type: int
+    flag: "-timeout"
+literals:
+  - ["-json"]
+  - ["-mc", "200,301,302,401,403,405,500"]
+  - ["-s"]

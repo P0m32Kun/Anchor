@@ -1,0 +1,33 @@
+id: naabu
+binary: naabu
+description: Fast port scanner
+output:
+  format: jsonl
+parameters:
+  host_file:
+    type: path
+    required: true
+    flag: "-list"
+  rate:
+    type: int
+    flag: "-rate"
+  threads:
+    type: int
+    flag: "-c"
+  timeout:
+    type: int
+    flag: "-timeout"
+  port_range:
+    type: enum
+    preset: port_range_naabu
+presets:
+  port_range_naabu:
+    top100: []
+    top1000: [["-tp", "1000"]]
+    full: [["-tp", "full"]]
+    high-risk: [["-p", "<HighRiskPorts>"]]
+    default:
+      flag: "-p"
+      # value provided at render time (custom port list)
+literals:
+  - ["-json"]

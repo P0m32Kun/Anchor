@@ -124,6 +124,9 @@ func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, wo
 	if resp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("worker rejected task: %s", resp.Status)
 	}
+	if err := d.queries.SetScanTaskWorker(task.ID, worker.ID); err != nil {
+		log.Printf("[dispatcher] set worker_id for task %s: %v", task.ID, err)
+	}
 
 	// Poll for task completion. The server trusts the worker's heartbeat
 	// mechanism: as long as the worker keeps reporting health (the API-server
@@ -151,8 +154,12 @@ func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, wo
 			if t.Status == models.TaskCompleted {
 				return nil
 			}
-			if t.Status == models.TaskFailed || t.Status == models.TaskScopeDenied || t.Status == models.TaskCancelled {
+			if t.Status == models.TaskFailed || t.Status == models.TaskScopeDenied {
 				return fmt.Errorf("task %s finished with status: %s", task.ID, t.Status)
+			}
+			if t.Status == models.TaskCancelled {
+				d.cancelRemoteTask(worker.Endpoint, task.ID)
+				return fmt.Errorf("task %s cancelled", task.ID)
 			}
 		case <-workerCheck.C:
 			// Trust the heartbeat watchdog: if the API server's background
@@ -168,9 +175,28 @@ func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, wo
 				return fmt.Errorf("task %s: worker %s heartbeat lost (worker unreachable) after %v", task.ID, worker.ID, time.Since(startTime).Round(time.Second))
 			}
 		case <-ctx.Done():
+			d.cancelRemoteTask(worker.Endpoint, task.ID)
 			return fmt.Errorf("task %s cancelled", task.ID)
 		}
 	}
+}
+
+// cancelRemoteTask sends a cancel request to a remote worker for the given task.
+// Best-effort: failures are logged but not returned, since the server-side
+// status update is the authoritative cancellation signal.
+func (d *Dispatcher) cancelRemoteTask(workerEndpoint, taskID string) {
+	req, err := http.NewRequest("POST", workerEndpoint+"/tasks/"+taskID+"/cancel", nil)
+	if err != nil {
+		log.Printf("[dispatcher] build cancel request for task %s: %v", taskID, err)
+		return
+	}
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		log.Printf("[dispatcher] cancel task %s on worker %s: %v", taskID, workerEndpoint, err)
+		return
+	}
+	resp.Body.Close()
+	log.Printf("[dispatcher] cancelled task %s on worker %s (status %d)", taskID, workerEndpoint, resp.StatusCode)
 }
 
 // collectInputFiles inspects command arguments for absolute file paths that

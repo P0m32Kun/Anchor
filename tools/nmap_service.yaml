@@ -1,0 +1,23 @@
+id: nmap_service
+binary: nmap
+description: Service version fingerprint via nmap -sV
+output:
+  format: xml
+parameters:
+  host_file:
+    type: path
+    required: true
+    flag: "-iL"
+  ports:
+    type: string_list
+    required: true
+    flag: "-p"
+  host_timeout:
+    type: int
+    # host_timeout is rendered as "Ns" by post-processing; no generic flag.
+literals:
+  - ["-sV"]
+  - ["-oX", "-"]
+  - ["-T4"]
+  - ["-n"]
+  - ["--open"]
