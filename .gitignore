@@ -30,6 +30,7 @@ frontend/.vite/
 frontend/playwright-report/
 frontend/test-results/
 frontend/e2e/storage-state.json
+frontend/e2e/screenshots/
 
 # Tauri
 target/
