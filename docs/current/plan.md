@@ -21,9 +21,10 @@ This is the only repository-wide implementation plan that agents should treat as
 
 | Workstream | Status | Source of truth? | Notes |
 | --- | --- | --- | --- |
-| Code health audit | Active | Yes | Multi-phase audit plan in [`code-health-audit.md`](code-health-audit.md); P0 safety & contract, P1 architecture, P2 test strategy, P3 frontend |
+| Code health audit | Accepted | Yes | Superseded by Slimdown 2026 audit; see [`slimdown-2026-summary.md`](../active/review/slimdown-2026-summary.md) for delta |
 | Documentation governance | Active | Yes | Consolidate navigation, mark document lifecycle, reduce agent confusion |
 | Current architecture baseline | Active | Yes | Defined in [`architecture.md`](architecture.md) |
+| Slimdown 2026 | Active | Yes | Repository-wide slimdown audit in [`slimdown-2026-handoff-for-implementer.md`](../active/review/slimdown-2026-handoff-for-implementer.md); T0-T6 reports at `docs/active/review/slimdown-*.md` |
 | v0.4 scan pipeline | Accepted | Yes | Verified by `docs/active/review/v0.4-acceptance.md`; design doc archived at `docs/archived/v0.4/scan-pipeline.md` (superseded 2026-05-12, see `architecture.md` for current baseline) |
 | Database migration notes for v0.4 | Accepted | Yes | Tied to v0.4; superseded plans now archived |
 | Large-scale refactoring | Backlog | No | See [`../refactoring-plan.md`](../refactoring-plan.md) as an idea pool, not an approved release plan |

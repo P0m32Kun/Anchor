@@ -36,6 +36,7 @@
 | --- | --- | --- |
 | [`design/`](design/) | In review | 新设计提案区 |
 | [`refactoring-plan.md`](refactoring-plan.md) | Backlog | 重构想法和拆分路线 |
+| [`superpowers/`](superpowers/) | Mixed | 外网扫描 pipeline 等 superpowers 生成的设计文档；部分已归档到 archived |
 
 ## 归档
 

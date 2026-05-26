@@ -1,6 +1,6 @@
 ---
-status: accepted
-source_of_truth: true
+status: superseded
+source_of_truth: false
 owner: kun
 last_updated: 2026-05-07
 scope: v0.4-acceptance
