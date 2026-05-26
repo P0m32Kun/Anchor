@@ -1,0 +1,9 @@
+{
+  "tool": "naabu",
+  "rules": [
+    { "type": "mustContain", "value": "Running naabu scan for", "scope": "stdout" },
+    { "type": "mustContain", "value": "results:", "scope": "stdout" },
+    { "type": "regex",       "value": "open ports?: \\d+",   "scope": "stdout" },
+    { "type": "stderrEmpty",                                 "scope": "stderr" }
+  ]
+}

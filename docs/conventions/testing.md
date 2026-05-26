@@ -97,6 +97,41 @@
 - **空状态**: 至少一条用例覆盖空数据时的提示文案
 - **错误态**: 至少一条用例覆盖 API 失败/网络断开时的 UI 反馈(可用 `page.route(...)` 拦截)
 
+### 3.4 双通道验证:UI + 日志审计
+
+Pipeline 运行涉及多个外部 CLI（subfinder / naabu / nuclei 等）,UI 只展示"跑完了/失败了"结果,
+**无法验证 CLI 层行为**（参数是否正确、是否有 stderr 错误、工具是否真跑了）。
+
+对涉及 pipeline 的 E2E 用例,需要在 UI 断言之外增加第二条验证通道:
+
+- **UI 通道**(必须):用户能在界面上看到进度、状态和最终结果(§3.3)
+- **审计通道**(补充):在 pipeline 运行结束后,通过 `GET /tasks/{id}/output` 拉取 stdout/stderr,
+  用**规则包**断言 CLI 层行为
+
+#### 规则包格式
+
+每条规则包是 JSON 文件,放在 `frontend/e2e/fixtures/log-rules/` 下:
+
+```json
+{
+  "tool": "naabu",
+  "rules": [
+    { "type": "mustContain", "value": "Running naabu scan for", "scope": "stdout" },
+    { "type": "mustContain", "value": "results:", "scope": "stdout" },
+    { "type": "regex",       "value": "open ports?: \\d+", "scope": "stdout" },
+    { "type": "stderrEmpty", "scope": "stderr" }
+  ]
+}
+```
+
+#### 审计通道约束
+
+- 审计通道**不能替代** UI 断言——最终结果必须从 UI 可见
+- 审计通过 ≠ E2E 通过;UI 通过 + 审计通过 = E2E 通过
+- 禁止用纯 API 完成扫描的测试(见 §3.3「禁止的操作」)
+- 具体实现、规则包索引和落地顺序参见:
+  `docs/active/review/ui-e2e-log-audit-handoff.md`
+
 ## 4. 文件组织
 
 ```

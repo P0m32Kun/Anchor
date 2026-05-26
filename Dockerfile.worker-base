@@ -18,7 +18,8 @@ RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/source
     git gcc libpcap-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ENV GOPROXY=https://goproxy.cn,direct
+# goproxy.cn TLS 不稳定，退回到官方代理
+ENV GOPROXY=https://proxy.golang.org,direct
 ENV GOSUMDB=off
 
 # 安装安全工具（这些变化极慢，单独成层）

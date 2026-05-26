@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git gcc libsqli
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-ENV GOPROXY=https://goproxy.cn,direct
+# goproxy.cn TLS 不稳定，退回到官方代理
+ENV GOPROXY=https://proxy.golang.org,direct
 ENV GOSUMDB=off
 
 COPY go.mod go.sum ./
