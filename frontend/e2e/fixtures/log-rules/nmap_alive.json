@@ -1,0 +1,7 @@
+{
+  "tool": "nmap_alive",
+  "rules": [
+    { "type": "mustContain", "value": "Nmap done:", "scope": "stdout" },
+    { "type": "notContain",  "value": "error",       "scope": "stderr" }
+  ]
+}

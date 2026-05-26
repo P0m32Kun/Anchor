@@ -1,0 +1,7 @@
+{
+  "tool": "cdncheck",
+  "rules": [
+    { "type": "regex",      "value": "\\{\"ip\":\"[^\"]+\"",  "scope": "stdout" },
+    { "type": "notContain", "value": "error",                 "scope": "stderr" }
+  ]
+}

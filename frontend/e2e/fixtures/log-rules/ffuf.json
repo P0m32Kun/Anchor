@@ -1,0 +1,7 @@
+{
+  "tool": "ffuf",
+  "rules": [
+    { "type": "regex",      "value": "\\{\"input\":\"[^\"]+\"", "scope": "stdout" },
+    { "type": "notContain", "value": "error",                    "scope": "stderr" }
+  ]
+}

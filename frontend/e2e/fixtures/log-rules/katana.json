@@ -1,0 +1,7 @@
+{
+  "tool": "katana",
+  "rules": [
+    { "type": "regex",      "value": "\\{\"endpoint\":\"[^\"]+\"", "scope": "stdout" },
+    { "type": "notContain", "value": "error",                        "scope": "stderr" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "tool": "gau",
+  "rules": [
+    { "type": "regex",      "value": "https?://[^\\s]+", "scope": "stdout" },
+    { "type": "notContain", "value": "error",             "scope": "stderr" }
+  ]
+}

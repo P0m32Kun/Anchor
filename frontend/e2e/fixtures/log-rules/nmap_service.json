@@ -1,0 +1,8 @@
+{
+  "tool": "nmap_service",
+  "rules": [
+    { "type": "mustContain", "value": "<?xml",       "scope": "stdout" },
+    { "type": "mustContain", "value": "nmaprun",     "scope": "stdout" },
+    { "type": "notContain",  "value": "error",       "scope": "stderr" }
+  ]
+}

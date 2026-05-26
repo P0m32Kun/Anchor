@@ -1,0 +1,7 @@
+{
+  "tool": "subfinder",
+  "rules": [
+    { "type": "regex",      "value": "\\[\"[^\"]+\"\\]",  "scope": "stdout" },
+    { "type": "notContain", "value": "error",              "scope": "stderr" }
+  ]
+}

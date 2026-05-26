@@ -1,0 +1,7 @@
+{
+  "tool": "dnsx",
+  "rules": [
+    { "type": "regex",      "value": "\\{\"host\":\"[^\"]+\"", "scope": "stdout" },
+    { "type": "notContain", "value": "error",                   "scope": "stderr" }
+  ]
+}

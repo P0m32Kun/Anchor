@@ -30,8 +30,8 @@ const API_BASE = "http://localhost:17421";
 const API_TOKEN = "p0m32kun";
 const REDIS_IP = "172.30.0.13";
 
-// 日志审计目标工具
-const TOOLS_TO_AUDIT = ["naabu"];
+// 日志审计目标工具(内网 pipeline 实际触发的工具)
+const TOOLS_TO_AUDIT = ["nmap_alive", "naabu", "nmap_service", "nuclei"];
 
 test.setTimeout(35 * 60 * 1000);
 
