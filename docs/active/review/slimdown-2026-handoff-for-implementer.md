@@ -5,7 +5,7 @@ owner: kun
 last_updated: 2026-05-26
 scope: repository-slimdown-audit-handoff
 audience: external-implementer (e.g. DeepSeek)
-audit_baseline_commit: "(执行前由接手人填写，例如 main @ <sha>)"
+audit_baseline_commit: "main @ b6d818f (2026-05-26)"
 ---
 
 # Anchor 全量瘦身 — 实现者交接说明
