@@ -3,7 +3,7 @@ status: active
 source_of_truth: true
 owner: kun
 audit_date: 2026-05-26
-audit_baseline_commit: "main @ 7399a5f"
+audit_baseline_commit: "main @ 27938da"
 scope: slimdown-summary
 ---
 

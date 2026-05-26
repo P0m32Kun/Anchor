@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-13
+last_updated: 2026-05-26
 scope: engineering-health-audit
 audit_baseline_date: 2026-05-13
 ---
@@ -13,20 +13,20 @@ audit_baseline_date: 2026-05-13
 
 ## 审计基线（2026-05-13 快照）
 
-| 指标 | 数值 | 健康阈值 |
-|------|------|----------|
-| Go 源文件 | 172 | — |
-| TSX/TS 源文件 | 52 | — |
-| Go 测试文件 | 28 (16%) | >40% |
-| 前端测试文件 | 4 (8%) | >30% |
-| Go 超 400 行文件 | 13 | <5 |
-| Go 超 800 行文件 | 1 (worker/server.go 730L) | 0 |
-| DB 迁移版本 | 20 个 | v0.x 阶段偏高 |
-| 裸 SQL 字符串 | 182 处 | 集中在 repository |
-| api 直接 import db | 4 处 | 0 |
-| api 直接 import models | 17 处 | 逼近 0 |
-| 踩坑记录（4月26-28日） | 7 条 / 3 天 | — |
-| refactoring-plan.md 声称完成 | 阶段 1-6 | 需逐项验证 |
+| 指标 | 数值 (2026-05-13) | 数值 (2026-05-26) | 健康阈值 |
+|------|-------------------|-------------------|----------|
+| Go 源文件 | 172 | 175 | — |
+| TSX/TS 源文件 | 52 | 56 | — |
+| Go 测试文件 | 28 (16%) | **64 (37%)** | >40% |
+| 前端测试文件 | 4 (8%) | 4 (7%) | >30% |
+| Go 超 400 行文件 | 13 | 14 | <5 |
+| Go 超 800 行文件 | 1 (worker/server.go 730L) | — | 0 |
+| DB 迁移版本 | 20 | 20 | v0.x 阶段偏高 |
+| api 直接 import db | 4 | 3 | 0 |
+| api 直接 import models | 17 | 15 | 逼近 0 |
+
+> 注：本表基于 2026-05-26 Slimdown 审计更新。更多变化详见
+> [`docs/active/review/slimdown-2026-summary.md`](../active/review/slimdown-2026-summary.md) 的§6。
 
 ---
 
