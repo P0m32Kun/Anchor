@@ -3,20 +3,13 @@ package worker
 import (
 	"fmt"
 	"strings"
+
+	"github.com/P0m32Kun/Anchor/internal/toolregistry"
 )
 
-// HighRiskPorts is a curated list of ports that commonly host vulnerable
-// or sensitive services. Naabu's built-in top-100/top-1000 sets are biased
-// toward Nmap's general-purpose service prevalence and miss several high-value
-// targets (e.g. 6379 Redis, 9200 Elasticsearch, 27017 MongoDB, 11434 Ollama).
-// This list intentionally favours attack-surface coverage over generality.
-const HighRiskPorts = "21,22,23,25,53,80,81,88,110,135,139,143,389,443,445,465,587,636,873,993,995," +
-	"1080,1099,1433,1521,1723,2049,2082,2375,2376,2480,3000,3128,3306,3389," +
-	"4040,4194,4369,4444,4848,5000,5432,5601,5672,5900,5901,5984,6379,6443," +
-	"7000,7001,7002,7077,7474,8000,8001,8008,8009,8020,8060,8080,8081,8086,8088,8090,8161,8200,8443,8500,8531,8888,8983," +
-	"9000,9001,9042,9043,9060,9080,9090,9091,9092,9100,9200,9300,9418,9443,9981," +
-	"10000,10022,10250,10255,11211,11434,13306,15672,15692,16379,18080,18091," +
-	"27017,27018,27019,28017,50000,50070,50075,61613,61616"
+// HighRiskPorts is now defined in toolregistry/schema.go.
+// This alias avoids callers needing to update their import path.
+const HighRiskPorts = toolregistry.HighRiskPorts
 
 // BuildSubfinderCommand builds a Subfinder command for the given domain.
 // Output goes to stdout as JSONL so the worker can capture it as an artifact.

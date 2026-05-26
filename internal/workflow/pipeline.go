@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/asset"
-	"github.com/P0m32Kun/Anchor/internal/cdn"
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/fingerprint"
 	"github.com/P0m32Kun/Anchor/internal/models"
@@ -43,7 +42,6 @@ type Pipeline struct {
 	runner           *worker.Runner
 	scope            *scope.Engine
 	resolver         *resolve.Resolver
-	cdnDet           *cdn.Detector
 	fofa             *search.FofaClient
 	merger           *asset.Merger
 	dataDir          string
@@ -71,7 +69,6 @@ func NewPipeline(queries *db.Queries, runner *worker.Runner, scopeEng *scope.Eng
 		runner:   runner,
 		scope:    scopeEng,
 		resolver: resolve.NewResolver(),
-		cdnDet:   cdn.NewDetector(),
 		merger:   asset.NewMerger(queries),
 		dataDir:  dataDir,
 	}

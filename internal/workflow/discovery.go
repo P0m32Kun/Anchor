@@ -15,6 +15,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/parser"
 	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/toolregistry"
 	"github.com/P0m32Kun/Anchor/internal/util"
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
@@ -430,7 +431,7 @@ func buildNaabuArgsWithPortRange(hostFile, portRange string) []string {
 	case "tpfull", "topfull", "full":
 		args = append(args, "-tp", "full")
 	case "high-risk", "highrisk", "hr":
-		args = append(args, "-p", worker.HighRiskPorts)
+		args = append(args, "-p", toolregistry.HighRiskPorts)
 	default:
 		args = append(args, "-p", portRange)
 	}
