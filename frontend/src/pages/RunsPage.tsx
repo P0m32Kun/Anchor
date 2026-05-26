@@ -304,58 +304,7 @@ export default function RunsPage() {
     window.location.href = `/reports?projectId=${projectId}`;
   };
 
-  const inspectingLive =
-    !!inspectingTask &&
-    (inspectingTask.status === "running" || inspectingTask.status === "queued");
-  const { text: inspectingLiveLogs, loading: inspectingLiveLoading } = useTaskLiveOutput(
-    inspectingTask,
-    inspectingLive
-  );
 
-  const expandedTask = expandedTaskId ? tasks.find((t) => t.id === expandedTaskId) ?? null : null;
-  const expandedLive =
-    !!expandedTask &&
-    (expandedTask.status === "running" || expandedTask.status === "queued");
-  const { text: expandedLiveLogs, loading: expandedLiveLoading } = useTaskLiveOutput(
-    expandedTask,
-    expandedLive
-  );
-
-  // Keep modal task status in sync when run details refresh.
-  useEffect(() => {
-    if (!inspectingTask) return;
-    const fresh = tasks.find((t) => t.id === inspectingTask.id);
-    if (fresh && fresh.status !== inspectingTask.status) {
-      setInspectingTask(fresh);
-    }
-  }, [tasks, inspectingTask]);
-
-  // After a live task finishes, load full artifacts once.
-  useEffect(() => {
-    if (!inspectingTask || inspectingLive) return;
-    if (inspectingLogs !== "" || logsLoading) return;
-    void (async () => {
-      setLogsLoading(true);
-      try {
-        const artifacts = await api.listArtifacts(inspectingTask.id);
-        const stdout = artifacts.find((a) => a.type === "stdout");
-        const stderr = artifacts.find((a) => a.type === "stderr");
-        const targetArtifact = stdout || stderr;
-        if (targetArtifact) {
-          const content = await api.getArtifactContent(targetArtifact.id);
-          setInspectingLogs(content);
-        } else {
-          setInspectingLogs("(无日志输出)");
-        }
-      } catch (err) {
-        setInspectingLogs(
-          "加载日志失败: " + (err instanceof Error ? err.message : String(err))
-        );
-      } finally {
-        setLogsLoading(false);
-      }
-    })();
-  }, [inspectingTask?.id, inspectingTask?.status, inspectingLive]);
 
   const handleInspectTask = async (task: ScanTask) => {
     setInspectingTask(task);

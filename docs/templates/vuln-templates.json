@@ -1,1 +1,1361 @@
-[]
+[
+  {
+    "source_tool": "nuclei",
+    "match_key": "snmp",
+    "title": "1.1 SNMP 公共团体字符串",
+    "severity": "high",
+    "summary": "SNMP v1/v2c 使用默认或弱团体字符串（如 public/private），攻击者可读取设备配置、性能指标、路由表等敏感信息。",
+    "remediation": "1. 升级到 SNMP v3 并使用基于用户的安全模型（USM）进行认证和加密。\n2. 若必须使用 SNMP v1/v2c，修改默认团体字符串为高强度随机字符串，并限制访问源 IP。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "ntp",
+    "title": "1.2 NTP 信息泄露与 monlist 放大",
+    "severity": "low",
+    "summary": "NTP 服务暴露于网络且启用了版本查询或 monlist 功能，攻击者可获取服务器系统信息（操作系统、处理器类型等），或利用 monlist 功能发起 NTP 放大拒绝服务攻击。",
+    "remediation": "1. 在 `ntp.conf` 中禁用 `monlist` 和 `mrulist` 功能（`restrict default noquery`）。\n2. 限制 NTP 查询来源 IP，仅允许受信任的 NTP 客户端。\n3. 升级至 ntpd 4.2.7p26 及之后版本。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "memcache",
+    "title": "10.1 Memcache 未授权访问",
+    "severity": "medium",
+    "summary": "Memcached 分布式缓存服务未启用 SASL 认证且监听于 0.0.0.0，攻击者可无需凭据连接并执行 `stats`、`flush_all` 等命令，获取缓存中的敏感数据（如会话 Token、用户信息），甚至导致缓存数据被清空。",
+    "remediation": "1. 配置 Memcached 仅监听 127.0.0.1：`--listen 127.0.0.1`。\n2. 启用 SASL 认证：`--sasl`。\n3. 若必须远程访问，使用主机防火墙（iptables/firewalld）限制 11211 仅可信 IP。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "hadoop-yarn-rce",
+    "title": "11.1 Hadoop YARN 未授权 RCE",
+    "severity": "high",
+    "summary": "Apache Hadoop YARN ResourceManager 未启用认证，攻击者可通过向 `/ws/v1/cluster/apps/new-application` 提交恶意应用实现远程代码执行。该漏洞常被用于在 Hadoop 集群中植入挖矿木马或窃取数据。",
+    "remediation": "1. 关闭 Hadoop Web 管理页面，或配置 Kerberos 认证。\n2. 部署 Knox、Nginx 等反向代理并启用 HTTP Basic 认证。\n3. 使用安全组/防火墙限制 8088/50070/50075 仅集群节点可访问。\n4. 定期审计 YARN 应用提交记录，排查异常任务。",
+    "enabled": true
+  },
+  {
+    "source_tool": "metasploit",
+    "match_key": "CVE-2020-1472",
+    "title": "12.1 CVE-2020-1472 Zerologon",
+    "severity": "medium",
+    "summary": "Windows Netlogon Remote Protocol（MS-NRPC）在 AES-CFB8 加密实现中存在缺陷，攻击者可将域控制器的机器密码置空，进而接管整个 AD 域。CVSS 3.1 评分 5.9（但实际危害极高，可导致域控完全失控）。",
+    "remediation": "1. 安装微软安全更新 KB4557222。\n2. 启用安全通道强制模式：`HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Netlogon\\Parameters` 中设置 `FullSecureChannelProtection = 1`。\n3. 监控域控 Netlogon 日志中的异常认证事件。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "dfscoerce",
+    "title": "12.10 DFSCoerce",
+    "severity": "medium",
+    "summary": "Windows Distributed File System（DFS）的 MS-DFSNM RPC 接口存在 NTLM 中继漏洞，攻击者可强制域控制器向攻击者服务器发送 NTLM 认证请求，结合 ADCS 或 NTLM Relay 实现权限提升。CVSS 3.1 评分 5.9。",
+    "remediation": "1. 安装微软安全更新。\n2. 禁用不必要的 DFS 服务。\n3. 启用 EPA 和 SMB 签名。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-38077",
+    "title": "12.11 CVE-2024-38077 Windows RDL 服务远程代码执行",
+    "severity": "high",
+    "summary": "Windows Remote Desktop Licensing（RDL）服务在处理许可协议时存在整数溢出漏洞，未经认证的攻击者可发送特制请求触发远程代码执行。CVSS 3.1 评分 9.8，被称为 MadLicense。",
+    "remediation": "1. 安装微软安全更新。\n2. 禁用 Remote Desktop Licensing 服务（如不需要 RDS CAL）。\n3. 通过防火墙限制 RDL 服务端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2025-59287",
+    "title": "12.12 CVE-2025-59287 WSUS 反序列化远程代码执行",
+    "severity": "high",
+    "summary": "Windows Server Update Services（WSUS）存在反序列化漏洞，未经认证的攻击者可通过 WSUS 的未授权端点发送恶意序列化数据实现远程代码执行。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 安装微软安全更新。\n2. 禁用 WSUS 服务（如不需要本地更新管理）。\n3. 限制 WSUS 端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-34527",
+    "title": "12.2 CVE-2021-34527 PrintNightmare",
+    "severity": "high",
+    "summary": "Windows Print Spooler 服务存在远程代码执行漏洞，攻击者可通过 RpcAddPrinterDriverEx 函数向域控推送恶意打印机驱动实现任意代码执行，进而接管域控。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 安装微软安全更新 KB5004945 等对应补丁。\n2. 通过组策略禁用 Print Spooler 服务（域控不需要打印功能时）。\n3. 在 `HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Printers` 中设置 `PointAndPrint = 0` 限制打印机驱动安装。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-26855",
+    "title": "12.3 CVE-2021-26855 ProxyLogon",
+    "severity": "medium",
+    "summary": "Microsoft Exchange Server 存在 SSRF 漏洞链（ProxyLogon），未经认证的攻击者可通过 SSRF 漏洞链接后续反序列化漏洞实现远程代码执行，获取 Exchange 服务器完全控制权。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 安装 Exchange Server 对应 CU 和 SU 补丁。\n2. 检查 Exchange 服务器是否已被植入 WebShell 后门。\n3. 限制 Exchange 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-34473",
+    "title": "12.4 CVE-2021-34473 ProxyShell",
+    "severity": "medium",
+    "summary": "Microsoft Exchange Server 存在 UNC 路径注入漏洞，未经认证的攻击者可通过构造特殊请求实现预认证 RCE，进而读取邮件、植入 WebShell。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 安装 Exchange Server 对应 CU 和 SU 补丁。\n2. 限制 Exchange 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2022-41040",
+    "title": "12.5 CVE-2022-41040 ProxyNotShell",
+    "severity": "medium",
+    "summary": "Microsoft Exchange Server 的 OWA 端点存在 SSRF 漏洞，结合 PowerShell 端点可实现远程代码执行。需要有效凭据才能利用。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 安装 Exchange Server 对应 SU 补丁。\n2. 在 IIS 中配置 URL Rewrite 规则拦截含 `autodiscover` 和 `powershell` 的异常请求。\n3. 限制 Exchange 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-36942",
+    "title": "12.6 CVE-2021-36942 PetitPotam",
+    "severity": "medium",
+    "summary": "Windows Encrypting File System Remote Protocol（MS-EFSRPC）存在 NTLM 中继漏洞，攻击者可强制域控制器向攻击者控制的服务器发送 NTLM 认证请求，结合 ADCS 实现域权限提升。CVSS 3.1 评分 5.9。",
+    "remediation": "1. 安装微软安全更新 KB5005413。\n2. 禁用 EFS 服务（如业务不需要）。\n3. 启用 EPA（Extended Protection for Authentication）。\n4. 配置 ADCS 证书模板拒绝 NTLM 认证。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-42278",
+    "title": "12.7 CVE-2021-42278 + CVE-2021-42287 noPac",
+    "severity": "medium",
+    "summary": "CVE-2021-42278 允许域内普通用户创建机器账户（machineAccountQuota 默认为 10），CVE-2021-42287 允许通过 S4U2Self 冒充域管理员。两者结合可实现从普通域用户到域管的权限提升。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 安装微软安全更新 KB5008102 / KB5008380。\n2. 将 `ms-DS-MachineAccountQuota` 设为 0，禁止普通用户创建机器账户。\n3. 审计域内机器账户，清理异常账户。",
+    "enabled": true
+  },
+  {
+    "source_tool": "metasploit",
+    "match_key": "CVE-2022-26923",
+    "title": "12.8 CVE-2022-26923 Certifried",
+    "severity": "medium",
+    "summary": "AD Certificate Services（ADCS）默认证书模板允许机器账户使用 DNS 名称作为 Subject，攻击者可创建与域控同名的机器账户获取域控证书实现域权限提升。CVSS 3.1 评分 8.1。",
+    "remediation": "1. 安装微软安全更新 KB5014754。\n2. 修改 ADCS 证书模板，禁止机器账户使用 DNS 名称作为 Subject。\n3. 审计已颁发的证书，吊销异常证书。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "krbrelayup",
+    "title": "12.9 KrbRelayUp",
+    "severity": "medium",
+    "summary": "Windows Kerberos 认证在本地权限提升场景中存在缺陷，攻击者可通过 Kerberos 认证中继和 SPN 操作实现从普通用户到 SYSTEM 的权限提升。影响 Windows 10 至 Server 2022。",
+    "remediation": "1. 启用 SMB 签名（强制模式）。\n2. 启用 EPA（Extended Protection for Authentication）。\n3. 限制 SPN 写入权限。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-致远oaa8默认口令反序列化",
+    "title": "13.1 致远 OA A8 默认口令/反序列化",
+    "severity": "high",
+    "summary": "致远 OA A8/V5/V8 系列存在默认口令和反序列化漏洞，攻击者可通过默认口令登录或利用反序列化漏洞获取服务器权限。",
+    "remediation": "1. 修改默认口令。\n2. 升级致远 OA 至最新版本。\n3. 限制 OA 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "sql-rce",
+    "title": "13.10 红帆 OA 通用 SQL 注入 + RCE",
+    "severity": "medium",
+    "summary": "红帆 iOffice 系列存在 SQL 注入和命令执行漏洞，攻击者可通过 SQL 注入读取数据库数据或通过命令执行漏洞获取服务器权限。",
+    "remediation": "1. 升级红帆 iOffice 至最新版本。\n2. 限制 OA 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-7262",
+    "title": "13.11 CVE-2024-7262 WPS Office 路径穿越 RCE",
+    "severity": "high",
+    "summary": "WPS Office 存在路径穿越漏洞，攻击者可通过构造特殊文档触发路径穿越实现任意文件读取或写入，在特定条件下可实现远程代码执行。CVSS 3.1 评分 9.3。影响 WPS Office 12.2.0.13110 至 12.2.0.13489。",
+    "remediation": "1. 升级 WPS Office 至 12.2.0.16412 或更高版本。\n2. 终端部署 EDR 监控 WPS 进程异常文件操作。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "sql-bshservlet-rce",
+    "title": "13.2 泛微 e-cology SQL 注入/BshServlet RCE",
+    "severity": "high",
+    "summary": "泛微 e-cology 协同办公系统存在 SQL 注入和 BshServlet 未授权访问漏洞，攻击者可通过 SQL 注入读取数据库或通过 BshServlet 执行任意命令。",
+    "remediation": "1. 升级泛微 e-cology 至最新版本。\n2. 限制 OA 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "uploadfile",
+    "title": "13.3 泛微 e-office UploadFile.php 文件上传",
+    "severity": "high",
+    "summary": "泛微 e-office 的 UploadFile.php 接口存在任意文件上传漏洞，攻击者可上传 WebShell 获取服务器权限。",
+    "remediation": "1. 升级泛微 e-office 至最新版本。\n2. 限制 OA 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "rce",
+    "title": "13.4 通达 OA 任意用户登录 + RCE",
+    "severity": "high",
+    "summary": "通达 OA 2017 及更早版本存在任意用户登录漏洞，攻击者可绕过认证以任意用户身份登录，结合文件包含或反序列化漏洞实现远程代码执行。",
+    "remediation": "1. 升级通达 OA 至最新版本。\n2. 限制 OA 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "ssrf-fastjson-rce",
+    "title": "13.5 蓝凌 OA custom.jsp SSRF + Fastjson RCE",
+    "severity": "high",
+    "summary": "蓝凌 OA EKP 系统的 custom.jsp 接口存在 SSRF 漏洞，结合 Fastjson 反序列化可实现远程代码执行。",
+    "remediation": "1. 升级蓝凌 OA 至最新版本。\n2. 限制 OA 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "finereport-rce",
+    "title": "13.6 帆软 FineReport RCE/路径穿越",
+    "severity": "high",
+    "summary": "帆软 FineReport 报表平台存在远程代码执行和路径穿越漏洞，攻击者可通过 FR Servlet 接口读取任意文件或执行系统命令。",
+    "remediation": "1. 升级帆软 FineReport 至最新版本。\n2. 限制报表平台管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "bshservlet-rce",
+    "title": "13.7 用友 NC/U8 BshServlet RCE/反序列化",
+    "severity": "high",
+    "summary": "用友 NC 和 U8 系统存在 BshServlet 未授权访问和反序列化漏洞，攻击者可通过 BshServlet 执行任意命令或通过反序列化漏洞获取服务器权限。",
+    "remediation": "1. 升级用友 NC/U8 至最新版本。\n2. 限制 ERP 系统管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "officeserver",
+    "title": "13.8 万户 OA OfficeServer 任意文件上传",
+    "severity": "high",
+    "summary": "万户 OA EZOffice 系统的 OfficeServer 接口存在任意文件上传漏洞，攻击者可上传 WebShell 获取服务器权限。",
+    "remediation": "1. 升级万户 OA 至最新版本。\n2. 限制 OA 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "jenkins-script-console",
+    "title": "14.2 Jenkins Script Console 未授权访问",
+    "severity": "high",
+    "summary": "Jenkins Script Console 允许管理员执行任意 Groovy 脚本。若管理后台未配置认证或存在弱口令，攻击者可通过 Script Console 实现远程代码执行。",
+    "remediation": "1. 为 Jenkins 配置强认证，启用 RBAC 权限控制。\n2. 通过 `Authorization Strategy` 限制 Script Console 仅管理员可访问。\n3. 限制 Jenkins 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-42820",
+    "title": "15.1 JumpServer CVE-2023-42820 密码重置验证码可预测",
+    "severity": "high",
+    "summary": "JumpServer 堡垒机的密码重置流程中验证码存在可预测缺陷，攻击者可通过预测验证码接管管理员账户。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 JumpServer 至 3.5.5 / 3.6.5 或更高版本。\n2. 限制 JumpServer 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-4966",
+    "title": "15.10 Citrix NetScaler CVE-2023-4966 GatewayBleed",
+    "severity": "medium",
+    "summary": "Citrix NetScaler ADC/Gateway 存在信息泄露漏洞（GatewayBleed），攻击者可通过发送特制 HTTP 请求泄露用户会话令牌等敏感信息。CVSS 3.1 评分 7.5。",
+    "remediation": "1. 升级 NetScaler ADC 至 14.1-8.x / 13.1-49.x 或更高版本。\n2. 限制 NetScaler 管理端口仅内网访问。\n3. 重置所有用户会话令牌。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-43652",
+    "title": "15.2 JumpServer CVE-2023-43652 公钥认证创建访问令牌",
+    "severity": "high",
+    "summary": "JumpServer 堡垒机的公钥认证接口存在缺陷，攻击者可通过该接口为任意用户创建访问令牌，进而获取堡垒机管理权限。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 JumpServer 至 3.5.5 / 3.6.5 或更高版本。\n2. 限制 JumpServer 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CNVD-2020-57240",
+    "title": "15.3 深信服 SSL VPN CNVD-2020-57240 命令注入",
+    "severity": "high",
+    "summary": "深信服 SSL VPN 的登录接口存在命令注入漏洞，攻击者可通过构造特殊请求在 VPN 设备上执行任意系统命令。",
+    "remediation": "1. 联系深信服技术支持获取补丁。\n2. 限制 VPN 管理端口仅管理网段访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-30805",
+    "title": "15.4 深信服 AF CVE-2023-30805 login.cgi 命令注入",
+    "severity": "high",
+    "summary": "深信服 AF 防火墙的 login.cgi 接口存在命令注入漏洞，攻击者可通过构造特殊 HTTP 请求在防火墙上执行任意系统命令。",
+    "remediation": "1. 升级深信服 AF 至最新版本。\n2. 限制防火墙管理端口仅管理网段访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-30803",
+    "title": "15.5 深信服 AF CVE-2023-30803 认证绕过",
+    "severity": "high",
+    "summary": "深信服 AF 防火墙（5.4 - 8.0.17）的 `/cgi-bin/login.cgi` 端点存在认证绕过漏洞。攻击者通过设置 `X-Forwarded-For: 127.0.0.1` 可欺骗服务端将请求视为本地来源，绕过认证获取管理员 PHPSESSID 会话。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级深信服 AF 至 8.0.18 或更高版本。\n2. 限制防火墙管理端口仅管理网段访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-30804",
+    "title": "15.6 深信服 AF CVE-2023-30804 任意文件读取",
+    "severity": "high",
+    "summary": "深信服 AF 防火墙（5.4 - 8.0.17）的 `/svpn_html/loadfile.php` 端点存在任意文件读取漏洞。攻击者结合 CVE-2023-30803 认证绕过获取的 session，可通过 `file` 参数读取系统任意文件（如 `/etc/hostname`、配置文件、SSL 私钥等）。本模板为自包含链式模板，内部自动完成认证绕过 + 文件读取。CVSS 3.1 评分 7.5。",
+    "remediation": "1. 升级深信服 AF 至 8.0.18 或更高版本。\n2. 限制防火墙管理端口仅管理网段访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "topsec",
+    "title": "15.7 天融信 TOPSEC 远程代码执行",
+    "severity": "high",
+    "summary": "天融信 TOPSEC 防火墙的管理接口存在命令注入漏洞，攻击者可通过构造特殊 Cookie 在设备上执行任意系统命令。",
+    "remediation": "1. 联系天融信技术支持获取补丁。\n2. 限制防火墙管理端口仅管理网段访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-21762",
+    "title": "15.8 Fortinet FortiOS CVE-2024-21762 SSL VPN 越界写入",
+    "severity": "medium",
+    "summary": "Fortinet FortiOS 的 SSL VPN 模块存在越界写入漏洞，攻击者可通过发送特制 HTTP 请求实现远程代码执行。CVSS 3.1 评分 9.6。",
+    "remediation": "1. 升级 FortiOS 至 7.4.3 / 7.2.7 / 7.0.13 / 6.4.14 或更高版本。\n2. 限制 SSL VPN 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-3400",
+    "title": "15.9 Palo Alto PAN-OS CVE-2024-3400 GlobalProtect 命令注入",
+    "severity": "medium",
+    "summary": "Palo Alto PAN-OS 的 GlobalProtect 网关存在命令注入漏洞，攻击者可通过构造特殊请求在防火墙上执行任意命令。CVSS 3.1 评分 10.0。",
+    "remediation": "1. 升级 PAN-OS 至 10.2.9 / 11.0.4 / 11.1.2 或更高版本。\n2. 限制 GlobalProtect 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "ssh",
+    "title": "2.1 SSH 服务暴露探测",
+    "severity": "low",
+    "summary": "内网存在 SSH 远程管理服务，需进一步评估其配置安全性。",
+    "remediation": "1. 梳理 SSH 服务资产，确认业务必要性，关闭非必要暴露。\n2. 后续结合 2.2、2.3 条目评估算法强度和认证安全性。",
+    "enabled": true
+  },
+  {
+    "source_tool": "metasploit",
+    "match_key": "CVE-2019-0708",
+    "title": "2.10 CVE-2019-0708 BlueKeep RDP 远程代码执行",
+    "severity": "high",
+    "summary": "Windows 远程桌面服务存在远程代码执行漏洞（BlueKeep），攻击者无需身份认证即可通过发送特制 RDP 请求触发漏洞。该漏洞具有蠕虫化传播潜力，影响 Windows XP/7/Server 2003/2008/2008 R2。",
+    "remediation": "1. 安装微软官方 KB4499175 等补丁（对应各操作系统版本）。\n2. 禁用 RDP 服务或在网络层阻断 3389 端口。\n3. 启用网络级认证（NLA），虽不能完全阻止但可提高利用门槛。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2026-24061",
+    "title": "2.11 CVE-2026-24061 GNU Inetutils Telnetd 认证绕过",
+    "severity": "high",
+    "summary": "GNU Inetutils telnetd ≤ 2.7 版本存在认证绕过漏洞。攻击者通过将 `USER` 环境变量设置为 `-f root`，可绕过认证直接以 root 身份远程登录 telnetd 服务。CVSS 3.1 评分 9.8（critical），已收录于 CISA KEV。",
+    "remediation": "1. 升级 GNU Inetutils 至 2.8 或更高版本。\n2. 在防火墙层禁止 TCP 23 端口的外部访问，或仅允许受信任的管理终端访问。\n3. 全面替换 Telnet 为 SSH，废弃明文传输的远程管理服务。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2026-32746",
+    "title": "2.12 CVE-2026-32746 GNU Telnetd LINEMODE SLC 缓冲区溢出",
+    "severity": "high",
+    "summary": "GNU Inetutils telnetd 存在 LINEMODE SLC（Special Character）缓冲区溢出漏洞。攻击者可通过发送超长 continueAfter 字段触发栈溢出，实现远程代码执行。",
+    "remediation": "1. 升级 GNU Inetutils 至修复版本。\n2. 在防火墙层禁止 TCP 23 端口的外部访问。\n3. 全面替换 Telnet 为 SSH。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "rdp",
+    "title": "2.4 RDP 服务暴露探测",
+    "severity": "low",
+    "summary": "内网存在 RDP 远程桌面服务，需进一步评估其认证和加密配置。",
+    "remediation": "1. 梳理 RDP 服务资产，确认业务必要性，关闭非必要暴露。\n2. 启用网络级认证（NLA），并通过组策略强制要求 RDP 客户端先通过身份认证再建立会话。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "telnet",
+    "title": "2.5 Telnet 明文传输暴露",
+    "severity": "medium",
+    "summary": "Telnet 服务以明文传输所有数据（包括用户名和密码），攻击者可通过内网流量嗅探直接获取凭据。",
+    "remediation": "1. 全面替换 Telnet 为 SSH，禁用所有 Telnet 服务。\n2. 若因遗留设备无法替换，通过 ACL 或防火墙严格限制 Telnet 访问源。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vnc",
+    "title": "2.6 VNC 未授权访问",
+    "severity": "high",
+    "summary": "VNC 服务未启用密码认证或使用空密码，攻击者可远程连接并完全控制目标桌面。",
+    "remediation": "1. 为 VNC 设置高强度密码，并启用操作系统级认证（如 VNC 密码 + 系统登录）。\n2. 通过 VPN 或跳板机限制 VNC 访问，避免直接暴露于内网。",
+    "enabled": true
+  },
+  {
+    "source_tool": "metasploit",
+    "match_key": "openssh",
+    "title": "2.7 OpenSSH 用户枚举",
+    "severity": "medium",
+    "summary": "OpenSSH 7.7 及之前版本中存在用户枚举漏洞（CVE-2018-15473）。程序对有效用户名和无效用户名的身份验证请求返回不同的响应时间或错误信息，攻击者可据此枚举系统中的有效用户账号。",
+    "remediation": "1. 升级 OpenSSH 至 7.8 或更高版本。\n2. 在 OpenSSH 配置中启用 `UsePAM yes` 和 `Delay 3` 以模糊化响应时间。\n3. 部署 fail2ban 等工具限制 SSH 枚举行为。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-x11未授权访问",
+    "title": "2.8 X11 未授权访问",
+    "severity": "high",
+    "summary": "X Window 系统（X11）监听 TCP 6000 端口（显示号 :0），若未配置访问控制（xhost +），攻击者可无需认证直接连接并获取屏幕截图、模拟键盘鼠标输入，实现远程桌面控制。",
+    "remediation": "1. 在 X11 启动参数中添加 `-nolisten tcp`，禁用 TCP 监听。\n2. 使用 `xhost -` 清空访问列表，仅通过 `xhost +<IP>` 允许特定来源。\n3. 通过 SSH X11 转发（`-X`）替代直接暴露 X11 端口。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "MS12-020",
+    "title": "2.9 MS12-020 RDP 远程代码执行",
+    "severity": "high",
+    "summary": "Windows 远程桌面协议（RDP）在处理特定报文时存在内存访问错误，攻击者可发送特制 RDP 报文触发任意代码执行，无需用户交互即可控制目标系统。",
+    "remediation": "1. 安装微软安全更新 KB2671387。\n2. 关闭不必要的 RDP 服务，或通过网络 ACL 限制 3389 端口访问源。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "smb",
+    "title": "3.1 SMB 匿名共享访问",
+    "severity": "high",
+    "summary": "SMB 服务允许匿名用户（空会话）访问共享资源，攻击者可无需凭据枚举共享列表并读取敏感文件。",
+    "remediation": "1. 在组策略中禁用匿名枚举（`Network access: Do not allow anonymous enumeration of SAM accounts and shares`）。\n2. 为所有共享目录配置显式访问控制列表（ACL），拒绝匿名用户访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "MS17-010",
+    "title": "3.10 MS17-010 永恒之蓝",
+    "severity": "high",
+    "summary": "MS17-010（永恒之蓝）是 NSA 泄露工具中针对 SMB 服务的漏洞，攻击者可在目标系统上执行任意代码。该漏洞被 WannaCry、NotPetya 等勒索软件大规模利用，影响 Windows XP 至 Server 2012 R2。",
+    "remediation": "1. 安装微软官方 MS17-010 补丁（各操作系统对应 KB 编号不同）。\n2. 禁用 SMBv1 协议。\n3. 在网络边界阻断 445 端口的外部访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2017-7494",
+    "title": "3.11 Samba 远程代码执行 (CVE-2017-7494)",
+    "severity": "high",
+    "summary": "Samba 3.5.0 及之后版本中，rpc_server/srv_pipe.c 存在验证缺陷。攻击者可将恶意共享库上传到具有写权限的共享目录，通过构造请求使服务器加载并执行该库，实现远程代码执行（SambaCry）。",
+    "remediation": "1. 升级 Samba 至 4.6.4 / 4.5.10 / 4.4.14 及之后版本。\n2. 在 `smb.conf` 中设置 `nt pipe support = no` 作为临时缓解措施。\n3. 确保所有共享目录无匿名写入权限。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "ipc",
+    "title": "3.12 IPC$ 空会话与弱口令",
+    "severity": "medium",
+    "summary": "Windows IPC$（Internet Process Connection）共享允许进程间通信。若未限制空会话（Null Session），攻击者可无需凭据建立连接，枚举用户列表、共享资源、策略信息等。结合弱口令可进一步获取系统权限。",
+    "remediation": "1. 在组策略中启用 `Network access: Do not allow anonymous enumeration of SAM accounts and shares`。\n2. 禁用默认共享：`HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters` 中设置 `AutoShareServer = 0`。\n3. 设置复杂密码策略，防止通过 IPC$ 穷举出口令。",
+    "enabled": true
+  },
+  {
+    "source_tool": "metasploit",
+    "match_key": "CVE-2020-0796",
+    "title": "3.13 CVE-2020-0796 SMBGhost 远程代码执行",
+    "severity": "high",
+    "summary": "Windows SMBv3 协议在处理压缩消息时存在缓冲区溢出漏洞（SMBGhost）。攻击者可通过发送特制的 SMBv3 压缩请求触发远程代码执行，无需认证。影响 Windows 10 1903/1909 和 Windows Server 1903/1909。",
+    "remediation": "1. 安装微软安全更新 KB4551762。\n2. 在 `HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters` 中设置 `DisableCompression = 1`（DWORD）禁用 SMBv3 压缩。\n3. 在网络层阻断 445 端口外部访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-44142",
+    "title": "3.14 CVE-2021-44142 Samba vfs_fruit 远程代码执行",
+    "severity": "medium",
+    "summary": "Samba 的 vfs_fruit VFS 模块在处理 AppleDouble 文件时存在越界读写漏洞。攻击者可通过上传特制文件触发堆溢出实现远程代码执行。需要对共享目录具有写入权限。影响 Samba 4.13.17/4.14.12/4.15.5 之前版本。",
+    "remediation": "1. 升级 Samba 至 4.13.17 / 4.14.12 / 4.15.5 及之后版本。\n2. 在 `smb.conf` 中移除 `vfs objects = fruit` 配置（如非 Apple 环境必需）。\n3. 限制共享目录写入权限，仅授权用户可写入。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "nfs",
+    "title": "3.3 NFS 未授权导出",
+    "severity": "high",
+    "summary": "NFS 服务将共享目录导出给不受信任的主机，攻击者可挂载导出目录读取或篡改敏感文件。",
+    "remediation": "1. 在 `/etc/exports` 中精确限制导出范围，使用主机名或 IP 白名单替代通配符。\n2. 启用 `root_squash` 选项，防止客户端 root 用户获得服务器 root 权限。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "ftp",
+    "title": "3.4 FTP 匿名登录",
+    "severity": "medium",
+    "summary": "FTP 服务器允许匿名用户登录（用户名 anonymous），可能暴露公共目录中的敏感文件。",
+    "remediation": "1. 在 FTP 服务器配置中禁用匿名访问（如 `anonymous_enable=NO`）。\n2. 定期审计 FTP 公共目录内容，移除不应公开的敏感文件。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-rsync未授权模块访问",
+    "title": "3.6 rsync 未授权模块访问",
+    "severity": "high",
+    "summary": "rsync 服务未配置认证，攻击者可枚举同步模块列表，进而下载或上传敏感数据。",
+    "remediation": "1. 在 rsync 守护进程配置中启用 `auth users` 和 `secrets file`，为每个模块配置独立认证。\n2. 通过 `hosts allow` 限制访问源 IP，避免 rsync 暴露于不受信任的网络区域。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "samba-smb",
+    "title": "3.7 Samba SMB1 协议支持",
+    "severity": "medium",
+    "summary": "SMB1 协议存在多个已知漏洞（如 CVE-2010-2063、MS17-010 等），且不支持加密和完整性校验。服务器支持 SMB1 协议意味着攻击者可利用历史漏洞进行攻击。",
+    "remediation": "1. 在 Samba 配置中禁用 SMB1：`server min protocol = SMB2`。\n2. 在 Windows 中通过 PowerShell 禁用 SMB1：`Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol`。\n3. 在网络层阻断 SMB1 协商流量。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "samba",
+    "title": "3.8 Samba 用户名枚举",
+    "severity": "medium",
+    "summary": "Samba 服务配置允许匿名用户枚举本地用户账号列表（如通过 `rpcclient` 或 MS-RPC 接口），攻击者可获取用户列表用于后续口令爆破。",
+    "remediation": "1. 在组策略中启用 `Network access: Do not allow anonymous enumeration of SAM accounts`。\n2. 在 Samba 配置中设置 `restrict anonymous = 2`。\n3. 禁用 SMB Null Session：`HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA` 中设置 `RestrictAnonymous = 1`。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "MS08-067",
+    "title": "3.9 MS08-067 Windows SMB 远程代码执行",
+    "severity": "high",
+    "summary": "Windows Server 服务在处理通过 MSRPC over SMB 通道的特制请求时存在缓冲区溢出漏洞。攻击者利用 NetPathCanonicalize 函数中的栈溢出可实现远程代码执行，无需认证。",
+    "remediation": "1. 安装微软安全更新 KB958644。\n2. 关闭 135、139、445 端口或通过网络 ACL 严格限制访问源。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "mysql",
+    "title": "4.1 MySQL 默认凭据",
+    "severity": "high",
+    "summary": "MySQL 数据库存在默认或弱凭据，攻击者可登录后读取、篡改或删除数据。",
+    "remediation": "1. 删除匿名用户\n2. 设置强密码策略\n3. 限制监听地址为内网接口",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2022-0543",
+    "title": "4.11 CVE-2022-0543 Redis Lua 沙箱逃逸",
+    "severity": "high",
+    "summary": "Debian 系 Linux 发行版中打包的 Redis 存在 Lua 沙箱逃逸漏洞。由于 Lua 初始化逻辑缺陷，攻击者可通过构造恶意 EVAL 命令逃逸 Lua 沙箱执行任意系统命令。CVSS 3.1 评分 10.0。",
+    "remediation": "1. 升级 Redis 至不受影响的打包版本（Debian/Ubuntu 已发布安全更新）。\n2. 启用 ACL 认证（`requirepass` 或 Redis 6+ ACL），限制 EVAL 命令执行权限。\n3. 设置 `rename-command EVAL \"\"` 禁用 EVAL 命令（如业务不需要 Lua 脚本）。\n4. 配置 `protected-mode yes` 并绑定内网接口。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2025-49844",
+    "title": "4.12 CVE-2025-49844 Redis RediShell UAF 远程代码执行",
+    "severity": "high",
+    "summary": "Redis 存在 Use-After-Free 漏洞（RediShell），攻击者可通过构造特定序列的 Redis 命令触发堆内存损坏实现远程代码执行。",
+    "remediation": "1. 升级 Redis 至最新稳定版本。\n2. 启用 ACL 认证，限制命令执行权限。\n3. 配置 `protected-mode yes` 并绑定内网接口。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "postgresql",
+    "title": "4.2 PostgreSQL 未授权访问",
+    "severity": "high",
+    "summary": "PostgreSQL 配置 trust 认证或 pg_hba.conf 过于宽松，允许无密码连接数据库。",
+    "remediation": "1. 禁止 trust 模式\n2. 使用 md5 或 scram-sha-256 认证\n3. 限制客户端来源 IP",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "mongodb",
+    "title": "4.3 MongoDB 未授权访问",
+    "severity": "high",
+    "summary": "MongoDB 未启用认证，任何客户端可无需凭据连接并操作数据库。",
+    "remediation": "1. 启用 security.authorization\n2. 绑定内网接口\n3. 创建独立用户并遵循最小权限",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "redis",
+    "title": "4.4 Redis 未授权暴露",
+    "severity": "high",
+    "summary": "Redis 未设置 requirepass 或 ACL，攻击者可读取内存数据、执行危险命令甚至获取服务器权限。",
+    "remediation": "1. 设置 requirepass 强密码\n2. 绑定内网接口\n3. 重命名或禁用 FLUSHALL/CONFIG/EVAL",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "elasticsearch",
+    "title": "4.5 Elasticsearch 未授权访问",
+    "severity": "high",
+    "summary": "Elasticsearch 默认未启用身份验证，攻击者可通过 REST API 查询、修改或删除索引数据。",
+    "remediation": "1. 启用 X-Pack Security 或安全插件\n2. 配置 TLS\n3. 限制 9200/9300 仅对可信节点开放",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "oracle-tns-listener",
+    "title": "4.6 Oracle TNS Listener 检测",
+    "severity": "medium",
+    "summary": "Oracle TNS Listener 是客户端与数据库之间的通信中介，默认监听 TCP 1521 端口。TNS Listener 远程数据投毒漏洞（CVE-2012-1675）允许攻击者在无需认证的情况下向 Listener 处理的数据投毒，将合法连接重定向至攻击者控制的系统，实施中间人攻击。",
+    "remediation": "1. 修改 `listener.ora` 配置，使用 `VALID_NODE_CHECKING_REGISTRATION = 1` 限制注册来源。\n2. 为 TNS Listener 设置密码保护：`ALTER SYSTEM SET LOCAL_LISTENER='...'`。\n3. 升级 Oracle 至已修复版本并应用官方补丁。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "oracle-sid",
+    "title": "4.7 Oracle SID 爆破",
+    "severity": "medium",
+    "summary": "Oracle 数据库使用 SID（System Identifier）作为实例唯一标识。攻击者可通过字典爆破获取有效 SID，进而尝试连接数据库并实施进一步攻击。",
+    "remediation": "1. 配置防火墙等访问控制策略，仅允许必要 IP 对 1521 端口的访问。\n2. 使用非默认 SID，避免使用 `ORCL`、`XE` 等常见名称。\n3. 启用 Oracle Database Vault 或强认证机制。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "mssql",
+    "title": "4.8 MSSQL 默认凭据",
+    "severity": "high",
+    "summary": "Microsoft SQL Server 存在默认或弱凭据（如 `sa` 空密码、弱密码），攻击者登录后可读取、篡改数据库数据，甚至通过 xp_cmdshell 执行操作系统命令获取服务器控制权。",
+    "remediation": "1. 为 `sa` 账户设置强密码，或禁用 `sa` 账户。\n2. 使用 Windows 身份验证模式替代混合模式。\n3. 禁用 `xp_cmdshell` 等危险存储过程。\n4. 限制 1433 端口仅对应用服务器开放。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-达梦数据库默认凭据",
+    "title": "4.9 达梦数据库默认凭据",
+    "severity": "medium",
+    "summary": "达梦数据库（DMDB）默认管理员用户名为 SYSDBA，默认密码也为 SYSDBA。若安装后未修改默认口令，攻击者可直接登录数据库获取完全控制权。",
+    "remediation": "1. 立即修改 SYSDBA 默认密码为强密码。\n2. 创建独立业务账户，遵循最小权限原则。\n3. 限制数据库端口仅对应用服务器开放。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "web",
+    "title": "5.1 Web 管理后台暴露",
+    "severity": "medium",
+    "summary": "Web 应用存在未做访问控制的管理后台路径，攻击者可尝试利用默认凭据或已知漏洞获取管理权限。",
+    "remediation": "1. 管理后台部署在管理网段或 VPN 后\n2. 启用 MFA\n3. 使用非标准路径",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "MS15-034",
+    "title": "5.10 MS15-034 HTTP.sys 远程代码执行",
+    "severity": "high",
+    "summary": "Microsoft Windows HTTP 协议栈 (HTTP.sys) 在处理经特殊设计的 HTTP 请求时存在远程代码执行漏洞。攻击者可向运行 IIS 的 Windows 服务器发送恶意 HTTP 请求，在系统账户上下文中执行任意代码，无需认证。",
+    "remediation": "1. 安装微软安全更新 KB3042553。\n2. 在漏洞修复前，临时禁用 IIS 或限制 HTTP 访问源。\n3. 部署 WAF 规则拦截异常 Range 头请求。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2020-1938",
+    "title": "5.11 Tomcat-Ajp 协议任意文件读取 (CVE-2020-1938)",
+    "severity": "medium",
+    "summary": "Apache Tomcat AJP 连接器（默认端口 8009）存在文件包含/读取漏洞（Ghostcat）。攻击者可利用 AJP 协议缺陷构造恶意请求，读取 Tomcat 上所有 Web 应用目录下的任意文件（如 `WEB-INF/web.xml`、配置文件、源代码），在特定条件下甚至可执行任意代码。",
+    "remediation": "1. 在 `server.xml` 中注释掉或删除 AJP Connector 配置。\n2. 若必须使用 AJP，绑定到 `127.0.0.1` 并配置 `secretRequired=\"true\"`。\n3. 升级 Tomcat 至 9.0.31 / 8.5.51 / 7.0.100 及之后版本。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "ajp",
+    "title": "5.12 AJP 服务暴露探测",
+    "severity": "low",
+    "summary": "内网存在 AJP（Apache JServ Protocol）服务暴露，需进一步评估其配置安全性。AJP 协议常用于 Tomcat 与反向代理（如 Apache HTTPD、Nginx）之间的通信，若直接暴露于网络且未配置认证，可能被利用进行信息泄露或进一步攻击。",
+    "remediation": "1. 若无需 AJP，在 `server.xml` 中删除 `<Connector port=\"8009\" protocol=\"AJP/1.3\" .../>`。\n2. 若必须使用，绑定到内网接口并配置 `address=\"127.0.0.1\"`。\n3. 启用 AJP 认证密钥：`requiredSecret=\"your_secret_key\"`。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "harbor",
+    "title": "5.13 Harbor 管理后台默认凭据",
+    "severity": "medium",
+    "summary": "Harbor 容器镜像仓库管理后台使用默认口令（如 `admin/Harbor12345`、`admin/admin`）未修改，攻击者可登录后推送恶意镜像、删除重要镜像或获取仓库敏感配置信息。",
+    "remediation": "1. 立即修改 Harbor 管理员默认密码为强密码。\n2. 启用 Harbor 的 OIDC/LDAP 集成，避免使用本地认证。\n3. 限制 Harbor 管理界面仅管理网段可访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-44228",
+    "title": "5.16 CVE-2021-44228 Log4Shell 远程代码执行",
+    "severity": "high",
+    "summary": "Apache Log4j 2.x 的 JNDI Lookup 功能存在远程代码执行漏洞。攻击者可通过在日志输入中注入 `${jndi:ldap://恶意地址}` 触发 JNDI 远程类加载实现 RCE。CVSS 3.1 评分 10.0，影响极其广泛。",
+    "remediation": "1. 升级 Log4j 至 2.17.1 或更高版本。\n2. 在 JVM 启动参数中添加 `-Dlog4j2.formatMsgNoLookups=true`。\n3. 移除 `JndiLookup.class`：`zip -q -d log4j-core-*.jar org/apache/logging/log4j/core/lookup/JndiLookup.class`。\n4. 部署 WAF 规则拦截含 `${jndi:` 的请求。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2022-22965",
+    "title": "5.17 CVE-2022-22965 Spring4Shell 远程代码执行",
+    "severity": "high",
+    "summary": "Spring Framework 在 JDK 9+ 环境下，通过数据绑定机制可访问 ClassLoader 属性，攻击者可修改 Tomcat 日志配置写入 WebShell 实现 RCE。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 Spring Framework 至 5.3.18 / 5.2.20 或更高版本。\n2. 升级至 Spring Framework 6.0.0 或更高版本。\n3. 降级至 JDK 8（临时缓解）。\n4. 部署 WAF 规则拦截含 `class.module.classLoader` 的请求参数。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2022-22947",
+    "title": "5.18 CVE-2022-22947 Spring Cloud Gateway SpEL 注入",
+    "severity": "high",
+    "summary": "Spring Cloud Gateway 在启用 Actuator 端点的情况下，攻击者可通过发送恶意 SpEL 表达式到 Gateway 路由配置接口实现远程代码执行。CVSS 3.1 评分 10.0。",
+    "remediation": "1. 升级 Spring Cloud Gateway 至 3.1.1 / 3.0.7 或更高版本。\n2. 通过 `management.endpoint.gateway.enabled: false` 禁用 Gateway Actuator 端点。\n3. 通过网络 ACL 限制 Actuator 端点仅管理网段可访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-26084",
+    "title": "5.19 CVE-2021-26084 Confluence OGNL 注入",
+    "severity": "high",
+    "summary": "Atlassian Confluence Server 和 Data Center 在处理 OGNL 表达式时存在注入漏洞，未经认证的攻击者可通过构造恶意请求在服务器上执行任意命令。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 Confluence 至 7.4.17 / 7.11.6 / 7.12.5 或更高版本。\n2. 限制 Confluence 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "tomcat",
+    "title": "5.2 Tomcat 管理后台默认凭据",
+    "severity": "high",
+    "summary": "Tomcat Manager/Host Manager 存在默认或弱凭据，攻击者可上传恶意 WAR 包获取服务器控制权。",
+    "remediation": "1. 删除 manager 应用\n2. 配置强密码及 IP 白名单\n3. 修改默认错误页面",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2022-26134",
+    "title": "5.20 CVE-2022-26134 Confluence OGNL 未授权 RCE",
+    "severity": "high",
+    "summary": "Atlassian Confluence Server 和 Data Center 存在 OGNL 注入漏洞，未经认证的攻击者可通过 URL 路径注入 OGNL 表达式执行任意命令。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 Confluence 至 7.4.17 / 7.13.7 / 7.14.3 / 7.15.2 / 7.16.4 / 7.17.4 / 7.18.1 或更高版本。\n2. 在 WAF 中拦截含 `${` 或 `%{` 的 URL 请求。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-22515",
+    "title": "5.21 CVE-2023-22515 Confluence 特权升级",
+    "severity": "high",
+    "summary": "Atlassian Confluence Server 和 Data Center 存在特权升级漏洞，未经认证的攻击者可利用 `/nf` 等端点绕过认证创建管理员账户。CVSS 3.1 评分 10.0。",
+    "remediation": "1. 升级 Confluence 至 8.3.3 / 8.4.3 / 8.5.2 或更高版本。\n2. 限制 Confluence 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-22518",
+    "title": "5.22 CVE-2023-22518 Confluence 未授权重置",
+    "severity": "high",
+    "summary": "Atlassian Confluence Server 和 Data Center 存在未授权访问漏洞，攻击者可通过 `/json/setup-restore.action` 端点未授权重置 Confluence 实例，导致数据丢失或被植入后门。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 Confluence 至 7.19.16 / 8.3.4 / 8.4.4 / 8.5.3 / 8.6.1 或更高版本。\n2. 限制 Confluence 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-22527",
+    "title": "5.23 CVE-2023-22527 Confluence SSTI 远程代码执行",
+    "severity": "high",
+    "summary": "Atlassian Confluence Server 和 Data Center 存在模板注入（SSTI）漏洞，未经认证的攻击者可通过注入 OGNL 表达式实现远程代码执行。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 Confluence 至 8.5.4 或更高版本。\n2. 限制 Confluence 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-21972",
+    "title": "5.24 CVE-2021-21972 VMware vCenter 任意文件上传",
+    "severity": "high",
+    "summary": "VMware vCenter Server 的 vROPS 插件存在未授权文件上传漏洞，攻击者可上传 JSP WebShell 获取服务器权限。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 vCenter Server 至 7.0 U1c / 6.7 U3l / 6.5 U3n 或更高版本。\n2. 限制 vCenter 管理端口仅管理网段访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2022-22963",
+    "title": "5.25 CVE-2022-22963 Spring Cloud Function SpEL 注入",
+    "severity": "high",
+    "summary": "Spring Cloud Function 在处理路由表达式时存在 SpEL 注入漏洞，攻击者可通过 `spring.cloud.function.routing-expression` HTTP 头注入恶意表达式实现远程代码执行。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 Spring Cloud Function 至 3.1.6 / 3.2.2 或更高版本。\n2. 限制 `/functionRouter` 端点仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-46604",
+    "title": "5.26 CVE-2023-46604 ActiveMQ OpenWire 反序列化 RCE",
+    "severity": "high",
+    "summary": "Apache ActiveMQ 的 OpenWire 协议在反序列化消息时存在远程代码执行漏洞，攻击者可通过发送特制的 OpenWire 消息触发类加载实现 RCE。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 ActiveMQ 至 5.15.16 / 5.16.7 / 5.17.6 / 5.18.3 或更高版本。\n2. 禁用 OpenWire 连接器（如业务不需要）。\n3. 限制 61616 端口仅可信客户端访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-49070",
+    "title": "5.27 CVE-2023-49070 OFBiz XML-RPC 反序列化 RCE",
+    "severity": "high",
+    "summary": "Apache OFBiz 的 XML-RPC 接口存在反序列化漏洞，未经认证的攻击者可通过发送恶意序列化数据实现远程代码执行。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 OFBiz 至 18.12.10 或更高版本。\n2. 禁用 XML-RPC 服务。\n3. 限制 OFBiz 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-51467",
+    "title": "5.28 CVE-2023-51467 OFBiz 认证绕过 + Groovy RCE",
+    "severity": "high",
+    "summary": "Apache OFBiz 存在认证绕过漏洞，攻击者可通过特殊参数绕过认证访问 `/webtools/control/ProgramExport` 端点执行任意 Groovy 代码实现 RCE。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 OFBiz 至 18.12.11 或更高版本。\n2. 限制 OFBiz 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-27348",
+    "title": "5.29 CVE-2024-27348 HugeGraph Gremlin RCE",
+    "severity": "high",
+    "summary": "Apache HugeGraph 的 Gremlin 查询引擎存在远程代码执行漏洞，攻击者可通过注入恶意 Gremlin 查询执行任意 Java 代码。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 HugeGraph 至 1.3.0 或更高版本。\n2. 限制 Gremlin 端点仅可信客户端访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "weblogic",
+    "title": "5.3 WebLogic 控制台暴露",
+    "severity": "medium",
+    "summary": "WebLogic Administration Console 暴露于网络，攻击者可尝试登录或利用历史反序列化漏洞。",
+    "remediation": "1. 限制控制台仅管理网段访问\n2. 修改默认管理员账户\n3. 及时应用 Oracle CPU 补丁",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-22205",
+    "title": "5.31 CVE-2021-22205 GitLab ExifTool 远程代码执行",
+    "severity": "high",
+    "summary": "GitLab CE/EE 在处理上传文件时使用 ExifTool 解析 DjVu 格式文件，存在命令注入漏洞。未经认证的攻击者可通过上传恶意 DjVu 文件触发 RCE。CVSS 3.1 评分 10.0。",
+    "remediation": "1. 升级 GitLab 至 13.10.3 / 13.9.6 / 13.8.8 或更高版本。\n2. 限制 GitLab 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-23897",
+    "title": "5.32 CVE-2024-23897 Jenkins CLI 任意文件读取",
+    "severity": "high",
+    "summary": "Jenkins CLI 接口在处理命令参数时存在任意文件读取漏洞，攻击者可通过 `@文件名` 参数读取 Jenkins 服务器上的任意文件（含凭据、配置等）。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 Jenkins 至 2.442 / LTS 2.426.3 或更高版本。\n2. 限制 Jenkins 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2021-2135",
+    "title": "5.33 CVE-2021-2135 WebLogic T3/IIOP 反序列化 RCE",
+    "severity": "high",
+    "summary": "Oracle WebLogic Server 的 T3 和 IIOP 协议在反序列化传入对象时存在远程代码执行漏洞。攻击者可通过 T3/IIOP 协议发送恶意序列化数据实现 RCE。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 WebLogic 至最新 CPU 补丁。\n2. 在 `config.xml` 中禁用 T3 协议或限制 T3 访问源 IP。\n3. 禁用 IIOP 协议（`-Dweblogic.security.net.ConnectionFilterRules=\"7001 deny iiop\"`）。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-21839",
+    "title": "5.34 CVE-2023-21839 WebLogic JNDI 注入 RCE",
+    "severity": "high",
+    "summary": "Oracle WebLogic Server 的 IIOP 协议在处理 JNDI 绑定请求时存在注入漏洞，未经认证的攻击者可通过 IIOP 协议发送恶意 JNDI 请求实现远程代码执行。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 WebLogic 至最新 CPU 补丁。\n2. 禁用 IIOP 协议。\n3. 限制 WebLogic 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-38856",
+    "title": "5.35 CVE-2024-38856 OFBiz 鉴权绕过 RCE",
+    "severity": "medium",
+    "summary": "Apache OFBiz 存在鉴权绕过漏洞，攻击者可通过覆盖 USERNAME 参数绕过认证，结合其他已知漏洞实现远程代码执行。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 OFBiz 至 18.12.14 或更高版本。\n2. 限制 OFBiz 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-45195",
+    "title": "5.36 CVE-2024-45195 OFBiz 未授权 RCE",
+    "severity": "medium",
+    "summary": "Apache OFBiz 存在未授权访问漏洞，攻击者可未经认证直接访问 ProgramExport 端点执行任意代码。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 OFBiz 至 18.12.15 或更高版本。\n2. 限制 OFBiz 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-21683",
+    "title": "5.37 CVE-2024-21683 Confluence 认证后 RCE",
+    "severity": "medium",
+    "summary": "Atlassian Confluence Data Center 的 Markdown 处理器存在输入验证缺陷，认证用户可通过注入恶意宏在服务器上执行任意代码。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 Confluence 至 8.9.0 或更高版本。\n2. 限制 Confluence 管理端口仅内网访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-7028",
+    "title": "5.38 CVE-2023-7028 GitLab 账户接管",
+    "severity": "medium",
+    "summary": "GitLab CE/EE 的密码重置流程存在缺陷，攻击者可将密码重置邮件发送到未经验证的邮箱地址，实现任意用户账户接管。CVSS 3.1 评分 6.8。",
+    "remediation": "1. 升级 GitLab 至 16.1.1 / 16.2.2 / 16.3.1 / 16.4.1 / 16.5.1 或更高版本。\n2. 为所有用户启用双因素认证（2FA）。\n3. 监控异常密码重置请求。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2025-41243",
+    "title": "5.39 CVE-2025-41243 Spring Cloud Gateway Actuator 未授权访问",
+    "severity": "medium",
+    "summary": "Spring Cloud Gateway 的 Actuator 端点未正确保护，攻击者可通过 Actuator 接口修改 Gateway 路由配置，可能导致服务中断或请求劫持。CVSS 3.1 评分 6.5。",
+    "remediation": "1. 升级 Spring Cloud Gateway 至 4.1.0 / 4.0.10 或更高版本。\n2. 通过 `management.endpoint.gateway.enabled: false` 禁用 Gateway Actuator 端点。\n3. 通过网络 ACL 限制 Actuator 端点仅管理网段可访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "jboss-jmx",
+    "title": "5.4 JBoss JMX 未授权",
+    "severity": "high",
+    "summary": "JBoss/WildFly JMX Console 未配置认证，攻击者可调用 MBean 方法部署恶意应用或执行系统命令。",
+    "remediation": "1. 在 web.xml 中启用强身份验证\n2. 限制 8080/9990 仅管理终端访问\n3. 升级至最新 WildFly",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "spring-boot-actuator",
+    "title": "5.5 Spring Boot Actuator 暴露",
+    "severity": "high",
+    "summary": "Spring Boot Actuator 的 heapdump/env/mappings 等端点未做访问控制，攻击者可下载堆内存转储（含密码）或枚举所有接口。",
+    "remediation": "1. 仅暴露 health/info 端点\n2. 为 Actuator 配置独立安全过滤器\n3. 关闭 heapdump/threaddump",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "ssl-tls",
+    "title": "5.6 SSL/TLS 弱加密配置",
+    "severity": "high",
+    "summary": "服务器支持弱加密套件（RC4/DES/3DES/MD5/SHA-1）或旧版 TLS 协议，攻击者可实施协议降级攻击解密通信。",
+    "remediation": "1. 禁用 SSLv2/v3/TLS1.0/TLS1.1\n2. 仅允许 TLS1.2+\n3. 移除 RC4/DES/MD5/SHA-1 套件",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "apache-shiro",
+    "title": "5.7 Apache Shiro 未授权访问 / 反序列化",
+    "severity": "high",
+    "summary": "Apache Shiro RememberMe Cookie 使用硬编码或弱密钥进行 AES 加密，攻击者可构造恶意序列化 Payload，在目标服务器上实现远程代码执行（RCE）。",
+    "remediation": "1. 升级 Shiro 至最新版本（≥ 1.13.0 / ≥ 2.0.1）\n2. 替换 `securityManager.rememberMeManager.cipherKey` 为随机强密钥（≥ 128 位）\n3. 部署 WAF 规则拦截含异常 RememberMe Cookie 的请求\n4. 禁用不必要的 RememberMe 功能",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "fastjson \\\n  -u http://<target> \\\n  -o fastjson_rce_$(date +%Y%m%d).json -j\n```\n\n各模板覆盖版本与利用方式：\n\n| 模板文件                   | 覆盖版本 | 利用方式     |\n| -------------------------- | -------- | ------------ |\n| `fastjson-1-2-41-rce.yaml` | ≤ 1.2.41 | JNDI RMI     |\n| `fastjson-1-2-47-rce.yaml` | ≤ 1.2.47 | JNDI LDAP    |\n| `fastjson-1-2-62-rce.yaml` | ≤ 1.2.62 | JNDI RMI     |\n| `fastjson-1-2-68-rce.yaml` | ≤ 1.2.68 | 多 Gadget 链 |\n\n**结果说明**\n\n- `[fastjson-1-2-*-rce] [high] [http] <target>` → 存在对应版本反序列化 RCE 漏洞\n- 无匹配 → 未检出；所有模板均为**纯 OOB 盲打**，目标不出网时必然漏报，须配合自建 DNSLOG 或 Burp Collaborator 二次验证\n\n**修复建议**\n\n1. 升级 Fastjson 至 ≥ 2.0.26，或替换为 Jackson / Gson\n2. 开启 `ParserConfig.getGlobalInstance().setSafeMode(true)` 禁用 `@type`\n3. 在应用层对 Content-Type 及请求体进行白名单过滤\n4. 部署 RASP / WAF 拦截包含 `@type`、`ldap://`、`rmi://` 的恶意载荷\n\n---",
+    "title": "5.8 Fastjson 反序列化远程代码执行",
+    "severity": "high",
+    "summary": "Fastjson 在解析 JSON 数据时支持 `@type` 自动类型推断，攻击者可传入恶意类路径触发 JNDI/LDAP 远程加载，结合 RMI/LDAP 实现远程代码执行（RCE）。官方模板覆盖 1.2.41 至 1.2.68 多个版本，均通过 JNDI + interactsh DNS 回调验证，目标必须出网才能检出。",
+    "remediation": "1. 升级 Fastjson 至 ≥ 2.0.26，或替换为 Jackson / Gson\n2. 开启 `ParserConfig.getGlobalInstance().setSafeMode(true)` 禁用 `@type`\n3. 在应用层对 Content-Type 及请求体进行白名单过滤\n4. 部署 RASP / WAF 拦截包含 `@type`、`ldap://`、`rmi://` 的恶意载荷",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "struts -tl\n```\n\n**验证命令**\n\n```bash\n# 批量执行全部 Struts tag 模板\nnuclei -tags struts \\\n  -u http://<target>:8080 \\\n  -o struts2_$(date +%Y%m%d).json -j\n\n# 仅跑 critical/high 级别（快速筛选高危）\nnuclei -tags struts \\\n  -severity critical,high \\\n  -u http://<target>:8080 \\\n  -o struts2_rce_$(date +%Y%m%d).json -j\n```\n\n主要覆盖 CVE 及触发点：\n\n| CVE            | S2 编号 | 触发点                 | 危害         |\n| -------------- | ------- | ---------------------- | ------------ |\n| CVE-2017-5638  | S2-045  | Content-Type OGNL 注入 | RCE          |\n| CVE-2018-11776 | S2-057  | namespace 表达式       | RCE          |\n| CVE-2019-0230  | S2-059  | 标签属性 OGNL          | RCE          |\n| CVE-2021-31805 | S2-062  | 标签属性 OGNL          | RCE          |\n| CVE-2023-50164 | S2-066  | multipart 路径穿越     | 文件上传 RCE |\n| CVE-2024-53677 | S2-067  | 参数名注入             | 文件上传 RCE |\n\n**结果说明**\n\n- `[CVE-20XX-XXXXX] [critical] [http] <target>:8080` → 存在对应 OGNL 注入 / RCE 漏洞\n- 无匹配 → 未检出；S2-066/S2-067 等较新漏洞需确认模板库已是最新版本\n\n**修复建议**\n\n1. 升级 Struts2 至官方最新稳定版（≥ 6.4.0）\n2. 禁用或严格过滤 OGNL 表达式，启用 `struts.ognl.allowlistEnabled=true`\n3. 禁止将 `.action`、`.do` 等后缀接口直接暴露于公网\n4. 部署 WAF 规则拦截 Content-Type 中含 `%{`、`${`、`#context` 等特征的请求\n\n---",
+    "title": "5.9 Apache Struts2 远程代码执行",
+    "severity": "high",
+    "summary": "Apache Struts2 OGNL 表达式注入系列漏洞（S2-045 至 S2-067），攻击者可通过构造恶意 Content-Type、multipart 数据或文件上传参数，触发 OGNL 表达式解析实现 RCE。",
+    "remediation": "1. 升级 Struts2 至官方最新稳定版（≥ 6.4.0）\n2. 禁用或严格过滤 OGNL 表达式，启用 `struts.ognl.allowlistEnabled=true`\n3. 禁止将 `.action`、`.do` 等后缀接口直接暴露于公网\n4. 部署 WAF 规则拦截 Content-Type 中含 `%{`、`${`、`#context` 等特征的请求",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "activemq",
+    "title": "6.1 ActiveMQ 未授权访问",
+    "severity": "medium",
+    "summary": "ActiveMQ 消息服务暴露于网络且未启用认证，攻击者可连接后查看队列、Topic 及消息内容。",
+    "remediation": "1. 启用 JAAS 认证\n2. 关闭不必要的传输协议\n3. 限制消息端口访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "rabbitmq",
+    "title": "6.2 RabbitMQ 未授权访问",
+    "severity": "medium",
+    "summary": "RabbitMQ AMQP 服务未启用 SASL 认证，攻击者可无需凭据连接并操作消息队列。",
+    "remediation": "1. 启用 SASL 认证\n2. 删除默认 guest 用户\n3. 配置基于角色的最小权限访问控制",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "kafka",
+    "title": "6.3 Kafka 未授权枚举",
+    "severity": "medium",
+    "summary": "Kafka 集群未启用 SASL/SSL 认证，攻击者可连接后枚举 Topic 列表、分区信息及消费者组。",
+    "remediation": "1. 启用 SASL/SSL 认证\n2. 配置 Kafka ACL\n3. 将 Broker 置于可信内网区域",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "rocketmq",
+    "title": "6.4 RocketMQ 未授权访问",
+    "severity": "high",
+    "summary": "RocketMQ Broker 未启用 ACL 认证，攻击者可发送/消费任意消息，甚至执行管理命令影响集群稳定性。",
+    "remediation": "1. 启用 RocketMQ ACL 2.0\n2. 限制 10911/9876 仅可信生产者/消费者\n3. 禁止 Console 暴露于公网",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "zookeeper",
+    "title": "6.5 Zookeeper 未授权访问",
+    "severity": "medium",
+    "summary": "Zookeeper 分布式协调服务默认开放 2181 端口且无需身份验证。攻击者可连接后枚举节点、读取敏感配置信息（如 Kafka 消费者偏移量、Dubbo 服务注册信息），甚至执行管理命令（如 `kill`、`delete`）破坏集群。",
+    "remediation": "1. 在 `zoo.cfg` 中启用 SASL 认证：`authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider`。\n2. 配置 ACL 限制节点访问权限。\n3. 修改默认端口 2181，使用防火墙限制仅集群节点可访问。\n4. 定期审计 Zookeeper 节点内容，移除敏感信息。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-33246",
+    "title": "6.6 CVE-2023-33246 RocketMQ NameServer 远程代码执行",
+    "severity": "high",
+    "summary": "Apache RocketMQ NameServer 默认未启用 ACL 认证，攻击者可通过 updateConfig 功能修改 Broker 配置，结合文件写入漏洞实现远程代码执行。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 RocketMQ 至 5.1.0 或更高版本。\n2. 启用 RocketMQ ACL 2.0 认证。\n3. 限制 9876/10911 端口仅可信节点访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2026-34197",
+    "title": "6.7 CVE-2026-34197 ActiveMQ Jolokia 远程代码执行",
+    "severity": "medium",
+    "summary": "Apache ActiveMQ 的 Jolokia 端口默认暴露且未限制访问，攻击者可通过 JMX MBean 操作执行系统命令实现远程代码执行。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 ActiveMQ 至 6.1.5 或更高版本。\n2. 在 `jetty.xml` 中禁用 Jolokia 端点或限制访问源 IP。\n3. 限制 8161 端口仅管理网段访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "smtp",
+    "title": "7.1 SMTP 用户枚举",
+    "severity": "medium",
+    "summary": "SMTP 服务器未禁用 VRFY/RCPT TO 命令，攻击者可通过构造不同收件人地址探测有效用户账号，获取企业内部邮箱列表。",
+    "remediation": "1. 禁用 VRFY/EXPN 命令或统一返回模糊响应码\n2. 部署邮件安全网关过滤异常会话行为\n3. 对 SMTP 服务实施速率限制和连接监控",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2010-4344",
+    "title": "7.2 Exim 堆缓冲区溢出 (CVE-2010-4344)",
+    "severity": "high",
+    "summary": "Exim 4.70 之前版本中的 `string.c` 文件的 `string_vformat` 函数存在基于堆的缓冲区溢出漏洞。远程攻击者可通过构造包含超长特制头消息的 SMTP 会话执行任意代码，导致邮件服务器被完全控制。",
+    "remediation": "1. 升级 Exim 至 4.70 及之后版本。\n2. 在邮件网关层限制超大 SMTP 头消息。\n3. 部署邮件安全网关过滤异常 SMTP 会话行为。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "docker-daemon",
+    "title": "8.1 Docker Daemon 未授权",
+    "severity": "high",
+    "summary": "Docker Daemon 错误配置为监听 TCP 2375 端口且未启用 TLS 认证，攻击者可远程调用 Docker API 创建特权容器实现宿主机逃逸。",
+    "remediation": "1. 禁止 Docker Daemon 监听 TCP 端口，使用 Unix Socket 通信\n2. 如需远程管理，配置 TLS 双向认证\n3. 使用 SSH 隧道替代直接暴露 Docker API",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-5043",
+    "title": "8.10 CVE-2023-5043 ingress-nginx configuration-snippet 注入",
+    "severity": "high",
+    "summary": "Kubernetes ingress-nginx 允许通过 `configuration-snippet` 注解注入任意 nginx 配置，攻击者可注入恶意 Lua 代码或 nginx 指令实现代码执行。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 ingress-nginx 至 1.9.0 或更高版本。\n2. 在 ingress-nginx ConfigMap 中设置 `allow-snippet-annotations: \"false\"`。\n3. 限制 Ingress 资源的创建权限（RBAC）。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2023-5044",
+    "title": "8.11 CVE-2023-5044 ingress-nginx permanent-redirect 注入",
+    "severity": "high",
+    "summary": "Kubernetes ingress-nginx 在处理 `permanent-redirect` 注解时存在配置注入漏洞，攻击者可通过注入恶意 nginx 配置指令实现代码执行。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 ingress-nginx 至 1.8.4 或更高版本。\n2. 限制 Ingress 资源的创建权限（RBAC）。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-10220",
+    "title": "8.12 CVE-2024-10220 Kubernetes kubelet gitRepo Volume 远程代码执行",
+    "severity": "medium",
+    "summary": "Kubernetes kubelet 在处理 gitRepo Volume 时存在漏洞，攻击者可通过创建使用 gitRepo 卷的 Pod，克隆包含恶意 Git hooks 的仓库实现代码执行。CVSS 3.1 评分 6.3。",
+    "remediation": "1. 升级 Kubernetes 至 1.28.12 / 1.29.7 / 1.30.3 或更高版本。\n2. 限制 Pod 创建权限，禁止使用 gitRepo Volume（通过 OPA/Gatekeeper 策略）。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-21545",
+    "title": "8.13 CVE-2024-21545 Proxmox VE API 任意文件读取",
+    "severity": "medium",
+    "summary": "Proxmox VE 的 API 端点存在 SSRF 漏洞，攻击者可通过 `cluster/acme/meta` 端点读取服务器上的任意文件。CVSS 3.1 评分 5.9。",
+    "remediation": "1. 升级 Proxmox VE 至 8.1.4 或更高版本。\n2. 限制 Proxmox VE 管理端口仅管理网段访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "kubernetes-api",
+    "title": "8.2 Kubernetes API 未授权",
+    "severity": "high",
+    "summary": "Kubernetes API Server 允许匿名访问或 RBAC 配置不当，攻击者无需凭证即可获取集群命名空间、Pod、Secret 等敏感资源。",
+    "remediation": "1. 设置 `--anonymous-auth=false` 禁用匿名访问\n2. 正确配置 RBAC，遵循最小权限原则\n3. 关闭 8080 非安全端口，限制 API Server 仅控制平面节点可访问",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-etcd未授权访问",
+    "title": "8.3 etcd 未授权访问",
+    "severity": "high",
+    "summary": "etcd 未启用客户端证书认证，攻击者可读取集群全部 Secret、Token、配置数据，等同于获取整个集群控制权。",
+    "remediation": "1. 启用 `--client-cert-auth=true` 强制客户端证书认证\n2. 使用 TLS 加密 etcd 通信\n3. 严格限制 2379/2380 端口仅控制平面节点可访问",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-21626",
+    "title": "8.4 CVE-2024-21626 runc 文件描述符泄漏容器逃逸",
+    "severity": "high",
+    "summary": "runc 在创建工作进程时存在文件描述符泄漏漏洞，恶意容器可通过 `/proc/self/fd` 访问宿主机文件系统实现容器逃逸。CVSS 3.1 评分 8.6。",
+    "remediation": "1. 升级 runc 至 1.1.12 或更高版本。\n2. 升级 Docker 至 25.0.2 或更高版本。\n3. 升级 containerd 至 1.6.28 或更高版本。\n4. 审查 Kubernetes Pod 安全策略，限制容器特权模式。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2025-1974",
+    "title": "8.5 CVE-2025-1974 ingress-nginx 远程代码执行",
+    "severity": "high",
+    "summary": "Kubernetes ingress-nginx 的 admission webhook 端点未正确限制访问，攻击者可通过注入恶意 nginx 配置实现远程代码执行。CVSS 3.1 评分 9.8。",
+    "remediation": "1. 升级 ingress-nginx 至 1.11.5 / 1.12.1 或更高版本。\n2. 禁用 validating admission webhook（临时缓解）。\n3. 限制对 ingress-nginx admission 端点的网络访问。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2025-24514",
+    "title": "8.6 CVE-2025-24514 ingress-nginx auth-url 注入",
+    "severity": "high",
+    "summary": "Kubernetes ingress-nginx 在处理 Ingress 资源的 `auth-url` 注解时存在配置注入漏洞，攻击者可通过注入恶意 nginx 配置指令实现代码执行。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 ingress-nginx 至 1.11.5 / 1.12.1 或更高版本。\n2. 限制 Ingress 资源的创建权限（RBAC）。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2025-1097",
+    "title": "8.7 CVE-2025-1097 ingress-nginx auth-tls-match-cn 注入",
+    "severity": "high",
+    "summary": "Kubernetes ingress-nginx 在处理 `auth-tls-match-cn` 注解时存在配置注入漏洞，攻击者可通过注入恶意 nginx 配置指令实现代码执行。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 ingress-nginx 至 1.11.5 / 1.12.1 或更高版本。\n2. 限制 Ingress 资源的创建权限（RBAC）。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2025-1098",
+    "title": "8.8 CVE-2025-1098 ingress-nginx mirror-target 注入",
+    "severity": "high",
+    "summary": "Kubernetes ingress-nginx 在处理 `mirror-target` 注解时存在配置注入漏洞，攻击者可通过注入恶意 nginx 配置指令实现代码执行。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 ingress-nginx 至 1.11.5 / 1.12.1 或更高版本。\n2. 限制 Ingress 资源的创建权限（RBAC）。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "CVE-2024-7646",
+    "title": "8.9 CVE-2024-7646 ingress-nginx 注解验证绕过",
+    "severity": "high",
+    "summary": "Kubernetes ingress-nginx 对部分注解的验证存在绕过缺陷，攻击者可通过构造特殊注解值绕过验证注入恶意 nginx 配置。CVSS 3.1 评分 8.8。",
+    "remediation": "1. 升级 ingress-nginx 至 1.11.2 / 1.12.0 或更高版本。\n2. 限制 Ingress 资源的创建权限（RBAC）。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "modbus-tcp",
+    "title": "9.1 Modbus TCP 设备探测",
+    "severity": "medium",
+    "summary": "内网存在 Modbus TCP 工控设备（如施耐德 Modicon PLC），协议本身无认证机制，攻击者可读写寄存器或获取设备信息。",
+    "remediation": "1. 部署工业防火墙对 Modbus 进行深度包检测\n2. OT 与 IT 网络物理隔离或逻辑隔离\n3. 禁用不必要的协议和服务，关闭未使用的 PLC 通信端口",
+    "enabled": true
+  },
+  {
+    "source_tool": "nmap",
+    "match_key": "vxworks-wdb-rpc",
+    "title": "9.10 VxWorks WDB RPC 调试接口",
+    "severity": "high",
+    "summary": "VxWorks 嵌入式实时操作系统在编译选项中包含 INCLUDE_WDB 和 INCLUDE_DEBUG 时，会默认开启 WDB（Wind Debug）调试功能。攻击者可通过 WDB RPC 端口（UDP 17185）读写内存、执行函数、篡改系统配置，完全控制目标设备。",
+    "remediation": "1. 在 VxWorks 编译配置中移除 INCLUDE_WDB 和 INCLUDE_DEBUG 选项。\n2. 若必须使用调试功能，通过防火墙严格限制 UDP 17185 仅开发终端可访问。\n3. 及时更新 VxWorks 至最新版本并应用风河公司官方补丁。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "comm-plc",
+    "title": "9.2 S7Comm PLC 设备探测",
+    "severity": "medium",
+    "summary": "西门子 S7 系列 PLC 使用 S7Comm 协议（端口 102），缺乏有效认证，攻击者可读取机架号、插槽号、固件版本等信息。本条目因 nuclei 暂无对应模板，使用 nmap 替代。",
+    "remediation": "1. 部署工业安全模块（SCALANCE S）进行协议隔离\n2. 启用 PLC 访问保护密码\n3. 限制编程口（端口 102）仅工程师站 IP 可访问",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "ethernet",
+    "title": "9.3 EtherNet/IP 设备探测",
+    "severity": "medium",
+    "summary": "Allen-Bradley PLC 使用 EtherNet/IP 协议，攻击者可通过 CIP 请求获取设备型号、固件版本、序列号等关键信息。",
+    "remediation": "1. 部署支持 CIP 解析的工业防火墙\n2. 对 PLC 启用源 IP 白名单\n3. 定期备份 PLC 逻辑程序，监控未授权访问行为",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "java-rmi",
+    "title": "9.4 Java RMI 未授权",
+    "severity": "medium",
+    "summary": "Java RMI Registry 暴露且无访问控制，攻击者可枚举绑定的远程对象名称和接口，进一步利用反序列化漏洞执行代码。",
+    "remediation": "1. 使用 Java 安全策略限制 RMI 访问来源\n2. 禁止 RMI Registry 监听 `0.0.0.0`，绑定到特定接口\n3. 升级 Java 版本并禁用不安全反序列化类",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "jdwp",
+    "title": "9.5 JDWP 调试接口暴露",
+    "severity": "high",
+    "summary": "JVM 远程调试端口 JDWP 暴露于网络，攻击者可连接后执行任意字节码、修改变量、暂停线程，导致远程代码执行。",
+    "remediation": "1. 生产环境绝对禁止开启 JDWP\n2. 如需调试，绑定 `127.0.0.1` 并通过 SSH 隧道转发\n3. 防火墙严格限制调试端口访问来源",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "rpc-portmapper",
+    "title": "9.6 RPC/Portmapper 信息泄露",
+    "severity": "low",
+    "summary": "RPCbind/Portmapper 维护 RPC 程序号到端口的映射表，攻击者查询后可获取 NFS、NIS、mountd 等服务的注册信息和版本号。",
+    "remediation": "1. 如不需要 NFS 等 RPC 服务则卸载 rpcbind\n2. 限制 111 端口仅可信主机访问\n3. 对 NFS 启用 Kerberos 认证，禁用 NFSv2/v3 的匿名挂载",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-打印机管理后台暴露",
+    "title": "9.7 打印机管理后台暴露",
+    "severity": "medium",
+    "summary": "网络打印机 Web 管理界面未配置认证或存在默认口令，攻击者可远程修改配置、查看打印历史或利用固件更新植入恶意固件。",
+    "remediation": "1. 为打印机管理界面设置强密码，禁用默认账户\n2. 禁用不需要的服务（Telnet/FTP/SNMP 写权限）\n3. 将打印机置于隔离网段，限制仅授权用户可访问",
+    "enabled": true
+  },
+  {
+    "source_tool": "metasploit",
+    "match_key": "MS03-026",
+    "title": "9.8 MS03-026 DCOM RPC 缓冲区溢出",
+    "severity": "high",
+    "summary": "Windows DCOM RPC 接口在处理 TCP/IP 消息交换过程中存在缓冲区溢出漏洞。攻击者发送畸形消息可导致系统蓝屏或远程代码执行，影响使用 RPC 框架的 DCOM 接口（如 UNC 路径激活请求）。",
+    "remediation": "1. 安装微软安全更新 KB823980。\n2. 关闭 135 端口或通过网络 ACL 限制访问源。\n3. 在防火墙层过滤异常 DCOM/RPC 流量。",
+    "enabled": true
+  },
+  {
+    "source_tool": "metasploit",
+    "match_key": "java-jmx",
+    "title": "9.9 Java JMX 配置不安全",
+    "severity": "medium",
+    "summary": "Java Management Extensions（JMX）未启用认证或 SSL，攻击者可远程连接 MBean Server，读取 JVM 运行时信息、调用 MBean 方法，甚至部署恶意 MBean 实现代码执行。JMX 通常通过 RMI 注册表（1099）或 HTTP 端口（8080/9990）暴露。",
+    "remediation": "1. 在启动参数中启用 JMX 认证：`-Dcom.sun.management.jmxremote.authenticate=true`。\n2. 启用 SSL 加密：`-Dcom.sun.management.jmxremote.ssl=true`。\n3. 绑定到特定接口（非 0.0.0.0），通过防火墙限制访问源。\n4. 禁用不必要的 JMX 远程访问，改用本地 JConsole 或 SSH 隧道。",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "nuclei",
+    "title": "A.1 Nuclei 常用参数",
+    "severity": "medium",
+    "summary": "A.1 Nuclei 常用参数：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "web-ssl",
+    "title": "Web / SSL",
+    "severity": "medium",
+    "summary": "Web / SSL：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-大数据服务",
+    "title": "大数据服务",
+    "severity": "medium",
+    "summary": "大数据服务：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-官方nucleitemplates默认凭",
+    "title": "官方 nuclei-templates 默认凭据模板",
+    "severity": "medium",
+    "summary": "官方 nuclei-templates 默认凭据模板：存在安全隐患，建议进行修复。",
+    "remediation": "1. 修改默认密码或禁用弱算法\n2. 设置强密码策略\n3. 启用账户锁定机制",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-手册中使用的自定义模板",
+    "title": "手册中使用的自定义模板",
+    "severity": "medium",
+    "summary": "手册中使用的自定义模板：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-数据库",
+    "title": "数据库",
+    "severity": "medium",
+    "summary": "数据库：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-文件共享",
+    "title": "文件共享",
+    "severity": "medium",
+    "summary": "文件共享：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-消息队列与分布式协调",
+    "title": "消息队列与分布式协调",
+    "severity": "medium",
+    "summary": "消息队列与分布式协调：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-缓存服务",
+    "title": "缓存服务",
+    "severity": "medium",
+    "summary": "缓存服务：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-网络基础设施",
+    "title": "网络基础设施",
+    "severity": "medium",
+    "summary": "网络基础设施：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "rbkd",
+    "title": "自定义模板（~/nuclei-templates/RBKD-templates/）",
+    "severity": "medium",
+    "summary": "自定义模板（~/nuclei-templates/RBKD-templates/）：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-远程管理",
+    "title": "远程管理",
+    "severity": "medium",
+    "summary": "远程管理：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  },
+  {
+    "source_tool": "nuclei",
+    "match_key": "vuln-邮件",
+    "title": "邮件",
+    "severity": "medium",
+    "summary": "邮件：存在安全隐患，建议进行修复。",
+    "remediation": "1. 参考官方文档进行配置加固\n2. 关注厂商安全公告并及时更新\n3. 限制服务网络访问范围",
+    "enabled": true
+  }
+]

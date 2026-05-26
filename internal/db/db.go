@@ -284,7 +284,6 @@ func migrate(db *sql.DB) error {
 		}
 		version = 25
 	}
-
 	if err := ensureProjectsColumns(db); err != nil {
 		return fmt.Errorf("ensure projects columns: %w", err)
 	}
