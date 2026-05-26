@@ -52,6 +52,15 @@ Thumbs.db
 # Build output
 bin/
 
+# Agent caches (local runtime state — never commit)
+.codegraph/
+.deepseek/
+.playwright-mcp/
+.antigravitycli/
+.claude/agents/
+.cursor/
+tmp-test/
+
 # Agent configuration
 .pi/
 
