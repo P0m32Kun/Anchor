@@ -288,6 +288,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}", auth(http.HandlerFunc(s.handleGetPipelineRun)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/stages", auth(http.HandlerFunc(s.handleGetPipelineRunStages)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/metrics", auth(http.HandlerFunc(s.handleGetScanRunMetrics)))
+	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/works", auth(http.HandlerFunc(s.handleListScanRunWorks)))
+	mux.Handle("GET /assets/{id}/works", auth(http.HandlerFunc(s.handleListAssetWorks)))
 	mux.Handle("POST /projects/{id}/pipeline/runs/{runId}/cancel", auth(http.HandlerFunc(s.handleCancelPipelineRun)))
 	mux.Handle("GET /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleGetPipelineConfig)))
 	mux.Handle("POST /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleUpdatePipelineConfig)))

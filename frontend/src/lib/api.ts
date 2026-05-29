@@ -545,6 +545,12 @@ export const api = {
   getScanRunMetrics: (projectId: string, runId: string, signal?: AbortSignal) =>
     fetchAPI<ScanRunMetrics>(`/projects/${projectId}/pipeline/runs/${runId}/metrics`, { signal }),
 
+  // --- Scan Work Items ---
+  listScanRunWorks: (projectId: string, runId: string, signal?: AbortSignal) =>
+    fetchAPI<{ items: ScanWorkItem[]; total: number }>(`/projects/${projectId}/pipeline/runs/${runId}/works`, { signal }),
+  listAssetWorks: (assetId: string, runId: string, signal?: AbortSignal) =>
+    fetchAPI<{ asset_id: string; run_id: string; items: ScanWorkItem[]; total: number }>(`/assets/${assetId}/works?run_id=${runId}`, { signal }),
+
   // --- Unified Scan ---
   createScan: (projectId: string, data: { mode: string; config: PipelineConfig }, signal?: AbortSignal) =>
     fetchAPI<{ run_id: string; status: string; mode: string }>(`/projects/${projectId}/scan`, { method: "POST", body: JSON.stringify(data), signal }),

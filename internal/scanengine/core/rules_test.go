@@ -154,6 +154,32 @@ func TestDeriveEligibleWorks_SubdomainOnlyAtDepth01(t *testing.T) {
 	}
 }
 
+func TestDeriveEligibleWorks_FFUFMaxDepth1(t *testing.T) {
+	profile := DefaultInternalProfile()
+
+	// Depth 0: ffuf eligible
+	a := &DiscoveryAsset{ID: "a1", Type: AssetHTTPService, DiscoveryDepth: 0}
+	works := DeriveEligibleWorks(a, profile)
+	var hasFFUF bool
+	for _, w := range works {
+		if w.Action == ActionFFUFBrute {
+			hasFFUF = true
+		}
+	}
+	if !hasFFUF {
+		t.Fatal("ffuf should be eligible at depth 0")
+	}
+
+	// Depth 2: ffuf NOT eligible
+	a.DiscoveryDepth = 2
+	works = DeriveEligibleWorks(a, profile)
+	for _, w := range works {
+		if w.Action == ActionFFUFBrute {
+			t.Fatal("ffuf should not be eligible at depth 2")
+		}
+	}
+}
+
 func TestDeriveEligibleWorks_HTTPXOnHTTPService(t *testing.T) {
 	profile := DefaultInternalProfile()
 

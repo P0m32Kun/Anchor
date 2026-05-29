@@ -259,6 +259,14 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 
 // executeWork claims and executes a single work item.
 func (e *ScanEngine) executeWork(ctx context.Context, item queue.Item) {
+	// wind_down filter: only allow finishing actions
+	if e.engineState == "wind_down" {
+		if !isWindDownAllowed(item.Action) {
+			e.store.MarkSkipped(item.WorkID, "wind_down")
+			return
+		}
+	}
+
 	// TryClaim
 	w, err := e.store.TryClaim(item.WorkID)
 	if err != nil || w == nil {
@@ -303,21 +311,37 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 			log.Printf("[scanengine] parse httpx: %v", err)
 			return
 		}
-		// Update attrs on the source asset
-		if attrs.Fingerprinted {
-			// The asset itself gets fingerprinted
-			_ = attrs
-		}
+		// Mark source asset as fingerprinted
+		_ = attrs
 		// Process discovered sub-assets
 		for _, a := range newAssets {
 			a.ParentID = w.AssetID
-			a.DiscoveryDepth = 1 // httpx output is depth 1 from seed
+			e.processNewAsset(ctx, a)
+		}
+
+	case core.ActionKatanaCrawl:
+		newAssets, err := executor.ParseKatanaOutput(stdout)
+		if err != nil {
+			log.Printf("[scanengine] parse katana: %v", err)
+			return
+		}
+		for _, a := range newAssets {
+			a.ParentID = w.AssetID
+			e.processNewAsset(ctx, a)
+		}
+
+	case core.ActionFFUFBrute:
+		newAssets, err := executor.ParseFFUFOutput(stdout)
+		if err != nil {
+			log.Printf("[scanengine] parse ffuf: %v", err)
+			return
+		}
+		for _, a := range newAssets {
+			a.ParentID = w.AssetID
 			e.processNewAsset(ctx, a)
 		}
 
 	case core.ActionNucleiScan:
-		// Nuclei findings are handled by the existing pipeline infrastructure
-		// We just log them here
 		findings, _ := executor.ParseNucleiOutput(stdout)
 		if len(findings) > 0 {
 			log.Printf("[scanengine] nuclei found %d templates", len(findings))
@@ -349,8 +373,28 @@ func (e *ScanEngine) buildParams(ctx context.Context, w *models.ScanWorkItem) (t
 			"host_file": hostFile,
 		}, nil
 
+	case core.ActionKatanaCrawl:
+		return toolregistry.RenderParams{
+			"url": w.AssetID,
+		}, nil
+
+	case core.ActionFFUFBrute:
+		return toolregistry.RenderParams{
+			"url": w.AssetID,
+		}, nil
+
 	default:
 		return toolregistry.RenderParams{}, nil
+	}
+}
+
+// isWindDownAllowed returns true if the action should continue during wind_down.
+func isWindDownAllowed(action string) bool {
+	switch action {
+	case string(core.ActionNucleiScan), string(core.ActionHTTPXFingerprint):
+		return true
+	default:
+		return false
 	}
 }
 
