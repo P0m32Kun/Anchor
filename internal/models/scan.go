@@ -173,6 +173,8 @@ type PipelineRun struct {
 	Status      string    `json:"status" db:"status"` // running | completed | failed | cancelled
 	Stage       string    `json:"stage,omitempty" db:"stage"`
 	Error       string    `json:"error,omitempty" db:"error"`
+	EngineState    string     `json:"engine_state" db:"engine_state"` // running | wind_down | stopped
+	LastNewAssetAt *time.Time `json:"last_new_asset_at,omitempty" db:"last_new_asset_at"`
 	StartedAt   time.Time `json:"started_at" db:"started_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
@@ -196,6 +198,10 @@ type PipelineRunStage struct {
 	Stage       string                 `json:"stage" db:"stage"`
 	Status      PipelineRunStageStatus `json:"status" db:"status"`
 	Error       string                 `json:"error,omitempty" db:"error"`
+	WorkTotal   *int                   `json:"work_total,omitempty" db:"work_total"`
+	WorkDone    *int                   `json:"work_done,omitempty" db:"work_done"`
+	WorkRunning *int                   `json:"work_running,omitempty" db:"work_running"`
+	Round       *int                   `json:"round,omitempty" db:"round"`
 	StartedAt   *time.Time             `json:"started_at,omitempty" db:"started_at"`
 	CompletedAt *time.Time             `json:"completed_at,omitempty" db:"completed_at"`
 	CreatedAt   time.Time              `json:"created_at" db:"created_at"`

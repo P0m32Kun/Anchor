@@ -506,8 +506,8 @@ func (q *Queries) ListServiceFingerprintsByProject(projectID string) ([]*models.
 // --- Pipeline Runs ---
 
 func (q *Queries) CreatePipelineRun(r *models.PipelineRun) error {
-	_, err := q.db.Exec(`INSERT INTO pipeline_runs (id, project_id, mode, status, stage, error, started_at, completed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.ProjectID, r.Mode, r.Status, r.Stage, r.Error, r.StartedAt, r.CompletedAt, r.CreatedAt)
+	_, err := q.db.Exec(`INSERT INTO pipeline_runs (id, project_id, mode, status, stage, error, engine_state, last_new_asset_at, started_at, completed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ProjectID, r.Mode, r.Status, r.Stage, r.Error, r.EngineState, r.LastNewAssetAt, r.StartedAt, r.CompletedAt, r.CreatedAt)
 	return err
 }
 
@@ -532,21 +532,24 @@ func (q *Queries) UpdatePipelineRunCompleted(id string, completedAt time.Time) e
 }
 
 func (q *Queries) GetPipelineRun(id string) (*models.PipelineRun, error) {
-	row := q.db.QueryRow(`SELECT id, project_id, mode, status, stage, error, started_at, completed_at, created_at FROM pipeline_runs WHERE id = ?`, id)
+	row := q.db.QueryRow(`SELECT id, project_id, mode, status, stage, error, engine_state, last_new_asset_at, started_at, completed_at, created_at FROM pipeline_runs WHERE id = ?`, id)
 	r := &models.PipelineRun{}
-	var completedAt sql.NullTime
-	err := row.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt)
+	var completedAt, lastNewAssetAt sql.NullTime
+	err := row.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.EngineState, &lastNewAssetAt, &r.StartedAt, &completedAt, &r.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if completedAt.Valid {
 		r.CompletedAt = &completedAt.Time
 	}
+	if lastNewAssetAt.Valid {
+		r.LastNewAssetAt = &lastNewAssetAt.Time
+	}
 	return r, err
 }
 
 func (q *Queries) ListPipelineRunsByProject(projectID string) ([]*models.PipelineRun, error) {
-	rows, err := q.db.Query(`SELECT id, project_id, mode, status, stage, error, started_at, completed_at, created_at FROM pipeline_runs WHERE project_id = ? ORDER BY created_at DESC`, projectID)
+	rows, err := q.db.Query(`SELECT id, project_id, mode, status, stage, error, engine_state, last_new_asset_at, started_at, completed_at, created_at FROM pipeline_runs WHERE project_id = ? ORDER BY created_at DESC`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -554,12 +557,15 @@ func (q *Queries) ListPipelineRunsByProject(projectID string) ([]*models.Pipelin
 	var list []*models.PipelineRun
 	for rows.Next() {
 		r := &models.PipelineRun{}
-		var completedAt sql.NullTime
-		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
+		var completedAt, lastNewAssetAt sql.NullTime
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.EngineState, &lastNewAssetAt, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		if completedAt.Valid {
 			r.CompletedAt = &completedAt.Time
+		}
+		if lastNewAssetAt.Valid {
+			r.LastNewAssetAt = &lastNewAssetAt.Time
 		}
 		list = append(list, r)
 	}
@@ -574,7 +580,7 @@ func (q *Queries) CountPipelineRunsByProject(projectID string) (int, error) {
 
 func (q *Queries) ListPipelineRunsByProjectPaginated(projectID string, limit, offset int) ([]*models.PipelineRun, error) {
 	rows, err := q.db.Query(
-		`SELECT id, project_id, mode, status, stage, error, started_at, completed_at, created_at
+		`SELECT id, project_id, mode, status, stage, error, engine_state, last_new_asset_at, started_at, completed_at, created_at
 		 FROM pipeline_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		projectID, limit, offset,
 	)
@@ -585,12 +591,15 @@ func (q *Queries) ListPipelineRunsByProjectPaginated(projectID string, limit, of
 	var list []*models.PipelineRun
 	for rows.Next() {
 		r := &models.PipelineRun{}
-		var completedAt sql.NullTime
-		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
+		var completedAt, lastNewAssetAt sql.NullTime
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.EngineState, &lastNewAssetAt, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		if completedAt.Valid {
 			r.CompletedAt = &completedAt.Time
+		}
+		if lastNewAssetAt.Valid {
+			r.LastNewAssetAt = &lastNewAssetAt.Time
 		}
 		list = append(list, r)
 	}
@@ -601,9 +610,9 @@ func (q *Queries) ListPipelineRunsByProjectPaginated(projectID string, limit, of
 
 func (q *Queries) CreatePipelineRunStage(s *models.PipelineRunStage) error {
 	_, err := q.db.Exec(`
-		INSERT INTO pipeline_run_stages (id, run_id, stage, status, error, started_at, completed_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		s.ID, s.RunID, s.Stage, s.Status, s.Error, s.StartedAt, s.CompletedAt, s.CreatedAt)
+		INSERT INTO pipeline_run_stages (id, run_id, stage, status, error, work_total, work_done, work_running, round, started_at, completed_at, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.ID, s.RunID, s.Stage, s.Status, s.Error, s.WorkTotal, s.WorkDone, s.WorkRunning, s.Round, s.StartedAt, s.CompletedAt, s.CreatedAt)
 	return err
 }
 
@@ -616,11 +625,11 @@ func (q *Queries) UpdatePipelineRunStageRecord(id string, status models.Pipeline
 
 func (q *Queries) GetPipelineRunStage(runID, stage string) (*models.PipelineRunStage, error) {
 	row := q.db.QueryRow(`
-		SELECT id, run_id, stage, status, error, started_at, completed_at, created_at
+		SELECT id, run_id, stage, status, error, work_total, work_done, work_running, round, started_at, completed_at, created_at
 		FROM pipeline_run_stages WHERE run_id = ? AND stage = ?`, runID, stage)
 	s := &models.PipelineRunStage{}
 	var startedAt, completedAt sql.NullTime
-	err := row.Scan(&s.ID, &s.RunID, &s.Stage, &s.Status, &s.Error, &startedAt, &completedAt, &s.CreatedAt)
+	err := row.Scan(&s.ID, &s.RunID, &s.Stage, &s.Status, &s.Error, &s.WorkTotal, &s.WorkDone, &s.WorkRunning, &s.Round, &startedAt, &completedAt, &s.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -635,7 +644,7 @@ func (q *Queries) GetPipelineRunStage(runID, stage string) (*models.PipelineRunS
 
 func (q *Queries) ListPipelineRunStages(runID string) ([]*models.PipelineRunStage, error) {
 	rows, err := q.db.Query(`
-		SELECT id, run_id, stage, status, error, started_at, completed_at, created_at
+		SELECT id, run_id, stage, status, error, work_total, work_done, work_running, round, started_at, completed_at, created_at
 		FROM pipeline_run_stages WHERE run_id = ? ORDER BY created_at ASC`, runID)
 	if err != nil {
 		return nil, err
@@ -645,7 +654,7 @@ func (q *Queries) ListPipelineRunStages(runID string) ([]*models.PipelineRunStag
 	for rows.Next() {
 		s := &models.PipelineRunStage{}
 		var startedAt, completedAt sql.NullTime
-		if err := rows.Scan(&s.ID, &s.RunID, &s.Stage, &s.Status, &s.Error, &startedAt, &completedAt, &s.CreatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.RunID, &s.Stage, &s.Status, &s.Error, &s.WorkTotal, &s.WorkDone, &s.WorkRunning, &s.Round, &startedAt, &completedAt, &s.CreatedAt); err != nil {
 			return nil, err
 		}
 		if startedAt.Valid {
