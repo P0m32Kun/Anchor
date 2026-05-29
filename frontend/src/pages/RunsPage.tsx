@@ -26,7 +26,7 @@ import {
 } from "../components";
 import { useToast } from "../components/Toast";
 import { getApiBase } from "../lib/config";
-import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig } from "../lib/api";
+import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig, ScanRunMetrics } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
 import {
   Play,
@@ -72,6 +72,7 @@ export default function RunsPage() {
   const [tasksLoading, setTasksLoading] = useState(false);
   const [stages, setStages] = useState<PipelineRunStage[]>([]);
   const [stagesLoading, setStagesLoading] = useState(false);
+  const [metrics, setMetrics] = useState<ScanRunMetrics | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -140,14 +141,18 @@ export default function RunsPage() {
     setTasksLoading(true);
     setStagesLoading(true);
     try {
-      const [taskData, stageData] = await Promise.all([
+      const [taskData, stageData, metricsData] = await Promise.all([
         api.getRunTasks(runId, signal).catch(() => [] as ScanTask[]),
         projectId
           ? api.listPipelineRunStages(projectId, runId, signal).catch(() => ({ stages: [] as PipelineRunStage[] }))
           : Promise.resolve({ stages: [] as PipelineRunStage[] }),
+        projectId
+          ? api.getScanRunMetrics(projectId, runId, signal).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setTasks(taskData ?? []);
       setStages(stageData.stages ?? []);
+      setMetrics(metricsData);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "加载任务详情失败";
@@ -161,14 +166,18 @@ export default function RunsPage() {
   const refreshRunDetails = useCallback(
     async (runId: string, signal?: AbortSignal) => {
       try {
-        const [taskData, stageData] = await Promise.all([
+        const [taskData, stageData, metricsData] = await Promise.all([
           api.getRunTasks(runId, signal).catch(() => null),
           projectId
             ? api.listPipelineRunStages(projectId, runId, signal).catch(() => null)
             : Promise.resolve(null),
+          projectId
+            ? api.getScanRunMetrics(projectId, runId, signal).catch(() => null)
+            : Promise.resolve(null),
         ]);
         if (taskData) setTasks(taskData);
         if (stageData) setStages(stageData.stages ?? []);
+        if (metricsData) setMetrics(metricsData);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
       }
@@ -596,6 +605,49 @@ export default function RunsPage() {
                 </div>
             ) : (
                 <div className="space-y-6">
+                    {/* Metrics Summary */}
+                    {metrics && (
+                        <Card className="overflow-hidden">
+                            <CardHeader className="bg-muted/30 pb-3">
+                                <CardTitle className="text-sm">扫描引擎状态</CardTitle>
+                                <CardDescription className="text-xs">Scan Engine Metrics</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-4">
+                                <div className="grid grid-cols-2 gap-3 text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">引擎状态:</span>
+                                        <span className={cn(
+                                            "font-medium",
+                                            metrics.engine_state === "running" ? "text-primary" :
+                                            metrics.engine_state === "wind_down" ? "text-warning" :
+                                            "text-muted-foreground"
+                                        )}>{metrics.engine_state}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">发现资产:</span>
+                                        <span className="font-medium">{metrics.assets_discovered}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">待处理:</span>
+                                        <span className="font-medium text-warning">{metrics.works_pending}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">已完成:</span>
+                                        <span className="font-medium text-brand-success">{metrics.works_done}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">执行中:</span>
+                                        <span className="font-medium text-primary">{metrics.works_running}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">已跳过:</span>
+                                        <span className="font-medium text-muted-foreground">{metrics.works_skipped}</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     <Card className="overflow-hidden">
                         <CardHeader className="bg-muted/30 pb-3">
                             <CardTitle className="text-sm">阶段进度报告</CardTitle>
@@ -653,6 +705,11 @@ export default function RunsPage() {
                                                         'text-muted-foreground'
                                                     )}>
                                                         {s.status.toUpperCase()}
+                                                        {s.work_total != null && s.work_total > 0 && (
+                                                            <span className="ml-2 text-muted-foreground">
+                                                                ({s.work_done ?? 0}/{s.work_total})
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     {s.error && (
                                                         <p className="text-[10px] mt-1 font-mono text-destructive/90 whitespace-pre-wrap break-all">

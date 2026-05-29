@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/P0m32Kun/Anchor/internal/asset"
 	"github.com/P0m32Kun/Anchor/internal/builtin"
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/dictionary"
@@ -54,6 +55,10 @@ type Server struct {
 	// worker: 本地 worker.Runner(注意区别于 worker 包内的 RemoteAgent)。
 	// 消费者: pipeline / run / slow_scan / task / workflow
 	worker *worker.Runner
+
+	// assetMerger: 资产合并器,用于 scanengine 的资产去重。
+	// 消费者: pipeline_handlers.go (scanengine)
+	assetMerger *asset.Merger
 
 	// health: 工具可用性探测器。
 	// 消费者: handlers.go(/health/tools, /health/check)
@@ -132,6 +137,7 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 		rawDB:       rawDB,
 		scopeEng:    scopeEng,
 		worker:      worker.NewRunner(queries, scopeEng, dataDir),
+		assetMerger: asset.NewMerger(queries),
 		health:      health.NewChecker(queries),
 		dataDir:     dataDir,
 		sseClients:      make(map[string]map[string]chan []byte),

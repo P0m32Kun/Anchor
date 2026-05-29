@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/errors"
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/scanengine"
+	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
 	"github.com/P0m32Kun/Anchor/internal/util"
 	"github.com/P0m32Kun/Anchor/internal/toolregistry"
 	"github.com/P0m32Kun/Anchor/internal/workflow"
@@ -371,6 +374,9 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 	s.pipelineCancels[runID] = cancel
 	s.mu.Unlock()
 
+	// Feature flag: ANCHOR_SCAN_ENGINE=1 enables the new asset-driven engine.
+	useScanEngine := os.Getenv("ANCHOR_SCAN_ENGINE") == "1"
+
 	go func() {
 		defer func() {
 			s.mu.Lock()
@@ -379,28 +385,52 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 			cancel()
 		}()
 
-		pipeline := workflow.NewPipeline(s.queries, s.worker, s.scopeEng, s.dataDir).
-			WithConfig(cfg).
-			WithRunID(runID).
-			WithTools(toolregistry.DefaultRegistry()).
-			WithStageCallback(func(rid string, stage workflow.StageID, status, errMsg string) {
-				s.broadcastProjectSSE(projectID, map[string]interface{}{
-					"event":   "pipeline_stage_change",
-					"run_id":  rid,
-					"stage":   string(stage),
-					"status":  status,
-					"error":   errMsg,
-					"time":    time.Now().UTC().Format(time.RFC3339),
-				})
+		stageCallback := func(rid string, stage string, status string, errMsg string) {
+			s.broadcastProjectSSE(projectID, map[string]interface{}{
+				"event":   "pipeline_stage_change",
+				"run_id":  rid,
+				"stage":   stage,
+				"status":  status,
+				"error":   errMsg,
+				"time":    time.Now().UTC().Format(time.RFC3339),
 			})
+		}
 
-		// Pipeline.Run() owns pipeline_runs.status / error / completed_at —
-		// it writes the final state internally (failed if any main-flow stage
-		// failed, completed otherwise). The handler only needs to log if Run
-		// returned an error and emit the SSE completion event so the UI
-		// reloads run details.
-		if err := pipeline.Run(ctx, projectID); err != nil {
-			log.Printf("scan run %s for project %s: %v", runID, projectID, err)
+		if useScanEngine {
+			// New asset-driven scan engine
+			profile := core.DefaultInternalProfile()
+			if req.Mode == "external" {
+				profile = core.DefaultExternalProfile()
+			}
+			engineCfg := scanengine.DefaultEngineConfig()
+			engine := scanengine.New(
+				s.queries, s.worker, toolregistry.DefaultRegistry(),
+				s.assetMerger, profile, s.dataDir, runID, projectID, engineCfg,
+				func(rid, stage, status, errMsg string) {
+					stageCallback(rid, stage, status, errMsg)
+				},
+			)
+			// Get targets for seeding
+			targets, _ := s.queries.ListTargetsByProject(projectID)
+			var targetVals []string
+			for _, t := range targets {
+				targetVals = append(targetVals, t.Value)
+			}
+			if err := engine.Run(ctx, targetVals); err != nil {
+				log.Printf("scan engine run %s for project %s: %v", runID, projectID, err)
+			}
+		} else {
+			// Legacy pipeline
+			pipeline := workflow.NewPipeline(s.queries, s.worker, s.scopeEng, s.dataDir).
+				WithConfig(cfg).
+				WithRunID(runID).
+				WithTools(toolregistry.DefaultRegistry()).
+				WithStageCallback(func(rid string, stage workflow.StageID, status, errMsg string) {
+					stageCallback(rid, string(stage), status, errMsg)
+				})
+			if err := pipeline.Run(ctx, projectID); err != nil {
+				log.Printf("scan run %s for project %s: %v", runID, projectID, err)
+			}
 		}
 
 		s.broadcastProjectSSE(projectID, map[string]interface{}{
