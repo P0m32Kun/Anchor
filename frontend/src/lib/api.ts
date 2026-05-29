@@ -541,6 +541,10 @@ export const api = {
   listPipelineRunStages: (projectId: string, runId: string, signal?: AbortSignal) =>
     fetchAPI<{ stages: PipelineRunStage[] }>(`/projects/${projectId}/pipeline/runs/${runId}/stages`, { signal }),
 
+  // --- Scan Run Metrics ---
+  getScanRunMetrics: (projectId: string, runId: string, signal?: AbortSignal) =>
+    fetchAPI<ScanRunMetrics>(`/projects/${projectId}/pipeline/runs/${runId}/metrics`, { signal }),
+
   // --- Unified Scan ---
   createScan: (projectId: string, data: { mode: string; config: PipelineConfig }, signal?: AbortSignal) =>
     fetchAPI<{ run_id: string; status: string; mode: string }>(`/projects/${projectId}/scan`, { method: "POST", body: JSON.stringify(data), signal }),
@@ -734,9 +738,38 @@ export interface PipelineRunStage {
   stage: string;
   status: string;
   error?: string;
+  work_total?: number;
+  work_done?: number;
+  work_running?: number;
+  round?: number;
   started_at?: string;
   completed_at?: string;
   created_at: string;
+}
+
+export interface ScanRunMetrics {
+  engine_state: "running" | "wind_down" | "stopped";
+  assets_discovered: number;
+  works_pending: number;
+  works_done: number;
+  works_skipped: number;
+  works_running: number;
+  works_failed: number;
+  queue_depth: { high: number; medium: number; low: number };
+  last_new_asset_at?: string;
+}
+
+export interface ScanWorkItem {
+  id: string;
+  run_id: string;
+  asset_id: string;
+  action: string;
+  status: string;
+  skip_reason?: string;
+  stage?: string;
+  started_at?: string;
+  completed_at?: string;
+  task_id?: string;
 }
 
 export interface PipelineRun {
@@ -746,6 +779,8 @@ export interface PipelineRun {
   status: string;
   stage?: string;
   error?: string;
+  engine_state: string;
+  last_new_asset_at?: string;
   started_at: string;
   completed_at?: string;
   created_at: string;

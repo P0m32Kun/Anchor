@@ -2,15 +2,18 @@
 status: in_review
 source_of_truth: false
 owner: kun
-last_updated: 2026-05-25
+last_updated: 2026-05-29
 scope: external-scan-pipeline
 verification: pending_implementation
 supersedes: informal chat design 2026-05-25
+execution_model_superseded_by: docs/superpowers/specs/2026-05-29-asset-driven-scan-engine-design.md
 ---
 
 # 外网扫描管线设计（细化版）
 
-> **状态**：In Review — 非当前架构基线。实现前以本文为准；落地后同步 `docs/current/architecture.md` 与 `docs/current/plan.md`。
+> **状态**：In Review — **阶段定义与外网 preset 仍有效**；**执行模型**（`runDomainFlow` 顺序编排）已由 `docs/superpowers/specs/2026-05-29-asset-driven-scan-engine-design.md` 取代，外网 P1–P5 改为 `ScanProfile.external` 规则集。
+>
+> 实现扫描引擎时以 2026-05-29 spec 为准；本文 §4 阶段表、§6 配置默认值仍作为 Profile 与 UI 标签来源。
 >
 > **读者**：实现 Agent、Review、E2E 编写者。
 
