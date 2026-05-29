@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-18
+last_updated: 2026-05-29
 scope: repository-wide
 ---
 
@@ -27,6 +27,7 @@ This is the only repository-wide implementation plan that agents should treat as
 | Slimdown 2026 | Active | Yes | Repository-wide slimdown audit in [`slimdown-2026-handoff-for-implementer.md`](../active/review/slimdown-2026-handoff-for-implementer.md); T0-T6 reports at `docs/active/review/slimdown-*.md` |
 | v0.4 scan pipeline | Accepted | Yes | Verified by `docs/active/review/v0.4-acceptance.md`; design doc archived at `docs/archived/v0.4/scan-pipeline.md` (superseded 2026-05-12, see `architecture.md` for current baseline) |
 | Database migration notes for v0.4 | Accepted | Yes | Tied to v0.4; superseded plans now archived |
+| Asset-driven scan engine | Active | Yes | `internal/scanengine/` — 资产图 + Work + 属性门控 + 收敛状态机；`ANCHOR_SCAN_ENGINE=1` 启用；设计稿 `docs/superpowers/specs/2026-05-29-asset-driven-scan-engine-design.md` |
 | Large-scale refactoring | Backlog | No | See [`../refactoring-plan.md`](../refactoring-plan.md) as an idea pool, not an approved release plan |
 | Design v2.1 selective ingestion | Active | Yes | PR1-3 merged to main (batch buffer, governor, allowlist); PR4 (asset_relations) remains backlog |
 

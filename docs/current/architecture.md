@@ -233,6 +233,62 @@ Sections 按 severity 倒序排列；同级 severity 时命中词条排在未命
 
 `Allowlist.Allow(name)` 支持运行时扩展（测试和自定义工具注册）。新增工具时强制走注册流程：先 `Allow()` 再执行。
 
+## 资产驱动扫描引擎（ScanEngine）
+
+**状态**：已实现，通过 `ANCHOR_SCAN_ENGINE=1` 环境变量启用。
+
+### 核心概念
+
+扫描执行从阶段流水线迁移为 **资产图 + Work(资产×动作) + 属性门控 + 收敛状态机**。
+
+| 概念 | 说明 |
+|------|------|
+| DiscoveryAsset | 发现层 DTO，含 Type/Value/Depth/Attrs |
+| Work (ScanWorkItem) | 调度真相：`(run_id, asset_id, action)` 唯一 |
+| ActionRule | 动作启用条件：Enabled + MaxDepth + Precondition |
+| EngineState | run 级状态：`running` → `wind_down` → `stopped` |
+
+### 包结构
+
+```
+internal/scanengine/
+  core/           DiscoveryAsset, TaskAction, AssetAttrs, DeriveEligibleWorks
+  work/           Store (TryClaim/MarkDone/AllTerminal)
+  queue/          PriorityQueue (high/medium/low)
+  dedup/          RunDedup (run-level normalized value dedup)
+  executor/       ToolExecutor + httpx/nuclei/katana/ffuf parsers
+  stageagg/       Aggregator (Work → Stage projection)
+  engine.go       ScanEngine main loop
+```
+
+### 深度控制
+
+- `MaxDiscoveryDepth = 2`（全局默认）
+- katana/ffuf `MaxDepth = 1`（仅 depth ≤ 1 执行）
+- 子域枚举 `MaxDepth = 1`
+
+### 收敛规则
+
+| 条件 | 行为 |
+|------|------|
+| `time.Since(lastNewAsset) > idleTimeout` | → `wind_down` |
+| `wind_down` + 队列空 + 全 Work 终态 | → `stopped` |
+| wind_down 期间 | 仅允许 Nuclei、httpx |
+
+### 双轨可观测性
+
+- **真相**：`scan_work_items` + `scan_tasks` + run metrics
+- **投影**：`pipeline_run_stages` + `pipeline_stage_change` SSE
+- Stage 无严格先后顺序；同一 stage 可多轮 `running`
+
+### API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/projects/{id}/pipeline/runs/{runId}/metrics` | 引擎状态 + Work 计数 |
+| GET | `/projects/{id}/pipeline/runs/{runId}/works` | Work 列表 |
+| GET | `/assets/{id}/works?run_id=` | 单资产 Work 时间线 |
+
 ## What Is Not Baseline Yet
 
 - `docs/refactoring-plan.md` is a backlog/refactor inventory, not the current product architecture.
