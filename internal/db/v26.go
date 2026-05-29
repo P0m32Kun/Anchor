@@ -27,7 +27,7 @@ func migrateV26(db *sql.DB) error {
 
 		// --- pipeline_runs extensions ---
 		`ALTER TABLE pipeline_runs ADD COLUMN engine_state TEXT NOT NULL DEFAULT 'running'`,
-		`ALTER TABLE pipeline_runs ADD COLUMN last_new_asset_at TEXT`,
+		`ALTER TABLE pipeline_runs ADD COLUMN last_new_asset_at DATETIME`,
 
 		// --- pipeline_run_stages extensions ---
 		`ALTER TABLE pipeline_run_stages ADD COLUMN work_total INTEGER`,
