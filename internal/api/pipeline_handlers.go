@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/errors"
+	"github.com/P0m32Kun/Anchor/internal/evaluator"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/scanengine"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
@@ -419,6 +420,16 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 			if err := engine.Run(ctx, targetVals); err != nil {
 				log.Printf("scan engine run %s for project %s: %v", runID, projectID, err)
 			}
+			// Trigger evaluation asynchronously
+			go func() {
+				eval := evaluator.NewEvaluator(s.queries, s.dataDir, projectID, runID)
+				_, evalErr := eval.Evaluate(context.Background())
+				if evalErr != nil {
+					log.Printf("[evaluation] failed for run %s: %v", runID, evalErr)
+				} else {
+					log.Printf("[evaluation] report generated for run %s", runID)
+				}
+			}()
 		} else {
 			// Legacy pipeline
 			pipeline := workflow.NewPipeline(s.queries, s.worker, s.scopeEng, s.dataDir).

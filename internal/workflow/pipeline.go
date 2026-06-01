@@ -16,6 +16,7 @@ import (
 
 	"github.com/P0m32Kun/Anchor/internal/asset"
 	"github.com/P0m32Kun/Anchor/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/evaluator"
 	"github.com/P0m32Kun/Anchor/internal/fingerprint"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/nuclei"
@@ -277,6 +278,17 @@ func (p *Pipeline) Run(ctx context.Context, projectID string) error {
 		} else {
 			p.queries.UpdatePipelineRunCompleted(p.runID, now)
 		}
+
+		// Trigger evaluation asynchronously
+		go func() {
+			eval := evaluator.NewEvaluator(p.queries, p.dataDir, p.projectID, p.runID)
+			_, err := eval.Evaluate(context.Background())
+			if err != nil {
+				log.Printf("[evaluation] failed for run %s: %v", p.runID, err)
+			} else {
+				log.Printf("[evaluation] report generated for run %s", p.runID)
+			}
+		}()
 	}
 
 	return flowErr
