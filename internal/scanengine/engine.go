@@ -410,6 +410,25 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 		if len(findings) > 0 {
 			log.Printf("[scanengine] nuclei found %d templates", len(findings))
 		}
+
+	case core.ActionSpoorScan:
+		endpoints, secrets, err := executor.ParseSpoorOutput(stdout, e.runID, e.projectID)
+		if err != nil {
+			log.Printf("[scanengine] parse spoor: %v", err)
+			return
+		}
+		// 回注 endpoint 为新资产
+		for _, a := range endpoints {
+			a.ParentID = w.AssetID
+			e.processNewAsset(ctx, a)
+		}
+		// 创建 secret findings
+		for _, f := range secrets {
+			f.AssetID = &w.AssetID
+			if err := e.queries.CreateFinding(f); err != nil {
+				log.Printf("[scanengine] create spoor finding %s: %v", f.Title, err)
+			}
+		}
 	}
 }
 
@@ -442,6 +461,11 @@ func (e *ScanEngine) buildParams(ctx context.Context, w *models.ScanWorkItem) (t
 	case core.ActionFFUFBrute:
 		return toolregistry.RenderParams{
 			"url": w.AssetID,
+		}, nil, nil
+
+	case core.ActionSpoorScan:
+		return toolregistry.RenderParams{
+			"target": w.AssetID,
 		}, nil, nil
 
 	default:

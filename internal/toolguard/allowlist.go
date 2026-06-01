@@ -33,6 +33,7 @@ func NewAllowlist() *Allowlist {
 			"ffuf":       {},
 			"gau":        {},
 			"katana":     {},
+			"spoor":      {},
 			"git":        {},
 			"git.exe":    {},
 			"sh":         {},

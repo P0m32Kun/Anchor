@@ -37,6 +37,7 @@ func (p *internalProfile) Rules() []ActionRule {
 		{Action: ActionServiceFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPPort},
 		{Action: ActionHTTPXFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isWebEntry},
 		{Action: ActionKatanaCrawl, Enabled: true, MaxDepth: 1, Precondition: isHTTPServiceOrPath},
+		{Action: ActionSpoorScan, Enabled: true, MaxDepth: 1, Precondition: isHTTPServiceOrPath},
 		{Action: ActionFFUFBrute, Enabled: true, MaxDepth: 1, Precondition: isHTTPService},
 		{Action: ActionNucleiScan, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isHTTPAndFingerprinted},
 	}

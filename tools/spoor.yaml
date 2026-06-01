@@ -1,0 +1,13 @@
+id: spoor
+binary: spoor
+description: JavaScript static analysis for paths, endpoints, and secrets
+output:
+  format: jsonl
+parameters:
+  target:
+    type: string
+    required: true
+    flag: ""  # positional argument
+literals:
+  - ["scan"]
+  - ["--jsonl"]

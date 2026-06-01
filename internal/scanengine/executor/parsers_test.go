@@ -143,3 +143,106 @@ func TestParseKatanaOutput_Empty(t *testing.T) {
 		t.Fatalf("expected 0, got %d", len(assets))
 	}
 }
+
+func TestParseSpoorOutput_Endpoint(t *testing.T) {
+	stdout := []byte(`{"file":"http://target.com/app.js","kind":"endpoint","value":"https://target.com/api/users","confidence":"high","method":"GET","origin":{"pattern":"fetch","snippet":"fetch(\"/api/users\")","line":9,"column":3}}
+{"file":"http://target.com/app.js","kind":"endpoint","value":"https://target.com/api/admin","confidence":"medium","origin":{"pattern":"xhr.open","snippet":"xhr.open(\"GET\",\"/api/admin\")","line":15,"column":3}}`)
+	endpoints, findings, err := ParseSpoorOutput(stdout, "run1", "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(endpoints) != 2 {
+		t.Fatalf("expected 2 endpoints, got %d", len(endpoints))
+	}
+	if endpoints[0].Value != "https://target.com/api/users" {
+		t.Errorf("endpoint[0].Value = %s", endpoints[0].Value)
+	}
+	if endpoints[0].SourceTool != "spoor" {
+		t.Errorf("endpoint[0].SourceTool = %s", endpoints[0].SourceTool)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("expected 0 findings, got %d", len(findings))
+	}
+}
+
+func TestParseSpoorOutput_Secret(t *testing.T) {
+	stdout := []byte(`{"file":"http://target.com/app.js","kind":"secret","value":"AKIAIOSFODNN7EXAMPLE","confidence":"high","secret_type":"aws_access_key","severity":"critical","origin":{"pattern":"string_literal","snippet":"const key = \"AKIAIOSFODNN7EXAMPLE\"","line":7,"column":15}}`)
+	endpoints, findings, err := ParseSpoorOutput(stdout, "run1", "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(endpoints) != 0 {
+		t.Fatalf("expected 0 endpoints, got %d", len(endpoints))
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+	f := findings[0]
+	if f.SourceTool != "spoor" {
+		t.Errorf("SourceTool = %s", f.SourceTool)
+	}
+	if f.SourceRuleID != "aws_access_key" {
+		t.Errorf("SourceRuleID = %s", f.SourceRuleID)
+	}
+	if f.Severity != "critical" {
+		t.Errorf("Severity = %s", f.Severity)
+	}
+	if f.Confidence != 90 {
+		t.Errorf("Confidence = %d", f.Confidence)
+	}
+	if f.RunID == nil || *f.RunID != "run1" {
+		t.Errorf("RunID = %v", f.RunID)
+	}
+}
+
+func TestParseSpoorOutput_Path(t *testing.T) {
+	stdout := []byte(`{"file":"http://target.com/app.js","kind":"path","value":"/api/admin","confidence":"medium","origin":{"pattern":"string_literal","snippet":"const path = \"/api/admin\"","line":12,"column":5}}`)
+	endpoints, findings, err := ParseSpoorOutput(stdout, "run1", "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(endpoints) != 0 {
+		t.Fatalf("expected 0 endpoints, got %d", len(endpoints))
+	}
+	if len(findings) != 0 {
+		t.Fatalf("expected 0 findings, got %d", len(findings))
+	}
+}
+
+func TestParseSpoorOutput_Mixed(t *testing.T) {
+	stdout := []byte(`{"file":"http://target.com/app.js","kind":"endpoint","value":"https://target.com/api/users","confidence":"high","origin":{"pattern":"fetch","snippet":"fetch(\"/api/users\")","line":9,"column":3}}
+{"file":"http://target.com/app.js","kind":"secret","value":"AKIAIOSFODNN7EXAMPLE","confidence":"high","secret_type":"aws_access_key","severity":"critical","origin":{"pattern":"string_literal","snippet":"...","line":7,"column":15}}
+{"file":"http://target.com/app.js","kind":"path","value":"/api/admin","confidence":"medium","origin":{"pattern":"string_literal","snippet":"...","line":12,"column":5}}`)
+	endpoints, findings, err := ParseSpoorOutput(stdout, "run1", "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(endpoints) != 1 {
+		t.Fatalf("expected 1 endpoint, got %d", len(endpoints))
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+}
+
+func TestParseSpoorOutput_Dedup(t *testing.T) {
+	stdout := []byte(`{"file":"http://target.com/app.js","kind":"endpoint","value":"https://target.com/api/users","confidence":"high","origin":{"pattern":"fetch","snippet":"...","line":9,"column":3}}
+{"file":"http://target.com/app.js","kind":"endpoint","value":"https://target.com/api/users","confidence":"medium","origin":{"pattern":"xhr.open","snippet":"...","line":15,"column":3}}`)
+	endpoints, _, err := ParseSpoorOutput(stdout, "run1", "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(endpoints) != 1 {
+		t.Fatalf("expected 1 (deduped), got %d", len(endpoints))
+	}
+}
+
+func TestParseSpoorOutput_Empty(t *testing.T) {
+	endpoints, findings, err := ParseSpoorOutput([]byte(""), "run1", "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(endpoints) != 0 || len(findings) != 0 {
+		t.Fatalf("expected 0, got %d endpoints, %d findings", len(endpoints), len(findings))
+	}
+}

@@ -17,6 +17,7 @@ const (
 	ActionKatanaCrawl        TaskAction = "KATANA_CRAWL"
 	ActionFFUFBrute          TaskAction = "FFUF_BRUTE"
 	ActionNucleiScan         TaskAction = "NUCLEI_SCAN"
+	ActionSpoorScan          TaskAction = "SPOOR_SCAN"
 )
 
 // ActionToTool maps a TaskAction to the tool ID in the registry.
@@ -33,6 +34,7 @@ var ActionToTool = map[TaskAction]string{
 	ActionKatanaCrawl:        "katana",
 	ActionFFUFBrute:          "ffuf",
 	ActionNucleiScan:         "nuclei",
+	ActionSpoorScan:          "spoor",
 }
 
 // ActionToStage maps a TaskAction to the stage ID for UI projection.
@@ -49,6 +51,7 @@ var ActionToStage = map[TaskAction]string{
 	ActionKatanaCrawl:        "crawl",
 	ActionFFUFBrute:          "ffuf",
 	ActionNucleiScan:         "vuln",
+	ActionSpoorScan:          "crawl",
 }
 
 // DerivedWork represents a work item to be enqueued.
