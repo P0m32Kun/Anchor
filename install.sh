@@ -22,6 +22,7 @@ PORT="17421"
 TOKEN=""
 CORE_URL=""
 COMPOSE_CMD=""
+ACTION=""  # install | open | build | restart
 
 check_docker() {
   info "⚓ Anchor 安装向导"
@@ -55,21 +56,116 @@ check_docker() {
   fi
 }
 
+check_desktop_deps() {
+  local missing=()
+
+  if ! command -v node &>/dev/null; then
+    missing+=("Node.js")
+  fi
+
+  if ! command -v cargo &>/dev/null; then
+    missing+=("Rust")
+  fi
+
+  if [ ${#missing[@]} -gt 0 ]; then
+    err "构建桌面应用缺少依赖: ${missing[*]}"
+    echo "  安装指南:"
+    [[ " ${missing[*]} " =~ "Node.js" ]] && echo "    Node.js: https://nodejs.org/"
+    [[ " ${missing[*]} " =~ "Rust" ]] && echo "    Rust: https://rustup.rs/"
+    return 1
+  fi
+
+  ok "桌面构建依赖已就绪 (Node $(node --version), Rust $(rustc --version | awk '{print $2}'))"
+  return 0
+}
+
+build_desktop_app() {
+  info "正在构建桌面应用（首次约需 5-10 分钟）..."
+
+  cd "$SCRIPT_DIR/frontend"
+  npm install
+  cd "$SCRIPT_DIR"
+
+  make tauri-build
+
+  ok "桌面应用构建完成"
+}
+
+get_compose_file() {
+  source "$SCRIPT_DIR/.env" 2>/dev/null || true
+  case "${ANCHOR_MODE:-server_worker}" in
+    server) echo "docker-compose.server.yml" ;;
+    worker) echo "docker-compose.worker.yml" ;;
+    *)      echo "docker-compose.yml" ;;
+  esac
+}
+
+restart_services() {
+  local compose_file
+  compose_file=$(get_compose_file)
+
+  if [ ! -f "$SCRIPT_DIR/$compose_file" ]; then
+    err "未找到 ${compose_file}，请先运行安装"
+    exit 1
+  fi
+
+  # 检查容器是否在运行
+  if ! docker ps --filter "name=anchor" --filter "status=running" | grep -q anchor 2>/dev/null; then
+    warn "没有运行中的 Anchor 容器"
+    read -rp "是否启动服务？ [Y/n]: " start_choice
+    if [[ ! "$start_choice" =~ ^[Nn]$ ]]; then
+      source "$SCRIPT_DIR/.env" 2>/dev/null || true
+      export ANCHOR_API_TOKEN="${ANCHOR_API_TOKEN:-}"
+      export ANCHOR_PORT="${ANCHOR_PORT:-17421}"
+      $COMPOSE_CMD -f "$compose_file" up -d
+    else
+      return 0
+    fi
+  else
+    info "正在重启服务..."
+    $COMPOSE_CMD -f "$compose_file" restart
+  fi
+
+  # 等待就绪
+  local port="${ANCHOR_PORT:-17421}"
+  info "等待服务就绪..."
+  local max_wait=60
+  local elapsed=0
+  while [ $elapsed -lt $max_wait ]; do
+    if curl -sf "http://localhost:${port}/health" &>/dev/null; then
+      ok "服务已就绪"
+      return 0
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+    printf "."
+  done
+  echo ""
+  warn "健康检查超时，请手动检查: make logs"
+}
+
 select_mode() {
   echo ""
-  echo "请选择部署模式:"
+  echo "请选择操作:"
   echo "  1) Server Only    — 仅 API 服务（适合 VPS 部署）"
   echo "  2) Worker Only    — 连接远程 Server 的扫描节点"
   echo "  3) Server+Worker  — 完整功能（本地开发/测试）"
+  echo "  ─────────────────"
+  echo "  4) 打开桌面应用   — 启动 Anchor 桌面端"
+  echo "  5) 构建桌面应用   — 重新编译 UI（更新后需要）"
+  echo "  6) 重启服务       — 重启已运行的容器"
   echo ""
 
   while true; do
-    read -rp "请输入选项 [1-3]: " choice
+    read -rp "请输入选项 [1-6]: " choice
     case $choice in
-      1) MODE="server"; break ;;
-      2) MODE="worker"; break ;;
-      3) MODE="server_worker"; break ;;
-      *) warn "无效选项，请输入 1、2 或 3" ;;
+      1) ACTION="install"; MODE="server"; break ;;
+      2) ACTION="install"; MODE="worker"; break ;;
+      3) ACTION="install"; MODE="server_worker"; break ;;
+      4) ACTION="open"; break ;;
+      5) ACTION="build"; break ;;
+      6) ACTION="restart"; break ;;
+      *) warn "无效选项，请输入 1-6" ;;
     esac
   done
 }
@@ -274,33 +370,63 @@ detect_desktop() {
   return 1
 }
 
+open_desktop_app() {
+  if ! detect_desktop; then
+    echo ""
+    info "未检测到桌面环境。"
+    echo "  请在本地桌面电脑打开 Anchor App，连接到此 Server:"
+    echo "  地址: http://<this-server-ip>:${PORT:-17421}"
+    echo "  Token: ${TOKEN:-<your-token>}"
+    return 0
+  fi
+
+  # 准备自动连接配置
+  if [ -n "${PORT:-}" ] && [ -n "${TOKEN:-}" ]; then
+    local auto_connect_file="/tmp/anchor-auto-connect.json"
+    cat > "$auto_connect_file" <<EOF
+{"api_base":"http://localhost:${PORT}","api_token":"${TOKEN}"}
+EOF
+  fi
+
+  local app_opened=false
+
+  if [ "$(uname)" = "Darwin" ]; then
+    if [ -d "$SCRIPT_DIR/src-tauri/target/release/bundle/macos/Anchor.app" ]; then
+      open "$SCRIPT_DIR/src-tauri/target/release/bundle/macos/Anchor.app"
+      app_opened=true
+    elif [ -d "/Applications/Anchor.app" ]; then
+      open /Applications/Anchor.app
+      app_opened=true
+    fi
+  else
+    if [ -x "$SCRIPT_DIR/src-tauri/target/release/anchor" ]; then
+      "$SCRIPT_DIR/src-tauri/target/release/anchor" &
+      app_opened=true
+    fi
+  fi
+
+  if [ "$app_opened" = false ]; then
+    warn "未找到桌面应用"
+    echo ""
+    read -rp "是否现在构建桌面应用？ [Y/n]: " build_choice
+    if [[ ! "$build_choice" =~ ^[Nn]$ ]]; then
+      if check_desktop_deps; then
+        build_desktop_app
+        # 重新尝试打开
+        open_desktop_app
+      fi
+    else
+      echo "  请手动访问: http://localhost:${PORT:-17421}"
+    fi
+  fi
+}
+
 maybe_open_app() {
   if detect_desktop; then
     echo ""
     read -rp "检测到桌面环境，是否打开 Anchor 桌面应用？ [Y/n]: " open_choice
     if [[ ! "$open_choice" =~ ^[Nn]$ ]]; then
-      local auto_connect_file="/tmp/anchor-auto-connect.json"
-      cat > "$auto_connect_file" <<EOF
-{"api_base":"http://localhost:${PORT}","api_token":"${TOKEN}"}
-EOF
-
-      if [ "$(uname)" = "Darwin" ]; then
-        if [ -d "$SCRIPT_DIR/src-tauri/target/release/bundle/macos/Anchor.app" ]; then
-          open "$SCRIPT_DIR/src-tauri/target/release/bundle/macos/Anchor.app"
-        elif [ -d "/Applications/Anchor.app" ]; then
-          open /Applications/Anchor.app
-        else
-          warn "未找到桌面应用，请先运行 make tauri-build"
-          echo "  或手动访问: http://localhost:${PORT}"
-        fi
-      else
-        if [ -x "$SCRIPT_DIR/src-tauri/target/release/anchor" ]; then
-          "$SCRIPT_DIR/src-tauri/target/release/anchor" &
-        else
-          warn "未找到桌面应用，请先运行 make tauri-build"
-          echo "  或手动访问: http://localhost:${PORT}"
-        fi
-      fi
+      open_desktop_app
     fi
   else
     echo ""
@@ -312,47 +438,68 @@ EOF
 }
 
 check_existing() {
-  if [ -f "$SCRIPT_DIR/.env" ]; then
-    local existing_mode
-    existing_mode=$(grep "^ANCHOR_MODE=" "$SCRIPT_DIR/.env" 2>/dev/null | cut -d= -f2 || true)
-    if [ -n "$existing_mode" ]; then
-      echo ""
-      warn "检测到已有部署配置（$existing_mode）"
-      read -rp "是否重新配置？ [y/N]: " reconfig
-      if [[ ! "$reconfig" =~ ^[Yy]$ ]]; then
-        info "使用现有配置"
-        source "$SCRIPT_DIR/.env"
-        TOKEN="${ANCHOR_API_TOKEN:-}"
-        PORT="${ANCHOR_PORT:-17421}"
-        MODE="${ANCHOR_MODE:-server_worker}"
-        if docker ps --filter "name=anchor-server" --filter "status=running" | grep -q anchor-server 2>/dev/null || \
-           docker ps --filter "name=anchor-worker" --filter "status=running" | grep -q anchor-worker 2>/dev/null; then
-          ok "容器已在运行"
-          print_result
-          maybe_open_app
-          exit 0
-        else
-          info "容器未运行，正在启动..."
-          start_containers
-          wait_healthy
-          print_result
-          exit 0
-        fi
+  # .env 已由 load_env 加载，这里只做询问
+  local existing_mode
+  existing_mode=$(grep "^ANCHOR_MODE=" "$SCRIPT_DIR/.env" 2>/dev/null | cut -d= -f2 || true)
+  if [ -n "$existing_mode" ]; then
+    echo ""
+    warn "检测到已有部署配置（${existing_mode}）"
+    read -rp "是否重新配置？ [y/N]: " reconfig
+    if [[ ! "$reconfig" =~ ^[Yy]$ ]]; then
+      info "使用现有配置"
+      if docker ps --filter "name=anchor-server" --filter "status=running" | grep -q anchor-server 2>/dev/null || \
+         docker ps --filter "name=anchor-worker" --filter "status=running" | grep -q anchor-worker 2>/dev/null; then
+        ok "容器已在运行"
+        print_result
+        maybe_open_app
+        exit 0
+      else
+        info "容器未运行，正在启动..."
+        start_containers
+        wait_healthy
+        print_result
+        exit 0
       fi
     fi
   fi
 }
 
+load_env() {
+  if [ -f "$SCRIPT_DIR/.env" ]; then
+    source "$SCRIPT_DIR/.env" 2>/dev/null || true
+    TOKEN="${ANCHOR_API_TOKEN:-}"
+    PORT="${ANCHOR_PORT:-17421}"
+    MODE="${ANCHOR_MODE:-server_worker}"
+  fi
+}
+
 main() {
   check_docker
-  check_existing
   select_mode
-  collect_config
-  build_images
-  start_containers
-  wait_healthy
-  print_result
-  maybe_open_app
+  load_env
+
+  case "$ACTION" in
+    open)
+      open_desktop_app
+      ;;
+    build)
+      check_desktop_deps
+      build_desktop_app
+      ;;
+    restart)
+      restart_services
+      maybe_open_app
+      ;;
+    install)
+      check_existing
+      collect_config
+      build_images
+      start_containers
+      wait_healthy
+      print_result
+      maybe_open_app
+      ;;
+  esac
 }
 
 main "$@"
