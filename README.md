@@ -96,24 +96,29 @@ make build    # 构建 Go 后端
 make test     # 运行测试
 ```
 
-## Worker 架构
+## 部署架构
 
-Worker 完全容器化，通过 Docker Compose 编排：
+三个 Docker 镜像通过 docker-compose 编排：
 
 ```
-[客户端] --HTTP--> [Server :17421] <--HTTP 长轮询-- [Worker 容器]
+[浏览器] --HTTP--> [Nginx :80] --/api/--> [Server :17421] <--HTTP 长轮询-- [Worker]
+                           |
+                     [React 静态文件]
 ```
 
+- **Frontend**：Nginx 静态 serve React 构建产物 + `/api/` 反向代理到 Server
 - **Server**：纯管理面，负责 API、任务调度、数据持久化
-- **Worker**：主动注册到 Server，通过长轮询拉取任务，执行安全工具（subfinder/httpx/naabu/nuclei）
+- **Worker**：预装所有安全工具，通过长轮询拉取任务执行
+
+**三种部署模式：**
+
+| 模式 | 适用场景 |
+|------|---------|
+| Server Only | VPS 部署，Worker 远程连接 |
+| Worker Only | 远程扫描节点，连接已有 Server |
+| Server+Worker | 本地开发/测试，完整功能 |
 
 Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
-
-**典型场景：**
-
-- 公网 VPS 部署 Server，家庭 WiFi 笔记本运行 Worker
-- 多云 Worker 统一接入中心 Server
-- 单机开发：`make up-all` 一键启动完整环境
 
 ## 目录结构
 
@@ -166,7 +171,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 │       ├── pipeline_flow.go   # 5 个目标类型 Flow
 │       ├── pipeline_tool.go   # 8 个工具执行器
 │       └── pipeline_result.go # 结果保存
-├── frontend/                   # Tauri + React 前端
+├── frontend/                   # React 前端
 │   ├── src/
 │   │   ├── lib/              # API 客户端 + Zustand store
 │   │   ├── hooks/            # 共享 Hooks（useResource 通用数据加载）
@@ -174,7 +179,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 │   │   ├── pages/            # 页面组件
 │   │   └── App.tsx           # 路由与布局
 │   └── package.json
-├── src-tauri/                  # Tauri 配置
+├── nginx.conf                  # Nginx 反向代理配置（/api/ → server:17421）
 ├── docker-rangefield/          # 靶场环境（用于测试）
 │   ├── docker-compose.yml
 │   └── README.md
@@ -194,7 +199,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 - [x] Scope Check 引擎（域名/URL/IP/CIDR 匹配 + 排除优先 + TOCTOU 防护）
 - [x] Worker subprocess runner（goroutine、workdir 隔离、超时、SIGTERM→SIGKILL、100MB 截断）
 - [x] HTTP API + SSE 实时推送
-- [x] Tauri 前端骨架
+- [x] React 前端骨架
 
 ### M1: 目标与 Scope 增强 ✅
 
@@ -244,7 +249,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 - [x] Dashboard 快捷入口
 - [x] 首次导入自动提示 Scope 确认
 
-### v0.3: 桌面可用性与可靠性 ✅
+### v0.3: 可用性与可靠性 ✅
 
 - [x] 扫描入口统一（TargetPage Subfinder 按钮 → Runs 导航）
 - [x] 路由统一（`/projects/:projectId/*` 嵌套路由）
@@ -290,6 +295,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 | [nmap](https://nmap.org/)                                | 服务指纹识别 (-sV)   | system   |
 | [cdncheck](https://github.com/projectdiscovery/cdncheck)   | CDN/WAF 过滤         | latest   |
 | [Nuclei](https://github.com/projectdiscovery/nuclei)       | 漏洞初筛             | v3.0+    |
+| [Spoor](https://github.com/P0m32Kun/Spoor)                 | JS 静态分析（路径/端点/密钥） | v0.2.0+ |
 | [Nmap](https://nmap.org/)                                  | 深度服务识别（可选） | v7.92+   |
 
 ## 版本
@@ -303,7 +309,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 | `v0.1.0-m4` | 报告导出                         |
 | `v0.2.0-p1` | Docker 容器化 + 远程 Worker 架构 |
 | `v0.2.0-p2` | 项目管理与体验修复               |
-| `v0.3.0`    | 桌面可用性与可靠性               |
+| `v0.3.0`    | 可用性与可靠性                   |
 | `v0.4.0`    | 智能扫描管线 + Nuclei 分层扫描   |
 
 ## 许可
