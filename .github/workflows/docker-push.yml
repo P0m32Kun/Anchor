@@ -1,4 +1,4 @@
-# Release 创建后自动构建 Docker 镜像并推送到阿里云 ACR
+# Release workflow 完成后自动构建 Docker 镜像并推送到阿里云 ACR
 # 需要在 GitHub repo Settings → Secrets 中配置：
 #   ACR_REGISTRY: crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com
 #   ACR_USERNAME: P0m32Kun
@@ -7,8 +7,9 @@
 name: Docker Push
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
 
 env:
   ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
@@ -16,6 +17,7 @@ env:
 
 jobs:
   push:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
