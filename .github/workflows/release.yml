@@ -2,7 +2,9 @@
 # 用法：git tag v0.x.x && git push --tags
 #
 # 产出：anchor-linux-amd64、anchor-linux-arm64 附加到 Release assets
-# Dockerfile 直接从 Release 下载二进制，不再需要 golang 构建镜像
+# Dockerfile 直接从 Release 下载二进制，不需要 golang 构建镜像
+#
+# 注意：arm64 通过交叉编译构建（gcc-aarch64-linux-gnu），不需要 ARM runner
 
 name: Release
 
@@ -16,18 +18,7 @@ permissions:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-latest
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-
-    runs-on: ${{ matrix.runner }}
-    name: build-linux-${{ matrix.arch }}
-
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -35,20 +26,32 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install CGO dependencies
+      - name: Install build dependencies
         run: |
+          sudo dpkg --add-architecture arm64
           sudo apt-get update
+          # amd64 native
           sudo apt-get install -y gcc libsqlite3-dev
+          # arm64 cross-compile
+          sudo apt-get install -y gcc-aarch64-linux-gnu libsqlite3-dev:arm64
 
-      - name: Build binary
+      - name: Build linux-amd64
         run: |
-          CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor-linux-${{ matrix.arch }} .
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+            CC=gcc \
+            go build -ldflags="-w -s" -o anchor-linux-amd64 .
 
-      - name: Upload artifact
+      - name: Build linux-arm64
+        run: |
+          CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
+            CC=aarch64-linux-gnu-gcc \
+            go build -ldflags="-w -s" -o anchor-linux-arm64 .
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: anchor-linux-${{ matrix.arch }}
-          path: anchor-linux-${{ matrix.arch }}
+          name: binaries
+          path: anchor-linux-*
 
   release:
     needs: build
@@ -56,15 +59,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
+          name: binaries
           path: dist
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/anchor-linux-amd64/anchor-linux-amd64
-            dist/anchor-linux-arm64/anchor-linux-arm64
+          files: dist/anchor-linux-*
           generate_release_notes: true
