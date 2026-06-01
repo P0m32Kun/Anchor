@@ -28,7 +28,10 @@ jobs:
 
       - name: Build and push server
         run: |
-          docker build -f Dockerfile.server -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-server:latest .
+          docker build -f Dockerfile.server \
+            --build-arg ACR_REGISTRY=${ACR_REGISTRY} \
+            --build-arg ACR_NAMESPACE=${ACR_NAMESPACE} \
+            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-server:latest .
           docker push ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-server:latest
 
       - name: Build and push worker
