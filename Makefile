@@ -1,4 +1,4 @@
-.PHONY: build clean
+.PHONY: build clean build-server build-worker
 .PHONY: up down up-server down-server up-worker down-worker restart-worker
 .PHONY: logs logs-server logs-worker status shell-server shell-worker
 .PHONY: build-worker-base build-worker-builder-base push-worker-base pull-worker-base setup-worker-base
@@ -204,6 +204,16 @@ range-logs:
 
 test-naabu:
 	docker exec -it anchor-worker naabu -host 172.30.0.10 -p 80
+
+# ============================================================
+#  Runtime Image Build (install.sh 使用)
+# ============================================================
+
+build-server:
+	docker build -f Dockerfile.server -t anchor-server:latest .
+
+build-worker:
+	docker build -f Dockerfile.worker -t anchor-worker:latest .
 
 # ============================================================
 #  Local Build (仅编译二进制，不启动服务)
