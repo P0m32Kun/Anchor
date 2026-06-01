@@ -36,7 +36,10 @@ jobs:
 
       - name: Build and push worker
         run: |
-          docker build -f Dockerfile.worker -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-worker:latest .
+          docker build -f Dockerfile.worker \
+            --build-arg ACR_REGISTRY=${ACR_REGISTRY} \
+            --build-arg ACR_NAMESPACE=${ACR_NAMESPACE} \
+            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-worker:latest .
           docker push ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-worker:latest
 
       - name: Build and push frontend

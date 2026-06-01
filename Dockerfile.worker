@@ -8,7 +8,9 @@
 # 多平台构建：
 #   docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.worker -t anchor-worker .
 
-FROM anchor-worker-base:latest
+ARG ACR_REGISTRY=crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com
+ARG ACR_NAMESPACE=p0m32kun
+FROM ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-worker-base:latest
 
 WORKDIR /app
 
