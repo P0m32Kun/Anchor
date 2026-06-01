@@ -46,6 +46,7 @@
 | `sse.go` | `GET /projects/{id}/events`(挂在 `handleProjectSSE`) | **`sseClients`**, **`mu`** | SSE 通道辅助;事件由 `report_handlers` / worker 推 |
 | `pagination.go` | — | — | 分页参数解析工具,无 handler |
 | `workdir_cleanup.go` | — | `queries`, `dataDir` | 后台 goroutine,定期清理过期工作目录;由 `Server.startWorkdirCleanup` 启动 |
+| `evaluation_handlers.go` | `GET /projects/{id}/runs/{runId}/evaluation`, `POST /projects/{id}/runs/{runId}/evaluation/retry`, `GET /projects/{id}/evaluations` | `queries`, `dataDir` | 评估报告查看与重试 |
 
 **加粗字段** = 任务分发与 SSE 子系统,改时四件套(`sseClients` / `taskQueue` / `taskResults` / `mu`)绑死,不要单改一个。
 
@@ -71,8 +72,8 @@
 
 | 字段 | 消费 handler 文件 | 改动 blast |
 |---|---|---|
-| `queries` | 15 文件(几乎全包) | **巨大** |
-| `dataDir` | 7 文件 | **大** |
+| `queries` | 16 文件(几乎全包) | **巨大** |
+| `dataDir` | 8 文件 | **大** |
 | `scopeEng` | 4 文件:pipeline / run / scope / workflow | 中等 |
 | `worker` | 5 文件:pipeline / run / slow_scan / task / workflow | 中等 |
 | `mu` | 3 文件:run / sse / worker(与下面三件套绑死) | 中等 |

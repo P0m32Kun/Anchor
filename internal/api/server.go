@@ -40,7 +40,7 @@ import (
 // 改任何字段前,先在 README.md 找消费者列表,再决定动手范围。
 type Server struct {
 	// queries: 持久化层。绝大多数 handler 都直接使用,改签名前慎重。
-	// 消费者: archive / asset / dashboard / engine / finding_template /
+	// 消费者: archive / asset / dashboard / engine / evaluation / finding_template /
 	//   pipeline / retest / run / scope / slow_scan / task /
 	//   worker / workdir_cleanup / workflow / handlers
 	queries *db.Queries
@@ -66,7 +66,7 @@ type Server struct {
 	health *health.Checker
 
 	// dataDir: 数据/产物目录根路径。
-	// 消费者: archive / handlers / pipeline / run /
+	// 消费者: archive / evaluation / handlers / pipeline / run /
 	//   worker / workdir_cleanup / workflow
 	dataDir string
 
@@ -311,6 +311,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /projects/{id}/pipeline/runs/{runId}/cancel", auth(http.HandlerFunc(s.handleCancelPipelineRun)))
 	mux.Handle("GET /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleGetPipelineConfig)))
 	mux.Handle("POST /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleUpdatePipelineConfig)))
+	// Evaluation
+	mux.Handle("GET /projects/{id}/runs/{runId}/evaluation", auth(http.HandlerFunc(s.handleGetEvaluation)))
+	mux.Handle("POST /projects/{id}/runs/{runId}/evaluation/retry", auth(http.HandlerFunc(s.handleRetryEvaluation)))
+	mux.Handle("GET /projects/{id}/evaluations", auth(http.HandlerFunc(s.handleListEvaluations)))
 	// Unified scan
 	mux.Handle("POST /projects/{id}/scan", auth(http.HandlerFunc(s.handleCreateScan)))
 	mux.Handle("GET /projects/{id}/scan/runs", auth(http.HandlerFunc(s.handleListScanRuns)))
