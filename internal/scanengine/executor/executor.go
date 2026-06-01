@@ -89,6 +89,8 @@ func actionToToolID(action string) string {
 		return "dnsx"
 	case string(core.ActionCDNCheck):
 		return "cdncheck"
+	case string(core.ActionSpoorScan):
+		return "spoor"
 	default:
 		return ""
 	}
