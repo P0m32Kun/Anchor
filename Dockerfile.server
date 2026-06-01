@@ -1,23 +1,40 @@
 # Anchor Core Server Dockerfile
-# Usage: docker build -f Dockerfile.server -t anchor-server .
-#        docker run -p 17421:17421 -v anchor-data:/data anchor-server
+# 使用 GitHub Release 预编译二进制，无需 Go 工具链
 #
-# 首次构建前请先构建基础镜像：
-#   docker build -f Dockerfile.server-base -t anchor-server-base:latest .
+# 用法：
+#   docker build -f Dockerfile.server -t anchor-server .
+#   docker run -p 17421:17421 -v anchor-data:/data anchor-server
+#
+# 多平台构建：
+#   docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.server -t anchor-server .
 
-FROM anchor-server-base:latest AS builder
-
-WORKDIR /build
-COPY . .
-RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor .
-
-# --- Runtime ---
 FROM anchor-server-runtime-base:latest
 
 WORKDIR /app
-COPY --from=builder /build/anchor .
+
+# 从 GitHub Release 下载预编译二进制
+ARG RELEASE_VERSION=latest
+RUN ARCH=$(uname -m); \
+    case "${ARCH}" in \
+      x86_64)  TARGETARCH=amd64 ;; \
+      aarch64) TARGETARCH=arm64 ;; \
+      *) echo "Unsupported architecture: ${ARCH}"; exit 1 ;; \
+    esac; \
+    if [ "${RELEASE_VERSION}" = "latest" ]; then \
+      URL="https://github.com/P0m32Kun/Anchor/releases/latest/download/anchor-linux-${TARGETARCH}"; \
+    else \
+      URL="https://github.com/P0m32Kun/Anchor/releases/download/${RELEASE_VERSION}/anchor-linux-${TARGETARCH}"; \
+    fi; \
+    echo "Downloading anchor ${RELEASE_VERSION} for ${TARGETARCH}..."; \
+    curl -fsSL -o /app/anchor "${URL}" && chmod +x /app/anchor
+
 # Vulnerability template knowledge base seed (read on every startup).
-COPY --from=builder /build/docs/templates /app/templates
+RUN curl -fsSL -o /tmp/templates.tar.gz \
+      "https://github.com/P0m32Kun/Anchor/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /tmp/anchor-src && \
+    tar xzf /tmp/templates.tar.gz -C /tmp/anchor-src --strip-components=1 && \
+    cp -r /tmp/anchor-src/docs/templates /app/templates && \
+    rm -rf /tmp/templates.tar.gz /tmp/anchor-src
 
 ENV ANCHOR_DATA_DIR=/data
 ENV ANCHOR_PORT=17421

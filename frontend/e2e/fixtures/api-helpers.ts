@@ -1,5 +1,5 @@
 const API_BASE = "http://localhost:17421";
-const API_TOKEN = "p0m32kun";
+const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
 
 async function apiFetch(
 	path: string,

@@ -4,34 +4,32 @@
 #
 # 更新时机：
 #   - apt 依赖变化时
-#   - dict / rbkd-templates / finger 仓库更新时（对应 *_REF 变化）
+#   - dict / rbkd-templates / finger 仓库更新时
 #   - 安全补丁更新时
 
 FROM debian:bookworm-slim
 
+# curl 用于下载 GitHub Release 二进制和数据仓库
 RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
     && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-    ca-certificates libsqlite3-0 wget git \
+    ca-certificates libsqlite3-0 curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Built-in dictionaries (RBKD-SEC/dict). The server's startup seed walks this
-# tree and registers each file in the dictionaries table with builtin=1.
-ARG DICT_REPO=https://github.com/RBKD-SEC/dict.git
-ARG DICT_REF=main
-RUN git clone --depth 1 --branch ${DICT_REF} ${DICT_REPO} /opt/dict && \
-    rm -rf /opt/dict/.git
+# Built-in dictionaries (RBKD-SEC/dict)
+RUN curl -fsSL -o /tmp/dict.tar.gz \
+      "https://github.com/RBKD-SEC/dict/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /opt/dict && tar xzf /tmp/dict.tar.gz -C /opt/dict --strip-components=1 && \
+    rm /tmp/dict.tar.gz
 
-# Built-in nuclei templates (RBKD-SEC/RBKD-templates). Startup seed registers the
-# builtin source; Worker exposes templates via symlink to /opt/rbkd-templates.
-ARG RBKD_TEMPLATES_REPO=https://github.com/RBKD-SEC/RBKD-templates.git
-ARG RBKD_TEMPLATES_REF=main
-RUN git clone --depth 1 --branch ${RBKD_TEMPLATES_REF} ${RBKD_TEMPLATES_REPO} /opt/rbkd-templates && \
-    rm -rf /opt/rbkd-templates/.git
+# Built-in nuclei templates (RBKD-SEC/RBKD-templates)
+RUN curl -fsSL -o /tmp/rbkd-templates.tar.gz \
+      "https://github.com/RBKD-SEC/RBKD-templates/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /opt/rbkd-templates && tar xzf /tmp/rbkd-templates.tar.gz -C /opt/rbkd-templates --strip-components=1 && \
+    rm /tmp/rbkd-templates.tar.gz
 
-# Built-in httpx fingerprints (RBKD-SEC/finger). Startup seed registers
-# /opt/finger/finger.json as the builtin tech_detect fingerprint row.
-ARG FINGER_REPO=https://github.com/RBKD-SEC/finger.git
-ARG FINGER_REF=main
-RUN git clone --depth 1 --branch ${FINGER_REF} ${FINGER_REPO} /opt/finger && \
-    rm -rf /opt/finger/.git
+# Built-in httpx fingerprints (RBKD-SEC/finger)
+RUN curl -fsSL -o /tmp/finger.tar.gz \
+      "https://github.com/RBKD-SEC/finger/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /opt/finger && tar xzf /tmp/finger.tar.gz -C /opt/finger --strip-components=1 && \
+    rm /tmp/finger.tar.gz

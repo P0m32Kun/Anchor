@@ -18,7 +18,7 @@ import { cleanupTestData, createProject, addTarget } from "../fixtures/db-utils"
 import { waitForPipeline } from "../fixtures/api-helpers";
 
 const API_BASE = "http://localhost:17421";
-const API_TOKEN = "p0m32kun";
+const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
 
 const RANGEFIELD_IPS = [
 	"172.30.0.10", // nginx

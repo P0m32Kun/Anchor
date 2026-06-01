@@ -3,12 +3,10 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  base: "./",
   clearScreen: false,
   server: {
     port: 1420,
     strictPort: true,
-    watch: { ignored: ["**/src-tauri/**"] },
     proxy: {
       "/api": {
         target: "http://localhost:17421",

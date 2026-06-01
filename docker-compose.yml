@@ -1,4 +1,19 @@
 services:
+  # --- Frontend (Nginx 静态 serve) ---
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: anchor-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - anchor-net
+
   # --- Core Server ---
   server:
     build:
@@ -12,7 +27,7 @@ services:
     environment:
       - ANCHOR_DATA_DIR=/data
       - ANCHOR_PORT=17421
-      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
+      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:?请在 .env 中设置 ANCHOR_API_TOKEN}
     restart: unless-stopped
     networks:
       - anchor-net
@@ -40,7 +55,7 @@ services:
       - ANCHOR_DATA_DIR=/data
       - ANCHOR_CORE_URL=http://server:17421
       - ANCHOR_WORKER_HOST=worker
-      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
+      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:?请在 .env 中设置 ANCHOR_API_TOKEN}
     volumes:
       - anchor-data:/data
       - anchor-worker-home:/root  # 持久化 ~/templates/

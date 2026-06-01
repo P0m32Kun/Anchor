@@ -11,7 +11,7 @@
  * internal-scan-live.spec.ts (整流水线) 覆盖。
  *
  * 前置条件:
- *   - anchor-server 已运行 (localhost:17421, token=p0m32kun)
+ *   - anchor-server 已运行 (localhost:17421, token=$ANCHOR_API_TOKEN)
  *   - vite 前端已运行 (localhost:1420)
  *
  * 运行: npx playwright test e2e/tests/qa-regression.spec.ts
@@ -21,7 +21,7 @@ import { createProject, addTarget } from "../fixtures/api-helpers";
 import { setCurrentProject } from "../fixtures/db-utils";
 
 const API_BASE = "http://localhost:17421";
-const API_TOKEN = "p0m32kun";
+const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
 const TARGET_IP = "172.30.0.13";
 
 async function seedProjectWithTarget(page: any, name: string, purpose: string) {

@@ -1,17 +1,18 @@
 const STORAGE_KEY = "anchor_api_base";
 const TOKEN_KEY = "anchor_api_token";
-
-export function isTauriEnv(): boolean {
-  // Tauri v1: window.__TAURI__, Tauri v2: globalThis.isTauri
-  return !!(window as any).__TAURI__ || !!(globalThis as any).isTauri;
-}
+const DEFAULT_API_BASE = "/api";
 
 export function getApiBase(): string {
-  return localStorage.getItem(STORAGE_KEY) || "";
+  return localStorage.getItem(STORAGE_KEY) || DEFAULT_API_BASE;
 }
 
+/**
+ * 是否需要用户配置 API 地址。
+ * 生产环境（nginx 反代）默认 /api，不需要配置；
+ * 只有 localStorage 完全为空且不是默认值时才需要。
+ */
 export function needsApiBaseConfig(): boolean {
-  return !localStorage.getItem(STORAGE_KEY);
+  return false;
 }
 
 export function setApiBase(url: string) {
@@ -39,27 +40,25 @@ export function needsApiToken(): boolean {
 }
 
 /**
- * 尝试从 Tauri 自动连接文件中读取配置。
- * install.sh 在打开桌面 App 前会写入 /tmp/anchor-auto-connect.json。
- * 读取成功后写入 localStorage，后续启动不再需要。
+ * 尝试从 URL query params 中读取自动连接配置。
+ * install.sh 完成后输出的浏览器地址会带上 api_base 和 api_token。
+ * 读取成功后写入 localStorage 并清除 URL 参数。
  * 返回 true 表示成功设置了连接信息。
  */
-export async function tryAutoConnect(): Promise<boolean> {
-  if (!isTauriEnv()) return false;
+export function tryAutoConnectFromUrl(): boolean {
   if (!needsApiBaseConfig() && !needsApiToken()) return false;
 
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const result = await invoke<{ api_base: string; api_token: string } | null>(
-      "read_auto_connect"
-    );
-    if (result) {
-      setApiBase(result.api_base);
-      setApiToken(result.api_token);
-      return true;
-    }
-  } catch (e) {
-    console.warn("[auto-connect] 读取自动连接配置失败:", e);
+  const params = new URLSearchParams(window.location.search);
+  const apiBase = params.get("api_base");
+  const apiToken = params.get("api_token");
+
+  if (apiBase) {
+    setApiBase(apiBase);
+    if (apiToken) setApiToken(apiToken);
+    // 清除 URL 参数，避免刷新时重复写入
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, "", cleanUrl);
+    return true;
   }
   return false;
 }

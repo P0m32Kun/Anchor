@@ -1,5 +1,4 @@
-# Frontend
-frontend/
+# Frontend (node_modules/dist 由 Docker 内构建，不进入 context)
 frontend/node_modules/
 frontend/dist/
 

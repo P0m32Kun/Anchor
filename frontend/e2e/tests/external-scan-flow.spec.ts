@@ -3,7 +3,7 @@ import { createProject, addTarget } from "../fixtures/api-helpers";
 import { setCurrentProject } from "../fixtures/db-utils";
 
 const API_BASE = "http://localhost:17421";
-const API_TOKEN = "p0m32kun";
+const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
 
 async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
 	const url = `${API_BASE}${path}`;

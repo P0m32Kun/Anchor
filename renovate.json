@@ -1,0 +1,111 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "subfinder",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+SUBFINDER_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "projectdiscovery/subfinder",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "naabu",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+NAABU_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "projectdiscovery/naabu",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "httpx",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+HTTPX_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "projectdiscovery/httpx",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "nuclei",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+NUCLEI_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "projectdiscovery/nuclei",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "cdncheck",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+CDNCHECK_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "projectdiscovery/cdncheck",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "dnsx",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+DNSX_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "projectdiscovery/dnsx",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "katana",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+KATANA_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "projectdiscovery/katana",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "ffuf",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+FFUF_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "ffuf/ffuf",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "gau",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+GAU_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "lc/gau",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "spoor",
+      "fileMatch": ["Dockerfile\\.worker-base$"],
+      "matchStrings": ["ARG\\s+SPOOR_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "P0m32Kun/Spoor",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchFileNames": ["Dockerfile.worker-base"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "groupName": "security-tools"
+    },
+    {
+      "matchFileNames": ["Dockerfile.worker-base"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "groupName": "security-tools-major"
+    }
+  ]
+}

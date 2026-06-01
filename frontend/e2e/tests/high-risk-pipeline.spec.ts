@@ -21,7 +21,7 @@ import { cleanupTestData, addTarget } from "../fixtures/db-utils";
 import { waitForPipeline } from "../fixtures/api-helpers";
 
 const API_BASE = "http://localhost:17421";
-const API_TOKEN = "p0m32kun";
+const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
 const REDIS_IP = "172.30.0.13";
 
 test.setTimeout(30 * 60 * 1000);

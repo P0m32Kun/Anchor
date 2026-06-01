@@ -19,7 +19,7 @@ services:
     environment:
       - ANCHOR_DATA_DIR=/data
       - ANCHOR_PORT=17421
-      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
+      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:?请在 .env 中设置 ANCHOR_API_TOKEN}
       - FOFA_BASE_URL=http://fofa-mock:8888
       - ANCHOR_SCAN_ENGINE=1
     restart: unless-stopped
@@ -43,7 +43,7 @@ services:
       - ANCHOR_DATA_DIR=/data
       - ANCHOR_CORE_URL=http://server:17421
       - ANCHOR_WORKER_HOST=worker
-      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
+      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:?请在 .env 中设置 ANCHOR_API_TOKEN}
     volumes:
       - anchor-worker-data:/data
     restart: unless-stopped

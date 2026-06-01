@@ -8,7 +8,7 @@ const BACKEND_HEALTH_URL = "http://localhost:17421/health";
 const E2E_COMPOSE_FILE = "../../docker-compose.e2e.yml";
 const MAX_WAIT_MS = 120_000;
 const POLL_INTERVAL_MS = 2_000;
-const API_TOKEN = "p0m32kun";
+const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
 const STORAGE_STATE_PATH = path.join(__dirname, "storage-state.json");
 
 function writeStorageState(): void {

@@ -5,7 +5,7 @@
 set -euo pipefail
 RUN_ID="${1:?Usage: $0 <runId>}"
 API="${ANCHOR_API_BASE:-http://localhost:17421}"
-TOKEN="${ANCHOR_API_TOKEN:-p0m32kun}"
+TOKEN="${ANCHOR_API_TOKEN:?请设置 ANCHOR_API_TOKEN}"
 AUTH="Authorization: Bearer $TOKEN"
 OUTDIR="scan-dump-${RUN_ID: -8}"
 mkdir -p "$OUTDIR"

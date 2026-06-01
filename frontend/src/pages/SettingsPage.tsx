@@ -9,7 +9,7 @@ import {
   Button, 
   Input 
 } from "../components";
-import { Eye, EyeOff, Save, RotateCcw, Info, Server, Key, Monitor } from "lucide-react";
+import { Eye, EyeOff, Save, RotateCcw, Info, Server, Key } from "lucide-react";
 
 export default function SettingsPage() {
   const rawBase = getApiBase();
@@ -23,7 +23,6 @@ export default function SettingsPage() {
   const placeholderText = isDefaultRelative
     ? "http://localhost:17421 (auto)"
     : rawBase || "http://localhost:17421";
-  const isTauri = !!(window as any).__TAURI__;
 
   useEffect(() => {
     setApiBaseState(getApiBase());
@@ -69,9 +68,7 @@ export default function SettingsPage() {
                 <CardTitle>后端连接</CardTitle>
             </div>
             <CardDescription>
-                {isTauri
-                ? "配置桌面应用如何连接到 Anchor Server 服务。"
-                : "Web 模式：设置后端 API 接口地址。"}
+                Web 模式：设置后端 API 接口地址。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -143,42 +140,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {isTauri && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                  <Monitor className="h-5 w-5 text-primary" />
-                  <CardTitle>本地环境</CardTitle>
-              </div>
-              <CardDescription>
-                  管理本地资源和路径。
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <div className="text-sm font-medium">本地 Worker 自动启动</div>
-                  <p className="text-xs text-muted-foreground">
-                    应用启动时自动在后台启动扫描节点。
-                  </p>
-                </div>
-                <div className="flex h-5 w-9 items-center rounded-full bg-primary/20 p-1">
-                    <div className="h-3 w-3 translate-x-4 rounded-full bg-primary transition-all" />
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between py-2 border-t">
-                <div>
-                  <div className="text-sm font-medium">数据存储目录</div>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    ~/.anchor
-                  </p>
-                </div>
-                <Button variant="secondary" size="sm">打开目录</Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <Card className="bg-muted/30">
           <CardHeader>
@@ -194,7 +155,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">构建环境</span>
-                <span className="font-mono text-xs">{isTauri ? "Tauri Native" : "React Web"}</span>
+                <span className="font-mono text-xs">React Web</span>
             </div>
           </CardContent>
         </Card>

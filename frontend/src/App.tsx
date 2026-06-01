@@ -37,7 +37,7 @@ import { Routes, Route, useLocation, Navigate, useNavigate } from "react-router-
 import { useEffect, useState } from "react";
 import { ToastProvider, Navbar, Header, useToast, ErrorBoundary, Button } from "./components";
 import { setGlobalErrorHandler, setConsecutiveErrorCallback, api, API_BASE, friendlyMessage } from "./lib/api";
-import { resetApiBase, needsApiBaseConfig, getApiToken, resetApiToken, needsApiToken, tryAutoConnect } from "./lib/config";
+import { resetApiBase, needsApiBaseConfig, getApiToken, resetApiToken, needsApiToken, tryAutoConnectFromUrl } from "./lib/config";
 import ApiBaseSetup from "./components/ApiBaseSetup";
 import { useStore } from "./lib/store";
 import { cn } from "./lib/utils";
@@ -244,27 +244,10 @@ function AppContent() {
 }
 
 function App() {
-  const [autoConnecting, setAutoConnecting] = useState(true);
-
-  useEffect(() => {
-    tryAutoConnect().then((connected) => {
-      if (connected) {
-        window.location.reload();
-      } else {
-        setAutoConnecting(false);
-      }
-    });
-  }, []);
-
-  if (autoConnecting) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-surface text-text-primary">
-        <div className="text-center space-y-3">
-          <Loader2 className="h-8 w-8 text-primary animate-spin mx-auto" />
-          <p className="text-text-secondary text-sm">正在连接...</p>
-        </div>
-      </div>
-    );
+  // URL 参数 auto-connect（同步，不需要 loading state）
+  const connected = tryAutoConnectFromUrl();
+  if (connected) {
+    window.location.reload();
   }
 
   const needsConfig = needsApiBaseConfig() || needsApiToken();

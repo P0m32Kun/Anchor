@@ -36,10 +36,6 @@ frontend/test-results/
 frontend/e2e/storage-state.json
 frontend/e2e/screenshots/
 
-# Tauri
-target/
-src-tauri/target/
-
 # OS
 .DS_Store
 Thumbs.db
@@ -57,11 +53,13 @@ Thumbs.db
 bin/
 
 # Agent caches (local runtime state — never commit)
+tasks/
 .codegraph/
 .deepseek/
 .playwright-mcp/
 .antigravitycli/
 .claude/agents/
+.claude/settings.local.json
 .claude/scheduled_tasks.lock
 .codex/
 .cursor/
@@ -88,9 +86,6 @@ tmp-tag-test/
 /Gemini_Generated_*.png
 /qa.md
 /plan.md
-
-# Tauri generated
-src-tauri/gen/
 
 # Superpowers design docs (internal, not for end users)
 docs/superpowers/

@@ -1,0 +1,18 @@
+# Renovate 自动检测安全工具版本更新
+# 需要在 repo Settings → Secrets 中配置 RENOVATE_TOKEN（GitHub PAT，需要 repo 权限）
+name: Renovate
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # 每周一早上 8 点检查
+  workflow_dispatch:       # 支持手动触发
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: renovatebot/github-action@v42
+        with:
+          configurationFile: renovate.json
+          token: ${{ secrets.RENOVATE_TOKEN }}

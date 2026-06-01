@@ -22,7 +22,7 @@ PORT="17421"
 TOKEN=""
 CORE_URL=""
 COMPOSE_CMD=""
-ACTION=""  # install | open | build | restart
+ACTION=""  # install | restart
 
 check_docker() {
   info "⚓ Anchor 安装向导"
@@ -54,41 +54,6 @@ check_docker() {
     echo "请启动 Docker Desktop，或运行: sudo systemctl start docker"
     exit 1
   fi
-}
-
-check_desktop_deps() {
-  local missing=()
-
-  if ! command -v node &>/dev/null; then
-    missing+=("Node.js")
-  fi
-
-  if ! command -v cargo &>/dev/null; then
-    missing+=("Rust")
-  fi
-
-  if [ ${#missing[@]} -gt 0 ]; then
-    err "构建桌面应用缺少依赖: ${missing[*]}"
-    echo "  安装指南:"
-    [[ " ${missing[*]} " =~ "Node.js" ]] && echo "    Node.js: https://nodejs.org/"
-    [[ " ${missing[*]} " =~ "Rust" ]] && echo "    Rust: https://rustup.rs/"
-    return 1
-  fi
-
-  ok "桌面构建依赖已就绪 (Node $(node --version), Rust $(rustc --version | awk '{print $2}'))"
-  return 0
-}
-
-build_desktop_app() {
-  info "正在构建桌面应用（首次约需 5-10 分钟）..."
-
-  cd "$SCRIPT_DIR/frontend"
-  npm install
-  cd "$SCRIPT_DIR"
-
-  make tauri-build
-
-  ok "桌面应用构建完成"
 }
 
 get_compose_file() {
@@ -134,6 +99,7 @@ restart_services() {
   while [ $elapsed -lt $max_wait ]; do
     if curl -sf "http://localhost:${port}/health" &>/dev/null; then
       ok "服务已就绪"
+      print_result
       return 0
     fi
     sleep 2
@@ -141,7 +107,7 @@ restart_services() {
     printf "."
   done
   echo ""
-  warn "健康检查超时，请手动检查: make logs"
+  warn "健康检查超时，请手动检查: $0 logs"
 }
 
 select_mode() {
@@ -151,21 +117,23 @@ select_mode() {
   echo "  2) Worker Only    — 连接远程 Server 的扫描节点"
   echo "  3) Server+Worker  — 完整功能（本地开发/测试）"
   echo "  ─────────────────"
-  echo "  4) 打开桌面应用   — 启动 Anchor 桌面端"
-  echo "  5) 构建桌面应用   — 重新编译 UI（更新后需要）"
-  echo "  6) 重启服务       — 重启已运行的容器"
+  echo "  4) 重启服务       — 重启已运行的容器"
+  echo "  5) 查看状态       — 容器运行状态"
+  echo "  6) 查看日志       — 实时日志"
+  echo "  7) 停止服务       — 停止所有容器"
   echo ""
 
   while true; do
-    read -rp "请输入选项 [1-6]: " choice
+    read -rp "请输入选项 [1-7]: " choice
     case $choice in
       1) ACTION="install"; MODE="server"; break ;;
       2) ACTION="install"; MODE="worker"; break ;;
       3) ACTION="install"; MODE="server_worker"; break ;;
-      4) ACTION="open"; break ;;
-      5) ACTION="build"; break ;;
-      6) ACTION="restart"; break ;;
-      *) warn "无效选项，请输入 1-6" ;;
+      4) ACTION="restart"; break ;;
+      5) ACTION="status"; break ;;
+      6) ACTION="logs"; break ;;
+      7) ACTION="down"; break ;;
+      *) warn "无效选项，请输入 1-7" ;;
     esac
   done
 }
@@ -219,44 +187,90 @@ collect_config() {
 
 build_images() {
   echo ""
-  info "正在构建镜像（首次约需 5-10 分钟）..."
+  info "正在构建镜像..."
+
+  # 拉取预构建的基础镜像（如果本地不存在）
+  pull_base_if_missing() {
+    local image="$1"
+    local dockerhub="$2"
+    if docker image inspect "${image}:latest" &>/dev/null; then
+      ok "${image} 镜像已存在"
+    else
+      info "拉取 ${image} 镜像..."
+      docker pull "${dockerhub}:latest"
+      docker tag "${dockerhub}:latest" "${image}:latest"
+    fi
+  }
+
+  # 检查 GitHub Release 是否有预编译二进制
+  check_release_binary() {
+    local arch
+    arch=$(uname -m)
+    case "${arch}" in
+      x86_64)  arch="amd64" ;;
+      aarch64) arch="arm64" ;;
+    esac
+    local url="https://github.com/P0m32Kun/Anchor/releases/latest/download/anchor-linux-${arch}"
+    if curl -sfI "${url}" &>/dev/null; then
+      return 0
+    else
+      return 1
+    fi
+  }
+
+  # 检查是否有本地编译的二进制
+  has_local_binary() {
+    [ -f "$SCRIPT_DIR/bin/anchor" ]
+  }
+
+  # 确保有可用的二进制（GitHub Release 或本地编译）
+  ensure_binary() {
+    if check_release_binary; then
+      ok "GitHub Release 二进制可用"
+      return 0
+    fi
+
+    warn "GitHub Release 未找到预编译二进制"
+
+    if has_local_binary; then
+      ok "检测到本地编译的二进制 (bin/anchor)"
+      warn "注意：当前 Dockerfile 从 GitHub Release 下载二进制"
+      warn "如需使用本地二进制，请手动构建："
+      echo "  docker build -f Dockerfile.server -t anchor-server . --build-arg RELEASE_VERSION=<tag>"
+      return 0
+    fi
+
+    err "未找到可用的二进制"
+    echo ""
+    echo "请先创建 GitHub Release："
+    echo "  git tag v0.1.0"
+    echo "  git push --tags"
+    echo ""
+    echo "或本地编译（需要 Go 环境）："
+    echo "  make build"
+    echo ""
+    exit 1
+  }
+
+  ensure_binary
 
   case $MODE in
     server)
-      if docker image inspect anchor-server-base:latest &>/dev/null; then
-        ok "Server base 镜像已存在，跳过构建"
-      else
-        info "构建 Server base 镜像..."
-        make setup-server-base
-      fi
-      info "构建 Server 运行镜像..."
+      pull_base_if_missing anchor-server-runtime-base p0m32kun/anchor-server-runtime-base
+      info "构建 Server 镜像..."
       make build-server
       ;;
     worker)
-      if docker image inspect anchor-worker-base:latest &>/dev/null; then
-        ok "Worker base 镜像已存在，跳过构建"
-      else
-        info "构建 Worker base 镜像..."
-        make setup-worker-base
-      fi
-      info "构建 Worker 运行镜像..."
+      pull_base_if_missing anchor-worker-base p0m32kun/anchor-worker-base
+      info "构建 Worker 镜像..."
       make build-worker
       ;;
     server_worker)
-      if docker image inspect anchor-server-base:latest &>/dev/null; then
-        ok "Server base 镜像已存在，跳过构建"
-      else
-        info "构建 Server base 镜像..."
-        make setup-server-base
-      fi
-      if docker image inspect anchor-worker-base:latest &>/dev/null; then
-        ok "Worker base 镜像已存在，跳过构建"
-      else
-        info "构建 Worker base 镜像..."
-        make setup-worker-base
-      fi
-      info "构建运行镜像..."
+      pull_base_if_missing anchor-server-runtime-base p0m32kun/anchor-server-runtime-base
+      pull_base_if_missing anchor-worker-base p0m32kun/anchor-worker-base
+      info "构建 Server 镜像..."
       make build-server
+      info "构建 Worker 镜像..."
       make build-worker
       ;;
   esac
@@ -339,102 +353,22 @@ print_result() {
   echo ""
 
   case $MODE in
-    server)
-      echo "  地址: http://localhost:${PORT}"
-      echo "  Token: $TOKEN"
+    server|server_worker)
+      echo "  浏览器访问: http://localhost"
+      echo "  API 地址:   http://localhost:${PORT}"
+      echo "  Token:      $TOKEN"
       ;;
     worker)
       echo "  Worker 已连接到: $CORE_URL"
-      ;;
-    server_worker)
-      echo "  地址: http://localhost:${PORT}"
-      echo "  Token: $TOKEN"
       ;;
   esac
 
   echo ""
   echo "  管理命令:"
-  echo "    make status    — 查看状态"
-  echo "    make logs      — 查看日志"
-  echo "    make down      — 停止服务"
+  echo "    $0 status    — 查看状态"
+  echo "    $0 logs      — 查看日志"
+  echo "    $0 down      — 停止服务"
   echo ""
-}
-
-detect_desktop() {
-  if [ "$(uname)" = "Darwin" ]; then
-    return 0
-  fi
-  if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
-    return 0
-  fi
-  return 1
-}
-
-open_desktop_app() {
-  if ! detect_desktop; then
-    echo ""
-    info "未检测到桌面环境。"
-    echo "  请在本地桌面电脑打开 Anchor App，连接到此 Server:"
-    echo "  地址: http://<this-server-ip>:${PORT:-17421}"
-    echo "  Token: ${TOKEN:-<your-token>}"
-    return 0
-  fi
-
-  # 准备自动连接配置
-  if [ -n "${PORT:-}" ] && [ -n "${TOKEN:-}" ]; then
-    local auto_connect_file="/tmp/anchor-auto-connect.json"
-    cat > "$auto_connect_file" <<EOF
-{"api_base":"http://localhost:${PORT}","api_token":"${TOKEN}"}
-EOF
-  fi
-
-  local app_opened=false
-
-  if [ "$(uname)" = "Darwin" ]; then
-    if [ -d "$SCRIPT_DIR/src-tauri/target/release/bundle/macos/Anchor.app" ]; then
-      open "$SCRIPT_DIR/src-tauri/target/release/bundle/macos/Anchor.app"
-      app_opened=true
-    elif [ -d "/Applications/Anchor.app" ]; then
-      open /Applications/Anchor.app
-      app_opened=true
-    fi
-  else
-    if [ -x "$SCRIPT_DIR/src-tauri/target/release/anchor" ]; then
-      "$SCRIPT_DIR/src-tauri/target/release/anchor" &
-      app_opened=true
-    fi
-  fi
-
-  if [ "$app_opened" = false ]; then
-    warn "未找到桌面应用"
-    echo ""
-    read -rp "是否现在构建桌面应用？ [Y/n]: " build_choice
-    if [[ ! "$build_choice" =~ ^[Nn]$ ]]; then
-      if check_desktop_deps; then
-        build_desktop_app
-        # 重新尝试打开
-        open_desktop_app
-      fi
-    else
-      echo "  请手动访问: http://localhost:${PORT:-17421}"
-    fi
-  fi
-}
-
-maybe_open_app() {
-  if detect_desktop; then
-    echo ""
-    read -rp "检测到桌面环境，是否打开 Anchor 桌面应用？ [Y/n]: " open_choice
-    if [[ ! "$open_choice" =~ ^[Nn]$ ]]; then
-      open_desktop_app
-    fi
-  else
-    echo ""
-    info "未检测到桌面环境。"
-    echo "  请在本地桌面电脑打开 Anchor App，连接到此 Server:"
-    echo "  地址: http://<this-server-ip>:${PORT}"
-    echo "  Token: $TOKEN"
-  fi
 }
 
 check_existing() {
@@ -451,7 +385,6 @@ check_existing() {
          docker ps --filter "name=anchor-worker" --filter "status=running" | grep -q anchor-worker 2>/dev/null; then
         ok "容器已在运行"
         print_result
-        maybe_open_app
         exit 0
       else
         info "容器未运行，正在启动..."
@@ -478,17 +411,12 @@ main() {
   select_mode
   load_env
 
+  local compose_file
+  compose_file=$(get_compose_file)
+
   case "$ACTION" in
-    open)
-      open_desktop_app
-      ;;
-    build)
-      check_desktop_deps
-      build_desktop_app
-      ;;
     restart)
       restart_services
-      maybe_open_app
       ;;
     install)
       check_existing
@@ -497,7 +425,17 @@ main() {
       start_containers
       wait_healthy
       print_result
-      maybe_open_app
+      ;;
+    status)
+      $COMPOSE_CMD -f "$compose_file" ps
+      ;;
+    logs)
+      $COMPOSE_CMD -f "$compose_file" logs -f
+      ;;
+    down)
+      info "正在停止服务..."
+      $COMPOSE_CMD -f "$compose_file" down
+      ok "服务已停止"
       ;;
   esac
 }

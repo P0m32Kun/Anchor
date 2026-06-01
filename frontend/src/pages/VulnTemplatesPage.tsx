@@ -245,14 +245,14 @@ export default function VulnTemplatesPage() {
                 >
                   <TableCell>
                     {t.is_builtin ? (
-                      <div className="flex flex-col gap-1 items-start">
+                      <div className="flex flex-wrap gap-1 items-center">
                         <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
                           <Lock className="mr-1 h-3 w-3 inline" />
                           内置
                         </Badge>
                         {t.user_modified && (
                           <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px]">
-                            本地已修改
+                            已修改
                           </Badge>
                         )}
                       </div>

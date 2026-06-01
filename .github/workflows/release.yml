@@ -1,0 +1,70 @@
+# Tag 推送时自动构建 Go 二进制并上传到 GitHub Release
+# 用法：git tag v0.x.x && git push --tags
+#
+# 产出：anchor-linux-amd64、anchor-linux-arm64 附加到 Release assets
+# Dockerfile 直接从 Release 下载二进制，不再需要 golang 构建镜像
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+    name: build-linux-${{ matrix.arch }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install CGO dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libsqlite3-dev
+
+      - name: Build binary
+        run: |
+          CGO_ENABLED=1 go build -ldflags="-w -s" -o anchor-linux-${{ matrix.arch }} .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-linux-${{ matrix.arch }}
+          path: anchor-linux-${{ matrix.arch }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/anchor-linux-amd64/anchor-linux-amd64
+            dist/anchor-linux-arm64/anchor-linux-arm64
+          generate_release_notes: true

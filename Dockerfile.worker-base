@@ -1,6 +1,8 @@
 # Anchor Worker Base Image
 # 预装所有安全扫描工具，作为 worker runtime 的基础镜像
 #
+# 使用 GitHub Release 预编译二进制（无需 Go 工具链），构建速度快 10x+
+#
 # 构建并推送（工具更新时才需要执行）：
 #   docker build -f Dockerfile.worker-base -t anchor-worker-base:latest .
 #   docker tag anchor-worker-base:latest p0m32kun/anchor-worker-base:latest
@@ -9,84 +11,125 @@
 # 本地开发使用：
 #   make build-worker-base
 
-# --- Stage 1: 构建工具 ---
-FROM golang:1.26-bookworm AS tools-builder
-
-RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-    git gcc libpcap-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# goproxy.cn TLS 不稳定，退回到官方代理
-ENV GOPROXY=https://proxy.golang.org,direct
-ENV GOSUMDB=off
-
-# 安装安全工具（这些变化极慢，单独成层）
-RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
-    go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
-    go install github.com/projectdiscovery/httpx/cmd/httpx@latest && \
-    go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
-    go install github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest && \
-    go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
-    go install github.com/projectdiscovery/katana/cmd/katana@latest && \
-    go install github.com/ffuf/ffuf/v2@latest && \
-    go install github.com/lc/gau/v2/cmd/gau@latest && \
-    nuclei -update-templates
-
-# --- Stage 2: 精简运行时基础镜像 ---
 FROM debian:bookworm-slim
 
+# ============================================================
+#  工具版本定义（集中管理，更新时只改这里）
+# ============================================================
+ARG SUBFINDER_VERSION=2.14.0
+ARG NAABU_VERSION=2.6.1
+ARG HTTPX_VERSION=1.9.0
+ARG NUCLEI_VERSION=3.8.0
+ARG CDNCHECK_VERSION=1.2.38
+ARG DNSX_VERSION=1.2.3
+ARG KATANA_VERSION=1.6.1
+ARG FFUF_VERSION=2.1.0
+ARG GAU_VERSION=2.2.4
+ARG SPOOR_VERSION=0.2.0
+
+# ============================================================
+#  系统依赖
+# ============================================================
+# - libpcap0.8: 运行时库（naabu 需要），不需要 -dev 头文件
+# - nmap: 代码中 BuildNmapServiceScanCommand 直接调用，必须保留
+# - unzip: 仅下载工具时使用
+# 注：git 已移除，内置数据改用 wget 下载 tarball
 RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
     && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-    ca-certificates libpcap-dev git nmap wget unzip \
-    libnss3 libfreetype6 libharfbuzz0b fonts-freefont-ttf \
-    libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 \
-    libx11-6 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
-    libgbm1 libpango-1.0-0 libcairo2 libxkbcommon0 libasound2 \
-    libdrm2 libxcb1 \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates libpcap0.8 nmap wget curl unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Chrome for Testing headless-shell — 无头截图专用，比完整 chromium 轻量 60%+
-RUN wget -q -O /tmp/chrome.zip \
-      "https://storage.googleapis.com/chrome-for-testing-public/135.0.7049.95/linux64/chrome-headless-shell-linux64.zip" && \
-    unzip -q /tmp/chrome.zip -d /opt/chrome && \
-    rm /tmp/chrome.zip && \
-    ln -s /opt/chrome/chrome-headless-shell-linux64/chrome-headless-shell /usr/bin/chromium
+# ============================================================
+#  安全工具（直接下载 GitHub Release 预编译二进制）
+# ============================================================
+# 用 uname -m 检测容器实际运行架构（兼容 docker build 和 buildx）
+# uname -m 输出：x86_64 / aarch64
+# TARGETARCH 用于 projectdiscovery 系列（amd64/arm64）
+# SPOOR_ARCH 用于 Spoor（Rust target triple）
+RUN set -eux; \
+    ARCH=$(uname -m); \
+    case "${ARCH}" in \
+      x86_64)  TARGETARCH=amd64; SPOOR_ARCH=x86_64-unknown-linux-gnu ;; \
+      aarch64) TARGETARCH=arm64;  SPOOR_ARCH=aarch64-unknown-linux-gnu ;; \
+      *) echo "Unsupported architecture: ${ARCH}"; exit 1 ;; \
+    esac; \
+    echo "Detected architecture: ${ARCH} (TARGETARCH=${TARGETARCH}, SPOOR_ARCH=${SPOOR_ARCH})"; \
+    # --- projectdiscovery 系列（zip 格式）---
+    for tool_ver in \
+      "subfinder:${SUBFINDER_VERSION}" \
+      "naabu:${NAABU_VERSION}" \
+      "httpx:${HTTPX_VERSION}" \
+      "nuclei:${NUCLEI_VERSION}" \
+      "cdncheck:${CDNCHECK_VERSION}" \
+      "dnsx:${DNSX_VERSION}" \
+      "katana:${KATANA_VERSION}"; do \
+      name="${tool_ver%%:*}"; \
+      ver="${tool_ver##*:}"; \
+      echo "Downloading ${name} v${ver} (${TARGETARCH})..."; \
+      wget -q -O "/tmp/${name}.zip" \
+        "https://github.com/projectdiscovery/${name}/releases/download/v${ver}/${name}_${ver}_linux_${TARGETARCH}.zip"; \
+      unzip -o "/tmp/${name}.zip" "${name}" -d /usr/local/bin/; \
+      rm "/tmp/${name}.zip"; \
+    done; \
+    # --- ffuf（tar.gz 格式）---
+    echo "Downloading ffuf v${FFUF_VERSION} (${TARGETARCH})..."; \
+    wget -q -O /tmp/ffuf.tar.gz \
+      "https://github.com/ffuf/ffuf/releases/download/v${FFUF_VERSION}/ffuf_${FFUF_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    tar xzf /tmp/ffuf.tar.gz -C /usr/local/bin/ ffuf; \
+    rm /tmp/ffuf.tar.gz; \
+    # --- gau（tar.gz 格式）---
+    echo "Downloading gau v${GAU_VERSION} (${TARGETARCH})..."; \
+    wget -q -O /tmp/gau.tar.gz \
+      "https://github.com/lc/gau/releases/download/v${GAU_VERSION}/gau_${GAU_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    tar xzf /tmp/gau.tar.gz -C /usr/local/bin/ gau; \
+    rm /tmp/gau.tar.gz; \
+    # --- Spoor（Rust 编译，arch 命名用 target triple）---
+    echo "Downloading spoor v${SPOOR_VERSION} (${SPOOR_ARCH})..."; \
+    wget -q -O /tmp/spoor.tar.gz \
+      "https://github.com/P0m32Kun/Spoor/releases/download/v${SPOOR_VERSION}/spoor-${SPOOR_ARCH}.tar.gz"; \
+    tar xzf /tmp/spoor.tar.gz -C /usr/local/bin/ spoor; \
+    rm /tmp/spoor.tar.gz; \
+    # --- 验证安装 ---
+    echo "Verifying installations..."; \
+    subfinder -version; \
+    naabu -version; \
+    httpx -version; \
+    nuclei -version; \
+    cdncheck -version; \
+    dnsx -version; \
+    katana -version; \
+    ffuf -V; \
+    gau --version; \
+    spoor --version
 
-ENV CHROME_PATH=/usr/bin/chromium
+# nuclei 内置模板
+RUN nuclei -update-templates
 
-COPY --from=tools-builder /go/bin/subfinder  /usr/local/bin/
-COPY --from=tools-builder /go/bin/naabu      /usr/local/bin/
-COPY --from=tools-builder /go/bin/httpx      /usr/local/bin/
-COPY --from=tools-builder /go/bin/nuclei     /usr/local/bin/
-COPY --from=tools-builder /go/bin/cdncheck   /usr/local/bin/
-COPY --from=tools-builder /go/bin/dnsx       /usr/local/bin/
-COPY --from=tools-builder /go/bin/katana     /usr/local/bin/
-COPY --from=tools-builder /go/bin/gau        /usr/local/bin/
-COPY --from=tools-builder /go/bin/ffuf       /usr/local/bin/
-COPY --from=tools-builder /root/nuclei-templates /root/nuclei-templates
+# ============================================================
+#  内置数据（与 server 镜像路径保持一致）
+# ============================================================
+# 用 wget 下载 tarball 替代 git clone，省掉 git 依赖（~30MB）
+# GitHub archive URL 格式：https://github.com/{org}/{repo}/archive/refs/heads/{branch}.tar.gz
 
-# Built-in dictionaries (RBKD-SEC/dict). Worker reads file paths recorded by
-# the server's startup-time seed; the path layout must match the server image
-# exactly, hence cloning to the same /opt/dict location in both.
-ARG DICT_REPO=https://github.com/RBKD-SEC/dict.git
-ARG DICT_REF=main
-RUN git clone --depth 1 --branch ${DICT_REF} ${DICT_REPO} /opt/dict && \
-    rm -rf /opt/dict/.git
+# Built-in dictionaries (RBKD-SEC/dict)
+RUN wget -q -O /tmp/dict.tar.gz \
+      "https://github.com/RBKD-SEC/dict/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /opt/dict && tar xzf /tmp/dict.tar.gz -C /opt/dict --strip-components=1 && \
+    rm /tmp/dict.tar.gz
 
-# Built-in nuclei templates (RBKD-SEC/RBKD-templates). Worker creates symlink
-# from nuclei-templates when the builtin source is enabled; path layout must
-# match the server image, hence /opt/rbkd-templates in both.
-ARG RBKD_TEMPLATES_REPO=https://github.com/RBKD-SEC/RBKD-templates.git
-ARG RBKD_TEMPLATES_REF=main
-RUN git clone --depth 1 --branch ${RBKD_TEMPLATES_REF} ${RBKD_TEMPLATES_REPO} /opt/rbkd-templates && \
-    rm -rf /opt/rbkd-templates/.git
+# Built-in nuclei templates (RBKD-SEC/RBKD-templates)
+RUN wget -q -O /tmp/rbkd-templates.tar.gz \
+      "https://github.com/RBKD-SEC/RBKD-templates/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /opt/rbkd-templates && tar xzf /tmp/rbkd-templates.tar.gz -C /opt/rbkd-templates --strip-components=1 && \
+    rm /tmp/rbkd-templates.tar.gz
 
-# Built-in httpx fingerprints (RBKD-SEC/finger). Worker reads file_path from the
-# server's startup-time seed; path layout must match, hence /opt/finger in both.
-ARG FINGER_REPO=https://github.com/RBKD-SEC/finger.git
-ARG FINGER_REF=main
-RUN git clone --depth 1 --branch ${FINGER_REF} ${FINGER_REPO} /opt/finger && \
-    rm -rf /opt/finger/.git
+# Built-in httpx fingerprints (RBKD-SEC/finger)
+RUN wget -q -O /tmp/finger.tar.gz \
+      "https://github.com/RBKD-SEC/finger/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /opt/finger && tar xzf /tmp/finger.tar.gz -C /opt/finger --strip-components=1 && \
+    rm /tmp/finger.tar.gz
+
+# 清理不需要的文件（doc、字体、X11 残留，保留 perl 因 nmap 脚本引擎依赖）
+RUN rm -rf /usr/share/doc /usr/share/fonts /usr/share/X11

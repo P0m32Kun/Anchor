@@ -8,7 +8,7 @@ services:
       - ANCHOR_DATA_DIR=/data
       - ANCHOR_CORE_URL=${ANCHOR_CORE_URL:-http://server:17421}
       - ANCHOR_WORKER_HOST=${ANCHOR_WORKER_HOST:-worker}
-      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
+      - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:?请在 .env 中设置 ANCHOR_API_TOKEN}
     volumes:
       - anchor-worker-data:/data
     restart: unless-stopped
