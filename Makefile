@@ -1,5 +1,6 @@
 .PHONY: build build-local clean
 .PHONY: build-server build-worker
+.PHONY: push-server-cn push-worker-cn push-frontend-cn push-all-cn
 .PHONY: up down up-server down-server up-worker down-worker restart-worker
 .PHONY: logs logs-server logs-worker status shell-server shell-worker
 .PHONY: build-worker-base push-worker-base push-worker-base-cn pull-worker-base
@@ -27,7 +28,7 @@ push-worker-base:
 		--push .
 
 # 推送到阿里云 ACR（国内加速）
-ACR_REGISTRY ?= registry.cn-hangzhou.aliyuncs.com
+ACR_REGISTRY ?= crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com
 ACR_NAMESPACE ?= p0m32kun
 push-worker-base-cn:
 	docker buildx build --platform linux/amd64,linux/arm64 \
@@ -49,6 +50,12 @@ push-server-runtime-base:
 		-t p0m32kun/anchor-server-runtime-base:latest \
 		--push .
 
+push-server-runtime-base-cn:
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		-f Dockerfile.server-runtime-base \
+		-t $(ACR_REGISTRY)/$(ACR_NAMESPACE)/anchor-server-runtime-base:latest \
+		--push .
+
 pull-server-runtime-base:
 	docker pull p0m32kun/anchor-server-runtime-base:latest
 	docker tag p0m32kun/anchor-server-runtime-base:latest anchor-server-runtime-base:latest
@@ -62,6 +69,23 @@ build-server:
 
 build-worker:
 	docker build -f Dockerfile.worker -t anchor-worker:latest .
+
+# --- 阿里云 ACR 推送（国内用户拉取用）---
+push-server-cn:
+	docker tag anchor-server:latest $(ACR_REGISTRY)/$(ACR_NAMESPACE)/anchor-server:latest
+	docker push $(ACR_REGISTRY)/$(ACR_NAMESPACE)/anchor-server:latest
+
+push-worker-cn:
+	docker tag anchor-worker:latest $(ACR_REGISTRY)/$(ACR_NAMESPACE)/anchor-worker:latest
+	docker push $(ACR_REGISTRY)/$(ACR_NAMESPACE)/anchor-worker:latest
+
+push-frontend-cn:
+	docker tag anchor-frontend:latest $(ACR_REGISTRY)/$(ACR_NAMESPACE)/anchor-frontend:latest
+	docker push $(ACR_REGISTRY)/$(ACR_NAMESPACE)/anchor-frontend:latest
+
+# 一键推送所有镜像到阿里云
+push-all-cn: push-server-cn push-worker-cn push-frontend-cn
+	@echo "所有镜像已推送到 $(ACR_REGISTRY)/$(ACR_NAMESPACE)/"
 
 # ============================================================
 #  Local Build (本地编译 Go 二进制，需要 Go + gcc + libsqlite3-dev)

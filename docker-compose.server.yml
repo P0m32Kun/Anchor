@@ -1,6 +1,7 @@
 services:
   # --- Frontend (Nginx 静态 serve) ---
   frontend:
+    image: ${ANCHOR_REGISTRY:-crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun}/anchor-frontend:latest
     build:
       context: .
       dockerfile: Dockerfile.frontend
@@ -14,6 +15,7 @@ services:
 
   # --- Core Server ---
   server:
+    image: ${ANCHOR_REGISTRY:-crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun}/anchor-server:latest
     build:
       context: .
       dockerfile: Dockerfile.server

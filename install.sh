@@ -23,6 +23,7 @@ TOKEN=""
 CORE_URL=""
 COMPOSE_CMD=""
 ACTION=""  # install | restart
+ACR_REGISTRY="crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun"
 
 check_docker() {
   info "⚓ Anchor 安装向导"
@@ -187,95 +188,36 @@ collect_config() {
 
 build_images() {
   echo ""
-  info "正在构建镜像..."
+  info "拉取镜像..."
 
-  # 拉取预构建的基础镜像（如果本地不存在）
-  pull_base_if_missing() {
+  # 从阿里云 ACR 拉取镜像（如果本地不存在）
+  pull_if_missing() {
     local image="$1"
-    local dockerhub="$2"
     if docker image inspect "${image}:latest" &>/dev/null; then
-      ok "${image} 镜像已存在"
+      ok "${image} 已存在"
     else
-      info "拉取 ${image} 镜像..."
-      docker pull "${dockerhub}:latest"
-      docker tag "${dockerhub}:latest" "${image}:latest"
+      info "拉取 ${image}..."
+      docker pull "${ACR_REGISTRY}/${image}:latest"
+      docker tag "${ACR_REGISTRY}/${image}:latest" "${image}:latest"
     fi
   }
-
-  # 检查 GitHub Release 是否有预编译二进制
-  check_release_binary() {
-    local arch
-    arch=$(uname -m)
-    case "${arch}" in
-      x86_64)  arch="amd64" ;;
-      aarch64) arch="arm64" ;;
-    esac
-    local url="https://github.com/P0m32Kun/Anchor/releases/latest/download/anchor-linux-${arch}"
-    if curl -sfI "${url}" &>/dev/null; then
-      return 0
-    else
-      return 1
-    fi
-  }
-
-  # 检查是否有本地编译的二进制
-  has_local_binary() {
-    [ -f "$SCRIPT_DIR/bin/anchor" ]
-  }
-
-  # 确保有可用的二进制（GitHub Release 或本地编译）
-  ensure_binary() {
-    if check_release_binary; then
-      ok "GitHub Release 二进制可用"
-      return 0
-    fi
-
-    warn "GitHub Release 未找到预编译二进制"
-
-    if has_local_binary; then
-      ok "检测到本地编译的二进制 (bin/anchor)"
-      warn "注意：当前 Dockerfile 从 GitHub Release 下载二进制"
-      warn "如需使用本地二进制，请手动构建："
-      echo "  docker build -f Dockerfile.server -t anchor-server . --build-arg RELEASE_VERSION=<tag>"
-      return 0
-    fi
-
-    err "未找到可用的二进制"
-    echo ""
-    echo "请先创建 GitHub Release："
-    echo "  git tag v0.1.0"
-    echo "  git push --tags"
-    echo ""
-    echo "或本地编译（需要 Go 环境）："
-    echo "  make build"
-    echo ""
-    exit 1
-  }
-
-  ensure_binary
 
   case $MODE in
     server)
-      pull_base_if_missing anchor-server-runtime-base p0m32kun/anchor-server-runtime-base
-      info "构建 Server 镜像..."
-      make build-server
+      pull_if_missing anchor-server
+      pull_if_missing anchor-frontend
       ;;
     worker)
-      pull_base_if_missing anchor-worker-base p0m32kun/anchor-worker-base
-      info "构建 Worker 镜像..."
-      make build-worker
+      pull_if_missing anchor-worker
       ;;
     server_worker)
-      pull_base_if_missing anchor-server-runtime-base p0m32kun/anchor-server-runtime-base
-      pull_base_if_missing anchor-worker-base p0m32kun/anchor-worker-base
-      info "构建 Server 镜像..."
-      make build-server
-      info "构建 Worker 镜像..."
-      make build-worker
+      pull_if_missing anchor-server
+      pull_if_missing anchor-worker
+      pull_if_missing anchor-frontend
       ;;
   esac
 
-  ok "镜像构建完成"
+  ok "镜像准备完成"
 }
 
 save_env() {
@@ -283,6 +225,7 @@ save_env() {
 ANCHOR_API_TOKEN=$TOKEN
 ANCHOR_PORT=$PORT
 ANCHOR_MODE=$MODE
+ANCHOR_REGISTRY=$ACR_REGISTRY
 EOF
 }
 
