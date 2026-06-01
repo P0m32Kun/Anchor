@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-30
+last_updated: 2026-06-01
 scope: runtime-baseline
 ---
 
@@ -16,51 +16,86 @@ This file describes the current repository baseline that agents should assume un
 - Local/remote service: Go application providing API, orchestration, and worker-facing endpoints
 - Persistence: SQLite in WAL mode
 - Realtime updates: SSE
-- Scan execution: worker processes running external security tools (subfinder, dnsx, httpx, naabu, nmap, cdncheck, nuclei)
-- Pipeline configuration: mode-driven (`external`/`internal`) tool selection, per-tool speed params (rate limit, threads, timeout), port range presets
+- Scan execution: worker processes running external security tools (subfinder, dnsx, httpx, naabu, nmap, cdncheck, nuclei, spoor)
 - Global engine credentials: FOFA/Hunter/Quake API keys stored in `engine_credentials` table, configured via `/engines/keys`
 - Vulnerability dictionary: `finding_templates` table stores knowledge entries (title, severity, summary, remediation) matched against findings at report time; seeded from repo JSON (`is_builtin=1`) or created in UI (`is_builtin=0`)
 - Report generation: synchronous Markdown export only; findings are aggregated by matched dictionary entry (`ReportSection`) before rendering
 
+### 执行模型：资产驱动（非管线阶段）
+
+**扫描执行是资产驱动模型，不是管线阶段模型。** 不存在固定的 P1→P2→P3→P4→P5 执行顺序。
+
+核心循环：
+
+```
+发现资产 → DeriveEligibleWorks(资产类型) → 派生 Work(资产×动作) → 执行工具 → 输出解析 → 发现新资产 → 循环
+```
+
+关键组件（`internal/scanengine/`）：
+
+| 组件 | 职责 |
+|------|------|
+| `core/rules.go` | `DeriveEligibleWorks()` — 根据资产类型 + Profile 规则派生 Work |
+| `core/task.go` | `TaskAction` 枚举 + `ActionToTool` 映射 |
+| `engine.go` | 主循环：`processNewAsset` → `tick` → `executeWork` → `onWorkComplete` → `processNewAsset` |
+| `executor/` | 工具调用 + 输出解析器（httpx, katana, ffuf, nuclei, spoor） |
+| `stageagg/` | **仅用于 UI 投影**（SSE 进度展示），不影响执行顺序 |
+
+资产类型 → 动作派生规则（`core/rules.go`）：
+
+| 资产类型 | 派生的动作 |
+|---------|-----------|
+| `AssetSubdomain` | SubdomainEnum, DNSResolve, CDNCheck |
+| `AssetIP` | DNSResolve, CDNCheck, PortScan（alive 且非 CDN） |
+| `AssetIPPort` | ServiceFingerprint |
+| `AssetHTTPService` | HTTPXFingerprint, KatanaCrawl, FFUFBrute, NucleiScan |
+| `AssetHTTPPath` | KatanaCrawl, NucleiScan, SpoorScan |
+
+收敛机制：`idle_timeout`（无新资产）→ `wind_down`（仅允许 Nuclei/httpx）→ `stopped`。
+
+通过 `ANCHOR_SCAN_ENGINE=1` 环境变量启用。详见 `docs/superpowers/specs/2026-05-29-asset-driven-scan-engine-design.md`。
+
 ## Baseline Workflow
 
-The stable product narrative remains:
+产品叙事：
 
 `目标输入 -> Scope Check -> 资产发现 -> Web 初筛 -> 人工验证 -> 报告导出`
 
-实际执行管线（当前已实现）：
+### 扫描配置（Profile）
 
-**内网 (`internal`)** — 以主动发现为主：
+> **注意：以下是扫描配置（Profile），决定哪些工具可用和默认参数，不是执行顺序。**
+> 实际执行由资产驱动引擎按 `DeriveEligibleWorks()` 规则自动调度，见上方「执行模型」。
+
+**内网 (`internal`)** — 以主动发现为主，Profile 规则允许全部动作。
+
+**外网 (`external`)** — `DefaultExternalPipelineConfig()` + `buildConfigForMode("external")` 提供默认参数：
+
+| 配置维度 | 内容 | 涉及工具 |
+|---------|------|----------|
+| 被动资产 | 搜索引擎 + 证书/历史 URL | FOFA、Hunter、Quake、`passive_cert`（crt.sh）、`passive_url`（gau） |
+| 解析降噪 | 子域 + DNS + CDN | Subfinder（默认 passive）、dnsx、cdncheck |
+| 受限主动 | 默认 top100、降 Naabu 速率 | nmap alive → Naabu → nmap -sV；`skip_portscan_on_cdn_host` 为 true 时不扫 CDN IP |
+| Web 扩面 | 探活 + 爬虫/目录 | httpx → Katana（`-jc` JS 端点）→ ffuf（`ffuf_tier` small/medium/off）→ Spoor（JS 静态分析）→ httpx_2 |
+| 精 POC | 指纹驱动 | Nuclei workflow 默认；`nuclei_require_fingerprint` 为 true 时无指纹跳过 |
 
 ```
-目标导入 → nmap alive → Naabu → nmap -sV → httpx → (Katana/ffuf) → Nuclei
-```
-
-**外网 (`external`)** — 五阶段 preset（`DefaultExternalPipelineConfig()` + `buildConfigForMode("external")`）：
-
-| 阶段 | 内容 | 主要工具 |
-|------|------|----------|
-| P1 被动资产 | 搜索引擎 + 证书/历史 URL | FOFA、Hunter、Quake、`passive_cert`（crt.sh）、`passive_url`（gau） |
-| P2 解析降噪 | 子域 + DNS + CDN | Subfinder（默认 passive）、dnsx、cdncheck |
-| P3 受限主动 | **仍做端口扫描**，默认 top100、降 Naabu 速率 | nmap alive → Naabu → nmap -sV；`skip_portscan_on_cdn_host` 为 true 时不扫 CDN IP |
-| P4 Web 慢扩面 | 探活 + 爬虫/目录 | httpx → Katana（`-jc` JS 端点）→ ffuf（`ffuf_tier` small/medium/off）→ httpx_2 |
-| P5 精 POC | 指纹驱动 | Nuclei workflow 默认；`nuclei_require_fingerprint` 为 true 时无指纹跳过 |
-
-```
-company → passive_search(FOFA+Hunter+Quake) → domain/ip 分流
-domain  → P1 passive_cert/url → P2 subfinder/DNS/CDN → P3 端口 → P4 Web → P5 Nuclei
-url     → 跳过 P3，直接 P4/P5
+company → passive_search(FOFA+Hunter+Quake) → domain/ip 分流 → 各自进入资产驱动循环
+domain  → subfinder/DNS/CDN → 端口 → httpx/Katana/ffuf/Spoor/Nuclei（由资产类型自动派生）
+url     → httpx/Katana/ffuf/Spoor/Nuclei（由资产类型自动派生）
 ```
 
 扫描模式由前端 `ScanModal` 选择；外网模式加载 `DEFAULT_EXTERNAL_PIPELINE_CONFIG`（`port_range: top100`、`nuclei_scan_depth: workflow` 等）。
 
 各工具的速率限制、并发线程、超时参数在 `ScanModal` Step 2 中配置，通过 `POST /projects/{id}/scan` 的 `config` 字段传递。端口范围支持 top100 / top1000 / high-risk / full / custom 五种预设。
 
-引擎凭证在全局 `engine_credentials` 表配置（`/engines/keys`）。**Pipeline 被动搜索**在 `runPassiveSearch` 中并行调用 FOFA、Hunter、Quake（fail-soft，单引擎失败不阻断）。Engines 页手动搜索仍保留，供 Pipeline 外调研。
+引擎凭证在全局 `engine_credentials` 表配置（`/engines/keys`）。被动搜索在 `runPassiveSearch` 中并行调用 FOFA、Hunter、Quake（fail-soft，单引擎失败不阻断）。Engines 页手动搜索仍保留，供扫描外调研。
 
 ### 多目标类型与 Company 目标自动展开
 
-`PipelineConfig.runFlow` 按 `Target.Type` 分流到不同入口：
+> **注意：以下是 Legacy Pipeline 的目标分流逻辑（`PipelineConfig.runFlow`）。**
+> 在资产驱动引擎下，所有目标统一作为 `AssetSubdomain` 种子资产注入，由 `DeriveEligibleWorks()` 自动派生后续动作。
+
+Legacy Pipeline 按 `Target.Type` 分流：
 
 | 目标类型 | 入口 |
 | --- | --- |
@@ -218,7 +253,7 @@ Sections 按 severity 倒序排列；同级 severity 时命中词条排在未命
 
 `internal/toolguard/allowlist.go` 提供外部二进制执行的集中管控。所有 `exec.Command` / `exec.CommandContext` 调用点在创建子进程之前都经过 `Allowlist.Validate(binary, args)` 检查：
 
-1. **二进制白名单** — 只允许预定义的工具名（`subfinder`, `dnsx`, `httpx`, `naabu`, `nmap`, `nuclei`, `cdncheck`, `git`, `sh`, `bash`）。检查基于 `filepath.Base`，因此 `/tmp/evil` 即使伪装成允许的名字也会被拒绝（basename 不在列表中），而 `/usr/local/bin/nuclei` 会被接受（basename `nuclei` 在白名单中）。
+1. **二进制白名单** — 只允许预定义的工具名（`subfinder`, `dnsx`, `httpx`, `naabu`, `nmap`, `nuclei`, `cdncheck`, `spoor`, `git`, `sh`, `bash`）。检查基于 `filepath.Base`，因此 `/tmp/evil` 即使伪装成允许的名字也会被拒绝（basename 不在列表中），而 `/usr/local/bin/nuclei` 会被接受（basename `nuclei` 在白名单中）。
 2. **参数安全检查** — 拒绝任何包含 shell 元字符（`;|&><`$(){}[]\n\r`）的参数。`exec.Command` 本身已规避 shell 注入，这层检查是纵深防御：万一参数在未来被拼接到 shell 字符串中，元字符不会穿透。
 
 接入点覆盖全部 5 个 `exec.Command` 调用文件：
@@ -235,11 +270,11 @@ Sections 按 severity 倒序排列；同级 severity 时命中词条排在未命
 
 ## 资产驱动扫描引擎（ScanEngine）
 
-**状态**：已实现，通过 `ANCHOR_SCAN_ENGINE=1` 环境变量启用。
+**状态**：已实现，通过 `ANCHOR_SCAN_ENGINE=1` 环境变量启用。**这是当前唯一的扫描执行模型。**
 
 ### 核心概念
 
-扫描执行从阶段流水线迁移为 **资产图 + Work(资产×动作) + 属性门控 + 收敛状态机**。
+扫描执行为 **资产图 + Work(资产×动作) + 属性门控 + 收敛状态机**。不存在固定阶段顺序。
 
 | 概念 | 说明 |
 |------|------|
@@ -256,7 +291,7 @@ internal/scanengine/
   work/           Store (TryClaim/MarkDone/AllTerminal)
   queue/          PriorityQueue (high/medium/low)
   dedup/          RunDedup (run-level normalized value dedup)
-  executor/       Executor interface + ToolExecutor + httpx/nuclei/katana/ffuf parsers
+  executor/       Executor interface + ToolExecutor + httpx/nuclei/katana/ffuf/spoor parsers
   stageagg/       Aggregator (Work → Stage projection)
   engine.go       ScanEngine main loop
 ```
@@ -286,8 +321,8 @@ internal/scanengine/
 ### 双轨可观测性
 
 - **真相**：`scan_work_items` + `scan_tasks` + run metrics
-- **投影**：`pipeline_run_stages` + `pipeline_stage_change` SSE
-- Stage 无严格先后顺序；同一 stage 可多轮 `running`
+- **UI 投影**：`pipeline_run_stages` + `pipeline_stage_change` SSE（由 `stageagg.Aggregator` 生成，仅用于前端进度展示，**不影响执行逻辑**）
+- Stage 是 UI 分组标签（crawl/vuln/httpx 等），不是执行阶段；同一 stage 可多轮 `running`
 
 ### API
 
