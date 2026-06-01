@@ -114,7 +114,7 @@ func BuildNaabuCommand(hostFile, portRange string, rate, threads, timeout int) [
 // stats heartbeat, a 100-target scan with zero matches would emit nothing on
 // stdout and get killed at the 60s idle threshold.
 func BuildNucleiCommand(targetFile, profile string, rateLimit, rateLimitPerMin, concurrency int, tags []string, scanDepth string, workflowDir string, templatePath string) []string {
-	args := []string{"nuclei", "-jsonl", "-l", targetFile, "-stats", "-si", "30"}
+	args := []string{"nuclei", "-jsonl", "-l", targetFile, "-stats", "-si", "30", "-dut=false", "-code"}
 
 	switch profile {
 	case "light":

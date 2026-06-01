@@ -33,11 +33,22 @@ ARG SPOOR_VERSION=0.2.0
 # - libpcap0.8: 运行时库（naabu 需要），不需要 -dev 头文件
 # - nmap: 代码中 BuildNmapServiceScanCommand 直接调用，必须保留
 # - unzip: 仅下载工具时使用
+# - telnet: nuclei code 模板常用（CVE-2026-24061 等）
+# - netcat-openbsd: 网络连接测试
+# - openssh-client: SSH 相关 code 模板
+# - redis-tools: Redis 未授权/弱口令验证
+# - default-mysql-client: MySQL 弱口令验证
+# - postgresql-client: PostgreSQL 弱口令验证
+# - python3: Python code 模板
+# - jq: JSON 处理
 # 注：git 已移除，内置数据改用 wget 下载 tarball
 RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
     && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
     ca-certificates libpcap0.8 nmap wget curl unzip \
+    telnet netcat-openbsd openssh-client \
+    redis-tools default-mysql-client postgresql-client \
+    python3 jq \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 

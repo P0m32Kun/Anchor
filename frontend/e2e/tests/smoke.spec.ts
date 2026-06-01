@@ -40,7 +40,7 @@ test.describe
 			// 导航到目标管理页（LegacyRouteGuard 会重定向到 /projects/:id/targets）
 			await page.goto("/targets");
 			await expect(page).toHaveURL(/\/projects\/.*\/targets/);
-			await expect(page.getByText("目标与 Scope")).toBeVisible({ timeout: 10000 });
+			await expect(page.getByRole("heading", { name: "目标与 Scope" })).toBeVisible({ timeout: 10000 });
 
 			// ── Step 4: 导入目标 ──
 			// 选择目标类型为域名（使用更精确的选择器）

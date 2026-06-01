@@ -14,7 +14,7 @@ export default defineConfig({
 	globalTimeout: 35 * 60 * 1000,
 	reporter: [["list"]],
 	use: {
-		baseURL: "http://localhost:1420",
+		baseURL: "http://localhost:80",
 		trace: "retain-on-failure",
 		screenshot: "only-on-failure",
 		video: "retain-on-failure",
