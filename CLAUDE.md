@@ -65,6 +65,18 @@ grep -rn "worker\.Build" ./internal/workflow/ | grep -v "discovery\.go\|screensh
 - 先说"代码现状是这样的，你确认应该怎么做？"
 - 尤其涉及 **Server 执行 vs Worker 调度** 的选择时
 
+### 代码搜索工具优先级
+
+禁止直接用 Grep/Glob 做代码探索。按问题类型选工具：
+
+| 问题类型 | 工具 | 示例 |
+|---|---|---|
+| 符号定义/签名 | `codegraph_search` + `codegraph_node` | "X 定义在哪？" |
+| 调用关系 | `codegraph_callers` / `codegraph_callees` | "谁调用了 X？" |
+| 改动影响面 | `codegraph_impact` | "改 X 会波及什么？" |
+| 模块/功能理解 | `semble-search` agent | "这个模块怎么工作的？" |
+| 纯字面量搜索 | Grep | 找特定字符串、日志、注释 |
+
 ### 编辑策略优先级
 
 1. 短文件（<200 行）→ `write_file` 完整覆写

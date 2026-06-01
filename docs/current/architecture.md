@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-26
+last_updated: 2026-05-30
 scope: runtime-baseline
 ---
 
@@ -256,7 +256,7 @@ internal/scanengine/
   work/           Store (TryClaim/MarkDone/AllTerminal)
   queue/          PriorityQueue (high/medium/low)
   dedup/          RunDedup (run-level normalized value dedup)
-  executor/       ToolExecutor + httpx/nuclei/katana/ffuf parsers
+  executor/       Executor interface + ToolExecutor + httpx/nuclei/katana/ffuf parsers
   stageagg/       Aggregator (Work → Stage projection)
   engine.go       ScanEngine main loop
 ```
@@ -266,6 +266,14 @@ internal/scanengine/
 - `MaxDiscoveryDepth = 2`（全局默认）
 - katana/ffuf `MaxDepth = 1`（仅 depth ≤ 1 执行）
 - 子域枚举 `MaxDepth = 1`
+
+### 执行与同步
+
+- `BatchSize` 同时作为最大在途 Work 数和并发信号量容量，避免 scheduler 一次性放出过多子进程。
+- `PriorityQueue` 对 `WorkID` 做去重；同一 Work 在被 `Pop()` 之前不会重复入队。
+- `Run()` 在取消上下文时会先等待所有 in-flight work 完成，再把引擎状态切到 `stopped`。
+- `stageagg.Aggregator` 用互斥锁串行化 stage 投影更新，避免并行 completion 回调互相踩写。
+- `executor.Executor` 通过接口注入，便于测试时替换真实工具执行器。
 
 ### 收敛规则
 
@@ -288,6 +296,64 @@ internal/scanengine/
 | GET | `/projects/{id}/pipeline/runs/{runId}/metrics` | 引擎状态 + Work 计数 |
 | GET | `/projects/{id}/pipeline/runs/{runId}/works` | Work 列表 |
 | GET | `/assets/{id}/works?run_id=` | 单资产 Work 时间线 |
+
+### 全局域名排除列表
+
+**状态**：已实现，默认启用。
+
+为防止爬虫在目标网站中发现外部链接时将公共服务域名误判为目标资产，系统提供了全局域名排除列表。
+
+#### 工作原理
+
+| 组件 | 说明 |
+|------|------|
+| `internal/exclude/defaults.go` | 内置默认排除域名列表（github.com, apache.org, w3.org 等） |
+| `internal/exclude/exclude.go` | 排除管理器，支持内存缓存和域名变更回调 |
+| `excluded_domains` 表 | 持久化存储，区分内置（builtin=1）和用户自定义（builtin=0） |
+| `internal/api/exclude_handlers.go` | REST API 接口 |
+| `internal/scanengine/engine.go` | 在 `processNewAsset` 中集成过滤 |
+
+#### 过滤时机
+
+域名排除检查在以下时机执行：
+
+1. **scanengine.processNewAsset**: 每当发现新资产时，检查其域名是否在排除列表中
+2. **支持 URL 解析**: 对于 URL 类型的资产，自动提取域名进行检查
+3. **子域名匹配**: `example.com` 会匹配 `api.example.com`、`sub.example.com` 等
+
+#### API 接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/excluded-domains` | 查看所有排除域名（内置 + 自定义） |
+| GET | `/excluded-domains/defaults` | 查看内置默认列表 |
+| POST | `/excluded-domains` | 添加自定义域名 |
+| POST | `/excluded-domains/batch` | 批量添加域名 |
+| DELETE | `/excluded-domains/{domain}` | 删除自定义域名（内置不可删） |
+| POST | `/excluded-domains/reset` | 重置为默认列表 |
+| GET | `/excluded-domains/check?domain=` | 检查域名是否被排除 |
+
+#### 数据库
+
+```sql
+CREATE TABLE excluded_domains (
+    id TEXT PRIMARY KEY,
+    domain TEXT NOT NULL UNIQUE,
+    reason TEXT NOT NULL DEFAULT '',
+    builtin INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### 启动顺序
+
+```text
+Server NewServer():
+  1. SeedDefaultExcludedDomains()  // 种子化内置域名
+  2. LoadCustomExcludedDomains()   // 加载用户自定义域名到内存
+```
+
+详细文档见 `docs/features/exclude-domains.md`。
 
 ## What Is Not Baseline Yet
 

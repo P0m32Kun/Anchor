@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-05-30 — 扫描引擎并发与靶场文档同步
+
+### 文档更新
+
+- **testing 约定补强**：`docs/conventions/testing.md` 新增外网授权靶标列表和 `docker-rangefield` 内网靶场入口
+- **架构基线同步**：`docs/current/architecture.md` 补充 scanengine 的并发限制、Work 去重、in-flight shutdown 等当前行为
+- **变更日志回填**：把这次文档和执行语义更新记入文档变更记录，方便后续对照
+
+### 代码语义变化
+
+- `internal/scanengine/queue.PriorityQueue` 现在会按 `WorkID` 去重，避免重复工作项并发执行
+- `internal/scanengine/engine.ScanEngine` 使用 `BatchSize` 信号量限制在途 work，并在停止时等待在跑任务收尾
+- `internal/scanengine/stageagg.Aggregator` 加锁保护 stage 投影更新，适配并行 work completion 回调
+
+---
+
 ## 2026-05-14 — 知识库洁癖审查
 
 ### 文档整理

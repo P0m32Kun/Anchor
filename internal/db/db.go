@@ -294,6 +294,15 @@ func migrate(db *sql.DB) error {
 		}
 		version = 26
 	}
+	if version < 27 {
+		if err := migrateV27(db); err != nil {
+			return fmt.Errorf("migrate v27 (excluded_domains): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 27"); err != nil {
+			return fmt.Errorf("set user_version 27: %w", err)
+		}
+		version = 27
+	}
 	if err := ensureProjectsColumns(db); err != nil {
 		return fmt.Errorf("ensure projects columns: %w", err)
 	}

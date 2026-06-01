@@ -3,11 +3,13 @@ package scanengine
 import (
 	"context"
 	"log"
+	"net"
 	"sync"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/asset"
 	"github.com/P0m32Kun/Anchor/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/exclude"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/dedup"
@@ -40,25 +42,26 @@ func DefaultEngineConfig() EngineConfig {
 
 // ScanEngine is the asset-driven scan engine.
 type ScanEngine struct {
-	queries  *db.Queries
-	runner   *worker.Runner
-	tools    *toolregistry.Registry
-	merger   *asset.Merger
-	store    *work.Store
-	exec     *executor.ToolExecutor
-	agg      *stageagg.Aggregator
-	dedup    *dedup.RunDedup
-	pq       *queue.PriorityQueue
-	config   EngineConfig
-	profile  core.Profile
-	dataDir  string
-	runID    string
-	projectID string
+	queries    *db.Queries
+	merger     *asset.Merger
+	store      *work.Store
+	exec       executor.Executor
+	agg        *stageagg.Aggregator
+	dedup      *dedup.RunDedup
+	pq         *queue.PriorityQueue
+	config     EngineConfig
+	profile    core.Profile
+	excludeMgr *exclude.Manager
+	dataDir    string
+	runID      string
+	projectID  string
 
 	mu             sync.Mutex
 	engineState    string
 	lastNewAssetAt time.Time
 	cancel         context.CancelFunc
+	wg             sync.WaitGroup
+	sem            chan struct{} // concurrency limiter
 }
 
 // New creates a new ScanEngine.
@@ -68,20 +71,35 @@ func New(
 	tools *toolregistry.Registry,
 	merger *asset.Merger,
 	profile core.Profile,
+	excludeMgr *exclude.Manager,
 	dataDir string,
 	runID string,
 	projectID string,
 	config EngineConfig,
 	stageCallback stageagg.StageEventCallback,
 ) *ScanEngine {
-	store := work.NewStore(queries)
 	exec := executor.NewToolExecutor(queries, runner, tools, merger, dataDir)
+	return NewWithExecutor(queries, merger, profile, excludeMgr, dataDir, runID, projectID, config, stageCallback, exec)
+}
+
+// NewWithExecutor creates a ScanEngine with an injected Executor (for testing).
+func NewWithExecutor(
+	queries *db.Queries,
+	merger *asset.Merger,
+	profile core.Profile,
+	excludeMgr *exclude.Manager,
+	dataDir string,
+	runID string,
+	projectID string,
+	config EngineConfig,
+	stageCallback stageagg.StageEventCallback,
+	exec executor.Executor,
+) *ScanEngine {
+	store := work.NewStore(queries)
 	agg := stageagg.NewAggregator(queries, runID, stageCallback)
 
 	return &ScanEngine{
 		queries:        queries,
-		runner:         runner,
-		tools:          tools,
 		merger:         merger,
 		store:          store,
 		exec:           exec,
@@ -90,11 +108,13 @@ func New(
 		pq:             queue.New(),
 		config:         config,
 		profile:        profile,
+		excludeMgr:     excludeMgr,
 		dataDir:        dataDir,
 		runID:          runID,
 		projectID:      projectID,
 		engineState:    "running",
 		lastNewAssetAt: time.Now().UTC(),
+		sem:            make(chan struct{}, config.BatchSize),
 	}
 }
 
@@ -127,6 +147,7 @@ func (e *ScanEngine) Run(ctx context.Context, targets []string) error {
 	for {
 		select {
 		case <-ctx.Done():
+			e.wg.Wait() // wait for in-flight work to finish
 			e.setEngineState("stopped")
 			return ctx.Err()
 		case <-ticker.C:
@@ -160,6 +181,12 @@ func (e *ScanEngine) processNewAsset(ctx context.Context, a *core.DiscoveryAsset
 
 	// Depth check
 	if a.DiscoveryDepth > core.MaxDiscoveryDepth {
+		return
+	}
+
+	// Exclusion check: skip assets that match excluded domains
+	if e.excludeMgr != nil && e.excludeMgr.IsExcluded(a.Value) {
+		log.Printf("[scanengine] skipping excluded domain: %s", a.Value)
 		return
 	}
 
@@ -206,19 +233,24 @@ func (e *ScanEngine) processNewAsset(ctx context.Context, a *core.DiscoveryAsset
 
 // tick is called on each scheduler cycle.
 func (e *ScanEngine) tick(ctx context.Context) error {
+	e.mu.Lock()
+	lastAsset := e.lastNewAssetAt
+	state := e.engineState
+	e.mu.Unlock()
+
 	// Check absolute timeout
-	if time.Since(e.lastNewAssetAt) > e.config.AbsoluteTimeout {
+	if time.Since(lastAsset) > e.config.AbsoluteTimeout {
 		e.setEngineState("stopped")
 		return nil
 	}
 
 	// Check idle timeout → wind_down
-	if e.engineState == "running" && time.Since(e.lastNewAssetAt) > e.config.IdleTimeout {
+	if state == "running" && time.Since(lastAsset) > e.config.IdleTimeout {
 		e.setEngineState("wind_down")
 	}
 
 	// If wind_down and queue empty and all terminal → stopped
-	if e.engineState == "wind_down" {
+	if state == "wind_down" {
 		allTerminal, err := e.store.AllTerminal(e.runID)
 		if err != nil {
 			return err
@@ -235,7 +267,6 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 		return err
 	}
 	for _, w := range pending {
-		// Check if already in queue (by checking if it's been processed)
 		priority := queue.ClassifyAction(w.Action)
 		e.pq.Push(queue.Item{
 			WorkID:   w.ID,
@@ -245,13 +276,19 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 		})
 	}
 
-	// Pop and execute up to BatchSize items
+	// Pop and execute up to BatchSize items with concurrency control
 	for i := 0; i < e.config.BatchSize; i++ {
 		item, ok := e.pq.Pop()
 		if !ok {
 			break
 		}
-		go e.executeWork(ctx, item)
+		e.wg.Add(1)
+		e.sem <- struct{}{} // acquire concurrency slot
+		go func(it queue.Item) {
+			defer e.wg.Done()
+			defer func() { <-e.sem }() // release slot
+			e.executeWork(ctx, it)
+		}(item)
 	}
 
 	return nil
@@ -277,7 +314,10 @@ func (e *ScanEngine) executeWork(ctx context.Context, item queue.Item) {
 	e.agg.OnWorkStarted(core.TaskAction(w.Action))
 
 	// Build params based on action
-	params, err := e.buildParams(ctx, w)
+	params, cleanup, err := e.buildParams(ctx, w)
+	if cleanup != nil {
+		defer cleanup()
+	}
 	if err != nil {
 		e.store.MarkFailed(w.ID, err.Error())
 		e.agg.OnWorkCompleted(core.TaskAction(w.Action))
@@ -306,13 +346,37 @@ func (e *ScanEngine) executeWork(ctx context.Context, item queue.Item) {
 func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem, stdout []byte) {
 	switch core.TaskAction(w.Action) {
 	case core.ActionHTTPXFingerprint:
-		newAssets, attrs, err := executor.ParseHttpxOutput(stdout, e.projectID)
+		newAssets, attrs, endpoints, err := executor.ParseHttpxOutput(stdout, e.projectID)
 		if err != nil {
 			log.Printf("[scanengine] parse httpx: %v", err)
 			return
 		}
-		// Mark source asset as fingerprinted
-		_ = attrs
+		_ = attrs // attrs are tracked at the asset level; technologies are stored per-endpoint below
+
+		// Persist web endpoints with technologies
+		for _, ep := range endpoints {
+			host := ep.Host
+			if host == "" {
+				continue
+			}
+			assetType := "domain"
+			if net.ParseIP(host) != nil {
+				assetType = "ip"
+			}
+			hostAsset, _, err := e.merger.MergeOrCreateAsset(e.projectID, assetType, host, "httpx")
+			if err != nil {
+				log.Printf("[scanengine] merge/create asset %s: %v", host, err)
+				continue
+			}
+			ep.AssetID = hostAsset.ID
+			if _, _, err := e.merger.CreateWebEndpointIfNotExists(
+				e.projectID, hostAsset.ID, ep.URL, ep.Scheme, ep.Host,
+				ep.Port, ep.Path, ep.Title, ep.StatusCode, ep.Technologies, "httpx",
+			); err != nil {
+				log.Printf("[scanengine] save web endpoint %s: %v", ep.URL, err)
+			}
+		}
+
 		// Process discovered sub-assets
 		for _, a := range newAssets {
 			a.ParentID = w.AssetID
@@ -350,41 +414,38 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 }
 
 // buildParams constructs tool parameters for a work item.
-func (e *ScanEngine) buildParams(ctx context.Context, w *models.ScanWorkItem) (toolregistry.RenderParams, error) {
+func (e *ScanEngine) buildParams(ctx context.Context, w *models.ScanWorkItem) (toolregistry.RenderParams, func(), error) {
 	switch core.TaskAction(w.Action) {
 	case core.ActionHTTPXFingerprint:
-		// Write the asset value to a host file
 		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{w.AssetID})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		_ = cleanup // cleanup happens after tool execution
 		return toolregistry.RenderParams{
 			"host_file": hostFile,
-		}, nil
+		}, cleanup, nil
 
 	case core.ActionNucleiScan:
 		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{w.AssetID})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		_ = cleanup
 		return toolregistry.RenderParams{
 			"host_file": hostFile,
-		}, nil
+		}, cleanup, nil
 
 	case core.ActionKatanaCrawl:
 		return toolregistry.RenderParams{
 			"url": w.AssetID,
-		}, nil
+		}, nil, nil
 
 	case core.ActionFFUFBrute:
 		return toolregistry.RenderParams{
 			"url": w.AssetID,
-		}, nil
+		}, nil, nil
 
 	default:
-		return toolregistry.RenderParams{}, nil
+		return toolregistry.RenderParams{}, nil, nil
 	}
 }
 

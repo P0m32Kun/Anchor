@@ -405,7 +405,7 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 			engineCfg := scanengine.DefaultEngineConfig()
 			engine := scanengine.New(
 				s.queries, s.worker, toolregistry.DefaultRegistry(),
-				s.assetMerger, profile, s.dataDir, runID, projectID, engineCfg,
+				s.assetMerger, profile, s.excludeMgr, s.dataDir, runID, projectID, engineCfg,
 				func(rid, stage, status, errMsg string) {
 					stageCallback(rid, stage, status, errMsg)
 				},

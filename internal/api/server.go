@@ -16,6 +16,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/builtin"
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/dictionary"
+	"github.com/P0m32Kun/Anchor/internal/exclude"
 	"github.com/P0m32Kun/Anchor/internal/health"
 	"github.com/P0m32Kun/Anchor/internal/httpxfp"
 	"github.com/P0m32Kun/Anchor/internal/models"
@@ -113,6 +114,8 @@ type Server struct {
 	dictMgr *dictionary.Manager
 	// httpxFpMgr 消费者: httpx_fingerprint_handlers.go
 	httpxFpMgr *httpxfp.Manager
+	// excludeMgr 消费者: exclude_handlers.go
+	excludeMgr *exclude.Manager
 }
 
 func generateAPIToken() string {
@@ -160,6 +163,15 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	s.httpxFpMgr = httpxfp.NewManager(queries, dataDir)
 	if err := s.httpxFpMgr.EnsureLayout(); err != nil {
 		log.Printf("[server] httpx fingerprint layout init: %v (continuing)", err)
+	}
+
+	// Initialize exclude manager
+	s.excludeMgr = exclude.NewManager()
+	if err := s.queries.SeedDefaultExcludedDomains(); err != nil {
+		log.Printf("[server] seed default excluded domains: %v (continuing)", err)
+	}
+	if err := s.queries.LoadCustomExcludedDomains(s.excludeMgr); err != nil {
+		log.Printf("[server] load custom excluded domains: %v (continuing)", err)
 	}
 
 	cfg := builtin.LoadConfig()
@@ -387,6 +399,14 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /projects/{id}/slow-scans", auth(http.HandlerFunc(s.handleListSlowScans)))
 	mux.Handle("GET /slow-scans/{id}", auth(http.HandlerFunc(s.handleGetSlowScan)))
 	mux.Handle("POST /slow-scans/{id}/cancel", auth(http.HandlerFunc(s.handleCancelSlowScan)))
+	// Excluded domains (global domain exclusion list)
+	mux.Handle("GET /excluded-domains", auth(http.HandlerFunc(s.handleListExcludedDomains)))
+	mux.Handle("GET /excluded-domains/defaults", auth(http.HandlerFunc(s.handleListDefaultDomains)))
+	mux.Handle("POST /excluded-domains", auth(http.HandlerFunc(s.handleAddExcludedDomain)))
+	mux.Handle("POST /excluded-domains/batch", auth(http.HandlerFunc(s.handleBatchAddExcludedDomains)))
+	mux.Handle("DELETE /excluded-domains/{domain}", auth(http.HandlerFunc(s.handleDeleteExcludedDomain)))
+	mux.Handle("POST /excluded-domains/reset", auth(http.HandlerFunc(s.handleResetExcludedDomains)))
+	mux.Handle("GET /excluded-domains/check", auth(http.HandlerFunc(s.handleCheckExcludedDomain)))
 	// Finding templates (vulnerability knowledge base)
 	mux.Handle("GET /finding-templates", auth(http.HandlerFunc(s.handleListFindingTemplates)))
 	mux.Handle("POST /finding-templates", auth(http.HandlerFunc(s.handleCreateFindingTemplate)))

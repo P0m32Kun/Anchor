@@ -1,6 +1,7 @@
 package stageagg
 
 import (
+	"sync"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/db"
@@ -16,6 +17,7 @@ type StageEventCallback func(runID, stage, status, errMsg string)
 // Aggregator projects work-item state changes into pipeline_run_stages
 // records and fires SSE callbacks.
 type Aggregator struct {
+	mu       sync.Mutex
 	queries  *db.Queries
 	runID    string
 	callback StageEventCallback
@@ -39,6 +41,8 @@ func NewAggregator(queries *db.Queries, runID string, callback StageEventCallbac
 // OnWorkStarted is called when a work item transitions to running.
 // It ensures the stage exists and updates work counts.
 func (a *Aggregator) OnWorkStarted(action core.TaskAction) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	stage := core.ActionToStage[action]
 	if err := a.ensureStage(stage); err != nil {
 		return err
@@ -50,6 +54,8 @@ func (a *Aggregator) OnWorkStarted(action core.TaskAction) error {
 
 // OnWorkCompleted is called when a work item reaches a terminal state.
 func (a *Aggregator) OnWorkCompleted(action core.TaskAction) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	stage := core.ActionToStage[action]
 	return a.refreshCounts(stage)
 }

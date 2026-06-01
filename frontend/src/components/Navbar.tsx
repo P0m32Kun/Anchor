@@ -21,6 +21,7 @@ import {
   BookOpen,
   Fingerprint,
   ShieldAlert,
+  Shield,
   PanelLeftClose,
   PanelLeftOpen
 } from "lucide-react";
@@ -40,6 +41,7 @@ const globalNavItems: NavItem[] = [
   { path: "/dictionaries", label: "字典", icon: BookOpen, color: "text-orange-400" },
   { path: "/httpx-fingerprints", label: "指纹", icon: Fingerprint, color: "text-pink-400" },
   { path: "/vuln-templates", label: "漏洞模板", icon: ShieldAlert, color: "text-rose-400" },
+  { path: "/excluded-domains", label: "域名排除", icon: Shield, color: "text-teal-400" },
   { path: "/workers", label: "Workers", icon: Cpu, color: "text-emerald-400" },
   { path: "/settings", label: "设置", icon: Settings, color: "text-slate-400" },
 ];

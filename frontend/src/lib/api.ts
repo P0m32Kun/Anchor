@@ -350,6 +350,14 @@ export interface ToolHealth {
   dns_available: boolean;
 }
 
+export interface ExcludedDomain {
+  id: string;
+  domain: string;
+  reason: string;
+  builtin: boolean;
+  created_at: string;
+}
+
 export interface Finding {
   id: string;
   project_id: string;
@@ -714,6 +722,40 @@ export const api = {
 
   acceptFindingTemplateUpstream: (id: string, signal?: AbortSignal) =>
     fetchAPI<FindingTemplate>(`/finding-templates/${id}/accept-upstream`, { method: "POST", signal }),
+
+  // --- Excluded Domains ---
+
+  listExcludedDomains: (signal?: AbortSignal) =>
+    fetchAPI<{ builtin: ExcludedDomain[]; custom: ExcludedDomain[]; total: number }>("/excluded-domains", { signal }),
+
+  listDefaultDomains: (signal?: AbortSignal) =>
+    fetchAPI<{ domains: string[]; total: number }>("/excluded-domains/defaults", { signal }),
+
+  addExcludedDomain: (domain: string, reason?: string, signal?: AbortSignal) =>
+    fetchAPI<ExcludedDomain>("/excluded-domains", {
+      method: "POST",
+      body: JSON.stringify({ domain, reason: reason || "" }),
+      signal,
+    }),
+
+  batchAddExcludedDomains: (domains: Array<{ domain: string; reason?: string }>, signal?: AbortSignal) =>
+    fetchAPI<{ created: number; domains: ExcludedDomain[] }>("/excluded-domains/batch", {
+      method: "POST",
+      body: JSON.stringify({ domains }),
+      signal,
+    }),
+
+  deleteExcludedDomain: (domain: string, signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/excluded-domains/${domain}`, { method: "DELETE", signal }),
+
+  resetExcludedDomains: (signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>("/excluded-domains/reset", { method: "POST", signal }),
+
+  checkExcludedDomain: (domain: string, signal?: AbortSignal) =>
+    fetchAPI<{ domain: string; excluded: boolean; reason: string }>(
+      `/excluded-domains/check?domain=${encodeURIComponent(domain)}`,
+      { signal }
+    ),
 };
 
 export interface Run {

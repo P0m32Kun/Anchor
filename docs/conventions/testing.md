@@ -226,7 +226,44 @@ lsof -i :17421 -i :1420
 
 任何长期占用 17421 / 1420 的本地进程都需要先停掉。`global-setup.ts` / `global-teardown.ts` 只清自己 compose project 的容器,**不会**清这些孤儿,因此清理是手动义务。
 
-## 10. 不讨论范围
+## 10. 扫描测试靶标
+
+### 外网靶标（SRC 授权）
+
+以下域名已通过 SRC 平台申请授权，可用于外网扫描测试：
+
+| 域名 | 所属公司 |
+|------|---------|
+| `lexin.com` | 乐信 |
+| `dreame.tech` | 追觅科技 |
+| `jtexpress.com` | 极兔速递 |
+| `dxy.cn` | 丁香园 |
+| `ztgame.com.cn` | 巨人网络 |
+| `sheingroup.net` | SHEIN |
+| `ltwebstatic.com` | SHEIN（静态资源） |
+| `sheinside.cn` | SHEIN（旧域名） |
+
+> **注意**: 仅限在 SRC 授权范围内使用，禁止超范围扫描。
+
+### 内网靶标（Docker 靶场）
+
+内网扫描测试使用 Docker 靶场环境，详见 [`docker-rangefield/README.md`](../../docker-rangefield/README.md)。
+
+| 服务 | 容器 IP | 端口 | 漏洞类型 |
+|------|---------|------|---------|
+| rf-nginx | 172.30.0.10 | 18080 | 基准正常服务 |
+| rf-tomcat | 172.30.0.11 | 18081 | Tomcat 弱口令 (tomcat/tomcat) |
+| rf-grafana | 172.30.0.12 | 18082 | Grafana 弱口令 (admin/admin) |
+| rf-redis | 172.30.0.13 | 16379 | Redis 未授权访问 |
+| rf-mysql | 172.30.0.14 | 13306 | MySQL 弱口令 (root/root) |
+
+启动方式：
+
+```bash
+cd docker-rangefield && make up
+```
+
+## 11. 不讨论范围
 
 - Tauri 桌面端的自动化测试(参见 `docs/tauri-testability.md`,目前只能浏览器跑)
 - 性能/压测/安全渗透——这些不属于本约定的金字塔

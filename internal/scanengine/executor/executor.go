@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/P0m32Kun/Anchor/internal/asset"
@@ -21,6 +22,11 @@ import (
 // OnWorkComplete is called after a work item finishes execution.
 // It returns new assets discovered and attribute updates.
 type OnWorkComplete func(workItem *models.ScanWorkItem, stdout []byte) ([]*core.DiscoveryAsset, core.AssetAttrs, error)
+
+// Executor is the interface for executing work items.
+type Executor interface {
+	Execute(ctx context.Context, w *models.ScanWorkItem, params toolregistry.RenderParams) (*toolrun.InvokeResult, error)
+}
 
 // ToolExecutor executes individual work items via toolrun.Invoke.
 type ToolExecutor struct {
@@ -88,10 +94,13 @@ func actionToToolID(action string) string {
 	}
 }
 
-// ParseHttpxOutput parses httpx JSONL output into discovered assets and attrs.
-func ParseHttpxOutput(stdout []byte, projectID string) ([]*core.DiscoveryAsset, core.AssetAttrs, error) {
+// ParseHttpxOutput parses httpx JSONL output into discovered assets, attrs,
+// and web endpoints (with technologies). The caller is responsible for
+// persisting the returned web endpoints via the merger.
+func ParseHttpxOutput(stdout []byte, projectID string) ([]*core.DiscoveryAsset, core.AssetAttrs, []*models.WebEndpoint, error) {
 	var assets []*core.DiscoveryAsset
 	var attrs core.AssetAttrs
+	var endpoints []*models.WebEndpoint
 
 	lines := strings.Split(strings.TrimSpace(string(stdout)), "\n")
 	for _, line := range lines {
@@ -120,8 +129,30 @@ func ParseHttpxOutput(stdout []byte, projectID string) ([]*core.DiscoveryAsset, 
 		if len(entry.Technologies) > 0 {
 			attrs.Technologies = append(attrs.Technologies, entry.Technologies...)
 		}
+
+		// Build web endpoint record for persistence
+		we := &models.WebEndpoint{
+			ID:           util.GenerateID(),
+			ProjectID:    projectID,
+			URL:          entry.URL,
+			Scheme:       entry.Scheme,
+			Host:         entry.Host,
+			Path:         entry.Path,
+			Title:        entry.Title,
+			Technologies: entry.Technologies,
+			SourceTool:   "httpx",
+		}
+		if entry.StatusCode > 0 {
+			we.StatusCode = &entry.StatusCode
+		}
+		if entry.Port != "" {
+			if p, err := strconv.Atoi(entry.Port); err == nil {
+				we.Port = &p
+			}
+		}
+		endpoints = append(endpoints, we)
 	}
-	return assets, attrs, nil
+	return assets, attrs, endpoints, nil
 }
 
 // ParseNucleiOutput parses nuclei JSONL output (currently a no-op placeholder

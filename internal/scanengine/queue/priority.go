@@ -34,17 +34,24 @@ type PriorityQueue struct {
 	high []Item
 	med  []Item
 	low  []Item
+	seen map[string]bool // dedup by WorkID
 }
 
 // New creates a new empty PriorityQueue.
 func New() *PriorityQueue {
-	return &PriorityQueue{}
+	return &PriorityQueue{
+		seen: make(map[string]bool),
+	}
 }
 
-// Push adds an item to the appropriate tier.
+// Push adds an item to the appropriate tier. Duplicate WorkIDs are ignored.
 func (q *PriorityQueue) Push(item Item) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	if q.seen[item.WorkID] {
+		return
+	}
+	q.seen[item.WorkID] = true
 	switch item.Priority {
 	case PriorityHigh:
 		q.high = append(q.high, item)
@@ -60,22 +67,25 @@ func (q *PriorityQueue) Push(item Item) {
 func (q *PriorityQueue) Pop() (Item, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	var item Item
+	var ok bool
 	if len(q.high) > 0 {
-		item := q.high[0]
+		item = q.high[0]
 		q.high = q.high[1:]
-		return item, true
-	}
-	if len(q.med) > 0 {
-		item := q.med[0]
+		ok = true
+	} else if len(q.med) > 0 {
+		item = q.med[0]
 		q.med = q.med[1:]
-		return item, true
-	}
-	if len(q.low) > 0 {
-		item := q.low[0]
+		ok = true
+	} else if len(q.low) > 0 {
+		item = q.low[0]
 		q.low = q.low[1:]
-		return item, true
+		ok = true
 	}
-	return Item{}, false
+	if ok {
+		delete(q.seen, item.WorkID)
+	}
+	return item, ok
 }
 
 // Len returns the total number of items in the queue.

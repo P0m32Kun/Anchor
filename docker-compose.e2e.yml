@@ -21,6 +21,7 @@ services:
       - ANCHOR_PORT=17421
       - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:-p0m32kun}
       - FOFA_BASE_URL=http://fofa-mock:8888
+      - ANCHOR_SCAN_ENGINE=1
     restart: unless-stopped
     networks:
       - anchor-net
