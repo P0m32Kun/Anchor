@@ -10,6 +10,7 @@ on:
   workflow_run:
     workflows: ["Release"]
     types: [completed]
+  workflow_dispatch:
 
 env:
   ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
