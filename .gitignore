@@ -1,3 +1,6 @@
+# Environment (contains secrets)
+.env
+
 # Binaries
 secbench-server
 内网渗透测试手册_v2.md
@@ -59,8 +62,13 @@ bin/
 .playwright-mcp/
 .antigravitycli/
 .claude/agents/
+.claude/scheduled_tasks.lock
+.codex/
 .cursor/
+.gstack/
+.vite/
 tmp-test/
+test-results/
 
 # Agent configuration
 .pi/
@@ -83,5 +91,9 @@ tmp-tag-test/
 
 # Tauri generated
 src-tauri/gen/
+
+# Superpowers design docs (internal, not for end users)
+docs/superpowers/
+
+# Local scratch
 .gitnexus
-.gstack/
