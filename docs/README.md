@@ -24,7 +24,6 @@
 | [`current/design/README.md`](current/design/README.md) | 当前候选设计索引 | Yes |
 | [`current/decisions/README.md`](current/decisions/README.md) | 当前决策索引 | Yes |
 | [`api-error-contract.md`](api-error-contract.md) | API 错误约定 | Supporting |
-| [`tauri-testability.md`](tauri-testability.md) | Tauri 可测试性规范 | Supporting |
 | [`schema-migrations.md`](schema-migrations.md) | Schema 迁移策略与版本历史 | Supporting |
 | [`CHANGELOG.md`](CHANGELOG.md) | 项目变更日志 | Supporting |
 

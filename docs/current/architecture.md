@@ -12,14 +12,39 @@ This file describes the current repository baseline that agents should assume un
 
 ## System Shape
 
-- Desktop client: Tauri 2.x shell hosting a React 18 + TypeScript frontend
-- Local/remote service: Go application providing API, orchestration, and worker-facing endpoints
+- Web frontend: React 18 + TypeScript, served by Nginx（静态文件 + `/api/` 反向代理到 Server）
+- Go service: Server 提供 API、编排、Worker 对端点；Worker 执行外部安全工具
 - Persistence: SQLite in WAL mode
 - Realtime updates: SSE
 - Scan execution: worker processes running external security tools (subfinder, dnsx, httpx, naabu, nmap, cdncheck, nuclei, spoor)
 - Global engine credentials: FOFA/Hunter/Quake API keys stored in `engine_credentials` table, configured via `/engines/keys`
 - Vulnerability dictionary: `finding_templates` table stores knowledge entries (title, severity, summary, remediation) matched against findings at report time; seeded from repo JSON (`is_builtin=1`) or created in UI (`is_builtin=0`)
 - Report generation: synchronous Markdown export only; findings are aggregated by matched dictionary entry (`ReportSection`) before rendering
+
+### 部署架构
+
+三个 Docker 镜像，通过 docker-compose 编排：
+
+| 镜像 | Dockerfile | 职责 |
+|------|-----------|------|
+| `anchor-server` | `Dockerfile.server` | Go API 服务（从 GitHub Release 下载预编译二进制） |
+| `anchor-worker` | `Dockerfile.worker` | 安全工具 + Go Worker（基于 `anchor-worker-base` 预装所有工具） |
+| `anchor-frontend` | `Dockerfile.frontend` | Nginx 静态 serve React 构建产物 + `/api/` 反向代理 |
+
+**三种部署模式**（通过 `install.sh` 交互式选择）：
+
+| 模式 | compose 文件 | 适用场景 |
+|------|-------------|---------|
+| Server Only | `docker-compose.server.yml` | VPS 部署，Worker 远程连接 |
+| Worker Only | `docker-compose.worker.yml` | 远程扫描节点，连接已有 Server |
+| Server+Worker | `docker-compose.yml` | 本地开发/测试，完整功能 |
+
+**镜像分发**：
+- GitHub Release：Go 二进制（`anchor-linux-amd64`、`anchor-linux-arm64`），tag 推送时由 CI 自动构建
+- 阿里云 ACR：Docker 镜像（`crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun/`），Release 完成后 CI 自动推送
+- `install.sh` 默认从 ACR 拉取镜像（国内加速），本地构建时 fallback 到 Dockerfile
+
+**前端 API 配置**：Nginx 反向代理 `/api/` → `server:17421`，前端默认 `apiBase="/api"`，无需手动配置 API 地址。
 
 ### 执行模型：资产驱动（非管线阶段）
 

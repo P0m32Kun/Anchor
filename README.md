@@ -22,12 +22,12 @@
 
 | 层级          | 技术                                             |
 | ------------- | ------------------------------------------------ |
-| 桌面客户端    | Tauri 2.x + React 18 + TypeScript + Tailwind CSS |
+| Web 前端      | React 18 + TypeScript + Tailwind CSS + Nginx     |
 | 状态管理      | Zustand                                          |
 | 本地/远程服务 | Go 1.26                                          |
 | 数据库        | SQLite (WAL 模式)                                |
 | 实时推送      | SSE (Server-Sent Events)                         |
-| 语法高亮      | Prism.js                                         |
+| 部署          | Docker + docker-compose + install.sh             |
 
 ## 文档入口
 
@@ -41,38 +41,29 @@
 
 ## 快速开始
 
-### 依赖
-
-- Go 1.26+
-- Node.js 18+
-- 外部安全工具
-  ```bash
-  go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-  go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
-  go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
-  go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
-  go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-  ```
-
 ### Docker 一键部署（推荐）
 
-> ⚠️ **部署与本地开发二选一**：Docker 部署和本地 `go run` 都使用端口 **17421**，同时运行会导致端口冲突。如需切换模式，请先停止另一方。
-
 ```bash
-# 启动 Server + Worker + 靶场（可选）
-make up-all
-
-# 停止所有服务
-make down-all
-
-# 查看状态
-docker compose ps
+# 交互式安装向导（支持 Server / Worker / Server+Worker 三种模式）
+bash install.sh
 ```
 
-Server 监听 `:17421`，Worker 自动注册并拉取任务。
+安装向导会自动：
+1. 检测 Docker 环境
+2. 选择部署模式
+3. 配置端口和 API Token
+4. 从阿里云 ACR 拉取预构建镜像（国内加速）
+5. 启动容器并等待健康检查
 
-**国内镜像源：**
-Dockerfile 默认已配置阿里云 Alpine 源和 `GOPROXY=https://goproxy.cn`，可直接在国内网络环境下构建。
+完成后浏览器访问 `http://localhost` 即可使用。
+
+**管理命令：**
+
+```bash
+bash install.sh status   # 查看状态
+bash install.sh logs     # 查看日志
+bash install.sh down     # 停止服务
+```
 
 ### 本地开发
 
@@ -95,7 +86,7 @@ make run-worker
 cd frontend
 npm install
 npm run dev
-# 打开 http://localhost:1420
+# 打开 http://localhost:5173
 ```
 
 **构建：**
@@ -103,7 +94,6 @@ npm run dev
 ```bash
 make build    # 构建 Go 后端
 make test     # 运行测试
-tauri build   # 构建 Tauri 桌面应用
 ```
 
 ## Worker 架构

@@ -1,7 +1,7 @@
 # 前端编码约定
 
-> Anchor 前端（Tauri + React + TypeScript + Tailwind）编码规范。
-> 最后更新：2026-04-27（M4）
+> Anchor 前端（React + TypeScript + Tailwind）编码规范。
+> 最后更新：2026-06-01
 
 ---
 
@@ -101,8 +101,8 @@ export const useProjectStore = create<ProjectStore>((set) => ({
 ### 5.1 唯一入口
 所有后端通信必须通过 `api.ts`：
 ```typescript
-// api.ts
-const API_BASE = 'http://localhost:8080';
+// api.ts — 默认通过 Nginx 反向代理 /api/ → server:17421
+const API_BASE = getApiBase(); // 默认 "/api"，可通过 localStorage 覆盖
 
 export async function createProject(data: CreateProjectInput) {
   const res = await fetch(`${API_BASE}/projects`, {

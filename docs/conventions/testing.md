@@ -265,5 +265,4 @@ cd docker-rangefield && make up
 
 ## 11. 不讨论范围
 
-- Tauri 桌面端的自动化测试(参见 `docs/tauri-testability.md`,目前只能浏览器跑)
 - 性能/压测/安全渗透——这些不属于本约定的金字塔

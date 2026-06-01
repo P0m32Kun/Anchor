@@ -39,7 +39,7 @@ services:
           "CMD",
           "sh",
           "-c",
-          "wget -qO- http://localhost:17421/health >/dev/null 2>&1",
+          "curl -sf --noproxy '*' http://localhost:17421/health >/dev/null 2>&1",
         ]
       interval: 5s
       timeout: 3s

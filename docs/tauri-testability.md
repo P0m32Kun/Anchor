@@ -1,10 +1,12 @@
 ---
-status: active
-source_of_truth: true
+status: archived
+source_of_truth: false
 owner: kun
-last_updated: 2026-05-07
+last_updated: 2026-06-01
 scope: tauri-testability
 ---
+
+> ⚠️ **已归档** — Tauri 桌面端已移除，项目改为纯 Web 部署（Nginx + Docker）。本文档仅保留历史参考。
 
 # Tauri 桌面端可测性评估
 
