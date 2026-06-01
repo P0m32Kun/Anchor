@@ -4,7 +4,8 @@
 # 产出：anchor-linux-amd64、anchor-linux-arm64 附加到 Release assets
 # Dockerfile 直接从 Release 下载二进制，不需要 golang 构建镜像
 #
-# 注意：arm64 通过交叉编译构建（gcc-aarch64-linux-gnu），不需要 ARM runner
+# arm64 通过交叉编译构建（gcc-aarch64-linux-gnu），不需要 ARM runner
+# go-sqlite3 自带 sqlite3 源码，不需要系统 libsqlite3-dev
 
 name: Release
 
@@ -26,26 +27,14 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install build dependencies
-        run: |
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          # amd64 native
-          sudo apt-get install -y gcc libsqlite3-dev
-          # arm64 cross-compile
-          sudo apt-get install -y gcc-aarch64-linux-gnu libsqlite3-dev:arm64
+      - name: Install cross-compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build linux-amd64
-        run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-            CC=gcc \
-            go build -ldflags="-w -s" -o anchor-linux-amd64 .
+        run: CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=gcc go build -ldflags="-w -s" -o anchor-linux-amd64 .
 
       - name: Build linux-arm64
-        run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
-            CC=aarch64-linux-gnu-gcc \
-            go build -ldflags="-w -s" -o anchor-linux-arm64 .
+        run: CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -ldflags="-w -s" -o anchor-linux-arm64 .
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
