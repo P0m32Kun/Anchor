@@ -296,6 +296,126 @@ func (q *Queries) ListEvidenceByFinding(findingID string) ([]*models.Evidence, e
 	return list, rows.Err()
 }
 
+// FindingSeverityStats holds finding count by severity.
+type FindingSeverityStats struct {
+	Severity string
+	Count    int
+}
+
+// GetFindingStatsBySeverity returns finding counts grouped by severity for a run.
+func (q *Queries) GetFindingStatsBySeverity(runID string) ([]*FindingSeverityStats, error) {
+	rows, err := q.db.Query(`
+		SELECT severity, COUNT(*) as cnt
+		FROM findings
+		WHERE run_id = ?
+		GROUP BY severity`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []*FindingSeverityStats
+	for rows.Next() {
+		s := &FindingSeverityStats{}
+		if err := rows.Scan(&s.Severity, &s.Count); err != nil {
+			return nil, err
+		}
+		stats = append(stats, s)
+	}
+	return stats, rows.Err()
+}
+
+// FindingStatusStats holds finding count by status.
+type FindingStatusStats struct {
+	Status string
+	Count  int
+}
+
+// GetFindingStatsByStatus returns finding counts grouped by status for a run.
+func (q *Queries) GetFindingStatsByStatus(runID string) ([]*FindingStatusStats, error) {
+	rows, err := q.db.Query(`
+		SELECT status, COUNT(*) as cnt
+		FROM findings
+		WHERE run_id = ?
+		GROUP BY status`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []*FindingStatusStats
+	for rows.Next() {
+		s := &FindingStatusStats{}
+		if err := rows.Scan(&s.Status, &s.Count); err != nil {
+			return nil, err
+		}
+		stats = append(stats, s)
+	}
+	return stats, rows.Err()
+}
+
+// GetFindingAvgConfidence returns average confidence for a run.
+func (q *Queries) GetFindingAvgConfidence(runID string) (float64, error) {
+	var avg sql.NullFloat64
+	err := q.db.QueryRow(`
+		SELECT AVG(confidence)
+		FROM findings
+		WHERE run_id = ?`, runID).Scan(&avg)
+	if err != nil {
+		return 0, err
+	}
+	if avg.Valid {
+		return avg.Float64, nil
+	}
+	return 0, nil
+}
+
+// GetUnlinkedFindingCount returns count of findings without asset_id for a run.
+func (q *Queries) GetUnlinkedFindingCount(runID string) (int, error) {
+	var count int
+	err := q.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM findings
+		WHERE run_id = ? AND asset_id IS NULL`, runID).Scan(&count)
+	return count, err
+}
+
+// TemplateHitStats holds template hit statistics.
+type TemplateHitStats struct {
+	SourceTool     string
+	SourceRuleID   string
+	HitCount       int
+	ConfirmedCount int
+}
+
+// GetTemplateHitStats returns template hit statistics for a run.
+func (q *Queries) GetTemplateHitStats(runID string) ([]*TemplateHitStats, error) {
+	rows, err := q.db.Query(`
+		SELECT
+			source_tool,
+			source_rule_id,
+			COUNT(*) as hit_count,
+			SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_count
+		FROM findings
+		WHERE run_id = ? AND source_rule_id != ''
+		GROUP BY source_tool, source_rule_id
+		ORDER BY hit_count DESC`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []*TemplateHitStats
+	for rows.Next() {
+		s := &TemplateHitStats{}
+		if err := rows.Scan(&s.SourceTool, &s.SourceRuleID, &s.HitCount, &s.ConfirmedCount); err != nil {
+			return nil, err
+		}
+		stats = append(stats, s)
+	}
+	return stats, rows.Err()
+}
+
 // ListEvidenceByFindingIDs returns evidence for multiple findings in one query (avoids N+1).
 func (q *Queries) ListEvidenceByFindingIDs(findingIDs []string) (map[string][]*models.Evidence, error) {
 	if len(findingIDs) == 0 {

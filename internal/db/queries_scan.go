@@ -722,6 +722,85 @@ func (q *Queries) ListRecentRuns(limit int) ([]*models.DashboardRunItem, error) 
 	return list, rows.Err()
 }
 
+// ListRecentCompletedRunsByProject returns recent completed runs for a project.
+func (q *Queries) ListRecentCompletedRunsByProject(projectID string, limit int) ([]*models.PipelineRun, error) {
+	rows, err := q.db.Query(`
+		SELECT id, project_id, mode, status, stage, error, engine_state, last_new_asset_at, started_at, completed_at, created_at
+		FROM pipeline_runs
+		WHERE project_id = ? AND status IN ('completed', 'failed')
+		ORDER BY created_at DESC
+		LIMIT ?`, projectID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var runs []*models.PipelineRun
+	for rows.Next() {
+		r := &models.PipelineRun{}
+		var completedAt, lastNewAssetAt sql.NullTime
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.EngineState, &lastNewAssetAt, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		if completedAt.Valid {
+			r.CompletedAt = &completedAt.Time
+		}
+		if lastNewAssetAt.Valid {
+			r.LastNewAssetAt = &lastNewAssetAt.Time
+		}
+		runs = append(runs, r)
+	}
+	return runs, rows.Err()
+}
+
+// PipelineRunStageStats holds stage duration statistics.
+type PipelineRunStageStats struct {
+	Stage       string
+	Status      string
+	StartedAt   *time.Time
+	CompletedAt *time.Time
+	Duration    float64 // seconds
+}
+
+// GetPipelineRunStageStats returns stage statistics for a run.
+func (q *Queries) GetPipelineRunStageStats(runID string) ([]*PipelineRunStageStats, error) {
+	rows, err := q.db.Query(`
+		SELECT
+			stage,
+			status,
+			started_at,
+			completed_at,
+			CASE
+				WHEN started_at IS NOT NULL AND completed_at IS NOT NULL
+				THEN (julianday(completed_at) - julianday(started_at)) * 86400
+				ELSE 0
+			END as duration
+		FROM pipeline_run_stages
+		WHERE run_id = ?
+		ORDER BY started_at`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []*PipelineRunStageStats
+	for rows.Next() {
+		s := &PipelineRunStageStats{}
+		var startedAt, completedAt sql.NullTime
+		if err := rows.Scan(&s.Stage, &s.Status, &startedAt, &completedAt, &s.Duration); err != nil {
+			return nil, err
+		}
+		if startedAt.Valid {
+			s.StartedAt = &startedAt.Time
+		}
+		if completedAt.Valid {
+			s.CompletedAt = &completedAt.Time
+		}
+		stats = append(stats, s)
+	}
+	return stats, rows.Err()
+}
+
 func (q *Queries) ListRecentFindingsByStatus(status models.FindingStatus, limit int) ([]*models.DashboardFindingItem, error) {
 	rows, err := q.db.Query(`
 		SELECT f.id, f.project_id, p.name, f.title, f.severity, f.created_at

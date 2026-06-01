@@ -268,3 +268,81 @@ func scanWorkItemRows(rows *sql.Rows) ([]*models.ScanWorkItem, error) {
 	}
 	return list, rows.Err()
 }
+
+// ToolStats holds aggregated statistics for a single tool.
+type ToolStats struct {
+	Tool         string
+	TotalCalls   int
+	SuccessCount int
+	FailedCount  int
+	SkippedCount int
+	AvgDuration  float64 // seconds
+}
+
+// GetToolStatsByRun returns aggregated tool statistics for a run.
+func (q *Queries) GetToolStatsByRun(runID string) ([]*ToolStats, error) {
+	rows, err := q.db.Query(`
+		SELECT
+			action as tool,
+			COUNT(*) as total_calls,
+			SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as success_count,
+			SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count,
+			SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) as skipped_count,
+			AVG(CASE
+				WHEN started_at IS NOT NULL AND completed_at IS NOT NULL
+				THEN (julianday(completed_at) - julianday(started_at)) * 86400
+				ELSE NULL
+			END) as avg_duration
+		FROM scan_work_items
+		WHERE run_id = ?
+		GROUP BY action`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []*ToolStats
+	for rows.Next() {
+		s := &ToolStats{}
+		var avgDuration sql.NullFloat64
+		if err := rows.Scan(&s.Tool, &s.TotalCalls, &s.SuccessCount, &s.FailedCount, &s.SkippedCount, &avgDuration); err != nil {
+			return nil, err
+		}
+		if avgDuration.Valid {
+			s.AvgDuration = avgDuration.Float64
+		}
+		stats = append(stats, s)
+	}
+	return stats, rows.Err()
+}
+
+// ToolErrorStats holds error distribution for a tool.
+type ToolErrorStats struct {
+	Tool  string
+	Error string
+	Count int
+}
+
+// GetToolErrorStatsByRun returns error distribution for tools in a run.
+func (q *Queries) GetToolErrorStatsByRun(runID string) ([]*ToolErrorStats, error) {
+	rows, err := q.db.Query(`
+		SELECT action, error, COUNT(*) as cnt
+		FROM scan_work_items
+		WHERE run_id = ? AND status = 'failed' AND error != ''
+		GROUP BY action, error
+		ORDER BY cnt DESC`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []*ToolErrorStats
+	for rows.Next() {
+		s := &ToolErrorStats{}
+		if err := rows.Scan(&s.Tool, &s.Error, &s.Count); err != nil {
+			return nil, err
+		}
+		stats = append(stats, s)
+	}
+	return stats, rows.Err()
+}
