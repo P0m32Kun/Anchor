@@ -1,9 +1,9 @@
 # Anchor 文档中心
 
-> 最后更新：2026-06-01
+> 最后更新：2026-06-02
 > 默认原则：任何 agent 在阅读历史材料前，先读本页和 `docs/current/`
 >
-> **2026-06-01 同步**：`current/architecture.md` 新增「扫描评估引擎（Evaluator）」和「Nuclei Code Templates」章节，补齐此前代码实现但缺失的文档。
+> **2026-06-02 同步**：`current/architecture.md` 新增「Docker 构建与部署」章节，记录镜像构建策略重构（移除 base 镜像层级，支持多平台构建）。
 
 ## 先读这些
 

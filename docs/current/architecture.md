@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-06-01
+last_updated: 2026-06-02
 scope: runtime-baseline
 ---
 
@@ -28,7 +28,7 @@ This file describes the current repository baseline that agents should assume un
 | 镜像 | Dockerfile | 职责 |
 |------|-----------|------|
 | `anchor-server` | `Dockerfile.server` | Go API 服务（从 GitHub Release 下载预编译二进制） |
-| `anchor-worker` | `Dockerfile.worker` | 安全工具 + Go Worker（基于 `anchor-worker-base` 预装所有工具） |
+| `anchor-worker` | `Dockerfile.worker` | 安全工具 + Go Worker（预装所有安全扫描工具） |
 | `anchor-frontend` | `Dockerfile.frontend` | Nginx 静态 serve React 构建产物 + `/api/` 反向代理 |
 
 **三种部署模式**（通过 `install.sh` 交互式选择）：
@@ -43,6 +43,11 @@ This file describes the current repository baseline that agents should assume un
 - GitHub Release：Go 二进制（`anchor-linux-amd64`、`anchor-linux-arm64`），tag 推送时由 CI 自动构建
 - 阿里云 ACR：Docker 镜像（`crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun/`），Release 完成后 CI 自动推送
 - `install.sh` 默认从 ACR 拉取镜像（国内加速），本地构建时 fallback 到 Dockerfile
+
+**多平台支持**：
+- Docker 镜像支持 `linux/amd64`（VPS/PC）和 `linux/arm64`（Mac M1/M2）
+- 通过 GitHub Actions 使用 QEMU + Docker Buildx 构建多平台镜像
+- 用户拉取时自动选择匹配的平台架构
 
 **前端 API 配置**：Nginx 反向代理 `/api/` → `server:17421`，前端默认 `apiBase="/api"`，无需手动配置 API 地址。
 
@@ -479,6 +484,74 @@ Server NewServer():
 #### 前端状态
 
 **后端 API 已就绪，前端 UI 尚未实现**。目前没有页面或组件消费这些 API。
+
+## Docker 构建与部署
+
+### 镜像构建策略（2026-06-02 重构）
+
+**当前架构**：所有依赖直接在主 Dockerfile 中安装，不再使用独立的 base 镜像层级。
+
+| 镜像 | Dockerfile | 基础镜像 | 内容 |
+|------|-----------|---------|------|
+| `anchor-server` | `Dockerfile.server` | `debian:bookworm-slim` | 系统依赖 + Go 二进制 + 漏洞模板知识库 |
+| `anchor-worker` | `Dockerfile.worker` | `debian:bookworm-slim` | 系统依赖 + 安全工具（10 个）+ Go 二进制 + 内置数据 |
+| `anchor-frontend` | `Dockerfile.frontend` | `nginx:alpine` | Nginx + React 构建产物 |
+
+**重构原因**：
+1. 消除 base 镜像依赖，简化构建流程
+2. 支持多平台构建（amd64/arm64），无需维护多平台 base 镜像
+3. 每次构建都是完整镜像，不依赖预构建的 base
+
+### 多平台构建
+
+**支持平台**：
+- `linux/amd64` (x86_64)：VPS、PC 用户
+- `linux/arm64` (aarch64)：Mac M1/M2 用户
+
+**构建方式**：
+- GitHub Actions 使用 QEMU 模拟 + Docker Buildx 构建多平台镜像
+- 构建命令：`docker buildx build --platform linux/amd64,linux/arm64 -t <image> --push .`
+- 用户拉取时自动选择匹配的平台架构
+
+### CI/CD 流程
+
+**触发条件**：
+- `release.yml`：tag 推送时触发，构建 Go 二进制并上传到 GitHub Release
+- `docker-push.yml`：Release 完成后自动触发，或通过 `workflow_dispatch` 手动触发
+
+**构建流程**：
+1. Checkout 代码
+2. 设置 QEMU（支持多平台模拟）
+3. 设置 Docker Buildx
+4. 登录阿里云 ACR
+5. 构建并推送多平台镜像（server、worker、frontend）
+
+**镜像标签**：
+- `latest`：最新稳定版
+- `v0.x.x`：特定版本标签（可选）
+
+### 环境变量与配置
+
+**Server 镜像**：
+- `ANCHOR_DATA_DIR=/data`：数据存储目录
+- `ANCHOR_PORT=17421`：API 服务端口
+- `ANCHOR_TEMPLATES_SEED=/app/templates/vuln-templates.json`：漏洞模板种子文件
+
+**Worker 镜像**：
+- `ANCHOR_DATA_DIR=/data`：数据存储目录
+- `ANCHOR_CORE_URL=""`：Server 连接地址（启动时配置）
+
+**安全工具版本**（在 Dockerfile.worker 中集中管理）：
+- subfinder: 2.14.0
+- naabu: 2.6.1
+- httpx: 1.9.0
+- nuclei: 3.8.0
+- cdncheck: 1.2.38
+- dnsx: 1.2.3
+- katana: 1.6.1
+- ffuf: 2.1.0
+- gau: 2.2.4
+- spoor: 0.2.0
 
 ## What Is Not Baseline Yet
 
