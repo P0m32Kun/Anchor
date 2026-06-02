@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/errors"
@@ -15,90 +14,8 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
 	"github.com/P0m32Kun/Anchor/internal/util"
 	"github.com/P0m32Kun/Anchor/internal/toolregistry"
-	"github.com/P0m32Kun/Anchor/internal/workflow"
 )
 
-func (s *Server) handleRunPipeline(w http.ResponseWriter, r *http.Request) {
-	projectID := r.PathValue("id")
-	if projectID == "" {
-		writeError(w, http.StatusBadRequest, errors.New("MISSING_PROJECT_ID", "Project ID is required"))
-		return
-	}
-
-	project, err := s.queries.GetProject(projectID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
-		return
-	}
-	if project == nil {
-		writeError(w, http.StatusNotFound, errors.New("NOT_FOUND", "Project not found"))
-		return
-	}
-
-	cfg := models.DefaultPipelineConfig()
-	if project.PipelineConfig != nil && *project.PipelineConfig != "" {
-		if err := json.Unmarshal([]byte(*project.PipelineConfig), &cfg); err != nil {
-			log.Printf("parse pipeline config: %v", err)
-		}
-	}
-
-	runID := util.GenerateID()
-	now := time.Now().UTC()
-	if err := s.queries.CreatePipelineRun(&models.PipelineRun{
-		ID:        runID,
-		ProjectID: projectID,
-		Status:    "running",
-		StartedAt: now,
-		CreatedAt: now,
-	}); err != nil {
-		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	s.mu.Lock()
-	s.pipelineCancels[runID] = cancel
-	s.mu.Unlock()
-
-	go func() {
-		defer func() {
-			s.mu.Lock()
-			delete(s.pipelineCancels, runID)
-			s.mu.Unlock()
-			cancel()
-		}()
-
-		pipeline := workflow.NewPipeline(s.queries, s.worker, s.scopeEng, s.dataDir).
-			WithConfig(cfg).
-			WithRunID(runID).
-			WithTools(toolregistry.DefaultRegistry()).
-			WithStageCallback(func(rid string, stage workflow.StageID, status, errMsg string) {
-				s.broadcastProjectSSE(projectID, map[string]interface{}{
-					"event":   "pipeline_stage_change",
-					"run_id":  rid,
-					"stage":   string(stage),
-					"status":  status,
-					"error":   errMsg,
-					"time":    time.Now().UTC().Format(time.RFC3339),
-				})
-			})
-		if err := pipeline.Run(ctx, projectID); err != nil {
-			log.Printf("pipeline run for project %s: %v", projectID, err)
-		}
-		// Broadcast final run status update.
-		s.broadcastProjectSSE(projectID, map[string]interface{}{
-			"event":  "pipeline_complete",
-			"run_id": runID,
-			"time":   time.Now().UTC().Format(time.RFC3339),
-		})
-	}()
-
-	writeJSON(w, http.StatusAccepted, map[string]string{
-		"status":  "accepted",
-		"message": "Pipeline started",
-		"run_id":  runID,
-	})
-}
 
 func (s *Server) handleListPipelineRuns(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
@@ -375,9 +292,6 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 	s.pipelineCancels[runID] = cancel
 	s.mu.Unlock()
 
-	// Feature flag: ANCHOR_SCAN_ENGINE=1 enables the new asset-driven engine.
-	useScanEngine := os.Getenv("ANCHOR_SCAN_ENGINE") == "1"
-
 	go func() {
 		defer func() {
 			s.mu.Lock()
@@ -397,52 +311,39 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
-		if useScanEngine {
-			// New asset-driven scan engine
-			profile := core.DefaultInternalProfile()
-			if req.Mode == "external" {
-				profile = core.DefaultExternalProfile()
-			}
-			engineCfg := scanengine.DefaultEngineConfig()
-			engine := scanengine.New(
-				s.queries, s.worker, toolregistry.DefaultRegistry(),
-				s.assetMerger, profile, s.excludeMgr, s.dataDir, runID, projectID, engineCfg,
-				func(rid, stage, status, errMsg string) {
-					stageCallback(rid, stage, status, errMsg)
-				},
-			)
-			// Get targets for seeding
-			targets, _ := s.queries.ListTargetsByProject(projectID)
-			var targetVals []string
-			for _, t := range targets {
-				targetVals = append(targetVals, t.Value)
-			}
-			if err := engine.Run(ctx, targetVals); err != nil {
-				log.Printf("scan engine run %s for project %s: %v", runID, projectID, err)
-			}
-			// Trigger evaluation asynchronously
-			go func() {
-				eval := evaluator.NewEvaluator(s.queries, s.dataDir, projectID, runID)
-				_, evalErr := eval.Evaluate(context.Background())
-				if evalErr != nil {
-					log.Printf("[evaluation] failed for run %s: %v", runID, evalErr)
-				} else {
-					log.Printf("[evaluation] report generated for run %s", runID)
-				}
-			}()
-		} else {
-			// Legacy pipeline
-			pipeline := workflow.NewPipeline(s.queries, s.worker, s.scopeEng, s.dataDir).
-				WithConfig(cfg).
-				WithRunID(runID).
-				WithTools(toolregistry.DefaultRegistry()).
-				WithStageCallback(func(rid string, stage workflow.StageID, status, errMsg string) {
-					stageCallback(rid, string(stage), status, errMsg)
-				})
-			if err := pipeline.Run(ctx, projectID); err != nil {
-				log.Printf("scan run %s for project %s: %v", runID, projectID, err)
-			}
+		// Asset-driven scan engine
+		profile := core.DefaultInternalProfile()
+		if req.Mode == "external" {
+			profile = core.DefaultExternalProfile()
 		}
+		engineCfg := scanengine.DefaultEngineConfig()
+		engineCfg.Pipeline = cfg
+		engine := scanengine.New(
+			s.queries, s.worker, toolregistry.DefaultRegistry(),
+			s.assetMerger, profile, s.excludeMgr, s.dataDir, runID, projectID, engineCfg,
+			func(rid, stage, status, errMsg string) {
+				stageCallback(rid, stage, status, errMsg)
+			},
+		)
+		// Get targets for seeding
+		targets, _ := s.queries.ListTargetsByProject(projectID)
+		var targetVals []string
+		for _, t := range targets {
+			targetVals = append(targetVals, t.Value)
+		}
+		if err := engine.Run(ctx, targetVals); err != nil {
+			log.Printf("scan engine run %s for project %s: %v", runID, projectID, err)
+		}
+		// Trigger evaluation asynchronously
+		go func() {
+			eval := evaluator.NewEvaluator(s.queries, s.dataDir, projectID, runID)
+			_, evalErr := eval.Evaluate(context.Background())
+			if evalErr != nil {
+				log.Printf("[evaluation] failed for run %s: %v", runID, evalErr)
+			} else {
+				log.Printf("[evaluation] report generated for run %s", runID)
+			}
+		}()
 
 		s.broadcastProjectSSE(projectID, map[string]interface{}{
 			"event":  "pipeline_complete",
