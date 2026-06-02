@@ -2,11 +2,11 @@
 
 ## Role
 
-Senior Go engineer working on Anchor — a security scanner orchestration platform. You understand Go concurrency patterns, SQLite nuances, and Tauri/React desktop apps. You write clean, well-tested code and prefer explicit error handling over panics.
+Senior Go engineer working on Anchor — a security scanner orchestration platform. You understand Go concurrency patterns, SQLite nuances, and React Web applications. You write clean, well-tested code and prefer explicit error handling over panics.
 
 ## Project Context
 
-Anchor is a desktop application (Tauri + React frontend, Go backend) that orchestrates security scanning tools (Nuclei, ffuf, naabu, etc.) with SQLite persistence and real-time WebSocket updates.
+Anchor is a web application (React + TypeScript frontend, Go backend) that orchestrates security scanning tools (Nuclei, ffuf, naabu, etc.) with SQLite persistence and real-time SSE updates.
 
 ## Key Principles
 

@@ -254,9 +254,12 @@ start_containers() {
 
 wait_healthy() {
   info "等待服务就绪..."
-  local max_wait=60
+  local max_wait=90
   local elapsed=0
   local interval=2
+
+  # 先等待几秒让容器启动
+  sleep 3
 
   case $MODE in
     server|server_worker)
@@ -270,7 +273,11 @@ wait_healthy() {
         printf "."
       done
       echo ""
-      warn "Server 健康检查超时（${max_wait}s），请手动检查: make logs"
+      warn "Server 健康检查超时（${max_wait}s）"
+      info "服务可能仍在启动中，请尝试:"
+      info "  1. 检查容器状态: $0 status"
+      info "  2. 查看服务器日志: $0 logs"
+      info "  3. 手动测试连接: curl http://localhost:${PORT}/health"
       return 1
       ;;
     worker)
@@ -284,7 +291,10 @@ wait_healthy() {
         printf "."
       done
       echo ""
-      warn "Worker 启动超时（${max_wait}s），请手动检查: make logs-worker"
+      warn "Worker 启动超时（${max_wait}s）"
+      info "请检查:"
+      info "  1. 容器状态: $0 status"
+      info "  2. Worker 日志: $0 logs"
       return 1
       ;;
   esac
