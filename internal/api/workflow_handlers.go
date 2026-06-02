@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/errors"
-	"github.com/P0m32Kun/Anchor/internal/workflow"
+	"github.com/P0m32Kun/Anchor/internal/workflows"
 )
 
 func (s *Server) handleStartAssetDiscovery(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +22,7 @@ func (s *Server) handleStartAssetDiscovery(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	wf := workflow.NewAssetDiscoveryWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir)
+	wf := workflows.NewAssetDiscoveryWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir)
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
@@ -53,7 +53,7 @@ func (s *Server) handleStartWebScreening(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	wf := workflow.NewWebScreeningWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir)
+	wf := workflows.NewWebScreeningWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir)
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)

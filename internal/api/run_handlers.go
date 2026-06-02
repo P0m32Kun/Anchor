@@ -10,7 +10,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/errors"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/util"
-	"github.com/P0m32Kun/Anchor/internal/workflow"
+	"github.com/P0m32Kun/Anchor/internal/workflows"
 )
 
 // POST /projects/{id}/runs
@@ -80,7 +80,7 @@ func (s *Server) dispatchRun(run *models.Run) {
 	//    - building correct tool commands (subfinder -d, naabu -list, etc.)
 	//    - creating hostlist files for batch tools
 	//    - parsing tool output and creating assets/findings
-	wf := workflow.NewAssetDiscoveryWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir).WithRunID(run.ID)
+	wf := workflows.NewAssetDiscoveryWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir).WithRunID(run.ID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
