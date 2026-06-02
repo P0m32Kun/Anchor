@@ -3,6 +3,8 @@
 #   ACR_REGISTRY: crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com
 #   ACR_USERNAME: P0m32Kun
 #   ACR_PASSWORD: <阿里云 ACR 登录密码>
+#
+# 支持多平台：linux/amd64 (VPS/PC), linux/arm64 (Mac M1/M2)
 
 name: Docker Push
 
@@ -23,26 +25,35 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # 设置 QEMU 支持多平台构建
+      - uses: docker/setup-qemu-action@v3
+
+      # 设置 Docker Buildx
+      - uses: docker/setup-buildx-action@v3
+
       - name: Login to ACR
         run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ${ACR_REGISTRY} -u ${{ secrets.ACR_USERNAME }} --password-stdin
 
       - name: Build and push server
         run: |
-          docker build -f Dockerfile.server \
-            --build-arg ACR_REGISTRY=${ACR_REGISTRY} \
-            --build-arg ACR_NAMESPACE=${ACR_NAMESPACE} \
-            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-server:latest .
-          docker push ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-server:latest
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -f Dockerfile.server \
+            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-server:latest \
+            --push .
 
       - name: Build and push worker
         run: |
-          docker build -f Dockerfile.worker \
-            --build-arg ACR_REGISTRY=${ACR_REGISTRY} \
-            --build-arg ACR_NAMESPACE=${ACR_NAMESPACE} \
-            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-worker:latest .
-          docker push ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-worker:latest
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -f Dockerfile.worker \
+            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-worker:latest \
+            --push .
 
       - name: Build and push frontend
         run: |
-          docker build -f Dockerfile.frontend -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-frontend:latest .
-          docker push ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-frontend:latest
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -f Dockerfile.frontend \
+            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-frontend:latest \
+            --push .

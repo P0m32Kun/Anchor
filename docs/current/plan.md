@@ -23,7 +23,7 @@ This is the only repository-wide implementation plan that agents should treat as
 | --- | --- | --- | --- |
 | Code health audit | Accepted | Yes | Superseded by Slimdown 2026 audit; see [`slimdown-2026-summary.md`](../active/review/slimdown-2026-summary.md) for delta |
 | Documentation governance | Active | Yes | Consolidate navigation, mark document lifecycle, reduce agent confusion |
-| Current architecture baseline | Active | Yes | Defined in [`architecture.md`](architecture.md) |
+| Current architecture baseline | Active | Yes | Defined in [`architecture.md`](architecture.md); synced 2026-06-01: added Evaluator module, Nuclei code templates |
 | Slimdown 2026 | Active | Yes | Repository-wide slimdown audit in [`slimdown-2026-handoff-for-implementer.md`](../active/review/slimdown-2026-handoff-for-implementer.md); T0-T6 reports at `docs/active/review/slimdown-*.md` |
 | v0.4 scan pipeline | Accepted | Yes | Verified by `docs/active/review/v0.4-acceptance.md`; design doc archived at `docs/archived/v0.4/scan-pipeline.md` (superseded 2026-05-12, see `architecture.md` for current baseline) |
 | Database migration notes for v0.4 | Accepted | Yes | Tied to v0.4; superseded plans now archived |

@@ -8,9 +8,19 @@
 # 多平台构建：
 #   docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.server -t anchor-server .
 
-ARG ACR_REGISTRY=crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com
-ARG ACR_NAMESPACE=p0m32kun
-FROM ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-server-runtime-base:latest
+FROM debian:bookworm-slim
+
+# ============================================================
+#  系统依赖
+# ============================================================
+# - curl: 下载 GitHub Release 二进制和数据仓库
+# - ca-certificates: HTTPS 证书
+# - libsqlite3-0: SQLite 运行时库
+RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+    ca-certificates libsqlite3-0 curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
