@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-06-02
+last_updated: 2026-06-03
 scope: runtime-baseline
 ---
 
@@ -120,22 +120,9 @@ url     → httpx/Katana/ffuf/Spoor/Nuclei（由资产类型自动派生）
 
 引擎凭证在全局 `engine_credentials` 表配置（`/engines/keys`）。被动搜索在 `runPassiveSearch` 中并行调用 FOFA、Hunter、Quake（fail-soft，单引擎失败不阻断）。Engines 页手动搜索仍保留，供扫描外调研。
 
-### 多目标类型与 Company 目标自动展开
+### 目标输入与资产驱动
 
-> **注意：以下是 Legacy Pipeline 的目标分流逻辑（`PipelineConfig.runFlow`）。**
-> 在资产驱动引擎下，所有目标统一作为 `AssetSubdomain` 种子资产注入，由 `DeriveEligibleWorks()` 自动派生后续动作。
-
-Legacy Pipeline 按 `Target.Type` 分流：
-
-| 目标类型 | 入口 |
-| --- | --- |
-| `domain` | Subfinder → DNSx → CDN → Naabu → nmap -sV → httpx/Nuclei |
-| `ip` | CDNCheck → Naabu → nmap -sV → httpx/Nuclei |
-| `cidr` | Naabu → nmap -sV → httpx/Nuclei |
-| `url` | httpx → Nuclei（仅 Web） |
-| `company` | FOFA `org/cert/title` 三维搜索 → 展开为新 Target（domain/ip）→ 路由到对应 flow |
-
-Company 目标在 `runCompanyFlow` 中调用 FOFA：每个查询返回的资产被去重后作为 `source="fofa"` 的新 Target 写入 DB，再分别进入 domain/ip flow。`FOFA_BASE_URL` 环境变量可覆盖默认 `https://fofa.info` 用于 E2E mock。
+所有目标统一作为 `AssetSubdomain` 种子资产注入，由 `DeriveEligibleWorks()` 自动派生后续动作。Company 目标通过被动搜索引擎（FOFA/Hunter/Quake）展开为 domain/ip 子目标后注入。
 
 ### Nuclei 分层扫描策略
 
@@ -465,9 +452,8 @@ Server NewServer():
 
 #### 触发机制
 
-1. **自动触发** — `internal/workflow/pipeline.go` 中，管线标记完成（或失败）后，启动 goroutine 调用 `evaluator.NewEvaluator(...).Evaluate(...)`，完全异步不阻塞。
+1. **自动触发** — `internal/api/pipeline_handlers.go` 中，资产驱动扫描引擎完成后，启动 goroutine 调用 `evaluator.NewEvaluator(...).Evaluate(...)`，完全异步不阻塞。
 2. **手动重试** — `POST /projects/{id}/runs/{runId}/evaluation/retry` 端点允许用户手动重新触发评估。
-3. **管线 handler 也触发** — `internal/api/pipeline_handlers.go:425-426` 有额外的评估触发点。
 
 #### 报告存储
 
