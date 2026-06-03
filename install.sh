@@ -186,9 +186,9 @@ collect_config() {
   esac
 }
 
-build_images() {
+pull_images() {
   echo ""
-  info "拉取镜像..."
+  info "拉取镜像（阿里云 ACR，用户部署不本地 build）..."
 
   # 从阿里云 ACR 拉取镜像（如果本地不存在）
   pull_if_missing() {
@@ -374,7 +374,7 @@ main() {
     install)
       check_existing
       collect_config
-      build_images
+      pull_images
       start_containers
       wait_healthy
       print_result

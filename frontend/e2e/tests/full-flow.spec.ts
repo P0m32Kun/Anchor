@@ -26,7 +26,7 @@ const API_BASE = E2E_API_BASE;
 const API_TOKEN = E2E_API_TOKEN;
 // 目标 IP: rangefield nginx,worker 在 docker 网络内可达。不要用 127.0.0.1
 // (那是 worker 容器自身 loopback,扫不到 rangefield)
-const TARGET_IP = "172.30.0.10";
+const TARGET_IP = "172.31.0.10";
 
 test.setTimeout(30 * 60 * 1000);
 

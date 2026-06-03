@@ -1,15 +1,8 @@
-# E2E 测试环境 - 使用本地构建的新代码（快速构建版本）
+# 本地开发测试专用 — server/worker 经 Dockerfile.*-fast 本地 build（anchor-*:local）。
+# frontend 仍拉 ACR；用户生产部署请用 docker-compose.yml（仅 image，无 build）。
 #
-# 使用方法：
-#   1. 首次使用或工具版本更新时，构建 base 镜像：
-#      make build-base
-#
-#   2. 日常测试时，快速构建并启动：
-#      make test-e2e
-#
-# 与 docker-compose.yml 的区别：
-#   - server/worker 使用 Dockerfile.*-fast（基于本地 base 镜像）
-#   - 构建速度快（只需复制二进制，约 10-30 秒）
+#   make build-base    # 首次或工具版本变更
+#   make e2e-local     # build-fast + 启动
 
 services:
   # --- Frontend (Nginx 静态 serve) ---

@@ -13,7 +13,7 @@ Anchor 使用 GitHub Actions：**PR/push 跑单元门禁**（`ci.yml`），**tag
 | `backend` | `go vet ./...`、`go test ./...` |
 | `frontend` | `npm ci`、`typecheck`、`test:unit`、`build` |
 
-长耗时 E2E（rangefield Docker 全栈）**不在**默认 PR 门禁内；本地或 nightly 使用 `make test-e2e-smoke` / `make test-e2e-full`。E2E 环境变量见 `frontend/e2e/fixtures/e2e-env.ts`（token 与 `docker-compose.e2e.yml` 对齐）。
+长耗时 E2E（rangefield Docker 全栈）**不在**默认 PR 门禁内；本地或 nightly 使用 `make test-e2e-smoke` / `make test-e2e-full`。E2E 使用 `docker-compose.e2e.yml`（含 `build`，网络 `anchor-net-e2e` / `172.31.0.0/24`），与用户部署用的 `docker-compose.yml`（仅 ACR `image`、无 `build`）分离。环境变量见 `frontend/e2e/fixtures/e2e-env.ts`。
 
 ## 发布流程图
 

@@ -24,7 +24,7 @@ import { E2E_API_BASE, E2E_API_TOKEN } from "../fixtures/e2e-env";
 
 const API_BASE = E2E_API_BASE;
 const API_TOKEN = E2E_API_TOKEN;
-const TARGET_IP = "172.30.0.13";
+const TARGET_IP = "172.31.0.13";
 
 async function seedProjectWithTarget(page: any, name: string, purpose: string) {
 	const project = await createProject({

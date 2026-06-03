@@ -134,13 +134,15 @@ make e2e-local-down
 - **Server**：纯管理面，负责 API、任务调度、数据持久化
 - **Worker**：预装所有安全工具，通过长轮询拉取任务执行
 
-**三种部署模式：**
+**三种部署模式**（均只拉取阿里云 ACR 预构建三镜像，`docker-compose*.yml` 不含 `build`）：
 
-| 模式 | 适用场景 |
-|------|---------|
-| Server Only | VPS 部署，Worker 远程连接 |
-| Worker Only | 远程扫描节点，连接已有 Server |
-| Server+Worker | 本地开发/测试，完整功能 |
+| 模式 | compose | 适用场景 |
+|------|---------|---------|
+| Server Only | `docker-compose.server.yml` | VPS，Worker 远程连接 |
+| Worker Only | `docker-compose.worker.yml` | 远程扫描节点 |
+| Server+Worker | `docker-compose.yml` | 同机完整部署 |
+
+**与测试 Docker 区分**：本地 / CI 使用 `docker-compose.e2e.yml`（build 发布版 Dockerfile）或 `docker-compose.e2e-local.yml`（`make build-fast` + fast Dockerfile），勿与上表混用。
 
 Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可（任务拉取、心跳、结果上报均为 Worker → Server）。
 
@@ -164,10 +166,13 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可（任务
 ├── main.go                     # Go 服务入口（单二进制，server/worker 双模式）
 ├── go.mod / go.sum            # Go 模块
 ├── Makefile                    # 构建脚本 + Docker 生命周期命令
-├── docker-compose.yml          # Server + Worker + 网络编排（发布版）
-├── docker-compose.e2e-local.yml # 本地 E2E 测试环境
-├── Dockerfile.server           # Server 镜像（发布版，从 GitHub Release 下载）
-├── Dockerfile.worker           # Worker 镜像（发布版，含安全工具）
+├── docker-compose.yml          # 用户部署：仅 ACR image（server+worker+frontend）
+├── docker-compose.server.yml   # 用户部署：Server + Frontend
+├── docker-compose.worker.yml   # 用户部署：Worker only
+├── docker-compose.e2e.yml      # 测试/CI：本地 build + rangefield
+├── docker-compose.e2e-local.yml  # 本地迭代：Dockerfile.*-fast
+├── Dockerfile.server           # CI/本地 build 用（ACR 镜像由 CI 构建推送）
+├── Dockerfile.worker           # CI/本地 build 用
 ├── Dockerfile.server-runtime-base # Server 运行时 base 镜像
 ├── Dockerfile.worker-runtime-base # Worker 运行时 base 镜像（含安全工具）
 ├── Dockerfile.server-fast      # Server 快速构建（基于 base）

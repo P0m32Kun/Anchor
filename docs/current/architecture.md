@@ -37,12 +37,20 @@ This file describes the current repository baseline that agents should assume un
 |------|-------------|---------|
 | Server Only | `docker-compose.server.yml` | VPS 部署，Worker 远程连接 |
 | Worker Only | `docker-compose.worker.yml` | 远程扫描节点，连接已有 Server |
-| Server+Worker | `docker-compose.yml` | 本地开发/测试，完整功能 |
+| Server+Worker | `docker-compose.yml` | 同机完整部署（VPS/内网单机） |
+
+**Compose 与镜像职责分离**（2026-06-03）：
+
+| 用途 | compose 文件 | 镜像来源 |
+|------|-------------|---------|
+| **用户部署** | `docker-compose.yml` / `.server.yml` / `.worker.yml` | 仅 `image`（阿里云 ACR 三镜像），**无 `build`** |
+| **CI / 全栈 E2E** | `docker-compose.e2e.yml` | 本地 `build`（`Dockerfile.server` / `Dockerfile.worker`）+ 内嵌 rangefield |
+| **本地迭代** | `docker-compose.e2e-local.yml` | `Dockerfile.*-fast` → `anchor-*:local`；frontend 仍拉 ACR |
 
 **镜像分发**：
 - GitHub Release：Go 二进制（`anchor-linux-amd64`、`anchor-linux-arm64`），tag 推送时由 CI 自动构建
-- 阿里云 ACR：Docker 镜像（`crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun/`），Release 完成后 CI 自动推送
-- `install.sh` 默认从 ACR 拉取镜像（国内加速），本地构建时 fallback 到 Dockerfile
+- 阿里云 ACR：Docker 镜像（`crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun/`），Release 完成后 CI 自动推送；**用户侧只 pull，不在部署 compose 里 build**
+- `install.sh` / `make up`：从 ACR 拉取三镜像后 `compose up -d`
 
 **Docker 镜像 tag 策略**（2026-06-03）：
 - `docker-push.yml` 在 Release workflow 成功后 checkout **触发 Release 的 tag/ref**（例如 `v0.2.0`），而非默认分支 HEAD
@@ -503,7 +511,9 @@ Server NewServer():
 
 ## Docker 构建与部署
 
-### 镜像构建策略
+用户生产环境只消费 ACR 上的 `anchor-server`、`anchor-worker`、`anchor-frontend`（见上文 compose 表）。下列 **base / fast / Dockerfile.server|worker** 仅供 CI 与开发者本地构建，不出现在部署 compose 中。
+
+### 镜像构建策略（开发 / CI）
 
 **分层构建架构**（2026-06-03 重构）：
 

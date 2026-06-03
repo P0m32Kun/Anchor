@@ -1,10 +1,9 @@
+# 用户部署（Server + Frontend）— 仅 ACR 镜像，不含 build。见 docker-compose.yml 顶部说明。
+
 services:
   # --- Frontend (Nginx 静态 serve) ---
   frontend:
     image: ${ANCHOR_REGISTRY:-crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun}/anchor-frontend:latest
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
     container_name: anchor-frontend
     ports:
       - "80:80"
@@ -16,9 +15,6 @@ services:
   # --- Core Server ---
   server:
     image: ${ANCHOR_REGISTRY:-crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun}/anchor-server:latest
-    build:
-      context: .
-      dockerfile: Dockerfile.server
     container_name: anchor-server
     ports:
       - "17421:17421"

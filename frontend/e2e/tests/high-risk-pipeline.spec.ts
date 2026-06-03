@@ -3,13 +3,13 @@
  * 覆盖流程: UI 创建项目 → API 注入 IP 目标(§3.3 例外,scope confirm 产品 bug) →
  *           ScanModal 切到 -p 自定义模式(默认填充高危端口) → 等待 pipeline 完成 →
  *           AssetPage 看到 6379 端口 → FindingsPage 看到 critical/high finding 行
- * 前置依赖: anchor-server / anchor-worker / anchor-rangefield(rf-redis 监听 172.30.0.13:6379)已经启动
+ * 前置依赖: anchor-server / anchor-worker / anchor-rangefield(rf-redis 监听 172.31.0.13:6379)已经启动
  * UI 断言点:
  *   - 项目卡片可见 → 跳转 /targets
- *   - TargetPage 表格中能看到 172.30.0.13 行
+ *   - TargetPage 表格中能看到 172.31.0.13 行
  *   - ScanModal 切到 -p 自定义后,textarea 默认值包含 6379
  *   - RunsPage 上扫描启动后能看到 run 卡片
- *   - 完成后 AssetPage 看到 172.30.0.13、Asset 详情/端口区域包含 6379
+ *   - 完成后 AssetPage 看到 172.31.0.13、Asset 详情/端口区域包含 6379
  *   - FindingsPage 至少有一条 critical/high 行(可见 severity 标签)
  * API 仅用于:
  *   - cleanup
@@ -23,7 +23,7 @@ import { E2E_API_BASE, E2E_API_TOKEN } from "../fixtures/e2e-env";
 
 const API_BASE = E2E_API_BASE;
 const API_TOKEN = E2E_API_TOKEN;
-const REDIS_IP = "172.30.0.13";
+const REDIS_IP = "172.31.0.13";
 
 test.setTimeout(30 * 60 * 1000);
 

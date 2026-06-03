@@ -90,7 +90,7 @@ test.describe.serial("Live Scan E2E — 新部署方式适配", () => {
 		log(`Project ID: ${projectId}`);
 
 		// ── Step 4: API 注入 scope rule + IP 目标 ──
-		log("Step 4: API inject scope + target 172.30.0.13 (Redis)");
+		log("Step 4: API inject scope + target 172.31.0.13 (Redis)");
 		const scopeRes = await page.request.post(`${API_BASE}/scope-rules`, {
 			headers: {
 				Authorization: `Bearer ${API_TOKEN}`,
@@ -100,7 +100,7 @@ test.describe.serial("Live Scan E2E — 新部署方式适配", () => {
 				project_id: projectId,
 				action: "include",
 				type: "cidr",
-				value: "172.30.0.13/32",
+				value: "172.31.0.13/32",
 				reason: "E2E scope",
 			},
 		});
@@ -114,14 +114,14 @@ test.describe.serial("Live Scan E2E — 新部署方式适配", () => {
 					Authorization: `Bearer ${API_TOKEN}`,
 					"Content-Type": "application/json",
 				},
-				data: { type: "ip", value: "172.30.0.13" },
+				data: { type: "ip", value: "172.31.0.13" },
 			},
 		);
 		expect([200, 201]).toContain(targetRes.status());
 		await page.reload();
 
 		await expect(
-			page.getByRole("cell", { name: "172.30.0.13" }).first(),
+			page.getByRole("cell", { name: "172.31.0.13" }).first(),
 		).toBeVisible({ timeout: 10_000 });
 
 		// ── Step 5: API 启动扫描 ──
@@ -175,7 +175,7 @@ test.describe.serial("Live Scan E2E — 新部署方式适配", () => {
 		await expect(page.getByRole("heading", { name: /资产清单|资产列表|Assets/ })).toBeVisible({
 			timeout: 10_000,
 		});
-		await expect(page.locator("text=172.30.0.13").first()).toBeVisible({
+		await expect(page.locator("text=172.31.0.13").first()).toBeVisible({
 			timeout: 30_000,
 		});
 

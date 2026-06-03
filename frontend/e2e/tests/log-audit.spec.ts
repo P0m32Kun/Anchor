@@ -5,10 +5,10 @@
  * 前置依赖: anchor-server / anchor-worker / anchor-rangefield(rf-redis)已启动
  * UI 断言点:
  *   - 项目卡片可见
- *   - TargetPage 表格中能看到 172.30.0.13 行
+ *   - TargetPage 表格中能看到 172.31.0.13 行
  *   - ScanModal 切到 -p 自定义后,textarea 默认值包含 6379
  *   - RunsPage 上扫描启动后能看到 run 卡片
- *   - 完成后 AssetPage 看到 172.30.0.13
+ *   - 完成后 AssetPage 看到 172.31.0.13
  * 审计通道(§3.4):
  *   - naabu stdout: contain "Running naabu scan for", "results:", regex "open ports?: \d+"
  *   - naabu stderr: 无未知错误
@@ -30,7 +30,7 @@ import { E2E_API_BASE, E2E_API_TOKEN } from "../fixtures/e2e-env";
 
 const API_BASE = E2E_API_BASE;
 const API_TOKEN = E2E_API_TOKEN;
-const REDIS_IP = "172.30.0.13";
+const REDIS_IP = "172.31.0.13";
 
 // 日志审计目标工具(内网 pipeline 实际触发的工具)
 const TOOLS_TO_AUDIT = ["nmap_alive", "naabu", "nmap_service", "nuclei"];

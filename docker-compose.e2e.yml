@@ -1,9 +1,9 @@
-# E2E Test Environment
-# 一键启动完整测试环境：server + worker + rangefield
+# 开发 / CI 测试专用 — 本地 build server/worker（Dockerfile.server / Dockerfile.worker），非用户部署路径。
+# 与 docker-compose.yml 分离：独立网络 anchor-net-e2e（172.31.0.0/24），避免与生产 compose 子网冲突。
 #
 # Usage:
-#   docker compose -f docker-compose.e2e.yml up -d
-#   make test-e2e
+#   make test-e2e-smoke
+#   docker compose -f docker-compose.e2e.yml up -d --build
 
 services:
   # --- Core Server ---
@@ -67,7 +67,7 @@ services:
       - "18080:80"
     networks:
       anchor-net:
-        ipv4_address: 172.30.0.10
+        ipv4_address: 172.31.0.10
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost/"]
       interval: 5s
@@ -84,7 +84,7 @@ services:
       - "18081:8080"
     networks:
       anchor-net:
-        ipv4_address: 172.30.0.11
+        ipv4_address: 172.31.0.11
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/manager/html"]
       interval: 10s
@@ -104,7 +104,7 @@ services:
       - GF_SERVER_ROOT_URL=http://localhost:3000
     networks:
       anchor-net:
-        ipv4_address: 172.30.0.12
+        ipv4_address: 172.31.0.12
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 5s
@@ -120,7 +120,7 @@ services:
     command: redis-server --protected-mode no --bind 0.0.0.0
     networks:
       anchor-net:
-        ipv4_address: 172.30.0.13
+        ipv4_address: 172.31.0.13
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -138,7 +138,7 @@ services:
       MYSQL_DATABASE: testdb
     networks:
       anchor-net:
-        ipv4_address: 172.30.0.14
+        ipv4_address: 172.31.0.14
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
       interval: 10s
@@ -153,7 +153,7 @@ services:
       - ./frontend/e2e/fixtures/fofa-mock.nginx.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       anchor-net:
-        ipv4_address: 172.30.0.20
+        ipv4_address: 172.31.0.20
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8888/health"]
       interval: 5s
@@ -162,10 +162,11 @@ services:
 
 networks:
   anchor-net:
+    name: anchor-net-e2e
     driver: bridge
     ipam:
       config:
-        - subnet: 172.30.0.0/24
+        - subnet: 172.31.0.0/24
 
 volumes:
   anchor-data:

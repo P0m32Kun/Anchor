@@ -1,7 +1,8 @@
 .PHONY: build build-local clean
 .PHONY: build-server build-worker
 .PHONY: push-server-cn push-worker-cn push-frontend-cn push-all-cn
-.PHONY: up down up-server down-server up-worker down-worker restart-worker
+.PHONY: up down pull up-server down-server up-worker down-worker restart-worker up-fast up-force
+.PHONY: dev-rebuild e2e-local e2e-local-down e2e-local-logs
 .PHONY: logs logs-server logs-worker status shell-server shell-worker
 .PHONY: build-server-runtime-base push-server-runtime-base pull-server-runtime-base
 .PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-full
@@ -112,31 +113,34 @@ build-fast: build-linux
 	@echo "[build-fast] Done! Images: anchor-server:local, anchor-worker:local"
 
 # ============================================================
-#  Development Environment
+#  用户部署（仅拉 ACR 三镜像，不 build）
 # ============================================================
 
-up:
-	docker compose -f docker-compose.yml up -d --build
+pull:
+	docker compose -f docker-compose.yml pull
+	docker compose -f docker-compose.server.yml pull
+	docker compose -f docker-compose.worker.yml pull
 
-up-fast:
-	docker compose -f docker-compose.yml up -d
-
-up-force:
-	docker compose -f docker-compose.yml down --remove-orphans
-	docker compose -f docker-compose.yml build --no-cache
+up: pull
 	docker compose -f docker-compose.yml up -d
 
 down:
 	docker compose -f docker-compose.yml down --remove-orphans
 
+# 已废弃别名：部署请用 up（pull + up）；本地重建请用 dev-rebuild
+up-fast: up
+up-force: dev-rebuild
+
 up-server:
-	docker compose -f docker-compose.server.yml up -d --build
+	docker compose -f docker-compose.server.yml pull
+	docker compose -f docker-compose.server.yml up -d
 
 down-server:
 	docker compose -f docker-compose.server.yml down --remove-orphans
 
 up-worker:
-	docker compose -f docker-compose.worker.yml up -d --build
+	docker compose -f docker-compose.worker.yml pull
+	docker compose -f docker-compose.worker.yml up -d
 
 down-worker:
 	docker compose -f docker-compose.worker.yml down --remove-orphans
@@ -211,10 +215,14 @@ test-e2e-down:
 	docker compose -f docker-compose.e2e.yml down --remove-orphans
 
 # ============================================================
-#  Local E2E (使用本地构建的新代码进行测试)
+#  本地测试 Docker（build-fast / e2e-local，非用户部署）
 # ============================================================
 
-# 使用本地构建的新代码启动 E2E 环境
+# 强制重建本地 fast 镜像并启动 e2e-local（原 up-force 语义，勿用于生产 compose）
+dev-rebuild: build-fast
+	docker compose -f docker-compose.e2e-local.yml down --remove-orphans
+	docker compose -f docker-compose.e2e-local.yml up -d --build
+
 e2e-local: build-fast
 	@echo "[e2e-local] Starting E2E environment with local code..."
 	ANCHOR_API_TOKEN=test-e2e-token docker compose -f docker-compose.e2e-local.yml up -d
@@ -254,7 +262,7 @@ range-logs:
 	docker compose -f docker-rangefield/docker-compose.yml logs -f
 
 test-naabu:
-	docker exec -it anchor-worker naabu -host 172.30.0.10 -p 80
+	docker exec -it anchor-worker naabu -host 172.31.0.10 -p 80
 
 # ============================================================
 #  Cleanup
@@ -267,7 +275,7 @@ clean:
 	docker compose -f docker-compose.worker.yml down --volumes --remove-orphans 2>/dev/null || true
 	docker compose -f docker-compose.e2e.yml down --volumes --remove-orphans 2>/dev/null || true
 	docker compose -f docker-rangefield/docker-compose.yml down --volumes --remove-orphans 2>/dev/null || true
-	docker network rm anchor-net 2>/dev/null || true
+	docker network rm anchor-net anchor-net-e2e 2>/dev/null || true
 
 # ============================================================
 #  Frontend Dev

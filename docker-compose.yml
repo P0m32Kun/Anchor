@@ -1,10 +1,11 @@
+# 用户部署 — 仅拉取阿里云 ACR 预构建三镜像（server / worker / frontend），不含 build。
+#   docker compose pull && docker compose up -d
+# 本地测试与 CI 构建请用 docker-compose.e2e.yml 或 docker-compose.e2e-local.yml。
+
 services:
   # --- Frontend (Nginx 静态 serve) ---
   frontend:
     image: ${ANCHOR_REGISTRY:-crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun}/anchor-frontend:latest
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
     container_name: anchor-frontend
     ports:
       - "80:80"
@@ -18,9 +19,6 @@ services:
   # --- Core Server ---
   server:
     image: ${ANCHOR_REGISTRY:-crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun}/anchor-server:latest
-    build:
-      context: .
-      dockerfile: Dockerfile.server
     container_name: anchor-server
     ports:
       - "17421:17421"
@@ -49,9 +47,6 @@ services:
   # --- Remote Worker ---
   worker:
     image: ${ANCHOR_REGISTRY:-crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun}/anchor-worker:latest
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
     container_name: anchor-worker
     user: root
     environment:

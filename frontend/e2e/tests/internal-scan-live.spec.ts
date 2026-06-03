@@ -20,14 +20,14 @@ import { E2E_API_BASE, E2E_API_TOKEN } from "../fixtures/e2e-env";
 
 const API_BASE = E2E_API_BASE;
 const API_TOKEN = E2E_API_TOKEN;
-const REDIS_IP = "172.30.0.13";
+const REDIS_IP = "172.31.0.13";
 
 const RANGEFIELD_IPS = [
-	"172.30.0.10", // nginx
-	"172.30.0.11", // tomcat
-	"172.30.0.12", // grafana
-	"172.30.0.13", // redis
-	"172.30.0.14", // mysql
+	"172.31.0.10", // nginx
+	"172.31.0.11", // tomcat
+	"172.31.0.12", // grafana
+	"172.31.0.13", // redis
+	"172.31.0.14", // mysql
 ];
 
 test.setTimeout(30 * 60 * 1000);
@@ -56,7 +56,7 @@ test.describe.serial("内网扫描 E2E — UI 主导", () => {
 				project_id: projectId,
 				action: "include",
 				type: "cidr",
-				value: "172.30.0.0/24",
+				value: "172.31.0.0/24",
 				reason: "E2E 内网扫描",
 			}),
 		});

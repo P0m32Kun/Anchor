@@ -1,9 +1,8 @@
+# 用户部署（仅 Worker）— 仅 ACR 镜像，不含 build。见 docker-compose.yml 顶部说明。
+
 services:
   worker:
     image: ${ANCHOR_REGISTRY:-crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun}/anchor-worker:latest
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
     container_name: anchor-worker
     environment:
       - ANCHOR_DATA_DIR=/data
