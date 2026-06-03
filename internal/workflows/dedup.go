@@ -6,8 +6,6 @@ import (
 	"net"
 	"net/url"
 	"strings"
-
-	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
 // normalizeScanURL canonicalizes a URL for exact-match deduplication (path-level).
@@ -74,40 +72,6 @@ func computeDedupKey(templateID, host, matcherName string) string {
 	h := sha256.New()
 	fmt.Fprintf(h, "%s|%s|%s", templateID, origin, matcherName)
 	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-// filterURLsForSecondaryScan drops URLs already covered by exact URL or by an
-// existing endpoint on the same host:port (scan origin).
-func filterURLsForSecondaryScan(urls []string, existingEndpoints []*models.WebEndpoint) []string {
-	existingURL := make(map[string]bool, len(existingEndpoints))
-	existingOrigin := make(map[string]bool, len(existingEndpoints))
-	for _, ep := range existingEndpoints {
-		if ep.URL != "" {
-			existingURL[normalizeScanURL(ep.URL)] = true
-			existingOrigin[scanOrigin(ep.URL)] = true
-		}
-	}
-
-	seenURL := make(map[string]bool)
-	seenOrigin := make(map[string]bool)
-	var out []string
-	for _, u := range urls {
-		norm := normalizeScanURL(u)
-		if norm == "" {
-			continue
-		}
-		origin := scanOrigin(norm)
-		if existingURL[norm] || existingOrigin[origin] {
-			continue
-		}
-		if seenURL[norm] || seenOrigin[origin] {
-			continue
-		}
-		seenURL[norm] = true
-		seenOrigin[origin] = true
-		out = append(out, u)
-	}
-	return out
 }
 
 // dedupHTTPTargetsByOrigin keeps one target per host:port so httpx is not run
