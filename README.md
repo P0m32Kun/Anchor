@@ -96,6 +96,28 @@ make build    # 构建 Go 后端
 make test     # 运行测试
 ```
 
+**本地 E2E 测试（使用新代码）：**
+
+```bash
+# 首次使用或工具版本更新时，构建 base 镜像（耗时较长，只需执行一次）
+make build-base
+
+# 日常测试迭代（约 10-30 秒）
+make build-linux    # 交叉编译 Linux 二进制
+make build-fast     # 快速构建 Docker 镜像
+make e2e-local      # 启动 E2E 测试环境
+
+# 运行测试
+make test-e2e       # 运行 Playwright E2E 测试
+
+# 停止环境
+make e2e-local-down
+```
+
+**分层构建架构**：
+- `anchor-server-base` / `anchor-worker-base`：预装运行时依赖，极少更新
+- `anchor-server:local` / `anchor-worker:local`：基于 base，仅 COPY 二进制，构建速度快
+
 ## 部署架构
 
 三个 Docker 镜像通过 docker-compose 编排：
@@ -127,9 +149,15 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 ├── main.go                     # Go 服务入口（单二进制，server/worker 双模式）
 ├── go.mod / go.sum            # Go 模块
 ├── Makefile                    # 构建脚本 + Docker 生命周期命令
-├── docker-compose.yml          # Server + Worker + 网络编排
-├── Dockerfile.server           # Server 镜像（纯管理面）
-├── Dockerfile.worker           # Worker 镜像（含安全工具）
+├── docker-compose.yml          # Server + Worker + 网络编排（发布版）
+├── docker-compose.e2e-local.yml # 本地 E2E 测试环境
+├── Dockerfile.server           # Server 镜像（发布版，从 GitHub Release 下载）
+├── Dockerfile.worker           # Worker 镜像（发布版，含安全工具）
+├── Dockerfile.server-runtime-base # Server 运行时 base 镜像
+├── Dockerfile.worker-runtime-base # Worker 运行时 base 镜像（含安全工具）
+├── Dockerfile.server-fast      # Server 快速构建（基于 base）
+├── Dockerfile.worker-fast      # Worker 快速构建（基于 base）
+├── Dockerfile.compile          # 交叉编译 Linux 二进制
 ├── plan.md                     # 旧计划跳转页（非当前真相）
 ├── README.md                   # 本文件
 ├── docs/                       # 文档中心
@@ -165,12 +193,11 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 │   ├── toolguard/             # 外部工具执行白名单（binary + arg 安全检查）
 │   ├── util/                  # 工具函数（脱敏、ID 生成、shutdown manager 等）
 │   ├── worker/                # Worker subprocess runner + 远程客户端 + 资源治理
-│   └── workflow/              # 工作流编排（按职责拆分为 5 个文件）
-│       ├── pipeline.go        # Pipeline 结构体、Builder、Run 入口
-│       ├── pipeline_stage.go  # 阶段状态管理
-│       ├── pipeline_flow.go   # 5 个目标类型 Flow
-│       ├── pipeline_tool.go   # 8 个工具执行器
-│       └── pipeline_result.go # 结果保存
+│   ├── workflows/             # 独立工作流（资产发现、Web 筛选）
+│   │   ├── discovery.go       # AssetDiscoveryWorkflow
+│   │   ├── screenshot.go      # WebScreeningWorkflow
+│   │   └── dedup.go           # URL 去重工具
+│   └── scanengine/            # 资产驱动扫描引擎
 ├── frontend/                   # React 前端
 │   ├── src/
 │   │   ├── lib/              # API 客户端 + Zustand store

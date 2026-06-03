@@ -473,20 +473,44 @@ Server NewServer():
 
 ## Docker 构建与部署
 
-### 镜像构建策略（2026-06-02 重构）
+### 镜像构建策略
 
-**当前架构**：所有依赖直接在主 Dockerfile 中安装，不再使用独立的 base 镜像层级。
+**分层构建架构**（2026-06-03 重构）：
 
-| 镜像 | Dockerfile | 基础镜像 | 内容 |
-|------|-----------|---------|------|
-| `anchor-server` | `Dockerfile.server` | `debian:bookworm-slim` | 系统依赖 + Go 二进制 + 漏洞模板知识库 |
-| `anchor-worker` | `Dockerfile.worker` | `debian:bookworm-slim` | 系统依赖 + 安全工具（10 个）+ Go 二进制 + 内置数据 |
-| `anchor-frontend` | `Dockerfile.frontend` | `nginx:alpine` | Nginx + React 构建产物 |
+```
+┌─────────────────────────────────────────────────────────┐
+│  应用层（频繁变化，快速构建 10-30 秒）                    │
+│  ┌─────────────────┐  ┌─────────────────┐              │
+│  │ anchor-server   │  │ anchor-worker   │              │
+│  │ :local          │  │ :local          │              │
+│  │ COPY bin/anchor │  │ COPY bin/anchor │              │
+│  └────────┬────────┘  └────────┬────────┘              │
+├───────────┼─────────────────────┼───────────────────────┤
+│  Base 层（很少变化，预构建缓存）                          │
+│  ┌────────┴────────┐  ┌────────┴────────┐              │
+│  │ anchor-server-  │  │ anchor-worker-  │              │
+│  │ base            │  │ base            │              │
+│  │ + 系统依赖      │  │ + 安全工具×10   │              │
+│  └─────────────────┘  └─────────────────┘              │
+└─────────────────────────────────────────────────────────┘
+```
 
-**重构原因**：
-1. 消除 base 镜像依赖，简化构建流程
-2. 支持多平台构建（amd64/arm64），无需维护多平台 base 镜像
-3. 每次构建都是完整镜像，不依赖预构建的 base
+**镜像清单**：
+
+| 镜像 | Dockerfile | 职责 |
+|------|-----------|------|
+| `anchor-server-base` | `Dockerfile.server-runtime-base` | Server 运行时依赖（debian + libsqlite3 + curl） |
+| `anchor-worker-base` | `Dockerfile.worker-runtime-base` | Worker 运行时依赖（debian + 10 个安全工具 + 系统依赖） |
+| `anchor-server:local` | `Dockerfile.server-fast` | 基于 base，仅 COPY Go 二进制 |
+| `anchor-worker:local` | `Dockerfile.worker-fast` | 基于 base，仅 COPY Go 二进制 |
+| `anchor-server` | `Dockerfile.server` | 发布版，从 GitHub Release 下载二进制 |
+| `anchor-worker` | `Dockerfile.worker` | 发布版，从 GitHub Release 下载二进制 |
+| `anchor-frontend` | `Dockerfile.frontend` | Nginx + React 构建产物 |
+
+**优势**：
+- 测试迭代快：只复制二进制，10-30 秒完成构建
+- 节省带宽：base 镜像可预构建并缓存
+- 测试/发布一致性：使用相同的构建流程
 
 ### 多平台构建
 
