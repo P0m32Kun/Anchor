@@ -63,6 +63,8 @@ POST /projects/{id}/scan
 
 ## 查询扫描状态
 
+扫描执行采用资产驱动模型。`pipeline_runs.stage` 和 `pipeline_run_stages` 只是兼容命名与 UI 聚合投影，不代表固定流水线顺序。判断运行状态看 run status / metrics；排查进度看 work items。
+
 ### 请求
 
 ```
@@ -88,6 +90,59 @@ GET /projects/{id}/pipeline/runs/{runId}
 - `"completed"` - 已完成
 - `"failed"` - 失败
 - `"cancelled"` - 已取消
+
+### 运行指标
+
+```
+GET /projects/{id}/pipeline/runs/{runId}/metrics
+```
+
+返回引擎状态和 Work 计数：
+
+```json
+{
+  "engine_state": "running",
+  "assets_discovered": 12,
+  "works_pending": 3,
+  "works_running": 2,
+  "works_done": 18,
+  "works_skipped": 1,
+  "works_failed": 0,
+  "last_new_asset_at": "2026-06-01T13:07:12Z"
+}
+```
+
+### Work Items 明细
+
+```
+GET /projects/{id}/pipeline/runs/{runId}/works
+GET /assets/{id}/works?run_id={runId}
+```
+
+`scan_work_items` 是资产驱动扫描的调度真相。每一行代表一个 `资产 × 动作`：
+
+```json
+{
+  "id": "id-xxx",
+  "run_id": "id-xxx",
+  "project_id": "id-xxx",
+  "asset_id": "id-xxx",
+  "action": "HTTPX_FINGERPRINT",
+  "status": "done",
+  "stage": "httpx",
+  "started_at": "2026-06-01T13:07:12Z",
+  "completed_at": "2026-06-01T13:07:18Z",
+  "created_at": "2026-06-01T13:07:10Z"
+}
+```
+
+### 扫描动作进度（UI 投影）
+
+```
+GET /projects/{id}/pipeline/runs/{runId}/stages
+```
+
+该接口用于前端「扫描动作进度」卡片，按 `stage` 聚合 Work 数量。它是进度摘要，不是执行编排 DAG。
 
 ## 获取扫描结果
 
@@ -180,8 +235,11 @@ RUN_ID="xxx"
 while true; do
   STATUS=$(curl -s -H "Authorization: Bearer test-token" \
     "http://localhost:17421/projects/$PROJECT_ID/pipeline/runs/$RUN_ID" | jq -r '.status')
+  METRICS=$(curl -s -H "Authorization: Bearer test-token" \
+    "http://localhost:17421/projects/$PROJECT_ID/pipeline/runs/$RUN_ID/metrics")
   
   echo "Status: $STATUS"
+  echo "$METRICS" | jq '{engine_state, assets_discovered, works_pending, works_running, works_done, works_failed}'
   
   if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
     break

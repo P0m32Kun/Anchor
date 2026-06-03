@@ -18,6 +18,8 @@
 
 **核心设计**：指纹驱动 Nuclei 模板筛选 — httpx 识别的技术栈（WordPress/nginx/Apache Druid 等）精确映射到 Nuclei `-tags`，无指纹目标自动跳过，避免全量扫描。
 
+**当前执行模型**：扫描由资产驱动引擎调度。目标先进入资产图，再按资产类型派生 `Work(资产 × 动作)`，工具输出继续回注新资产。前端「扫描执行」页展示的是运行观察台：引擎状态、扫描动作进度和 Work Items 明细；阶段只作为 UI 聚合标签，不代表固定线性流水线。
+
 ## 技术栈
 
 | 层级          | 技术                                             |
@@ -293,11 +295,11 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
 - [x] Go 单元测试覆盖（tagmapper、httpx parser、parser 包、naabu args）
 - [x] E2E 测试：ScanConfigPage + high-risk pipeline 端到端验证
 
-### v0.4: 智能扫描管线 ✅
+### v0.4: 智能扫描能力 ✅
 
 - [x] **多目标类型导入**：domain / ip / cidr / url / **company**（新增）
 - [x] **Company 目标自动展开**：FOFA `org/cert/title` 三维搜索 → 展开为 domain/ip 子目标 → 路由到对应 flow
-- [x] **完整 8 阶段扫描管线**：classify → search → subdomain → resolve → cdn_filter → portscan → fingerprint → vuln
+- [x] **资产驱动扫描引擎**：目标 → 资产图 → Work(资产×动作) → 工具执行 → 新资产回注循环；阶段仅用于 UI 聚合展示
 - [x] **智能服务指纹**：nmap -sV 识别 Web + 非 Web 服务，不依赖端口号
 - [x] **指纹驱动 Nuclei tags**：服务类型精确映射到 Nuclei `-tags`
 - [x] **Nuclei 分层扫描**：tags / workflow / both 三选一（含 RBKD-SEC/templates 集成）

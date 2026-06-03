@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { mergeStageEvent } from "./RunsPage";
-import type { PipelineRunStage } from "../lib/api";
+import {
+  actionLabelForWork,
+  buildWorkGroups,
+  mergeStageEvent,
+} from "./RunsPage";
+import type { PipelineRunStage, ScanWorkItem } from "../lib/api";
 
 const mkStage = (over: Partial<PipelineRunStage>): PipelineRunStage => ({
   id: "id-1",
@@ -69,5 +73,61 @@ describe("mergeStageEvent (RunsPage SSE reducer)", () => {
     const prev = [mkStage({ stage: "portscan" })];
     const next = mergeStageEvent(prev, { run_id: "run-1", status: "completed" });
     expect(next).toBe(prev);
+  });
+});
+
+const mkWork = (over: Partial<ScanWorkItem>): ScanWorkItem => ({
+  id: "work-1",
+  run_id: "run-1",
+  project_id: "project-1",
+  asset_id: "asset-1",
+  action: "PORT_SCAN",
+  status: "pending",
+  created_at: "2026-05-12T00:00:00.000Z",
+  ...over,
+});
+
+describe("buildWorkGroups (asset-driven run view)", () => {
+  it("groups work items by stage and counts terminal/running states", () => {
+    const groups = buildWorkGroups([
+      mkWork({ id: "w1", stage: "portscan", status: "done" }),
+      mkWork({ id: "w2", stage: "portscan", status: "running" }),
+      mkWork({ id: "w3", stage: "vuln", status: "failed" }),
+      mkWork({ id: "w4", stage: "vuln", status: "skipped" }),
+    ]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toMatchObject({
+      stage: "portscan",
+      total: 2,
+      done: 1,
+      running: 1,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(groups[1]).toMatchObject({
+      stage: "vuln",
+      total: 2,
+      done: 0,
+      running: 0,
+      failed: 1,
+      skipped: 1,
+    });
+  });
+
+  it("uses action as fallback when a work item has no stage", () => {
+    const groups = buildWorkGroups([
+      mkWork({ id: "w1", action: "SPOOR_SCAN", stage: undefined, status: "pending" }),
+    ]);
+
+    expect(groups[0].stage).toBe("SPOOR_SCAN");
+    expect(groups[0].pending).toBe(1);
+  });
+});
+
+describe("actionLabelForWork", () => {
+  it("uses action labels instead of legacy pipeline stage wording", () => {
+    expect(actionLabelForWork("HTTPX_FINGERPRINT")).toBe("Web 探活");
+    expect(actionLabelForWork("UNKNOWN_ACTION")).toBe("UNKNOWN_ACTION");
   });
 });

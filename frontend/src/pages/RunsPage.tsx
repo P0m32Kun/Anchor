@@ -26,7 +26,7 @@ import {
 } from "../components";
 import { useToast } from "../components/Toast";
 import { getApiBase } from "../lib/config";
-import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig, ScanRunMetrics } from "../lib/api";
+import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig, ScanRunMetrics, ScanWorkItem } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
 import {
   Play,
@@ -43,8 +43,6 @@ import {
   FileText,
   Download,
   Copy,
-  ChevronDown,
-  ChevronRight,
   Eye,
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -72,6 +70,9 @@ export default function RunsPage() {
   const [tasksLoading, setTasksLoading] = useState(false);
   const [stages, setStages] = useState<PipelineRunStage[]>([]);
   const [stagesLoading, setStagesLoading] = useState(false);
+  const [works, setWorks] = useState<ScanWorkItem[]>([]);
+  const [worksLoading, setWorksLoading] = useState(false);
+  const [workStatusFilter, setWorkStatusFilter] = useState<WorkStatusFilter>("all");
   const [metrics, setMetrics] = useState<ScanRunMetrics | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -83,11 +84,6 @@ export default function RunsPage() {
   const [inspectingLogs, setInspectingLogs] = useState<string>("");
   const [logsLoading, setLogsLoading] = useState(false);
   const [logViewMode, setLogViewMode] = useState<"raw" | "parsed">("parsed");
-
-  // Inline task output expansion state
-  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
-  const [expandedTaskLogs, setExpandedTaskLogs] = useState<Record<string, string>>({});
-  const [expandedTaskLoading, setExpandedTaskLoading] = useState<Record<string, boolean>>({});
 
   const lastToastErrorRef = useRef<string | null>(null);
 
@@ -140,8 +136,9 @@ export default function RunsPage() {
     setSelectedRun(runId);
     setTasksLoading(true);
     setStagesLoading(true);
+    setWorksLoading(true);
     try {
-      const [taskData, stageData, metricsData] = await Promise.all([
+      const [taskData, stageData, metricsData, workData] = await Promise.all([
         api.getRunTasks(runId, signal).catch(() => [] as ScanTask[]),
         projectId
           ? api.listPipelineRunStages(projectId, runId, signal).catch(() => ({ stages: [] as PipelineRunStage[] }))
@@ -149,10 +146,14 @@ export default function RunsPage() {
         projectId
           ? api.getScanRunMetrics(projectId, runId, signal).catch(() => null)
           : Promise.resolve(null),
+        projectId
+          ? api.listScanRunWorks(projectId, runId, signal).catch(() => ({ items: [] as ScanWorkItem[], total: 0 }))
+          : Promise.resolve({ items: [] as ScanWorkItem[], total: 0 }),
       ]);
       setTasks(taskData ?? []);
       setStages(stageData.stages ?? []);
       setMetrics(metricsData);
+      setWorks(workData.items ?? []);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "加载任务详情失败";
@@ -160,13 +161,14 @@ export default function RunsPage() {
     } finally {
       setTasksLoading(false);
       setStagesLoading(false);
+      setWorksLoading(false);
     }
   };
 
   const refreshRunDetails = useCallback(
     async (runId: string, signal?: AbortSignal) => {
       try {
-        const [taskData, stageData, metricsData] = await Promise.all([
+        const [taskData, stageData, metricsData, workData] = await Promise.all([
           api.getRunTasks(runId, signal).catch(() => null),
           projectId
             ? api.listPipelineRunStages(projectId, runId, signal).catch(() => null)
@@ -174,10 +176,14 @@ export default function RunsPage() {
           projectId
             ? api.getScanRunMetrics(projectId, runId, signal).catch(() => null)
             : Promise.resolve(null),
+          projectId
+            ? api.listScanRunWorks(projectId, runId, signal).catch(() => null)
+            : Promise.resolve(null),
         ]);
         if (taskData) setTasks(taskData);
         if (stageData) setStages(stageData.stages ?? []);
         if (metricsData) setMetrics(metricsData);
+        if (workData) setWorks(workData.items ?? []);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
       }
@@ -321,15 +327,6 @@ export default function RunsPage() {
     inspectingLive,
   );
 
-  const expandedTask = expandedTaskId ? tasks.find((t) => t.id === expandedTaskId) ?? null : null;
-  const expandedLive =
-    !!expandedTask &&
-    (expandedTask.status === "running" || expandedTask.status === "queued");
-  const { text: expandedLiveLogs, loading: expandedLiveLoading } = useTaskLiveOutput(
-    expandedTask,
-    expandedLive,
-  );
-
   // Keep modal task status in sync when run details refresh.
   useEffect(() => {
     if (!inspectingTask) return;
@@ -396,39 +393,11 @@ export default function RunsPage() {
     }
   };
 
-  // Toggle inline task output expansion (fetch artifact lazily).
-  const toggleTaskExpand = async (task: ScanTask) => {
-    if (expandedTaskId === task.id) {
-      setExpandedTaskId(null);
-      return;
-    }
-    setExpandedTaskId(task.id);
-    if (task.status === "running" || task.status === "queued") {
-      return;
-    }
-    if (expandedTaskLogs[task.id] !== undefined) return; // already cached
-
-    setExpandedTaskLoading((prev) => ({ ...prev, [task.id]: true }));
-    try {
-      const artifacts = await api.listArtifacts(task.id);
-      const stdout = artifacts.find(a => a.type === 'stdout');
-      const stderr = artifacts.find(a => a.type === 'stderr');
-      const targetArtifact = stdout || stderr;
-      if (targetArtifact) {
-        const content = await api.getArtifactContent(targetArtifact.id);
-        // Truncate to first 50 lines for inline preview
-        const lines = content.split('\n');
-        const preview = lines.slice(0, 50).join('\n');
-        setExpandedTaskLogs((prev) => ({ ...prev, [task.id]: preview + (lines.length > 50 ? '\n...' : '') }));
-      } else {
-        setExpandedTaskLogs((prev) => ({ ...prev, [task.id]: '(无日志输出)' }));
-      }
-    } catch (err) {
-      setExpandedTaskLogs((prev) => ({ ...prev, [task.id]: '加载失败: ' + (err instanceof Error ? err.message : String(err)) }));
-    } finally {
-      setExpandedTaskLoading((prev) => ({ ...prev, [task.id]: false }));
-    }
-  };
+  const workGroups = buildWorkGroups(works);
+  const actionSummaries = buildActionSummaries(stages, workGroups);
+  const filteredWorks = works.filter((work) =>
+    workStatusFilter === "all" ? true : work.status === workStatusFilter
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -480,7 +449,7 @@ export default function RunsPage() {
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_520px]">
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
@@ -596,7 +565,7 @@ export default function RunsPage() {
         <aside className="space-y-6">
             <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
                 <Terminal className="h-5 w-5 text-muted-foreground" />
-                流水线详情
+                运行观察台
             </h2>
 
             {!selectedRun ? (
@@ -643,6 +612,18 @@ export default function RunsPage() {
                                         <span className="text-muted-foreground">已跳过:</span>
                                         <span className="font-medium text-muted-foreground">{metrics.works_skipped}</span>
                                     </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">失败:</span>
+                                        <span className="font-medium text-destructive">{metrics.works_failed}</span>
+                                    </div>
+                                    {metrics.last_new_asset_at && (
+                                        <div className="flex items-center gap-2 col-span-2">
+                                            <span className="text-muted-foreground">最新资产:</span>
+                                            <span className="font-medium font-mono text-[10px]">
+                                                {new Date(metrics.last_new_asset_at).toLocaleTimeString()}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -650,165 +631,148 @@ export default function RunsPage() {
 
                     <Card className="overflow-hidden">
                         <CardHeader className="bg-muted/30 pb-3">
-                            <CardTitle className="text-sm">阶段进度报告</CardTitle>
-                            <CardDescription className="text-xs">Pipeline Execution Stages</CardDescription>
+                            <CardTitle className="text-sm">扫描动作进度</CardTitle>
+                            <CardDescription className="text-xs">按资产驱动 work item 聚合，不表示固定执行顺序</CardDescription>
                         </CardHeader>
                         <CardContent className="p-0">
-                            {stagesLoading || tasksLoading ? (
+                            {stagesLoading || worksLoading ? (
                                 <div className="p-8 text-center flex flex-col items-center gap-2">
                                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                    <span className="text-xs text-muted-foreground font-mono">Loading pipeline stages...</span>
+                                    <span className="text-xs text-muted-foreground font-mono">Loading scan actions...</span>
                                 </div>
-                            ) : stages.length === 0 ? (
+                            ) : actionSummaries.length === 0 ? (
                                 <div className="p-8 text-center text-xs text-muted-foreground italic">
-                                    暂无阶段数据 (可能为手动触发的单个任务)
+                                    暂无动作进度数据
                                 </div>
                             ) : (
                                 <div className="divide-y border-t">
-                                    {stages.map((s, idx) => {
-                                        const stageTasks = tasksInStage(s, tasks);
-                                        return (
-                                        <div key={s.id} className="group">
-                                            <div className="relative flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
-                                                <div className="flex flex-col items-center relative h-full">
-                                                    <div className={cn(
-                                                        "z-10 h-6 w-6 rounded-full border-2 bg-background flex items-center justify-center shrink-0",
-                                                        s.status === 'completed' ? 'border-brand-success text-brand-success' :
-                                                        s.status === 'running' ? 'border-primary text-primary animate-pulse' :
-                                                        s.status === 'failed' ? 'border-destructive text-destructive' :
-                                                        'border-border text-muted-foreground'
-                                                    )}>
-                                                        {s.status === 'completed' ? <CheckCircle2 className="h-3 w-3" /> :
-                                                         s.status === 'failed' ? <AlertCircle className="h-3 w-3" /> :
-                                                         <span className="text-[9px] font-bold">{idx + 1}</span>
-                                                        }
-                                                    </div>
-                                                    {idx < stages.length - 1 && (
-                                                        <div className="absolute top-6 bottom-[-16px] w-[1px] bg-border group-hover:bg-primary/20 transition-colors" />
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-sm font-semibold uppercase tracking-tight truncate pr-2">
-                                                            {STAGE_LABELS[s.stage] || s.stage}
+                                    {actionSummaries.map((summary) => (
+                                        <div key={summary.stage} className="p-4 space-y-2 hover:bg-muted/20 transition-colors">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-semibold truncate">
+                                                            {stageLabel(summary.stage)}
                                                         </span>
-                                                        <span className="text-[10px] font-mono text-muted-foreground">
-                                                            {formatStageDuration(s)}
-                                                        </span>
-                                                    </div>
-                                                    <div className={cn(
-                                                        "text-[10px] mt-0.5 font-medium",
-                                                        !s.error && "truncate",
-                                                        s.status === 'completed' ? 'text-brand-success' :
-                                                        s.status === 'running' ? 'text-primary' :
-                                                        s.status === 'failed' ? 'text-destructive' :
-                                                        'text-muted-foreground'
-                                                    )}>
-                                                        {s.status.toUpperCase()}
-                                                        {s.work_total != null && s.work_total > 0 && (
-                                                            <span className="ml-2 text-muted-foreground">
-                                                                ({s.work_done ?? 0}/{s.work_total})
-                                                            </span>
+                                                        {summary.round > 1 && (
+                                                            <Badge variant="outline" className="h-4 px-1 text-[9px]">
+                                                                round {summary.round}
+                                                            </Badge>
                                                         )}
                                                     </div>
-                                                    {s.error && (
-                                                        <p className="text-[10px] mt-1 font-mono text-destructive/90 whitespace-pre-wrap break-all">
-                                                            {s.error}
-                                                        </p>
-                                                    )}
-                                                    {stageTasks.length === 0 && s.status !== 'pending' && !s.error && (
-                                                        <p className="text-[10px] mt-1 text-muted-foreground">
-                                                            此阶段无 cdncheck 子任务（可能尚未执行或 run 无 stage 记录）
-                                                        </p>
-                                                    )}
+                                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                                                        <span>总数 {summary.total}</span>
+                                                        <span className="text-primary">执行中 {summary.running}</span>
+                                                        <span className="text-brand-success">完成 {summary.done}</span>
+                                                        {summary.failed > 0 && <span className="text-destructive">失败 {summary.failed}</span>}
+                                                        {summary.skipped > 0 && <span>跳过 {summary.skipped}</span>}
+                                                    </div>
                                                 </div>
+                                                <Badge variant={statusVariant(summary.status)} className="h-5 px-1.5 text-[10px] shrink-0">
+                                                    {summary.status}
+                                                </Badge>
                                             </div>
-                                            {stageTasks.length > 0 && (
-                                                <div className="pl-14 pr-4 pb-3 -mt-1 space-y-1.5">
-                                                    {stageTasks.map((task) => {
-                                                        const isExpanded = expandedTaskId === task.id;
-                                                        const taskLive =
-                                                          task.status === "running" ||
-                                                          task.status === "queued";
-                                                        const isLoading = taskLive
-                                                          ? expandedLiveLoading
-                                                          : expandedTaskLoading[task.id];
-                                                        const logs = taskLive
-                                                          ? expandedLiveLogs
-                                                          : expandedTaskLogs[task.id];
-                                                        return (
-                                                        <div key={task.id}>
-                                                            <div
-                                                                className="flex items-center justify-between gap-3 text-[11px] py-1 border-l border-border/40 pl-3 hover:bg-primary/[0.03] cursor-pointer transition-colors group/task"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    toggleTaskExpand(task);
-                                                                }}
-                                                            >
-                                                                <div className="flex items-center gap-2 min-w-0">
-                                                                    {isExpanded
-                                                                        ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
-                                                                        : <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0 group-hover/task:text-muted-foreground transition-colors" />
-                                                                    }
-                                                                    <span className="px-1.5 py-0.5 rounded bg-muted font-mono font-bold text-muted-foreground text-[10px] group-hover/task:bg-primary/10 group-hover/task:text-primary transition-colors">
-                                                                        {task.tool}
-                                                                    </span>
-                                                                    <span className="font-mono text-muted-foreground opacity-50 truncate">#{task.id.slice(-6)}</span>
-                                                                    <span className="font-mono text-muted-foreground/70 text-[10px]">
-                                                                        {formatTaskDuration(task)}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Badge variant={
-                                                                        task.status === 'completed' ? 'success' :
-                                                                        task.status === 'failed' ? 'destructive' :
-                                                                        task.status === 'running' ? 'info' :
-                                                                        'secondary'
-                                                                    } className="h-4 px-1 text-[9px] shrink-0">
-                                                                        {task.status}
-                                                                    </Badge>
-                                                                    <Terminal className="h-3 w-3 text-muted-foreground/30 group-hover/task:text-primary transition-colors" />
-                                                                </div>
-                                                            </div>
-                                                            {/* Inline output preview */}
-                                                            {isExpanded && (
-                                                                <div className="ml-6 mt-1 mb-2 border-l border-primary/20 pl-3 animate-in fade-in slide-in-from-top-1 duration-150">
-                                                                    {isLoading && (!logs || logs === "") ? (
-                                                                        <div className="flex items-center gap-2 py-2">
-                                                                            <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                                                                            <span className="text-[10px] text-muted-foreground">
-                                                                              {taskLive ? "等待工具输出…" : "加载中..."}
-                                                                            </span>
-                                                                        </div>
-                                                                    ) : logs !== undefined ? (
-                                                                        <div className="space-y-1.5">
-                                                                            {taskLive && (
-                                                                              <span className="text-[9px] font-bold uppercase tracking-wider text-brand-success">
-                                                                                实时输出
-                                                                              </span>
-                                                                            )}
-                                                                            <pre className="text-[10px] font-mono text-muted-foreground bg-black/20 rounded-md p-2 overflow-x-auto max-h-[200px] overflow-y-auto leading-relaxed whitespace-pre-wrap break-all">
-                                                                                {logs || (taskLive ? "(尚无输出，工具可能仍在启动)" : "")}
-                                                                            </pre>
-                                                                            <button
-                                                                                className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium transition-colors"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    handleInspectTask(task);
-                                                                                }}
-                                                                            >
-                                                                                <Eye className="h-3 w-3" />
-                                                                                查看完整日志
-                                                                            </button>
-                                                                        </div>
-                                                                    ) : null}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )})}
+                                            {summary.total > 0 && (
+                                                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                                    <div
+                                                        className={cn(
+                                                            "h-full rounded-full",
+                                                            summary.failed > 0 ? "bg-destructive" : "bg-primary"
+                                                        )}
+                                                        style={{ width: `${actionCompletePercent(summary)}%` }}
+                                                    />
                                                 </div>
                                             )}
+                                            {summary.error && (
+                                                <p className="text-[10px] font-mono text-destructive/90 whitespace-pre-wrap break-all">
+                                                    {summary.error}
+                                                </p>
+                                            )}
                                         </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="overflow-hidden">
+                        <CardHeader className="bg-muted/30 pb-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <CardTitle className="text-sm">Work Items 明细</CardTitle>
+                                    <CardDescription className="text-xs">每一行代表一个资产与扫描动作的调度单元</CardDescription>
+                                </div>
+                                <Badge variant="secondary" className="font-mono text-[10px]">{filteredWorks.length}/{works.length}</Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="flex flex-wrap gap-1.5 border-t border-b bg-muted/20 p-3">
+                                {WORK_STATUS_FILTERS.map((filter) => (
+                                    <button
+                                        key={filter}
+                                        onClick={() => setWorkStatusFilter(filter)}
+                                        className={cn(
+                                            "rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors",
+                                            workStatusFilter === filter
+                                                ? "border-primary/30 bg-primary/10 text-primary"
+                                                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        {workFilterLabel(filter)}
+                                    </button>
+                                ))}
+                            </div>
+                            {worksLoading || tasksLoading ? (
+                                <div className="p-8 text-center flex flex-col items-center gap-2">
+                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                    <span className="text-xs text-muted-foreground font-mono">Loading work items...</span>
+                                </div>
+                            ) : filteredWorks.length === 0 ? (
+                                <div className="p-8 text-center text-xs text-muted-foreground italic">
+                                    当前筛选条件下没有 work item
+                                </div>
+                            ) : (
+                                <div className="max-h-[520px] overflow-y-auto divide-y">
+                                    {filteredWorks.map((work) => {
+                                        const task = taskForWork(work, tasks);
+                                        return (
+                                            <div key={work.id} className="p-3 hover:bg-muted/20 transition-colors">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0 space-y-1">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <Badge variant={statusVariant(work.status)} className="h-5 px-1.5 text-[10px]">
+                                                                {work.status}
+                                                            </Badge>
+                                                            <span className="text-xs font-semibold">{actionLabelForWork(work.action)}</span>
+                                                            <span className="font-mono text-[10px] text-muted-foreground">#{work.id.slice(-6)}</span>
+                                                        </div>
+                                                        <div className="font-mono text-[10px] text-muted-foreground truncate">
+                                                            asset:{work.asset_id.slice(-10)}
+                                                        </div>
+                                                        {(work.error || work.skip_reason) && (
+                                                            <p className={cn(
+                                                                "text-[10px] font-mono whitespace-pre-wrap break-all",
+                                                                work.error ? "text-destructive/90" : "text-muted-foreground"
+                                                            )}>
+                                                                {work.error || work.skip_reason}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        {task ? (
+                                                            <button
+                                                                className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[10px] text-primary hover:bg-primary/10 transition-colors"
+                                                                onClick={() => handleInspectTask(task)}
+                                                            >
+                                                                <Eye className="h-3 w-3" />
+                                                                日志
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-[10px] text-muted-foreground">无任务日志</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         );
                                     })}
                                 </div>
@@ -860,46 +824,191 @@ export default function RunsPage() {
   );
 }
 
-// Mapping of stages to the tools they are allowed to contain.
-// This prevents tasks from appearing in multiple stages if they start/end 
-// at the exact same time as a stage boundary.
-const STAGE_TOOL_ALLOWLIST: Record<string, string[]> = {
-  alive: ["nmap"],
-  portscan: ["naabu"],
-  fingerprint: ["nmap"],
-  httpx: ["httpx"],
-  vuln: ["nuclei"],
-  subdomain: ["subfinder"],
-  resolve: ["dnsx"],
-  cdn_filter: ["cdncheck"],
-  ffuf: ["ffuf"],
-  urlfinder: ["urlfinder"],
-  httpx_2: ["httpx"],
-  vuln_2: ["nuclei"],
-  search: ["fofa", "hunter", "quake"],
-  passive_cert: ["crt"],
-  passive_url: ["gau"],
+type WorkStatusFilter = "all" | "pending" | "running" | "done" | "failed" | "skipped";
+type BadgeVariant = "default" | "secondary" | "outline" | "destructive" | "success" | "warning" | "info" | "critical" | "purple";
+
+type WorkGroup = {
+  stage: string;
+  total: number;
+  pending: number;
+  running: number;
+  done: number;
+  failed: number;
+  skipped: number;
+  items: ScanWorkItem[];
 };
 
-function tasksInStage(stage: PipelineRunStage, allTasks: ScanTask[]): ScanTask[] {
-  if (!stage.started_at) return [];
-  const stageStart = new Date(stage.started_at).getTime();
-  const stageEnd = stage.completed_at ? new Date(stage.completed_at).getTime() : Infinity;
-  
-  const allowedTools = STAGE_TOOL_ALLOWLIST[stage.stage];
+type ActionSummary = Omit<WorkGroup, "items"> & {
+  status: string;
+  error?: string;
+  round: number;
+};
 
-  return allTasks.filter((t) => {
-    if (!t.started_at) return false;
-    const ts = new Date(t.started_at).getTime();
-    
-    // Time boundary check
-    if (ts < stageStart || ts > stageEnd) return false;
-    
-    // Strict tool matching if allowlist exists for this stage
-    if (allowedTools && !allowedTools.includes(t.tool)) return false;
-    
-    return true;
+const WORK_STATUS_FILTERS: WorkStatusFilter[] = ["all", "running", "failed", "pending", "done", "skipped"];
+
+const ACTION_LABELS: Record<string, string> = {
+  PASSIVE_SEARCH: "被动搜索",
+  PASSIVE_CERT: "证书子域",
+  PASSIVE_URL: "历史 URL",
+  SUBDOMAIN_ENUM: "子域名发现",
+  DNS_RESOLVE: "DNS 解析",
+  CDN_CHECK: "CDN 检测",
+  PORT_SCAN: "端口扫描",
+  SERVICE_FINGERPRINT: "服务指纹",
+  HTTPX_FINGERPRINT: "Web 探活",
+  KATANA_CRAWL: "站点爬虫",
+  FFUF_BRUTE: "目录爆破",
+  NUCLEI_SCAN: "漏洞扫描",
+  SPOOR_SCAN: "敏感信息扫描",
+};
+
+const ACTION_TO_TOOL_ID: Record<string, string> = {
+  PASSIVE_CERT: "crt",
+  PASSIVE_URL: "gau",
+  SUBDOMAIN_ENUM: "subfinder",
+  DNS_RESOLVE: "dnsx",
+  CDN_CHECK: "cdncheck",
+  PORT_SCAN: "naabu",
+  SERVICE_FINGERPRINT: "nmap_service",
+  HTTPX_FINGERPRINT: "httpx",
+  KATANA_CRAWL: "katana",
+  FFUF_BRUTE: "ffuf",
+  NUCLEI_SCAN: "nuclei",
+  SPOOR_SCAN: "spoor",
+};
+
+export function actionLabelForWork(action: string): string {
+  return ACTION_LABELS[action] || action;
+}
+
+export function buildWorkGroups(items: ScanWorkItem[]): WorkGroup[] {
+  const groups = new Map<string, WorkGroup>();
+  for (const item of items) {
+    const key = item.stage || item.action;
+    const group = groups.get(key) ?? {
+      stage: key,
+      total: 0,
+      pending: 0,
+      running: 0,
+      done: 0,
+      failed: 0,
+      skipped: 0,
+      items: [],
+    };
+    group.total += 1;
+    group.items.push(item);
+    switch (item.status) {
+      case "done":
+        group.done += 1;
+        break;
+      case "failed":
+        group.failed += 1;
+        break;
+      case "skipped":
+        group.skipped += 1;
+        break;
+      case "running":
+        group.running += 1;
+        break;
+      default:
+        group.pending += 1;
+        break;
+    }
+    groups.set(key, group);
+  }
+  return Array.from(groups.values());
+}
+
+function buildActionSummaries(stages: PipelineRunStage[], groups: WorkGroup[]): ActionSummary[] {
+  if (stages.length === 0) {
+    return groups.map((group) => ({
+      ...group,
+      status: statusFromWorkGroup(group),
+      round: 0,
+    }));
+  }
+
+  return stages.map((stage) => {
+    const group = groups.find((g) => g.stage === stage.stage);
+    return {
+      stage: stage.stage,
+      total: stage.work_total ?? group?.total ?? 0,
+      pending: group?.pending ?? 0,
+      running: stage.work_running ?? group?.running ?? 0,
+      done: group?.done ?? stage.work_done ?? 0,
+      failed: group?.failed ?? (stage.status === "failed" ? 1 : 0),
+      skipped: group?.skipped ?? 0,
+      status: stage.status,
+      error: stage.error,
+      round: stage.round ?? 0,
+    };
   });
+}
+
+function statusFromWorkGroup(group: WorkGroup): string {
+  if (group.running > 0) return "running";
+  if (group.pending > 0) return "pending";
+  if (group.failed > 0) return "failed";
+  return "completed";
+}
+
+function actionCompletePercent(summary: ActionSummary): number {
+  if (summary.total <= 0) return 0;
+  const terminal = summary.done + summary.failed + summary.skipped;
+  const completed = terminal > 0 ? terminal : summary.done;
+  return Math.min(100, Math.round((completed / summary.total) * 100));
+}
+
+function stageLabel(stage: string): string {
+  return STAGE_LABELS[stage] || actionLabelForWork(stage);
+}
+
+function workFilterLabel(filter: WorkStatusFilter): string {
+  const labels: Record<WorkStatusFilter, string> = {
+    all: "全部",
+    pending: "待处理",
+    running: "执行中",
+    done: "完成",
+    failed: "失败",
+    skipped: "跳过",
+  };
+  return labels[filter];
+}
+
+function statusVariant(status: string): BadgeVariant {
+  switch (status) {
+    case "completed":
+    case "done":
+      return "success";
+    case "failed":
+      return "destructive";
+    case "running":
+      return "info";
+    case "pending":
+      return "warning";
+    default:
+      return "secondary";
+  }
+}
+
+function taskForWork(work: ScanWorkItem, tasks: ScanTask[]): ScanTask | undefined {
+  if (work.task_id) {
+    const exact = tasks.find((task) => task.id === work.task_id);
+    if (exact) return exact;
+  }
+
+  const toolID = ACTION_TO_TOOL_ID[work.action];
+  if (!toolID) return undefined;
+  const candidates = tasks.filter((task) => task.tool === toolID);
+  if (candidates.length <= 1 || !work.started_at) return candidates[0];
+
+  const workStarted = new Date(work.started_at).getTime();
+  return candidates
+    .filter((task) => task.started_at)
+    .sort((a, b) =>
+      Math.abs(new Date(a.started_at!).getTime() - workStarted) -
+      Math.abs(new Date(b.started_at!).getTime() - workStarted)
+    )[0] ?? candidates[0];
 }
 
 function formatDurationMs(ms: number): string {
@@ -909,13 +1018,6 @@ function formatDurationMs(ms: number): string {
   const m = Math.floor(s / 60);
   const rs = Math.round(s % 60);
   return `${m}m${rs}s`;
-}
-
-function formatStageDuration(s: PipelineRunStage): string {
-  if (!s.started_at) return "";
-  const start = new Date(s.started_at).getTime();
-  const end = s.completed_at ? new Date(s.completed_at).getTime() : Date.now();
-  return formatDurationMs(end - start);
 }
 
 function formatTaskDuration(t: ScanTask): string {

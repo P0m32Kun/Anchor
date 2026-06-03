@@ -351,6 +351,7 @@ internal/scanengine/
 - **真相**：`scan_work_items` + `scan_tasks` + run metrics
 - **UI 投影**：`pipeline_run_stages` + `pipeline_stage_change` SSE（由 `stageagg.Aggregator` 生成，仅用于前端进度展示，**不影响执行逻辑**）
 - Stage 是 UI 分组标签（crawl/vuln/httpx 等），不是执行阶段；同一 stage 可多轮 `running`
+- **前端展示**：`frontend/src/pages/RunsPage.tsx` 的运行详情是「运行观察台」。主视图展示引擎状态、Work 计数、扫描动作进度和 Work Items 明细；不再把 stage 渲染为严格线性 Pipeline 时间线。
 
 ### API
 

@@ -810,14 +810,17 @@ export interface ScanRunMetrics {
 export interface ScanWorkItem {
   id: string;
   run_id: string;
+  project_id: string;
   asset_id: string;
   action: string;
   status: string;
   skip_reason?: string;
   stage?: string;
+  error?: string;
   started_at?: string;
   completed_at?: string;
   task_id?: string;
+  created_at: string;
 }
 
 export interface PipelineRun {
