@@ -127,7 +127,18 @@ func runWorker(dataDir, coreURL string) {
 		if apiToken == "" {
 			log.Fatal("[worker] ANCHOR_API_TOKEN environment variable is required for remote mode")
 		}
-		remoteClient = worker.NewRemoteClient(coreURL, endpoint, apiToken, dataDir)
+
+		// Create a runner for executing tools
+		sqliteDB, err := db.Open(dataDir)
+		if err != nil {
+			log.Fatal("open db:", err)
+		}
+		defer sqliteDB.Close()
+
+		queries := db.New(sqliteDB)
+		runner := worker.NewRunner(queries, nil, dataDir)
+
+		remoteClient = worker.NewRemoteClient(coreURL, endpoint, apiToken, dataDir, runner)
 
 		// 指数退避重试注册（最多 5 次，Server 可能还没启动）
 		var regErr error

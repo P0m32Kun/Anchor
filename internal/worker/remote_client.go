@@ -4,6 +4,7 @@ import (
 	archive_tar "archive/tar"
 	"compress/gzip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +24,7 @@ type RemoteClient struct {
 	token      string
 	endpoint   string
 	dataDir    string
+	runner     *Runner
 	syncer     *BundleSyncer
 	httpClient *http.Client
 	stopCh     chan struct{}
@@ -31,12 +33,14 @@ type RemoteClient struct {
 // NewRemoteClient creates a client that registers with the core server.
 // apiToken is the global server token required for all API calls.
 // dataDir is used for local bundle storage.
-func NewRemoteClient(coreURL, endpoint, apiToken, dataDir string) *RemoteClient {
+// runner is the local task runner for executing tools.
+func NewRemoteClient(coreURL, endpoint, apiToken, dataDir string, runner *Runner) *RemoteClient {
 	return &RemoteClient{
 		coreURL:    coreURL,
 		endpoint:   endpoint,
 		token:      apiToken,
 		dataDir:    dataDir,
+		runner:     runner,
 		syncer:     NewBundleSyncer(dataDir, coreURL, apiToken),
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		stopCh:     make(chan struct{}),
@@ -281,11 +285,31 @@ func (c *RemoteClient) StartPolling() {
 func (c *RemoteClient) executeTask(taskID, tool string, payload map[string]interface{}) {
 	log.Printf("[worker] executing task %s (tool=%s)", taskID, tool)
 
-	// TODO: integrate with actual tool execution
-	// For now, simulate execution
-	time.Sleep(2 * time.Second)
+	// Execute the task using the local runner
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
 
-	// Report result
+	if err := c.runner.Run(ctx, taskID); err != nil {
+		log.Printf("[worker] task %s execution error: %v", taskID, err)
+
+		// Report failure
+		resultBody, _ := json.Marshal(map[string]interface{}{
+			"status": "failed",
+			"error":  err.Error(),
+		})
+		req, _ := http.NewRequest("POST", fmt.Sprintf("%s/tasks/%s/result", c.coreURL, taskID), bytes.NewReader(resultBody))
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			log.Printf("[worker] report result error: %v", err)
+			return
+		}
+		resp.Body.Close()
+		return
+	}
+
+	// Report success
 	resultBody, _ := json.Marshal(map[string]interface{}{
 		"status":    "completed",
 		"artifacts": []map[string]interface{}{},

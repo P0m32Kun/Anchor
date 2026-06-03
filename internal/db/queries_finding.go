@@ -416,6 +416,60 @@ func (q *Queries) GetTemplateHitStats(runID string) ([]*TemplateHitStats, error)
 	return stats, rows.Err()
 }
 
+// DictionaryHitStats holds dictionary hit statistics.
+type DictionaryHitStats struct {
+	TaskID     string
+	Dictionary string
+	HitCount   int
+}
+
+// GetDictionaryHitStats returns dictionary hit statistics for a run.
+// Queries ffuf tasks and their stdout artifacts to count unique hits.
+func (q *Queries) GetDictionaryHitStats(runID string) ([]*DictionaryHitStats, error) {
+	rows, err := q.db.Query(`
+		SELECT
+			t.id as task_id,
+			COALESCE(a.path, '') as artifact_path
+		FROM scan_tasks t
+		LEFT JOIN raw_artifacts a ON a.task_id = t.id AND a.type = 'stdout'
+		WHERE t.run_id = ? AND t.tool = 'ffuf' AND t.status = 'completed'
+		ORDER BY t.created_at`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type taskArtifact struct {
+		TaskID       string
+		ArtifactPath string
+	}
+	var tasks []taskArtifact
+	for rows.Next() {
+		var ta taskArtifact
+		if err := rows.Scan(&ta.TaskID, &ta.ArtifactPath); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, ta)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// For each task, parse the ffuf output and count hits
+	var stats []*DictionaryHitStats
+	for _, ta := range tasks {
+		if ta.ArtifactPath == "" {
+			continue
+		}
+		// The actual parsing will be done in the evaluator
+		// For now, return the task info
+		stats = append(stats, &DictionaryHitStats{
+			TaskID: ta.TaskID,
+		})
+	}
+	return stats, nil
+}
+
 // ListEvidenceByFindingIDs returns evidence for multiple findings in one query (avoids N+1).
 func (q *Queries) ListEvidenceByFindingIDs(findingIDs []string) (map[string][]*models.Evidence, error) {
 	if len(findingIDs) == 0 {

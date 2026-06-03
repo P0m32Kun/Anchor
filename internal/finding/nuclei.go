@@ -3,8 +3,6 @@ package finding
 import (
 	"crypto/sha256"
 	"fmt"
-	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -152,42 +150,8 @@ func (p *NucleiPersister) saveEvidence(workdir, projectID, taskID, findingID str
 
 // DedupKey hashes template + scan origin + matcher (same semantics as legacy workflow).
 func DedupKey(templateID, host, matcherName string) string {
-	origin := scanOrigin(host)
+	origin := util.ScanOrigin(host)
 	h := sha256.New()
 	fmt.Fprintf(h, "%s|%s|%s", templateID, origin, matcherName)
 	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-func scanOrigin(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ""
-	}
-	if strings.Contains(raw, "://") {
-		u, err := url.Parse(raw)
-		if err == nil && u.Host != "" {
-			host := u.Hostname()
-			port := u.Port()
-			if port == "" {
-				switch strings.ToLower(u.Scheme) {
-				case "http":
-					port = "80"
-				case "https":
-					port = "443"
-				}
-			}
-			if port != "" {
-				return strings.ToLower(net.JoinHostPort(host, port))
-			}
-			return strings.ToLower(u.Host)
-		}
-	}
-	if idx := strings.Index(raw, "/"); idx > 0 {
-		raw = raw[:idx]
-	}
-	host, port, err := net.SplitHostPort(raw)
-	if err != nil {
-		return strings.ToLower(raw)
-	}
-	return strings.ToLower(net.JoinHostPort(host, port))
 }

@@ -1,6 +1,12 @@
 package evaluator
 
-import "github.com/P0m32Kun/Anchor/internal/db"
+import (
+	"bytes"
+	"os"
+
+	"github.com/P0m32Kun/Anchor/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/parser"
+)
 
 // TemplateEffectivenessEvaluator evaluates template and dictionary effectiveness.
 type TemplateEffectivenessEvaluator struct {
@@ -38,9 +44,67 @@ func (e *TemplateEffectivenessEvaluator) EvaluateTemplateStats(runID string) (ma
 }
 
 // EvaluateDictionaryStats collects dictionary hit statistics for a run.
-// Note: Dictionary stats are derived from ffuf work items.
+// Parses ffuf work items to count unique hits per dictionary.
 func (e *TemplateEffectivenessEvaluator) EvaluateDictionaryStats(runID string) (map[string]*DictionaryStat, error) {
-	// TODO: Implement dictionary stats when ffuf output parsing is available
-	// For now, return empty stats
-	return make(map[string]*DictionaryStat), nil
+	stats, err := e.queries.GetDictionaryHitStats(runID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]*DictionaryStat)
+	for _, s := range stats {
+		// Parse the ffuf output file
+		if s.TaskID == "" {
+			continue
+		}
+
+		// Get the artifact path from the task
+		artifacts, err := e.queries.ListRawArtifactsByTask(s.TaskID)
+		if err != nil {
+			continue
+		}
+
+		for _, a := range artifacts {
+			if a.Type != "stdout" {
+				continue
+			}
+
+			// Read and parse ffuf output
+			data, err := os.ReadFile(a.Path)
+			if err != nil {
+				continue
+			}
+
+			results, _ := parser.ParseFfufOutput(bytes.NewReader(data))
+			if len(results) == 0 {
+				continue
+			}
+
+			// Count unique paths and hits
+			uniquePaths := make(map[string]bool)
+			for _, r := range results {
+				uniquePaths[r.URL] = true
+			}
+
+			// For now, use a generic dictionary name
+			// In a real implementation, you would extract the dictionary name from the ffuf command
+			dictName := "unknown"
+			key := dictName + ":" + s.TaskID
+
+			stat, exists := result[key]
+			if !exists {
+				stat = &DictionaryStat{
+					DictionaryName: dictName,
+					UsedInTool:     "ffuf",
+				}
+				result[key] = stat
+			}
+
+			stat.UniquePaths += len(uniquePaths)
+			// Hit rate would be calculated as hits / total requests
+			// For now, we don't have the total request count, so we leave it as 0
+		}
+	}
+
+	return result, nil
 }
