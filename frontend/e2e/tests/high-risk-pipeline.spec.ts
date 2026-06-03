@@ -19,9 +19,10 @@
 import { expect, test } from "@playwright/test";
 import { cleanupTestData, addTarget } from "../fixtures/db-utils";
 import { waitForPipeline } from "../fixtures/api-helpers";
+import { E2E_API_BASE, E2E_API_TOKEN } from "../fixtures/e2e-env";
 
-const API_BASE = "http://localhost:17421";
-const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
+const API_BASE = E2E_API_BASE;
+const API_TOKEN = E2E_API_TOKEN;
 const REDIS_IP = "172.30.0.13";
 
 test.setTimeout(30 * 60 * 1000);
@@ -133,8 +134,8 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		expect(status).toBe("completed");
 		log(`Pipeline ${runId} completed`);
 
-		// ── Step 5: UI 验证资产 + 端口 ──
-		log("Step 5: Verify asset on AssetPage (port 6379 soft-checked)");
+		// ── Step 5: UI 验证资产 + Redis 6379 ──
+		log("Step 5: Verify asset on AssetPage (Redis 6379 required)");
 		await page.goto(`/projects/${projectId}/assets`);
 		await expect(page.getByText(/资产清单|资产列表|Assets/)).toBeVisible({
 			timeout: 10_000,
@@ -142,38 +143,19 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 		await expect(page.locator(`text=${REDIS_IP}`).first()).toBeVisible({
 			timeout: 30_000,
 		});
+		await expect(page.getByText(/6379/).first()).toBeVisible({
+			timeout: 30_000,
+		});
 
-		// 端口 6379 在 e2e docker 环境下可能因 scan pipeline 限制未被 nmap 发现,
-		// 此处降级为 soft-check:有则验证,无则 warn 但不 fail
-		try {
-			await expect(page.getByText(/6379/).first()).toBeVisible({
-				timeout: 10_000,
-			});
-		} catch {
-			console.warn(
-				"[e2e] Port 6379 not visible — scan pipeline may not discover ports in e2e env. " +
-				"See tasks/pending/task_fix_scope_confirm_ip_suggestion/",
-			);
-		}
-
-		// ── Step 6: UI 验证 FindingsPage ──
-		log("Step 6: Verify FindingsPage renders (critical/high soft-checked)");
+		// ── Step 6: UI 验证 FindingsPage（至少 1 条 critical/high）──
+		log("Step 6: Verify FindingsPage has critical/high finding");
 		await page.goto(`/projects/${projectId}/findings`);
 		await expect(
 			page.locator("h1").filter({ hasText: /发现审核|漏洞发现|Finding/i }),
 		).toBeVisible({ timeout: 10_000 });
-
-		// finding 在 e2e docker 环境下可能因 scan pipeline 限制未产出,
-		// 此处降级为 soft-check
-		try {
-			await expect(
-				page.getByText(/critical|high|严重|高危/i).first(),
-			).toBeVisible({ timeout: 30_000 });
-		} catch {
-			console.warn(
-				"[e2e] No critical/high finding visible — scan pipeline may not produce findings in e2e env",
-			);
-		}
+		await expect(
+			page.getByText(/critical|high|严重|高危/i).first(),
+		).toBeVisible({ timeout: 30_000 });
 
 		log("✓ High-risk pipeline UI test completed");
 	});

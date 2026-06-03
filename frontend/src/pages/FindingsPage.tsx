@@ -311,6 +311,18 @@ export default function FindingsPage() {
                                             <span className="font-semibold text-muted-foreground/60">CONFIDENCE:</span>
                                             <span className="font-mono">{f.confidence}</span>
                                         </div>
+                                        {f.asset_id && (
+                                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                <span className="font-semibold text-muted-foreground/60">ASSET:</span>
+                                                <Link 
+                                                    to={`/projects/${projectId}/assets?highlight=${f.asset_id}`}
+                                                    className="font-mono text-primary hover:underline truncate max-w-[120px]"
+                                                    title={f.asset_id}
+                                                >
+                                                    {f.asset_id.slice(-8)}
+                                                </Link>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

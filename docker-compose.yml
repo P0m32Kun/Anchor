@@ -25,7 +25,7 @@ services:
     ports:
       - "17421:17421"
     volumes:
-      - anchor-data:/data
+      - anchor-server-data:/data
     environment:
       - ANCHOR_DATA_DIR=/data
       - ANCHOR_PORT=17421
@@ -60,7 +60,7 @@ services:
       - ANCHOR_WORKER_HOST=worker
       - ANCHOR_API_TOKEN=${ANCHOR_API_TOKEN:?请在 .env 中设置 ANCHOR_API_TOKEN}
     volumes:
-      - anchor-data:/data
+      - anchor-worker-data:/data
       - anchor-worker-home:/root  # 持久化 ~/templates/
     restart: unless-stopped
     privileged: true
@@ -84,5 +84,6 @@ networks:
         - subnet: 172.30.0.0/24
 
 volumes:
-  anchor-data:
+  anchor-server-data:
+  anchor-worker-data:
   anchor-worker-home:  # Worker 家目录，持久化 ~/templates/

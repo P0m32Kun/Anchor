@@ -1,0 +1,36 @@
+{
+  "name": "nuclei_deep_tags",
+  "tool_id": "nuclei",
+  "params": {
+    "concurrency": 5,
+    "profile": "deep",
+    "rate_limit": 20,
+    "scan_depth": "tags",
+    "tags": [
+      "cve",
+      "misconfig"
+    ],
+    "target_file": "/tmp/targets.txt"
+  },
+  "ignore_tokens": [
+    "-stats",
+    "-si",
+    "30"
+  ],
+  "want_argv": [
+    "-c",
+    "-jsonl",
+    "-l",
+    "-rl",
+    "-severity",
+    "-tags",
+    "-timeout",
+    "/tmp/targets.txt",
+    "10",
+    "20",
+    "5",
+    "critical,high,medium,low,info",
+    "cve,misconfig",
+    "nuclei"
+  ]
+}

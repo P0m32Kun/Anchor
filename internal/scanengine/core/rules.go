@@ -32,10 +32,10 @@ func (p *internalProfile) Rules() []ActionRule {
 	return []ActionRule{
 		{Action: ActionSubdomainEnum, Enabled: true, MaxDepth: 1, Precondition: isSubdomain},
 		{Action: ActionDNSResolve, Enabled: true, MaxDepth: -1, Precondition: isSubdomainOrIP},
-		{Action: ActionCDNCheck, Enabled: true, MaxDepth: -1, Precondition: isSubdomainOrIP},
+		// 内网模式不做 CDN 过滤（Fix 1: internal 不上报 cdn_filter stage）
 		{Action: ActionPortScan, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPAndAlive},
 		{Action: ActionServiceFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPPort},
-		{Action: ActionHTTPXFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isWebEntry},
+		{Action: ActionHTTPXFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isWebEntryOrHTTPXCandidate},
 		{Action: ActionKatanaCrawl, Enabled: true, MaxDepth: 1, Precondition: isHTTPServiceOrPath},
 		{Action: ActionSpoorScan, Enabled: true, MaxDepth: 1, Precondition: isHTTPServiceOrPath},
 		{Action: ActionFFUFBrute, Enabled: true, MaxDepth: 1, Precondition: isHTTPService},
@@ -98,6 +98,20 @@ func isIPPort(a *DiscoveryAsset, _ Profile) bool {
 
 func isWebEntry(a *DiscoveryAsset, _ Profile) bool {
 	return a.Type == AssetHTTPService || a.Type == AssetHTTPPath
+}
+
+// isHTTPXCandidate covers assets that should be probed by httpx before becoming HTTP services.
+func isHTTPXCandidate(a *DiscoveryAsset, _ Profile) bool {
+	switch a.Type {
+	case AssetSubdomain, AssetIP, AssetIPPort:
+		return true
+	default:
+		return false
+	}
+}
+
+func isWebEntryOrHTTPXCandidate(a *DiscoveryAsset, p Profile) bool {
+	return isWebEntry(a, p) || isHTTPXCandidate(a, p)
 }
 
 func isHTTPServiceOrPath(a *DiscoveryAsset, _ Profile) bool {

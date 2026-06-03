@@ -26,8 +26,10 @@ import {
 	printAuditResults,
 } from "../fixtures/log-audit";
 
-const API_BASE = "http://localhost:17421";
-const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
+import { E2E_API_BASE, E2E_API_TOKEN } from "../fixtures/e2e-env";
+
+const API_BASE = E2E_API_BASE;
+const API_TOKEN = E2E_API_TOKEN;
 const REDIS_IP = "172.30.0.13";
 
 // 日志审计目标工具(内网 pipeline 实际触发的工具)

@@ -11,9 +11,9 @@ import (
 
 func (q *Queries) CreateScanWorkItem(w *models.ScanWorkItem) error {
 	_, err := q.db.Exec(`
-		INSERT INTO scan_work_items (id, run_id, project_id, asset_id, action, status, skip_reason, stage, error, started_at, completed_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		w.ID, w.RunID, w.ProjectID, w.AssetID, w.Action, w.Status,
+		INSERT INTO scan_work_items (id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		w.ID, w.RunID, w.ProjectID, w.AssetID, w.Action, w.TaskID, w.Status,
 		sqlNullStringValue(w.SkipReason), sqlNullStringValue(w.Stage), sqlNullStringValue(w.Error),
 		w.StartedAt, w.CompletedAt, w.CreatedAt)
 	return err
@@ -21,12 +21,13 @@ func (q *Queries) CreateScanWorkItem(w *models.ScanWorkItem) error {
 
 func (q *Queries) GetScanWorkItem(id string) (*models.ScanWorkItem, error) {
 	row := q.db.QueryRow(`
-		SELECT id, run_id, project_id, asset_id, action, status, skip_reason, stage, error, started_at, completed_at, created_at
+		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
 		FROM scan_work_items WHERE id = ?`, id)
 	w := &models.ScanWorkItem{}
 	var skipReason, stage, errMsg sql.NullString
+	var taskID sql.NullString
 	var startedAt, completedAt sql.NullTime
-	err := row.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &w.Status,
+	err := row.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &taskID, &w.Status,
 		&skipReason, &stage, &errMsg, &startedAt, &completedAt, &w.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -40,26 +41,19 @@ func (q *Queries) GetScanWorkItem(id string) (*models.ScanWorkItem, error) {
 	if stage.Valid {
 		w.Stage = stage.String
 	}
-	if errMsg.Valid {
-		w.Error = errMsg.String
-	}
-	if startedAt.Valid {
-		w.StartedAt = &startedAt.Time
-	}
-	if completedAt.Valid {
-		w.CompletedAt = &completedAt.Time
-	}
+	applyScanWorkItemNullables(w, skipReason, stage, errMsg, taskID, startedAt, completedAt)
 	return w, nil
 }
 
 func (q *Queries) GetScanWorkItemByRunAssetAction(runID, assetID, action string) (*models.ScanWorkItem, error) {
 	row := q.db.QueryRow(`
-		SELECT id, run_id, project_id, asset_id, action, status, skip_reason, stage, error, started_at, completed_at, created_at
+		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
 		FROM scan_work_items WHERE run_id = ? AND asset_id = ? AND action = ?`, runID, assetID, action)
 	w := &models.ScanWorkItem{}
 	var skipReason, stage, errMsg sql.NullString
+	var taskID sql.NullString
 	var startedAt, completedAt sql.NullTime
-	err := row.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &w.Status,
+	err := row.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &taskID, &w.Status,
 		&skipReason, &stage, &errMsg, &startedAt, &completedAt, &w.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -67,22 +61,33 @@ func (q *Queries) GetScanWorkItemByRunAssetAction(runID, assetID, action string)
 	if err != nil {
 		return nil, err
 	}
-	if skipReason.Valid {
-		w.SkipReason = skipReason.String
-	}
-	if stage.Valid {
-		w.Stage = stage.String
-	}
-	if errMsg.Valid {
-		w.Error = errMsg.String
-	}
-	if startedAt.Valid {
-		w.StartedAt = &startedAt.Time
-	}
-	if completedAt.Valid {
-		w.CompletedAt = &completedAt.Time
-	}
+	applyScanWorkItemNullables(w, skipReason, stage, errMsg, taskID, startedAt, completedAt)
 	return w, nil
+}
+
+// ClaimScanWorkItem atomically transitions pending → running.
+func (q *Queries) ClaimScanWorkItem(id string) (*models.ScanWorkItem, error) {
+	now := time.Now().UTC()
+	res, err := q.db.Exec(`
+		UPDATE scan_work_items SET status = ?, started_at = ?
+		WHERE id = ? AND status = ?`,
+		models.WorkStatusRunning, now, id, models.WorkStatusPending)
+	if err != nil {
+		return nil, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, nil
+	}
+	return q.GetScanWorkItem(id)
+}
+
+func (q *Queries) UpdateScanWorkItemTaskID(id, taskID string) error {
+	_, err := q.db.Exec(`UPDATE scan_work_items SET task_id = ? WHERE id = ?`, taskID, id)
+	return err
 }
 
 func (q *Queries) UpdateScanWorkItemStatus(id string, status models.WorkStatus, startedAt, completedAt *time.Time) error {
@@ -108,7 +113,7 @@ func (q *Queries) UpdateScanWorkItemError(id string, status models.WorkStatus, e
 
 func (q *Queries) ListScanWorkItemsByRun(runID string) ([]*models.ScanWorkItem, error) {
 	rows, err := q.db.Query(`
-		SELECT id, run_id, project_id, asset_id, action, status, skip_reason, stage, error, started_at, completed_at, created_at
+		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
 		FROM scan_work_items WHERE run_id = ? ORDER BY created_at`, runID)
 	if err != nil {
 		return nil, err
@@ -119,7 +124,7 @@ func (q *Queries) ListScanWorkItemsByRun(runID string) ([]*models.ScanWorkItem, 
 
 func (q *Queries) ListScanWorkItemsByRunAndStatus(runID string, status models.WorkStatus) ([]*models.ScanWorkItem, error) {
 	rows, err := q.db.Query(`
-		SELECT id, run_id, project_id, asset_id, action, status, skip_reason, stage, error, started_at, completed_at, created_at
+		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
 		FROM scan_work_items WHERE run_id = ? AND status = ? ORDER BY created_at`, runID, status)
 	if err != nil {
 		return nil, err
@@ -130,7 +135,7 @@ func (q *Queries) ListScanWorkItemsByRunAndStatus(runID string, status models.Wo
 
 func (q *Queries) ListScanWorkItemsByAsset(runID, assetID string) ([]*models.ScanWorkItem, error) {
 	rows, err := q.db.Query(`
-		SELECT id, run_id, project_id, asset_id, action, status, skip_reason, stage, error, started_at, completed_at, created_at
+		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
 		FROM scan_work_items WHERE run_id = ? AND asset_id = ? ORDER BY started_at`, runID, assetID)
 	if err != nil {
 		return nil, err
@@ -244,29 +249,37 @@ func scanWorkItemRows(rows *sql.Rows) ([]*models.ScanWorkItem, error) {
 	for rows.Next() {
 		w := &models.ScanWorkItem{}
 		var skipReason, stage, errMsg sql.NullString
+		var taskID sql.NullString
 		var startedAt, completedAt sql.NullTime
-		if err := rows.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &w.Status,
+		if err := rows.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &taskID, &w.Status,
 			&skipReason, &stage, &errMsg, &startedAt, &completedAt, &w.CreatedAt); err != nil {
 			return nil, err
 		}
-		if skipReason.Valid {
-			w.SkipReason = skipReason.String
-		}
-		if stage.Valid {
-			w.Stage = stage.String
-		}
-		if errMsg.Valid {
-			w.Error = errMsg.String
-		}
-		if startedAt.Valid {
-			w.StartedAt = &startedAt.Time
-		}
-		if completedAt.Valid {
-			w.CompletedAt = &completedAt.Time
-		}
+		applyScanWorkItemNullables(w, skipReason, stage, errMsg, taskID, startedAt, completedAt)
 		list = append(list, w)
 	}
 	return list, rows.Err()
+}
+
+func applyScanWorkItemNullables(w *models.ScanWorkItem, skipReason, stage, errMsg, taskID sql.NullString, startedAt, completedAt sql.NullTime) {
+	if skipReason.Valid {
+		w.SkipReason = skipReason.String
+	}
+	if stage.Valid {
+		w.Stage = stage.String
+	}
+	if errMsg.Valid {
+		w.Error = errMsg.String
+	}
+	if taskID.Valid {
+		w.TaskID = &taskID.String
+	}
+	if startedAt.Valid {
+		w.StartedAt = &startedAt.Time
+	}
+	if completedAt.Valid {
+		w.CompletedAt = &completedAt.Time
+	}
 }
 
 // ToolStats holds aggregated statistics for a single tool.

@@ -2,9 +2,20 @@
 
 ## 概述
 
-Anchor 使用 GitHub Actions 实现自动化构建和部署。代码推送到 GitHub 后，通过 tag 触发 Release，自动构建二进制文件和 Docker 镜像，并推送到阿里云 ACR。
+Anchor 使用 GitHub Actions：**PR/push 跑单元门禁**（`ci.yml`），**tag 触发 Release + Docker 发布**（`release.yml` → `docker-push.yml`）。
 
-## 流程图
+## PR 门禁（`ci.yml`）
+
+在 `main` 的 push 与所有 Pull Request 上自动运行：
+
+| Job | 步骤 |
+|-----|------|
+| `backend` | `go vet ./...`、`go test ./...` |
+| `frontend` | `npm ci`、`typecheck`、`test:unit`、`build` |
+
+长耗时 E2E（rangefield Docker 全栈）**不在**默认 PR 门禁内；本地或 nightly 使用 `make test-e2e-smoke` / `make test-e2e-full`。E2E 环境变量见 `frontend/e2e/fixtures/e2e-env.ts`（token 与 `docker-compose.e2e.yml` 对齐）。
+
+## 发布流程图
 
 ```
 git tag v0.x.x && git push --tags
@@ -63,12 +74,10 @@ git push --tags
    - 附加二进制文件到 Release assets
 
 2. **Docker Push workflow** (`docker-push.yml`)
-   - 等待 Release workflow 完成
-   - 构建 3 个 Docker 镜像：
-     - `anchor-server`
-     - `anchor-worker`
-     - `anchor-frontend`
-   - 推送到阿里云 ACR
+   - 等待 Release workflow 完成（或 `workflow_dispatch` 指定 tag）
+   - Checkout **Release 对应 tag/ref**（非 main HEAD）
+   - 构建并推送 `anchor-server`、`anchor-worker`、`anchor-frontend`
+   - 镜像同时打 `v0.x.x` 与 `latest`；server/worker 从该 tag 的 GitHub Release 下载二进制
 
 ## Docker 镜像
 
@@ -87,8 +96,8 @@ git push --tags
 
 ### 镜像标签
 
-- `latest`: 最新稳定版本
-- `v0.x.x`: 特定版本（暂未实现）
+- `v0.x.x`：与 GitHub Release tag 对齐（权威版本）
+- `latest`：每次成功 docker-push 同步更新
 
 ### 拉取镜像
 
@@ -132,27 +141,18 @@ RUN curl -fsSL -o /tmp/templates.tar.gz "..."
 ### Worker 镜像
 
 ```dockerfile
-# 基础镜像（预装所有安全工具）
-FROM anchor-worker-base:latest
+# 运行时 base（预装安全工具，见 Dockerfile.worker-runtime-base）
+FROM anchor-worker-runtime-base:latest
 
-# 从 GitHub Release 下载预编译二进制
+# 从 GitHub Release 下载与 RELEASE_VERSION 对齐的二进制
 RUN curl -fsSL -o /app/anchor "${RELEASE_URL}"
 ```
 
-### Worker Base 镜像
+### 运行时 Base 镜像
 
-Worker Base 镜像包含所有依赖，很少更新：
+Server/Worker 运行时 base 很少更新，本地快速迭代用 `make build-linux` + `make build-fast`（见 [`architecture.md`](architecture.md) Docker 章节）。
 
-```bash
-# 本地构建（需要时手动执行）
-make build-worker-base
-
-# 推送到 Docker Hub
-make push-worker-base
-
-# 推送到阿里云 ACR
-make push-worker-base-cn
-```
+生产 `docker-compose.yml` 中 Server 与 Worker 使用**独立数据卷**（`anchor-server-data` / `anchor-worker-data`），避免 SQLite 共库冲突。
 
 ## 常见问题
 

@@ -1,0 +1,27 @@
+{
+  "name": "nuclei_standard_workflow",
+  "tool_id": "nuclei",
+  "params": {
+    "profile": "standard",
+    "scan_depth": "workflow",
+    "target_file": "/tmp/targets.txt",
+    "workflow_dir": "/root/workflows"
+  },
+  "ignore_tokens": [
+    "-stats",
+    "-si",
+    "30"
+  ],
+  "want_argv": [
+    "-jsonl",
+    "-l",
+    "-severity",
+    "-timeout",
+    "-w",
+    "/root/workflows",
+    "/tmp/targets.txt",
+    "5",
+    "critical,high,medium",
+    "nuclei"
+  ]
+}

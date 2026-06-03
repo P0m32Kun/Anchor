@@ -12,8 +12,10 @@
 import { expect, test } from "@playwright/test";
 import { cleanupTestData } from "../fixtures/db-utils";
 
-const API_BASE = "http://localhost:17421";
-const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token";
+import { E2E_API_BASE, E2E_API_TOKEN } from "../fixtures/e2e-env";
+
+const API_BASE = E2E_API_BASE;
+const API_TOKEN = E2E_API_TOKEN;
 
 test.describe.serial("Live Scan E2E — 新部署方式适配", () => {
 	test.beforeAll(async () => {

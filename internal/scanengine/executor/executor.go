@@ -78,7 +78,7 @@ func actionToToolID(action string) string {
 	case string(core.ActionPortScan):
 		return "naabu"
 	case string(core.ActionServiceFingerprint):
-		return "nmap"
+		return "nmap_service"
 	case string(core.ActionKatanaCrawl):
 		return "katana"
 	case string(core.ActionFFUFBrute):

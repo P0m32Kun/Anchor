@@ -45,25 +45,13 @@ func (p *PassiveInjector) InjectCrt(ctx context.Context, domain string, projectI
 // InjectFromTargets injects initial targets as seed assets.
 func (p *PassiveInjector) InjectFromTargets(ctx context.Context, targets []string, projectID string) {
 	for _, target := range targets {
-		assetType := classifyTarget(target)
 		p.processor(ctx, &core.DiscoveryAsset{
 			ID:              util.GenerateID(),
-			Type:            assetType,
+			Type:            core.ClassifySeedTarget(target),
 			Value:           target,
 			NormalizedValue: target,
 			DiscoveryDepth:  0,
 			SourceTool:      "seed",
 		})
 	}
-}
-
-// classifyTarget determines the asset type from the target string.
-func classifyTarget(target string) core.AssetType {
-	// Simple heuristic: if it looks like a URL, it's HTTP_SERVICE
-	// If it's an IP, it's IP; otherwise assume subdomain
-	if len(target) > 7 && (target[:7] == "http://" || target[:8] == "https://") {
-		return core.AssetHTTPService
-	}
-	// TODO: check if it's an IP
-	return core.AssetSubdomain
 }

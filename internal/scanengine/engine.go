@@ -2,19 +2,27 @@ package scanengine
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/asset"
+	"github.com/P0m32Kun/Anchor/internal/cdn"
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/exclude"
+	"github.com/P0m32Kun/Anchor/internal/finding"
 	"github.com/P0m32Kun/Anchor/internal/models"
+	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/parser"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/dedup"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/executor"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/queue"
+	"github.com/P0m32Kun/Anchor/internal/scanengine/seed"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/stageagg"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/work"
 	"github.com/P0m32Kun/Anchor/internal/toolregistry"
@@ -28,6 +36,7 @@ type EngineConfig struct {
 	AbsoluteTimeout time.Duration // hard limit on run duration
 	SchedulerTick   time.Duration // how often the scheduler checks for pending work
 	BatchSize       int           // max concurrent work items
+	Pipeline        models.PipelineConfig // tool-specific settings (rate, threads, timeout, port_range, etc.)
 }
 
 // DefaultEngineConfig returns sensible defaults.
@@ -37,6 +46,7 @@ func DefaultEngineConfig() EngineConfig {
 		AbsoluteTimeout: 30 * time.Minute,
 		SchedulerTick:   2 * time.Second,
 		BatchSize:       5,
+		Pipeline:        models.DefaultPipelineConfig(),
 	}
 }
 
@@ -51,16 +61,20 @@ type ScanEngine struct {
 	pq         *queue.PriorityQueue
 	config     EngineConfig
 	profile    core.Profile
-	excludeMgr *exclude.Manager
-	dataDir    string
-	runID      string
-	projectID  string
+	excludeMgr     *exclude.Manager
+	scopeEng       *scope.Engine
+	nucleiPersist  *finding.NucleiPersister
+	dataDir        string
+	runID          string
+	projectID      string
+	assetDepth     sync.Map // assetID -> int discovery depth
 
 	mu             sync.Mutex
 	engineState    string
 	lastNewAssetAt time.Time
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
+	inFlight       int32
 	sem            chan struct{} // concurrency limiter
 }
 
@@ -72,6 +86,7 @@ func New(
 	merger *asset.Merger,
 	profile core.Profile,
 	excludeMgr *exclude.Manager,
+	scopeEng *scope.Engine,
 	dataDir string,
 	runID string,
 	projectID string,
@@ -79,7 +94,7 @@ func New(
 	stageCallback stageagg.StageEventCallback,
 ) *ScanEngine {
 	exec := executor.NewToolExecutor(queries, runner, tools, merger, dataDir)
-	return NewWithExecutor(queries, merger, profile, excludeMgr, dataDir, runID, projectID, config, stageCallback, exec)
+	return NewWithExecutor(queries, merger, profile, excludeMgr, scopeEng, dataDir, runID, projectID, config, stageCallback, exec)
 }
 
 // NewWithExecutor creates a ScanEngine with an injected Executor (for testing).
@@ -88,6 +103,7 @@ func NewWithExecutor(
 	merger *asset.Merger,
 	profile core.Profile,
 	excludeMgr *exclude.Manager,
+	scopeEng *scope.Engine,
 	dataDir string,
 	runID string,
 	projectID string,
@@ -109,6 +125,8 @@ func NewWithExecutor(
 		config:         config,
 		profile:        profile,
 		excludeMgr:     excludeMgr,
+		scopeEng:       scopeEng,
+		nucleiPersist:  finding.NewNucleiPersister(queries, dataDir),
 		dataDir:        dataDir,
 		runID:          runID,
 		projectID:      projectID,
@@ -132,12 +150,24 @@ func (e *ScanEngine) Run(ctx context.Context, targets []string) error {
 	for _, target := range targets {
 		e.processNewAsset(ctx, &core.DiscoveryAsset{
 			ID:              util.GenerateID(),
-			Type:            core.AssetSubdomain,
+			Type:            core.ClassifySeedTarget(target),
 			Value:           target,
 			NormalizedValue: target,
 			DiscoveryDepth:  0,
 			SourceTool:      "seed",
 		})
+	}
+
+	// External profile: passive cert discovery for root domains (crt.sh)
+	if _, ok := e.profile.(*core.ExternalProfile); ok {
+		inj := seed.NewPassiveInjector(func(c context.Context, a *core.DiscoveryAsset) {
+			e.processNewAsset(c, a)
+		})
+		for _, target := range targets {
+			if core.ClassifySeedTarget(target) == core.AssetSubdomain {
+				inj.InjectCrt(ctx, target, e.projectID)
+			}
+		}
 	}
 
 	// Main scheduler loop
@@ -153,6 +183,10 @@ func (e *ScanEngine) Run(ctx context.Context, targets []string) error {
 		case <-ticker.C:
 			if err := e.tick(ctx); err != nil {
 				log.Printf("[scanengine] tick error: %v", err)
+			}
+			if e.EngineState() == "stopped" {
+				e.wg.Wait()
+				return nil
 			}
 		}
 	}
@@ -184,9 +218,8 @@ func (e *ScanEngine) processNewAsset(ctx context.Context, a *core.DiscoveryAsset
 		return
 	}
 
-	// Exclusion check: skip assets that match excluded domains
-	if e.excludeMgr != nil && e.excludeMgr.IsExcluded(a.Value) {
-		log.Printf("[scanengine] skipping excluded domain: %s", a.Value)
+	if e.isAssetExcluded(a) {
+		log.Printf("[scanengine] skipping excluded asset: %s", a.Value)
 		return
 	}
 
@@ -199,11 +232,16 @@ func (e *ScanEngine) processNewAsset(ctx context.Context, a *core.DiscoveryAsset
 	// Merge into asset DB (best-effort)
 	assetType := assetTypeToString(a.Type)
 	if assetType != "" {
-		createdAsset, isNew, err := e.merger.MergeOrCreateAsset(e.projectID, assetType, a.Value, a.SourceTool)
-		if err == nil && isNew && createdAsset != nil {
+		createdAsset, _, err := e.merger.MergeOrCreateAsset(e.projectID, assetType, a.Value, a.SourceTool)
+		if err != nil {
+			log.Printf("[scanengine] merge asset %s: %v", a.Value, err)
+			return
+		}
+		if createdAsset != nil {
 			a.ID = createdAsset.ID
 		}
 	}
+	e.assetDepth.Store(a.ID, a.DiscoveryDepth)
 
 	// Derive eligible works
 	works := core.DeriveEligibleWorks(a, e.profile)
@@ -247,18 +285,26 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 	// Check idle timeout → wind_down
 	if state == "running" && time.Since(lastAsset) > e.config.IdleTimeout {
 		e.setEngineState("wind_down")
+		state = "wind_down"
 	}
 
-	// If wind_down and queue empty and all terminal → stopped
-	if state == "wind_down" {
-		allTerminal, err := e.store.AllTerminal(e.runID)
-		if err != nil {
-			return err
-		}
-		if allTerminal && e.pq.IsEmpty() {
-			e.setEngineState("stopped")
-			return nil
-		}
+	allTerminal, err := e.store.AllTerminal(e.runID)
+	if err != nil {
+		return err
+	}
+	queueEmpty := e.pq.IsEmpty()
+	inFlight := atomic.LoadInt32(&e.inFlight)
+
+	// Early completion: all work done, nothing queued or running
+	if state == "running" && allTerminal && queueEmpty && inFlight == 0 {
+		e.setEngineState("stopped")
+		return nil
+	}
+
+	// wind_down → stopped when drained
+	if state == "wind_down" && allTerminal && queueEmpty && inFlight == 0 {
+		e.setEngineState("stopped")
+		return nil
 	}
 
 	// Process pending work items from DB that aren't in queue yet
@@ -296,8 +342,11 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 
 // executeWork claims and executes a single work item.
 func (e *ScanEngine) executeWork(ctx context.Context, item queue.Item) {
+	atomic.AddInt32(&e.inFlight, 1)
+	defer atomic.AddInt32(&e.inFlight, -1)
+
 	// wind_down filter: only allow finishing actions
-	if e.engineState == "wind_down" {
+	if e.EngineState() == "wind_down" {
 		if !isWindDownAllowed(item.Action) {
 			e.store.MarkSkipped(item.WorkID, "wind_down")
 			return
@@ -330,6 +379,10 @@ func (e *ScanEngine) executeWork(ctx context.Context, item queue.Item) {
 		e.store.MarkFailed(w.ID, err.Error())
 		e.agg.OnWorkCompleted(core.TaskAction(w.Action))
 		return
+	}
+	if res != nil && res.Task != nil {
+		_ = e.store.SetTaskID(w.ID, res.Task.ID)
+		w.TaskID = &res.Task.ID
 	}
 
 	// Mark done
@@ -377,9 +430,14 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 			}
 		}
 
-		// Process discovered sub-assets
+		// Process discovered sub-assets (httpx fingerprinted HTTP services)
 		for _, a := range newAssets {
 			a.ParentID = w.AssetID
+			a.Attrs.Fingerprinted = true
+			if len(attrs.Technologies) > 0 {
+				a.Attrs.Technologies = append([]string(nil), attrs.Technologies...)
+			}
+			e.prepareChildAsset(a, w.AssetID)
 			e.processNewAsset(ctx, a)
 		}
 
@@ -391,6 +449,7 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 		}
 		for _, a := range newAssets {
 			a.ParentID = w.AssetID
+			e.prepareChildAsset(a, w.AssetID)
 			e.processNewAsset(ctx, a)
 		}
 
@@ -402,13 +461,20 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 		}
 		for _, a := range newAssets {
 			a.ParentID = w.AssetID
+			e.prepareChildAsset(a, w.AssetID)
 			e.processNewAsset(ctx, a)
 		}
 
 	case core.ActionNucleiScan:
-		findings, _ := executor.ParseNucleiOutput(stdout)
-		if len(findings) > 0 {
-			log.Printf("[scanengine] nuclei found %d templates", len(findings))
+		taskID := ""
+		if w.TaskID != nil {
+			taskID = *w.TaskID
+		}
+		created, updated, err := e.nucleiPersist.Persist(e.projectID, e.runID, taskID, w.AssetID, stdout)
+		if err != nil {
+			log.Printf("[scanengine] persist nuclei: %v", err)
+		} else if created+updated > 0 {
+			log.Printf("[scanengine] nuclei findings created=%d updated=%d", created, updated)
 		}
 
 	case core.ActionSpoorScan:
@@ -420,6 +486,7 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 		// 回注 endpoint 为新资产
 		for _, a := range endpoints {
 			a.ParentID = w.AssetID
+			e.prepareChildAsset(a, w.AssetID)
 			e.processNewAsset(ctx, a)
 		}
 		// 创建 secret findings
@@ -429,23 +496,203 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 				log.Printf("[scanengine] create spoor finding %s: %v", f.Title, err)
 			}
 		}
+
+	case core.ActionPortScan:
+		results, parseErrs := parser.ParseNaabu(strings.NewReader(string(stdout)))
+		for _, pe := range parseErrs {
+			log.Printf("[scanengine] parse naabu line %d: %s", pe.Line, pe.Message)
+		}
+		for _, r := range results {
+			host := r.Host
+			if host == "" {
+				host = r.IP
+			}
+			if host == "" || r.Port == 0 {
+				continue
+			}
+			if _, _, err := e.merger.CreatePortIfNotExists(w.AssetID, r.Port, "tcp", "naabu"); err != nil {
+				log.Printf("[scanengine] create port %s:%d: %v", host, r.Port, err)
+			}
+			a := &core.DiscoveryAsset{
+				ID:              util.GenerateID(),
+				Type:            core.AssetIPPort,
+				Value:           fmt.Sprintf("%s:%d", host, r.Port),
+				NormalizedValue: fmt.Sprintf("%s:%d", host, r.Port),
+				ParentID:        w.AssetID,
+				SourceTool:      "naabu",
+			}
+			e.prepareChildAsset(a, w.AssetID)
+			e.processNewAsset(ctx, a)
+		}
+
+	case core.ActionSubdomainEnum:
+		results, parseErrs := parser.ParseSubfinder(strings.NewReader(string(stdout)))
+		for _, pe := range parseErrs {
+			log.Printf("[scanengine] parse subfinder line %d: %s", pe.Line, pe.Message)
+		}
+		for _, r := range results {
+			if r.Host == "" {
+				continue
+			}
+			a := &core.DiscoveryAsset{
+				ID:              util.GenerateID(),
+				Type:            core.AssetSubdomain,
+				Value:           r.Host,
+				NormalizedValue: r.Host,
+				ParentID:        w.AssetID,
+				SourceTool:      "subfinder",
+			}
+			e.prepareChildAsset(a, w.AssetID)
+			e.processNewAsset(ctx, a)
+		}
+
+	case core.ActionDNSResolve:
+		results, parseErrs := parser.ParseDNSx(strings.NewReader(string(stdout)))
+		for _, pe := range parseErrs {
+			log.Printf("[scanengine] parse dnsx line %d: %s", pe.Line, pe.Message)
+		}
+		alive := true
+		for _, rec := range results {
+			for _, ip := range parser.ExtractDNSxIPs(rec) {
+				a := &core.DiscoveryAsset{
+					ID:              util.GenerateID(),
+					Type:            core.AssetIP,
+					Value:           ip,
+					NormalizedValue: ip,
+					ParentID:        w.AssetID,
+					SourceTool:      "dnsx",
+					Attrs:           core.AssetAttrs{Alive: &alive},
+				}
+				e.prepareChildAsset(a, w.AssetID)
+				e.processNewAsset(ctx, a)
+			}
+			for _, cname := range parser.ExtractDNSxCNAMEs(rec) {
+				a := &core.DiscoveryAsset{
+					ID:              util.GenerateID(),
+					Type:            core.AssetSubdomain,
+					Value:           cname,
+					NormalizedValue: cname,
+					ParentID:        w.AssetID,
+					SourceTool:      "dnsx",
+				}
+				e.prepareChildAsset(a, w.AssetID)
+				e.processNewAsset(ctx, a)
+			}
+		}
+
+	case core.ActionCDNCheck:
+		host, err := e.assetHostValue(w.AssetID)
+		if err != nil {
+			log.Printf("[scanengine] cdn check asset: %v", err)
+			return
+		}
+		ips := []string{host}
+		if net.ParseIP(host) == nil {
+			// cdncheck expects IPs; domain-level check is best-effort via resolved child IPs
+			return
+		}
+		_, cdnResults, err := cdn.ParseJSONLOutput(stdout, ips)
+		if err != nil {
+			log.Printf("[scanengine] parse cdncheck: %v", err)
+			return
+		}
+		isCDN := true
+		for _, r := range cdnResults {
+			a := &core.DiscoveryAsset{
+				ID:              util.GenerateID(),
+				Type:            core.AssetIP,
+				Value:           r.IP,
+				NormalizedValue: r.IP,
+				ParentID:        w.AssetID,
+				SourceTool:      "cdncheck",
+				Attrs:           core.AssetAttrs{IsCDN: &isCDN},
+			}
+			e.prepareChildAsset(a, w.AssetID)
+			e.processNewAsset(ctx, a)
+		}
 	}
 }
 
 // buildParams constructs tool parameters for a work item.
 func (e *ScanEngine) buildParams(ctx context.Context, w *models.ScanWorkItem) (toolregistry.RenderParams, func(), error) {
+	cfg := e.config.Pipeline
+	host, err := e.assetHostValue(w.AssetID)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	switch core.TaskAction(w.Action) {
 	case core.ActionHTTPXFingerprint:
-		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{w.AssetID})
+		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{host})
 		if err != nil {
 			return nil, nil, err
 		}
 		return toolregistry.RenderParams{
 			"host_file": hostFile,
+			"rate":      cfg.HttpxRateLimit,
+			"threads":   cfg.HttpxThreads,
 		}, cleanup, nil
 
 	case core.ActionNucleiScan:
-		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{w.AssetID})
+		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{host})
+		if err != nil {
+			return nil, nil, err
+		}
+		profile := "standard"
+		if cfg.NucleiScanDepth == "workflow" {
+			profile = "deep"
+		}
+		params := toolregistry.RenderParams{
+			"host_file":  hostFile,
+			"profile":    profile,
+			"scan_depth": cfg.NucleiScanDepth,
+			"rate_limit": cfg.NucleiRateLimit,
+			"concurrency": cfg.NucleiConcurrency,
+		}
+		if cfg.NucleiRateLimitPerMinute > 0 {
+			params["rate_limit_per_min"] = cfg.NucleiRateLimitPerMinute
+		}
+		return params, cleanup, nil
+
+	case core.ActionPortScan:
+		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{host})
+		if err != nil {
+			return nil, nil, err
+		}
+		return toolregistry.RenderParams{
+			"host_file":  hostFile,
+			"port_range": cfg.PortRange,
+			"rate":       cfg.NaabuRate,
+			"threads":    cfg.NaabuThreads,
+			"timeout":    cfg.NaabuTimeout,
+		}, cleanup, nil
+
+	case core.ActionServiceFingerprint:
+		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{host})
+		if err != nil {
+			return nil, nil, err
+		}
+		port := host
+		if h, p, ok := strings.Cut(host, ":"); ok {
+			hostFile, cleanup, err = executor.WriteHostFile(e.dataDir, []string{h})
+			if err != nil {
+				return nil, nil, err
+			}
+			port = p
+		}
+		return toolregistry.RenderParams{
+			"host_file": hostFile,
+			"ports":     []string{port},
+			"timeout":   cfg.NmapServiceTimeout,
+		}, cleanup, nil
+
+	case core.ActionSubdomainEnum:
+		return toolregistry.RenderParams{
+			"domain": host,
+		}, nil, nil
+
+	case core.ActionDNSResolve:
+		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{host})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -453,24 +700,45 @@ func (e *ScanEngine) buildParams(ctx context.Context, w *models.ScanWorkItem) (t
 			"host_file": hostFile,
 		}, cleanup, nil
 
+	case core.ActionCDNCheck:
+		return toolregistry.RenderParams{
+			"ips": host,
+		}, nil, nil
+
 	case core.ActionKatanaCrawl:
 		return toolregistry.RenderParams{
-			"url": w.AssetID,
+			"url":        host,
+			"max_depth":  cfg.KatanaMaxDepth,
+			"rate_limit": cfg.KatanaRateLimit,
+			"timeout":    cfg.KatanaTimeout,
 		}, nil, nil
 
 	case core.ActionFFUFBrute:
 		return toolregistry.RenderParams{
-			"url": w.AssetID,
+			"url":     host,
+			"rate":    cfg.FfufRateLimit,
+			"timeout": cfg.FfufTimeout,
 		}, nil, nil
 
 	case core.ActionSpoorScan:
 		return toolregistry.RenderParams{
-			"target": w.AssetID,
+			"target": host,
 		}, nil, nil
 
 	default:
 		return toolregistry.RenderParams{}, nil, nil
 	}
+}
+
+func (e *ScanEngine) assetHostValue(assetID string) (string, error) {
+	a, err := e.queries.GetAssetByID(assetID)
+	if err != nil {
+		return "", fmt.Errorf("get asset %s: %w", assetID, err)
+	}
+	if a == nil {
+		return "", fmt.Errorf("asset not found: %s", assetID)
+	}
+	return a.Value, nil
 }
 
 // isWindDownAllowed returns true if the action should continue during wind_down.
@@ -496,6 +764,64 @@ func (e *ScanEngine) setEngineState(state string) {
 	}
 }
 
+func (e *ScanEngine) isAssetExcluded(a *core.DiscoveryAsset) bool {
+	if e.excludeMgr != nil && e.excludeMgr.IsExcluded(a.Value) {
+		return true
+	}
+	if e.scopeEng == nil {
+		return false
+	}
+	target := assetToScopeTarget(a)
+	if target == nil {
+		return false
+	}
+	excluded, err := e.scopeEng.IsExcludedForProject(e.projectID, target)
+	if err != nil {
+		log.Printf("[scanengine] scope check %s: %v", a.Value, err)
+		return false
+	}
+	return excluded
+}
+
+func (e *ScanEngine) prepareChildAsset(a *core.DiscoveryAsset, parentAssetID string) {
+	if parentAssetID == "" {
+		return
+	}
+	if v, ok := e.assetDepth.Load(parentAssetID); ok {
+		if depth, ok := v.(int); ok {
+			a.DiscoveryDepth = depth + 1
+			return
+		}
+	}
+	a.DiscoveryDepth++
+}
+
+func assetToScopeTarget(a *core.DiscoveryAsset) *models.Target {
+	if a == nil {
+		return nil
+	}
+	value := strings.TrimSpace(a.Value)
+	switch a.Type {
+	case core.AssetSubdomain:
+		return &models.Target{Type: models.TargetTypeDomain, Value: value}
+	case core.AssetIP:
+		return &models.Target{Type: models.TargetTypeIP, Value: value}
+	case core.AssetIPPort:
+		host, _, err := net.SplitHostPort(value)
+		if err != nil {
+			host = value
+		}
+		if net.ParseIP(host) != nil {
+			return &models.Target{Type: models.TargetTypeIP, Value: host}
+		}
+		return &models.Target{Type: models.TargetTypeDomain, Value: host}
+	case core.AssetHTTPService, core.AssetHTTPPath:
+		return &models.Target{Type: models.TargetTypeURL, Value: value}
+	default:
+		return &models.Target{Type: models.TargetTypeDomain, Value: value}
+	}
+}
+
 // assetTypeToString converts core.AssetType to the string used by asset.Merger.
 func assetTypeToString(t core.AssetType) string {
 	switch t {
@@ -504,7 +830,7 @@ func assetTypeToString(t core.AssetType) string {
 	case core.AssetIP:
 		return "ip"
 	case core.AssetIPPort:
-		return "ip_port"
+		return "ip"
 	case core.AssetHTTPService:
 		return "url"
 	case core.AssetHTTPPath:

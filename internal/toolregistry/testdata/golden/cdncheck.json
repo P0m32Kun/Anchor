@@ -1,0 +1,15 @@
+{
+  "name": "cdncheck",
+  "tool_id": "cdncheck",
+  "params": {
+    "ips": "1.1.1.1,8.8.8.8"
+  },
+  "want_argv": [
+    "-duc",
+    "-i",
+    "-jsonl",
+    "-silent",
+    "1.1.1.1,8.8.8.8",
+    "cdncheck"
+  ]
+}

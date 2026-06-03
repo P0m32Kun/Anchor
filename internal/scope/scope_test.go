@@ -44,13 +44,13 @@ func TestEngineEvaluate(t *testing.T) {
 		decision models.ScopeDecisionResult
 	}{
 		{
-			name:     "allow by include",
+			name:     "allow when no exclude matches",
 			target:   &models.Target{Type: models.TargetTypeDomain, Value: "example.com"},
 			rules:    []*models.ScopeRule{{Action: models.ScopeActionInclude, Type: models.TargetTypeDomain, Value: "example.com"}},
 			decision: models.ScopeAllow,
 		},
 		{
-			name:   "deny by exclude priority",
+			name:   "deny by exclude",
 			target: &models.Target{Type: models.TargetTypeDomain, Value: "sub.example.com"},
 			rules: []*models.ScopeRule{
 				{Action: models.ScopeActionInclude, Type: models.TargetTypeDomain, Value: "example.com"},
@@ -59,10 +59,10 @@ func TestEngineEvaluate(t *testing.T) {
 			decision: models.ScopeDeny,
 		},
 		{
-			name:     "deny by default",
+			name:     "allow by default without exclude",
 			target:   &models.Target{Type: models.TargetTypeDomain, Value: "unknown.com"},
 			rules:    []*models.ScopeRule{{Action: models.ScopeActionInclude, Type: models.TargetTypeDomain, Value: "example.com"}},
-			decision: models.ScopeDeny,
+			decision: models.ScopeAllow,
 		},
 	}
 
@@ -332,7 +332,7 @@ func TestFilterTargetsWithRules(t *testing.T) {
 		}
 	})
 
-	t.Run("no rules → default deny", func(t *testing.T) {
+	t.Run("no rules → default allow", func(t *testing.T) {
 		targets := []*models.Target{
 			{Type: models.TargetTypeIP, Value: "10.0.0.5"},
 		}
@@ -340,8 +340,8 @@ func TestFilterTargetsWithRules(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(got) != 0 {
-			t.Errorf("whitelist mode should deny with no rules, got %d allowed: %+v", len(got), valuesOf(got))
+		if len(got) != 1 || got[0].Value != "10.0.0.5" {
+			t.Errorf("exclusion-only should allow with no rules, got: %+v", valuesOf(got))
 		}
 	})
 

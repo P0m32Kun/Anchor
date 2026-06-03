@@ -21,6 +21,7 @@ func (s *Server) handleListAssetsFiltered(w http.ResponseWriter, r *http.Request
 	portStr := r.URL.Query().Get("port")
 	titleQuery := r.URL.Query().Get("title")
 	techQuery := r.URL.Query().Get("technology")
+	showExcluded := r.URL.Query().Get("show_excluded") == "true"
 
 	assets, err := s.queries.ListAssetsByProject(projectID)
 	if err != nil {
@@ -31,6 +32,11 @@ func (s *Server) handleListAssetsFiltered(w http.ResponseWriter, r *http.Request
 	// Apply filters in memory (for MVP; optimize with SQL later)
 	var filtered []*models.Asset
 	for _, a := range assets {
+		// Exclusion filter: skip excluded domains unless explicitly requested
+		if !showExcluded && s.excludeMgr != nil && s.excludeMgr.IsExcluded(a.Value) {
+			continue
+		}
+
 		// Status code filter applies to web_endpoints, not assets directly
 		// Skip for now - needs JOIN query
 		_ = statusCode

@@ -4,6 +4,8 @@
 
 Scan API 用于启动安全扫描任务。本文档说明正确的请求格式和参数配置。
 
+资产驱动执行模型、排除-only scope、Work/task 关联与验收矩阵见 [`asset-driven-remediation-design.md`](asset-driven-remediation-design.md)。
+
 ## 启动扫描
 
 ### 请求
@@ -128,6 +130,7 @@ GET /assets/{id}/works?run_id={runId}
   "project_id": "id-xxx",
   "asset_id": "id-xxx",
   "action": "HTTPX_FINGERPRINT",
+  "task_id": "id-task-xxx",
   "status": "done",
   "stage": "httpx",
   "started_at": "2026-06-01T13:07:12Z",
@@ -174,11 +177,11 @@ PROJECT=$(curl -s -X POST http://localhost:17421/projects \
   -d '{"name":"Test","organization":"Org","purpose":"Test"}')
 PROJECT_ID=$(echo $PROJECT | jq -r '.id')
 
-# 添加 scope 规则
+# 添加排除规则（scope 为 exclusion-only；include 已废弃）
 curl -s -X POST http://localhost:17421/scope-rules \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
-  -d "{\"project_id\":\"$PROJECT_ID\",\"action\":\"include\",\"type\":\"cidr\",\"value\":\"192.168.1.0/24\"}"
+  -d "{\"project_id\":\"$PROJECT_ID\",\"action\":\"exclude\",\"type\":\"domain\",\"value\":\"admin.example.com\"}"
 
 # 添加目标
 curl -s -X POST "http://localhost:17421/projects/$PROJECT_ID/targets" \

@@ -61,23 +61,15 @@ func (s *Store) CreateBatch(runID, projectID string, works []core.DerivedWork) (
 	return created, nil
 }
 
-// TryClaim attempts to transition a pending work item to running.
+// TryClaim atomically transitions a pending work item to running.
 // Returns nil if the item is not in pending state (already claimed).
 func (s *Store) TryClaim(id string) (*models.ScanWorkItem, error) {
-	w, err := s.q.GetScanWorkItem(id)
-	if err != nil {
-		return nil, err
-	}
-	if w == nil || w.Status != models.WorkStatusPending {
-		return nil, nil
-	}
-	now := time.Now().UTC()
-	if err := s.q.UpdateScanWorkItemStatus(id, models.WorkStatusRunning, &now, nil); err != nil {
-		return nil, err
-	}
-	w.Status = models.WorkStatusRunning
-	w.StartedAt = &now
-	return w, nil
+	return s.q.ClaimScanWorkItem(id)
+}
+
+// SetTaskID links a work item to its scan task.
+func (s *Store) SetTaskID(workID, taskID string) error {
+	return s.q.UpdateScanWorkItemTaskID(workID, taskID)
 }
 
 // MarkDone transitions a work item to done.

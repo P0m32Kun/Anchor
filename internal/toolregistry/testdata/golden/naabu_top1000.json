@@ -1,0 +1,22 @@
+{
+  "name": "naabu_top1000",
+  "tool_id": "naabu",
+  "params": {
+    "host_file": "/tmp/hosts.txt",
+    "port_range": "top1000",
+    "rate": 1000,
+    "threads": 100
+  },
+  "want_argv": [
+    "-c",
+    "-json",
+    "-list",
+    "-rate",
+    "-tp",
+    "/tmp/hosts.txt",
+    "100",
+    "1000",
+    "1000",
+    "naabu"
+  ]
+}

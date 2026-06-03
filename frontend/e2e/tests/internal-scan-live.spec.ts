@@ -16,9 +16,11 @@
 import { expect, test } from "@playwright/test";
 import { cleanupTestData, createProject, addTarget } from "../fixtures/db-utils";
 import { waitForPipeline } from "../fixtures/api-helpers";
+import { E2E_API_BASE, E2E_API_TOKEN } from "../fixtures/e2e-env";
 
-const API_BASE = "http://localhost:17421";
-const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
+const API_BASE = E2E_API_BASE;
+const API_TOKEN = E2E_API_TOKEN;
+const REDIS_IP = "172.30.0.13";
 
 const RANGEFIELD_IPS = [
 	"172.30.0.10", // nginx
@@ -147,22 +149,23 @@ test.describe.serial("内网扫描 E2E — UI 主导", () => {
 		await expect(
 			page.getByText(/资产清单|资产列表|Assets/),
 		).toBeVisible({ timeout: 10_000 });
-		for (const ip of RANGEFIELD_IPS) {
-			try {
-				await expect(page.locator(`text=${ip}`).first()).toBeVisible({
-					timeout: 5_000,
-				});
-			} catch {
-				console.warn(`[e2e] Asset ${ip} not visible — scan pipeline may not discover it`);
-			}
-		}
+		await expect(page.locator(`text=${REDIS_IP}`).first()).toBeVisible({
+			timeout: 30_000,
+		});
+		await expect(page.getByText(/6379/).first()).toBeVisible({
+			timeout: 30_000,
+		});
+		log("Step 4 完成: Redis 资产与 6379 端口可见");
 
-		// ── Step 5: UI 验证 FindingsPage ──
+		// ── Step 5: UI 验证 FindingsPage（至少 1 条 critical/high）──
 		log("Step 5: UI 验证 FindingsPage");
 		await page.goto(`/projects/${projectId}/findings`);
 		await expect(
 			page.locator("h1").filter({ hasText: /发现审核|漏洞发现|Finding/i }),
 		).toBeVisible({ timeout: 10_000 });
+		await expect(
+			page.getByText(/critical|high|严重|高危/i).first(),
+		).toBeVisible({ timeout: 30_000 });
 
 		log("✓ 内网扫描 E2E 完成");
 	});

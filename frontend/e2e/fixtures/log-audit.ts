@@ -22,12 +22,13 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { E2E_API_BASE, E2E_API_TOKEN } from "./e2e-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const API_BASE = "http://localhost:17421";
-const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
+const API_BASE = E2E_API_BASE;
+const API_TOKEN = E2E_API_TOKEN;
 const RULES_DIR = path.resolve(__dirname, "log-rules");
 
 // --- Types ---

@@ -29,3 +29,35 @@ Anchor is a web application (React + TypeScript frontend, Go backend) that orche
 - Integration tests for database operations (use temp DB)
 - E2E tests for critical user flows
 - Mock external services (HTTP clients, tool executors), not the database
+
+## Skill Auto-Loading Rules
+
+When working on Anchor, **automatically load the following skills** based on task type:
+
+### Security Tasks
+
+**Trigger `security-dev-skills` when:**
+- Modifying security scanner integration (Nuclei, ffuf, naabu, etc.)
+- Working with passive search engines (FOFA, Hunter, Quake)
+- Implementing or modifying vulnerability detection logic
+- Adding new security tools or APIs
+- Security-related configuration changes
+
+**Actions:**
+1. Read `/Users/kun/.pi/agent/skills/security-dev-skills/SKILL.md`
+2. Follow the Research → Design → Implement → Verify workflow
+3. Use integrated MCP tools (Semble for code search, CodeGraph for analysis)
+
+### Code Quality Tasks
+
+**Trigger `context-mode` when:**
+- Processing large outputs (test results, logs, API responses)
+- Analyzing codebase statistics
+- Running multiple commands for analysis
+
+### Documentation Tasks
+
+**Trigger `doc-sync` (part of security-dev-skills) when:**
+- Changing public APIs or interfaces
+- Modifying configuration structures
+- Adding new features or tools

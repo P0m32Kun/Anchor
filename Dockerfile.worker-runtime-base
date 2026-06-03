@@ -1,0 +1,125 @@
+# Anchor Worker Runtime Base Image
+# 包含所有安全工具和系统依赖，极少更新
+# 构建: docker build -f Dockerfile.worker-runtime-base -t anchor-worker-base:latest .
+
+FROM debian:bookworm-slim
+
+# ============================================================
+#  工具版本定义（集中管理，更新时只改这里）
+# ============================================================
+ARG SUBFINDER_VERSION=2.14.0
+ARG NAABU_VERSION=2.6.1
+ARG HTTPX_VERSION=1.9.0
+ARG NUCLEI_VERSION=3.8.0
+ARG CDNCHECK_VERSION=1.2.38
+ARG DNSX_VERSION=1.2.3
+ARG KATANA_VERSION=1.6.1
+ARG FFUF_VERSION=2.1.0
+ARG GAU_VERSION=2.2.4
+ARG SPOOR_VERSION=0.2.0
+
+# ============================================================
+#  系统依赖
+# ============================================================
+RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+    ca-certificates libpcap0.8 nmap wget curl unzip \
+    telnet netcat-openbsd openssh-client \
+    redis-tools default-mysql-client postgresql-client \
+    python3 jq \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# ============================================================
+#  安全工具（直接下载 GitHub Release 预编译二进制）
+# ============================================================
+RUN set -eux; \
+    ARCH=$(uname -m); \
+    case "${ARCH}" in \
+      x86_64)  TARGETARCH=amd64; SPOOR_ARCH=x86_64-unknown-linux-gnu ;; \
+      aarch64) TARGETARCH=arm64;  SPOOR_ARCH=aarch64-unknown-linux-gnu ;; \
+      *) echo "Unsupported architecture: ${ARCH}"; exit 1 ;; \
+    esac; \
+    echo "Detected architecture: ${ARCH} (TARGETARCH=${TARGETARCH}, SPOOR_ARCH=${SPOOR_ARCH})"; \
+    # --- projectdiscovery 系列（zip 格式）---
+    for tool_ver in \
+      "subfinder:${SUBFINDER_VERSION}" \
+      "naabu:${NAABU_VERSION}" \
+      "httpx:${HTTPX_VERSION}" \
+      "nuclei:${NUCLEI_VERSION}" \
+      "cdncheck:${CDNCHECK_VERSION}" \
+      "dnsx:${DNSX_VERSION}" \
+      "katana:${KATANA_VERSION}"; do \
+      name="${tool_ver%%:*}"; \
+      ver="${tool_ver##*:}"; \
+      echo "Downloading ${name} v${ver} (${TARGETARCH})..."; \
+      wget -q -O "/tmp/${name}.zip" \
+        "https://github.com/projectdiscovery/${name}/releases/download/v${ver}/${name}_${ver}_linux_${TARGETARCH}.zip"; \
+      unzip -o "/tmp/${name}.zip" "${name}" -d /usr/local/bin/; \
+      rm "/tmp/${name}.zip"; \
+    done; \
+    # --- ffuf（tar.gz 格式）---
+    echo "Downloading ffuf v${FFUF_VERSION} (${TARGETARCH})..."; \
+    wget -q -O /tmp/ffuf.tar.gz \
+      "https://github.com/ffuf/ffuf/releases/download/v${FFUF_VERSION}/ffuf_${FFUF_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    tar xzf /tmp/ffuf.tar.gz -C /usr/local/bin/ ffuf; \
+    rm /tmp/ffuf.tar.gz; \
+    # --- gau（tar.gz 格式）---
+    echo "Downloading gau v${GAU_VERSION} (${TARGETARCH})..."; \
+    wget -q -O /tmp/gau.tar.gz \
+      "https://github.com/lc/gau/releases/download/v${GAU_VERSION}/gau_${GAU_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    tar xzf /tmp/gau.tar.gz -C /usr/local/bin/ gau; \
+    rm /tmp/gau.tar.gz; \
+    # --- Spoor（Rust 编译，arch 命名用 target triple）---
+    echo "Downloading spoor v${SPOOR_VERSION} (${SPOOR_ARCH})..."; \
+    wget -q -O /tmp/spoor.tar.gz \
+      "https://github.com/P0m32Kun/Spoor/releases/download/v${SPOOR_VERSION}/spoor-${SPOOR_ARCH}.tar.gz"; \
+    tar xzf /tmp/spoor.tar.gz -C /usr/local/bin/ spoor; \
+    rm /tmp/spoor.tar.gz; \
+    # --- 验证安装 ---
+    echo "Verifying installations..."; \
+    subfinder -version; \
+    naabu -version; \
+    httpx -version; \
+    nuclei -version; \
+    cdncheck -version; \
+    dnsx -version; \
+    katana -version; \
+    ffuf -V; \
+    gau --version; \
+    spoor --version
+
+# nuclei 内置模板
+RUN nuclei -update-templates
+
+# ============================================================
+#  内置数据
+# ============================================================
+# Built-in dictionaries (RBKD-SEC/dict)
+RUN wget -q -O /tmp/dict.tar.gz \
+      "https://github.com/RBKD-SEC/dict/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /opt/dict && tar xzf /tmp/dict.tar.gz -C /opt/dict --strip-components=1 && \
+    rm /tmp/dict.tar.gz
+
+# Built-in nuclei templates (RBKD-SEC/RBKD-templates)
+RUN wget -q -O /tmp/rbkd-templates.tar.gz \
+      "https://github.com/RBKD-SEC/RBKD-templates/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /opt/rbkd-templates && tar xzf /tmp/rbkd-templates.tar.gz -C /opt/rbkd-templates --strip-components=1 && \
+    rm /tmp/rbkd-templates.tar.gz
+
+# Built-in httpx fingerprints (RBKD-SEC/finger)
+RUN wget -q -O /tmp/finger.tar.gz \
+      "https://github.com/RBKD-SEC/finger/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /opt/finger && tar xzf /tmp/finger.tar.gz -C /opt/finger --strip-components=1 && \
+    rm /tmp/finger.tar.gz
+
+# 清理不需要的文件
+RUN rm -rf /usr/share/doc /usr/share/fonts /usr/share/X11
+
+WORKDIR /app
+
+ENV ANCHOR_DATA_DIR=/data
+ENV ANCHOR_CORE_URL=""
+
+VOLUME ["/data"]

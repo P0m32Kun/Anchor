@@ -61,13 +61,14 @@ func TestPassiveActions_External(t *testing.T) {
 		actions[w.Action] = true
 	}
 
-	if !actions[ActionPassiveSearch] {
-		t.Error("passive search should be enabled for external profile")
+	// Passive discovery runs via seed injectors, not tool work items.
+	if actions[ActionPassiveSearch] {
+		t.Error("passive search should not enqueue work items")
 	}
-	if !actions[ActionPassiveCert] {
-		t.Error("passive cert should be enabled for external profile")
+	if actions[ActionPassiveCert] {
+		t.Error("passive cert should not enqueue work items")
 	}
-	if !actions[ActionPassiveURL] {
-		t.Error("passive URL should be enabled for external profile")
+	if actions[ActionPassiveURL] {
+		t.Error("passive URL should not enqueue work items")
 	}
 }

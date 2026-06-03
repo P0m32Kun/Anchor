@@ -1,0 +1,29 @@
+# Anchor Cross-Compilation Dockerfile
+# 用于在 macOS / CI 上交叉编译 Linux 二进制
+# 用法：
+#   docker buildx build --platform linux/arm64 -f Dockerfile.compile \
+#     --build-arg TARGETARCH=arm64 --target output --output type=local,dest=./bin/ .
+
+ARG TARGETARCH=arm64
+
+FROM --platform=linux/${TARGETARCH} golang:1.26-bookworm AS builder
+
+ARG TARGETARCH=arm64
+
+RUN apt-get update && apt-get install -y gcc libsqlite3-dev && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+ENV GOPROXY=https://proxy.golang.org,direct
+ENV CGO_ENABLED=1
+ENV GOOS=linux
+ENV GOARCH=${TARGETARCH}
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN go build -ldflags="-w -s" -o anchor-linux-${TARGETARCH} .
+
+FROM scratch AS output
+ARG TARGETARCH=arm64
+COPY --from=builder /build/anchor-linux-${TARGETARCH} /anchor-linux-${TARGETARCH}

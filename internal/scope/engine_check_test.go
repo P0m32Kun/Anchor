@@ -122,12 +122,12 @@ func TestEngine_Check_Domain_ExcludeOverInclude(t *testing.T) {
 	}
 }
 
-func TestEngine_Check_Domain_NoRules_Deny(t *testing.T) {
+func TestEngine_Check_Domain_NoRules_Allow(t *testing.T) {
 	eng, _, pid := setupEngine(t)
 
 	target := &models.Target{Type: models.TargetTypeDomain, Value: "unknown.com"}
 	d, err := eng.Check(context.Background(), pid, target)
-	assertDeny(t, d, err)
+	assertAllow(t, d, err)
 }
 
 // --- Check: IP ---
@@ -141,13 +141,13 @@ func TestEngine_Check_IP_Allow(t *testing.T) {
 	assertAllow(t, d, err)
 }
 
-func TestEngine_Check_IP_Deny(t *testing.T) {
+func TestEngine_Check_IP_IncludeOnly_Allow(t *testing.T) {
 	eng, q, pid := setupEngine(t)
 	addRule(t, q, pid, models.ScopeActionInclude, models.TargetTypeIP, "10.0.0.1")
 
 	target := &models.Target{Type: models.TargetTypeIP, Value: "10.0.0.2"}
 	d, err := eng.Check(context.Background(), pid, target)
-	assertDeny(t, d, err)
+	assertAllow(t, d, err)
 }
 
 // --- Check: CIDR ---
@@ -161,13 +161,13 @@ func TestEngine_Check_CIDR_Allow(t *testing.T) {
 	assertAllow(t, d, err)
 }
 
-func TestEngine_Check_CIDR_Deny_OutOfRange(t *testing.T) {
+func TestEngine_Check_CIDR_IncludeOnly_OutOfRange_Allow(t *testing.T) {
 	eng, q, pid := setupEngine(t)
 	addRule(t, q, pid, models.ScopeActionInclude, models.TargetTypeCIDR, "10.0.0.0/24")
 
 	target := &models.Target{Type: models.TargetTypeIP, Value: "10.0.1.1"}
 	d, err := eng.Check(context.Background(), pid, target)
-	assertDeny(t, d, err)
+	assertAllow(t, d, err)
 }
 
 // --- Check: URL ---
@@ -249,11 +249,11 @@ func TestEngine_CheckIP_Allow(t *testing.T) {
 	assertAllow(t, d, err)
 }
 
-func TestEngine_CheckIP_Deny(t *testing.T) {
+func TestEngine_CheckIP_NoExclude_Allow(t *testing.T) {
 	eng, _, pid := setupEngine(t)
 
 	d, err := eng.CheckIP(context.Background(), pid, "10.0.0.1")
-	assertDeny(t, d, err)
+	assertAllow(t, d, err)
 }
 
 // --- ValidateBeforeRun ---
@@ -343,20 +343,20 @@ func TestEngine_ValidateBeforeRun_NoCachedDecision_FreshCheck(t *testing.T) {
 
 // --- matchURL edge cases ---
 
-func TestEngine_Check_URL_WrongDomain_Deny(t *testing.T) {
+func TestEngine_Check_URL_IncludeOnly_WrongDomain_Allow(t *testing.T) {
 	eng, q, pid := setupEngine(t)
 	addRule(t, q, pid, models.ScopeActionInclude, models.TargetTypeDomain, "example.com")
 
 	target := &models.Target{Type: models.TargetTypeURL, Value: "https://evil.com/phish"}
 	d, err := eng.Check(context.Background(), pid, target)
-	assertDeny(t, d, err)
+	assertAllow(t, d, err)
 }
 
-func TestEngine_Check_URL_WrongIP_Deny(t *testing.T) {
+func TestEngine_Check_URL_IncludeOnly_WrongIP_Allow(t *testing.T) {
 	eng, q, pid := setupEngine(t)
 	addRule(t, q, pid, models.ScopeActionInclude, models.TargetTypeIP, "10.0.0.1")
 
 	target := &models.Target{Type: models.TargetTypeURL, Value: "http://10.0.0.2:8080/api"}
 	d, err := eng.Check(context.Background(), pid, target)
-	assertDeny(t, d, err)
+	assertAllow(t, d, err)
 }

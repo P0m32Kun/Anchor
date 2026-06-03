@@ -7,9 +7,13 @@ import (
 // handleGetScanRunMetrics returns aggregated metrics for a pipeline run.
 // GET /projects/{id}/pipeline/runs/{runId}/metrics
 func (s *Server) handleGetScanRunMetrics(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
 	runID := r.PathValue("runId")
 	if runID == "" {
 		http.Error(w, "runId required", http.StatusBadRequest)
+		return
+	}
+	if _, ok := s.requireRunInProject(w, r, projectID, runID); !ok {
 		return
 	}
 

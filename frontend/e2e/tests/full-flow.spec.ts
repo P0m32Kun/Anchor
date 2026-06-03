@@ -20,8 +20,10 @@ import { expect, test } from "@playwright/test";
 import { cleanupTestData, addTarget } from "../fixtures/db-utils";
 import { waitForPipeline } from "../fixtures/api-helpers";
 
-const API_BASE = "http://localhost:17421";
-const API_TOKEN = process.env.ANCHOR_API_TOKEN || "test-token-e2e";
+import { E2E_API_BASE, E2E_API_TOKEN } from "../fixtures/e2e-env";
+
+const API_BASE = E2E_API_BASE;
+const API_TOKEN = E2E_API_TOKEN;
 // 目标 IP: rangefield nginx,worker 在 docker 网络内可达。不要用 127.0.0.1
 // (那是 worker 容器自身 loopback,扫不到 rangefield)
 const TARGET_IP = "172.30.0.10";

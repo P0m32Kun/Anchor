@@ -5,6 +5,7 @@
 #   ACR_PASSWORD: <阿里云 ACR 登录密码>
 #
 # 支持多平台：linux/amd64 (VPS/PC), linux/arm64 (Mac M1/M2)
+# 镜像 tag 与 GitHub Release tag 对齐；server/worker 从该 tag 下载二进制（非 latest）
 
 name: Docker Push
 
@@ -13,6 +14,11 @@ on:
     workflows: ["Release"]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release tag (e.g. v0.2.0) or latest"
+        required: true
+        default: "latest"
 
 env:
   ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
@@ -23,37 +29,64 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Resolve release version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.release_version }}"
+          else
+            # Release workflow runs on tag push; head_branch is the tag (e.g. v0.2.0)
+            VERSION="${{ github.event.workflow_run.head_branch }}"
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "Could not resolve release version" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION"
 
-      # 设置 QEMU 支持多平台构建
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.version.outputs.version }}
+
       - uses: docker/setup-qemu-action@v3
 
-      # 设置 Docker Buildx
       - uses: docker/setup-buildx-action@v3
 
       - name: Login to ACR
         run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ${ACR_REGISTRY} -u ${{ secrets.ACR_USERNAME }} --password-stdin
 
       - name: Build and push server
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             -f Dockerfile.server \
+            --build-arg RELEASE_VERSION="${RELEASE_VERSION}" \
+            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-server:${RELEASE_VERSION} \
             -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-server:latest \
             --push .
 
       - name: Build and push worker
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             -f Dockerfile.worker \
+            --build-arg RELEASE_VERSION="${RELEASE_VERSION}" \
+            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-worker:${RELEASE_VERSION} \
             -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-worker:latest \
             --push .
 
       - name: Build and push frontend
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             -f Dockerfile.frontend \
+            -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-frontend:${RELEASE_VERSION} \
             -t ${ACR_REGISTRY}/${ACR_NAMESPACE}/anchor-frontend:latest \
             --push .

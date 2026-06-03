@@ -303,6 +303,15 @@ func migrate(db *sql.DB) error {
 		}
 		version = 27
 	}
+	if version < 28 {
+		if err := migrateV28(db); err != nil {
+			return fmt.Errorf("migrate v28 (scan_work_items.task_id): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 28"); err != nil {
+			return fmt.Errorf("set user_version 28: %w", err)
+		}
+		version = 28
+	}
 	if err := ensureProjectsColumns(db); err != nil {
 		return fmt.Errorf("ensure projects columns: %w", err)
 	}

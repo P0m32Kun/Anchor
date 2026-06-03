@@ -1,0 +1,17 @@
+{
+  "name": "nmap_alive",
+  "tool_id": "nmap_alive",
+  "params": {
+    "host_file": "/tmp/hosts.txt"
+  },
+  "want_argv": [
+    "-",
+    "-T4",
+    "-iL",
+    "-n",
+    "-oG",
+    "-sn",
+    "/tmp/hosts.txt",
+    "nmap"
+  ]
+}

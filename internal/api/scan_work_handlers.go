@@ -7,9 +7,13 @@ import (
 // handleListScanRunWorks returns all work items for a pipeline run.
 // GET /projects/{id}/pipeline/runs/{runId}/works
 func (s *Server) handleListScanRunWorks(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
 	runID := r.PathValue("runId")
 	if runID == "" {
 		http.Error(w, "runId required", http.StatusBadRequest)
+		return
+	}
+	if _, ok := s.requireRunInProject(w, r, projectID, runID); !ok {
 		return
 	}
 
@@ -38,6 +42,12 @@ func (s *Server) handleListAssetWorks(w http.ResponseWriter, r *http.Request) {
 	if runID == "" {
 		http.Error(w, "run_id query param required", http.StatusBadRequest)
 		return
+	}
+	projectID := r.URL.Query().Get("project_id")
+	if projectID != "" {
+		if _, ok := s.requireRunInProject(w, r, projectID, runID); !ok {
+			return
+		}
 	}
 
 	works, err := s.queries.ListScanWorkItemsByAsset(runID, assetID)

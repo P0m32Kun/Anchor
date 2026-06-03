@@ -5,8 +5,10 @@ frontend/dist/
 # Tauri (desktop app, not used by server/worker)
 src-tauri/
 
-# Build artifacts
-bin/
+# Build artifacts (保留 bin/anchor* 用于 fast build)
+bin/*
+!bin/anchor*
+!bin/anchor-linux-*
 
 # Git
 .git/

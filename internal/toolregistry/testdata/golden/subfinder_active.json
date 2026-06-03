@@ -1,0 +1,20 @@
+{
+  "name": "subfinder_active",
+  "tool_id": "subfinder",
+  "params": {
+    "domain": "test.org",
+    "mode": "active",
+    "rate_limit": 100,
+    "threads": 5
+  },
+  "want_argv": [
+    "-d",
+    "-oJ",
+    "-rate-limit",
+    "-t",
+    "100",
+    "5",
+    "subfinder",
+    "test.org"
+  ]
+}

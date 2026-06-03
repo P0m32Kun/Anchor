@@ -90,7 +90,7 @@ func setupTestEngine(t *testing.T, fakeExec *fakeExecutor, config EngineConfig) 
 
 	merger := asset.NewMerger(queries)
 	profile := core.DefaultInternalProfile()
-	engine := NewWithExecutor(queries, merger, profile, nil, t.TempDir(), "run1", "proj1", config, nil, fakeExec)
+	engine := NewWithExecutor(queries, merger, profile, nil, nil, t.TempDir(), "run1", "proj1", config, nil, fakeExec)
 	return engine, queries
 }
 

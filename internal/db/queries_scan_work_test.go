@@ -446,3 +446,31 @@ func TestPipelineRunStage_WorkCounts(t *testing.T) {
 		t.Errorf("round = %v, want 1", got.Round)
 	}
 }
+
+func TestScanWorkItem_ClaimAtomic(t *testing.T) {
+	q, runID := setupScanWorkTest(t)
+	now := time.Now().UTC()
+	w := &models.ScanWorkItem{
+		ID:        util.GenerateID(),
+		RunID:     runID,
+		ProjectID: "proj-1",
+		AssetID:   "asset-claim",
+		Action:    "HTTPX_FINGERPRINT",
+		Status:    models.WorkStatusPending,
+		CreatedAt: now,
+	}
+	if err := q.CreateScanWorkItem(w); err != nil {
+		t.Fatal(err)
+	}
+	got, err := q.ClaimScanWorkItem(w.ID)
+	if err != nil || got == nil || got.Status != models.WorkStatusRunning {
+		t.Fatalf("first claim failed: %v %+v", err, got)
+	}
+	got2, err := q.ClaimScanWorkItem(w.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got2 != nil {
+		t.Fatal("second claim should return nil")
+	}
+}

@@ -27,6 +27,13 @@ func (q *Queries) CreateAsset(a *models.Asset) error {
 	return err
 }
 
+func (q *Queries) GetAssetByID(id string) (*models.Asset, error) {
+	row := q.db.QueryRow(`
+		SELECT id, project_id, type, value, normalized_value, source_tools, first_seen, last_seen, tags
+		FROM assets WHERE id = ?`, id)
+	return scanAsset(row)
+}
+
 func (q *Queries) GetAssetByNormalizedValue(projectID, normalizedValue string) (*models.Asset, error) {
 	row := q.db.QueryRow(`
 		SELECT id, project_id, type, value, normalized_value, source_tools, first_seen, last_seen, tags

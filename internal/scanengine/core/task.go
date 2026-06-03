@@ -29,7 +29,7 @@ var ActionToTool = map[TaskAction]string{
 	ActionDNSResolve:         "dnsx",
 	ActionCDNCheck:           "cdncheck",
 	ActionPortScan:           "naabu",
-	ActionServiceFingerprint: "nmap",
+	ActionServiceFingerprint: "nmap_service",
 	ActionHTTPXFingerprint:   "httpx",
 	ActionKatanaCrawl:        "katana",
 	ActionFFUFBrute:          "ffuf",

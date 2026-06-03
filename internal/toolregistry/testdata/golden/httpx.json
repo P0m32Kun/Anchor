@@ -1,0 +1,21 @@
+{
+  "name": "httpx",
+  "tool_id": "httpx",
+  "params": {
+    "host_file": "/tmp/hosts.txt",
+    "rate_limit": 150,
+    "threads": 50
+  },
+  "want_argv": [
+    "-follow-redirects",
+    "-json",
+    "-l",
+    "-rate-limit",
+    "-td",
+    "-threads",
+    "/tmp/hosts.txt",
+    "150",
+    "50",
+    "httpx"
+  ]
+}

@@ -195,12 +195,16 @@ func TestDeriveEligibleWorks_HTTPXOnHTTPService(t *testing.T) {
 		t.Fatal("httpx should be eligible on HTTP_SERVICE")
 	}
 
-	// IP only: httpx not eligible
+	// IP: httpx candidate for web discovery
 	ip := &DiscoveryAsset{ID: "ip-1", Type: AssetIP, DiscoveryDepth: 0}
 	works = DeriveEligibleWorks(ip, profile)
+	var ipHttpx bool
 	for _, w := range works {
 		if w.Action == ActionHTTPXFingerprint {
-			t.Fatal("httpx should not be eligible on IP asset")
+			ipHttpx = true
 		}
+	}
+	if !ipHttpx {
+		t.Fatal("httpx should be eligible on IP asset (HTTPX candidate)")
 	}
 }

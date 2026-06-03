@@ -1,0 +1,28 @@
+{
+  "name": "katana",
+  "tool_id": "katana",
+  "params": {
+    "depth": 2,
+    "list_file": "/tmp/urls.txt",
+    "rate_limit": 10,
+    "timeout": 10
+  },
+  "want_argv": [
+    "-depth",
+    "-fs",
+    "-jc",
+    "-jsonl",
+    "-list",
+    "-ob",
+    "-or",
+    "-rate-limit",
+    "-silent",
+    "-timeout",
+    "/tmp/urls.txt",
+    "10",
+    "10",
+    "2",
+    "katana",
+    "rdn"
+  ]
+}

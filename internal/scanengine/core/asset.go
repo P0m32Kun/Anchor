@@ -1,5 +1,10 @@
 package core
 
+import (
+	"net"
+	"strings"
+)
+
 // AssetType represents the kind of discovered asset.
 type AssetType string
 
@@ -22,4 +27,22 @@ type DiscoveryAsset struct {
 	DiscoveryDepth  int        `json:"discovery_depth"`
 	Attrs           AssetAttrs `json:"attrs"`
 	SourceTool      string     `json:"source_tool,omitempty"`
+}
+
+// ClassifySeedTarget infers asset type from a scan seed value.
+func ClassifySeedTarget(target string) AssetType {
+	target = strings.TrimSpace(target)
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		return AssetHTTPService
+	}
+	if host, _, err := net.SplitHostPort(target); err == nil {
+		if net.ParseIP(host) != nil {
+			return AssetIP
+		}
+		return AssetSubdomain
+	}
+	if net.ParseIP(target) != nil {
+		return AssetIP
+	}
+	return AssetSubdomain
 }

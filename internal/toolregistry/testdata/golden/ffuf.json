@@ -1,0 +1,25 @@
+{
+  "name": "ffuf",
+  "tool_id": "ffuf",
+  "params": {
+    "rate_limit": 6,
+    "target": "http://example.com/FUZZ",
+    "timeout": 30,
+    "wordlist": "/tmp/dict.txt"
+  },
+  "want_argv": [
+    "-json",
+    "-mc",
+    "-rate",
+    "-s",
+    "-timeout",
+    "-u",
+    "-w",
+    "/tmp/dict.txt",
+    "200,301,302,401,403,405,500",
+    "30",
+    "6",
+    "ffuf",
+    "http://example.com/FUZZ"
+  ]
+}

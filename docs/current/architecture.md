@@ -44,6 +44,19 @@ This file describes the current repository baseline that agents should assume un
 - 阿里云 ACR：Docker 镜像（`crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun/`），Release 完成后 CI 自动推送
 - `install.sh` 默认从 ACR 拉取镜像（国内加速），本地构建时 fallback 到 Dockerfile
 
+**Docker 镜像 tag 策略**（2026-06-03）：
+- `docker-push.yml` 在 Release workflow 成功后 checkout **触发 Release 的 tag/ref**（例如 `v0.2.0`），而非默认分支 HEAD
+- 构建 server/worker 时传入 `RELEASE_VERSION=<tag>`，`Dockerfile.server` / `Dockerfile.worker` 从 `releases/download/<tag>/` 下载二进制；避免发布镜像内嵌 `latest` 资产与 tag 不一致
+- 推送到 ACR 时同时打版本 tag（`anchor-server:v0.2.0`）与 `latest`；frontend 同步版本 tag（构建物来自 checkout 的源码树）
+- 手动触发 `workflow_dispatch` 时需指定 `release_version` 输入（tag 或 `latest`）
+
+**Worker 部署网络**：
+- **出站为主**：Worker 通过 `--core-url` 连接 Server（长轮询拉任务、心跳、上报结果），无需 Worker 公网 IP
+- **Server 入站 Worker（可选）**：运行中任务的实时 stdout/stderr 由 Server 代理到 Worker 注册的 `endpoint`（`proxyWorkerTaskOutput`）；若不需要 UI 实时日志，可不暴露 Worker HTTP
+- **同机 compose**：`docker-compose.yml` 中 Worker 使用服务名 `worker` 作为 endpoint；Server 与 Worker 使用**独立** named volume（`anchor-server-data` / `anchor-worker-data`），避免 SQLite 与 Worker 本地状态互相覆盖
+
+**API Token**：安装时写入 `.env` 的 `ANCHOR_API_TOKEN`；轮换时修改 `.env` 并重启 compose。`install.sh` 不将完整 Token 打印到终端（仅提示已写入 `.env`）。
+
 **多平台支持**：
 - Docker 镜像支持 `linux/amd64`（VPS/PC）和 `linux/arm64`（Mac M1/M2）
 - 通过 GitHub Actions 使用 QEMU + Docker Buildx 构建多平台镜像
@@ -358,8 +371,24 @@ internal/scanengine/
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/projects/{id}/pipeline/runs/{runId}/metrics` | 引擎状态 + Work 计数 |
-| GET | `/projects/{id}/pipeline/runs/{runId}/works` | Work 列表 |
+| GET | `/projects/{id}/pipeline/runs/{runId}/works` | Work 列表（校验 run 归属 project） |
 | GET | `/assets/{id}/works?run_id=` | 单资产 Work 时间线 |
+
+`scan_work_items.task_id` 关联 `scan_tasks.id`，前端 Work 日志优先跳转 task 详情。
+
+### 项目 Scope（排除规则 only）
+
+**状态**：2026-06-03 起全局 **exclusion-only**（见 [`asset-driven-remediation-design.md`](asset-driven-remediation-design.md)）。
+
+| 层级 | 行为 |
+|------|------|
+| 无 exclude 命中 | **允许**（含发现链上的新子域/IP/URL） |
+| 命中 `scope_rules.action=exclude` | **拒绝**派生 work / FilterTargets 过滤 |
+| `scope_rules.action=include` | **已废弃**，不参与评估 |
+
+ScanEngine 在 `processNewAsset` 与 seed 路径同时检查：全局 `exclude.Manager` + `scope.Engine.IsExcludedForProject`。
+
+`PipelineConfig`（`EnableHttpx`、`EnableNuclei` 等）通过 `core.ProfileFromConfig` 控制 work 派生；Nuclei stdout 经 `internal/finding.NucleiPersister` 写入 Findings + Evidence。
 
 ### 全局域名排除列表
 
@@ -381,7 +410,7 @@ internal/scanengine/
 
 域名排除检查在以下时机执行：
 
-1. **scanengine.processNewAsset**: 每当发现新资产时，检查其域名是否在排除列表中
+1. **scanengine.processNewAsset**: 全局排除列表 + 项目 exclude 规则
 2. **支持 URL 解析**: 对于 URL 类型的资产，自动提取域名进行检查
 3. **子域名匹配**: `example.com` 会匹配 `api.example.com`、`sub.example.com` 等
 
@@ -527,19 +556,19 @@ Server NewServer():
 ### CI/CD 流程
 
 **触发条件**：
+- `ci.yml`：push/PR 到 `main` 时跑 `go test`/`go vet` 与前端 typecheck/unit/build（见 [`ci-cd-guide.md`](ci-cd-guide.md)）
 - `release.yml`：tag 推送时触发，构建 Go 二进制并上传到 GitHub Release
 - `docker-push.yml`：Release 完成后自动触发，或通过 `workflow_dispatch` 手动触发
 
-**构建流程**：
-1. Checkout 代码
-2. 设置 QEMU（支持多平台模拟）
-3. 设置 Docker Buildx
-4. 登录阿里云 ACR
-5. 构建并推送多平台镜像（server、worker、frontend）
+**构建流程**（`docker-push.yml`）：
+1. 解析 `RELEASE_VERSION`（Release workflow 的 `head_branch` = tag，或 `workflow_dispatch` 输入）
+2. Checkout **该 tag/ref**（保证 Dockerfile 内源码种子与发布版本一致）
+3. 设置 QEMU + Docker Buildx，登录阿里云 ACR
+4. 构建并推送多平台镜像；server/worker 传入 `--build-arg RELEASE_VERSION=<tag>`
 
 **镜像标签**：
-- `latest`：最新稳定版
-- `v0.x.x`：特定版本标签（可选）
+- `v0.x.x`：与 GitHub Release tag 对齐的权威版本标签
+- `latest`：每次成功 docker-push 同时更新，供 `install.sh` 默认拉取
 
 ### 环境变量与配置
 

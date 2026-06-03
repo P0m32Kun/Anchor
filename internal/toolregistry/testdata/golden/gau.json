@@ -1,0 +1,11 @@
+{
+  "name": "gau",
+  "tool_id": "gau",
+  "params": {
+    "domain": "example.com"
+  },
+  "want_argv": [
+    "example.com",
+    "gau"
+  ]
+}

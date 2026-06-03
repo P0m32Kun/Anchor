@@ -1,0 +1,26 @@
+{
+  "name": "nuclei_custom_template",
+  "tool_id": "nuclei",
+  "params": {
+    "profile": "deep",
+    "target_file": "/tmp/targets.txt",
+    "template_path": "/root/custom-workflows/ssh.yaml"
+  },
+  "ignore_tokens": [
+    "-stats",
+    "-si",
+    "30"
+  ],
+  "want_argv": [
+    "-jsonl",
+    "-l",
+    "-severity",
+    "-timeout",
+    "-w",
+    "/root/custom-workflows/ssh.yaml",
+    "/tmp/targets.txt",
+    "10",
+    "critical,high,medium,low,info",
+    "nuclei"
+  ]
+}

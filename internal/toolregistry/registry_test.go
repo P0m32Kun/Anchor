@@ -1,231 +1,55 @@
 package toolregistry
 
 import (
+	"encoding/json"
+	"embed"
+	"io/fs"
 	"slices"
 	"testing"
-
-	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
-// goldenTest asserts that registry.Render(id, params) produces argv equivalent
-// to the legacy worker.Build* function (order-independent set comparison).
-type goldenTest struct {
-	toolID string
-	params RenderParams
-	wantFn func() []string
-	// ignoreTokens are argv tokens excluded from comparison (e.g. -stats -si 30).
-	ignoreTokens []string
+//go:embed testdata/golden/*.json
+var goldenFS embed.FS
+
+type goldenFile struct {
+	Name         string                 `json:"name"`
+	ToolID       string                 `json:"tool_id"`
+	Params       map[string]interface{} `json:"params"`
+	IgnoreTokens []string               `json:"ignore_tokens,omitempty"`
+	WantArgv     []string               `json:"want_argv"`
 }
 
-func TestGolden_RenderMatchesBuildFunctions(t *testing.T) {
+func TestGolden_RenderMatchesFixtures(t *testing.T) {
 	reg := DefaultRegistry()
 
-	tests := []goldenTest{
-		{
-			toolID: "subfinder",
-			params: RenderParams{
-				"domain":       "example.com",
-				"rate_limit":   50,
-				"threads":      10,
-				"timeout":      30,
-				"mode":         "passive",
-			},
-			wantFn: func() []string {
-				return worker.BuildSubfinderCommand("example.com", 50, 10, 30, "passive", "")
-			},
-		},
-		{
-			toolID: "subfinder",
-			params: RenderParams{
-				"domain":     "test.org",
-				"rate_limit": 100,
-				"threads":    5,
-				"mode":       "active",
-			},
-			wantFn: func() []string {
-				return worker.BuildSubfinderCommand("test.org", 100, 5, 0, "active", "")
-			},
-		},
-		{
-			toolID: "dnsx",
-			params: RenderParams{
-				"host_file":  "/tmp/hosts.txt",
-				"rate_limit": 100,
-				"threads":    50,
-				"timeout":    5,
-			},
-			wantFn: func() []string {
-				return worker.BuildDNSxCommand("/tmp/hosts.txt", nil, 100, 50, 5)
-			},
-		},
-		{
-			toolID: "cdncheck",
-			params: RenderParams{
-				"ips": "1.1.1.1,8.8.8.8",
-			},
-			wantFn: func() []string {
-				return worker.BuildCDNCheckCommand("1.1.1.1,8.8.8.8")
-			},
-		},
-		{
-			toolID: "nmap_alive",
-			params: RenderParams{
-				"host_file": "/tmp/hosts.txt",
-			},
-			wantFn: func() []string {
-				return worker.BuildNmapAliveCommand("/tmp/hosts.txt")
-			},
-		},
-		{
-			toolID: "nmap_service",
-			params: RenderParams{
-				"host_file":    "/tmp/hosts.txt",
-				"ports":        []string{"80", "443"},
-				"host_timeout": 180,
-			},
-			wantFn: func() []string {
-				return worker.BuildNmapServiceScanCommand("/tmp/hosts.txt", []int{80, 443}, 180)
-			},
-		},
-		{
-			toolID: "naabu",
-			params: RenderParams{
-				"host_file":  "/tmp/hosts.txt",
-				"port_range": "top1000",
-				"rate":       1000,
-				"threads":    100,
-			},
-			wantFn: func() []string {
-				return worker.BuildNaabuCommand("/tmp/hosts.txt", "top1000", 1000, 100, 0)
-			},
-		},
-		{
-			toolID: "naabu",
-			params: RenderParams{
-				"host_file":  "/tmp/hosts.txt",
-				"port_range": "high-risk",
-				"rate":       300,
-				"threads":    50,
-			},
-			wantFn: func() []string {
-				return worker.BuildNaabuCommand("/tmp/hosts.txt", "high-risk", 300, 50, 0)
-			},
-		},
-		{
-			toolID: "httpx",
-			params: RenderParams{
-				"host_file":  "/tmp/hosts.txt",
-				"rate_limit": 150,
-				"threads":    50,
-			},
-			wantFn: func() []string {
-				return worker.BuildHttpxCommand("/tmp/hosts.txt", 150, 50, "")
-			},
-		},
-		{
-			toolID: "katana",
-			params: RenderParams{
-				"list_file":  "/tmp/urls.txt",
-				"depth":      2,
-				"rate_limit": 10,
-				"timeout":    10,
-			},
-			wantFn: func() []string {
-				return worker.BuildKatanaCommand("/tmp/urls.txt", 2, 10, 10)
-			},
-		},
-		{
-			toolID: "ffuf",
-			params: RenderParams{
-				"target":     "http://example.com/FUZZ",
-				"wordlist":   "/tmp/dict.txt",
-				"rate_limit": 6,
-				"timeout":    30,
-			},
-			wantFn: func() []string {
-				return worker.BuildFfufCommand("http://example.com/FUZZ", "/tmp/dict.txt", 6, 30)
-			},
-		},
-		{
-			toolID: "nuclei",
-			params: RenderParams{
-				"target_file": "/tmp/targets.txt",
-				"profile":     "deep",
-				"rate_limit":  20,
-				"concurrency": 5,
-				"scan_depth":  "tags",
-				"tags":        []string{"cve", "misconfig"},
-			},
-			wantFn: func() []string {
-				return worker.BuildNucleiCommand("/tmp/targets.txt", "deep", 20, 0, 5, []string{"cve", "misconfig"}, "tags", "", "")
-			},
-			ignoreTokens: []string{"-stats", "-si", "30"},
-		},
-		{
-			toolID: "nuclei",
-			params: RenderParams{
-				"target_file":  "/tmp/targets.txt",
-				"profile":      "standard",
-				"scan_depth":   "workflow",
-				"workflow_dir": "/root/workflows",
-			},
-			wantFn: func() []string {
-				return worker.BuildNucleiCommand("/tmp/targets.txt", "standard", 0, 0, 0, nil, "workflow", "/root/workflows", "")
-			},
-			ignoreTokens: []string{"-stats", "-si", "30"},
-		},
-		{
-			toolID: "nuclei",
-			params: RenderParams{
-				"target_file":  "/tmp/targets.txt",
-				"profile":      "light",
-				"rate_limit":   150,
-				"concurrency":  10,
-				"scan_depth":   "both",
-				"workflow_dir": "/root/workflows",
-				"tags":         []string{"rce"},
-			},
-			wantFn: func() []string {
-				return worker.BuildNucleiCommand("/tmp/targets.txt", "light", 150, 0, 10, []string{"rce"}, "both", "/root/workflows", "")
-			},
-			ignoreTokens: []string{"-stats", "-si", "30"},
-		},
-		{
-			toolID: "nuclei",
-			params: RenderParams{
-				"target_file":   "/tmp/targets.txt",
-				"profile":       "deep",
-				"template_path": "/root/custom-workflows/ssh.yaml",
-			},
-			wantFn: func() []string {
-				return worker.BuildNucleiCommand("/tmp/targets.txt", "deep", 0, 0, 0, nil, "tags", "", "/root/custom-workflows/ssh.yaml")
-			},
-			ignoreTokens: []string{"-stats", "-si", "30"},
-		},
-		{
-			toolID: "gau",
-			params: RenderParams{
-				"domain": "example.com",
-			},
-			wantFn: func() []string {
-				return []string{"gau", "example.com"}
-			},
-		},
+	entries, err := fs.Glob(goldenFS, "testdata/golden/*.json")
+	if err != nil {
+		t.Fatalf("glob golden fixtures: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("no golden fixtures found")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.toolID, func(t *testing.T) {
-			got, err := reg.Render(tt.toolID, tt.params)
+	for _, path := range entries {
+		path := path
+		t.Run(path, func(t *testing.T) {
+			data, err := goldenFS.ReadFile(path)
 			if err != nil {
-				t.Fatalf("Render(%q) error: %v", tt.toolID, err)
+				t.Fatalf("read fixture: %v", err)
 			}
-			want := tt.wantFn()
+			var gf goldenFile
+			if err := json.Unmarshal(data, &gf); err != nil {
+				t.Fatalf("unmarshal fixture: %v", err)
+			}
 
-			gotSet := ArgvSetMinus(got, tt.ignoreTokens)
-			wantSet := ArgvSetMinus(want, tt.ignoreTokens)
+			got, err := reg.Render(gf.ToolID, RenderParams(gf.Params))
+			if err != nil {
+				t.Fatalf("Render(%q) error: %v", gf.ToolID, err)
+			}
 
-			if !slices.Equal(gotSet, wantSet) {
-				t.Errorf("Render(%q) argv set mismatch:\ngot:  %v\nwant: %v", tt.toolID, gotSet, wantSet)
+			gotSet := ArgvSetMinus(got, gf.IgnoreTokens)
+			if !slices.Equal(gotSet, gf.WantArgv) {
+				t.Errorf("Render(%q) argv set mismatch:\ngot:  %v\nwant: %v", gf.ToolID, gotSet, gf.WantArgv)
 			}
 		})
 	}

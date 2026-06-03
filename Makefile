@@ -3,7 +3,6 @@
 .PHONY: push-server-cn push-worker-cn push-frontend-cn push-all-cn
 .PHONY: up down up-server down-server up-worker down-worker restart-worker
 .PHONY: logs logs-server logs-worker status shell-server shell-worker
-.PHONY: build-worker-base push-worker-base push-worker-base-cn pull-worker-base
 .PHONY: build-server-runtime-base push-server-runtime-base pull-server-runtime-base
 .PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-full
 .PHONY: range-up range-down range-status range-logs
@@ -15,30 +14,8 @@ GO_FILES := $(shell find . -name '*.go' -not -path './frontend/*')
 #  Base Images (预装运行时依赖，极少更新)
 # ============================================================
 
-# --- Worker Base Image (预装安全工具) ---
-# 本地开发构建 — 自动匹配 host 架构
-build-worker-base:
-	docker build -f Dockerfile.worker-base -t anchor-worker-base:latest .
-
-# 多平台推送
-push-worker-base:
-	docker buildx build --platform linux/amd64,linux/arm64 \
-		-f Dockerfile.worker-base \
-		-t p0m32kun/anchor-worker-base:latest \
-		--push .
-
-# 推送到阿里云 ACR（国内加速）
 ACR_REGISTRY ?= crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com
 ACR_NAMESPACE ?= p0m32kun
-push-worker-base-cn:
-	docker buildx build --platform linux/amd64,linux/arm64 \
-		-f Dockerfile.worker-base \
-		-t $(ACR_REGISTRY)/$(ACR_NAMESPACE)/anchor-worker-base:latest \
-		--push .
-
-pull-worker-base:
-	docker pull p0m32kun/anchor-worker-base:latest
-	docker tag p0m32kun/anchor-worker-base:latest anchor-worker-base:latest
 
 # --- Server Runtime Base Image ---
 build-server-runtime-base:
@@ -94,11 +71,45 @@ push-all-cn: push-server-cn push-worker-cn push-frontend-cn
 build:
 	CGO_ENABLED=1 go build -ldflags="-w -s" -o bin/anchor .
 
+# 交叉编译 Linux 二进制（用于 Docker 快速构建）
+TARGETARCH ?= arm64
+build-linux:
+	@echo "[build-linux] Cross-compiling for linux/$(TARGETARCH)..."
+	@mkdir -p bin
+	@docker buildx build --platform linux/$(TARGETARCH) \
+		-f Dockerfile.compile \
+		--build-arg TARGETARCH=$(TARGETARCH) \
+		-t anchor-compile:latest \
+		--target output \
+		--output type=local,dest=./bin/ \
+		. 2>&1 | tail -5
+	@ls -lh bin/anchor-linux-$(TARGETARCH) 2>/dev/null && echo "[build-linux] Done!" || echo "[build-linux] Failed!"
+
 # 编译并构建 Docker 镜像（本地有 Go 环境时使用，不依赖 GitHub Release）
 build-local: build
 	docker build -f Dockerfile.server -t anchor-server:latest \
 		--build-arg RELEASE_VERSION=local .
 	@echo "注意：build-local 需要先将 bin/anchor 上传到 release 或修改 Dockerfile 使用 COPY"
+
+# ============================================================
+#  Fast Build (基于 base 镜像的快速构建，适合测试迭代)
+# ============================================================
+
+# 首次使用或工具版本更新时，构建 base 镜像（耗时较长，只需执行一次）
+build-base:
+	@echo "[build-base] Building server runtime base..."
+	docker build -f Dockerfile.server-runtime-base -t anchor-server-base:latest .
+	@echo "[build-base] Building worker runtime base (this takes a while)..."
+	docker build -f Dockerfile.worker-runtime-base -t anchor-worker-base:latest .
+	@echo "[build-base] Done! Base images are ready."
+
+# 快速构建应用镜像（基于 base，只需复制二进制，约 10-30 秒）
+build-fast: build-linux
+	@echo "[build-fast] Building server image (TARGETARCH=$(TARGETARCH))..."
+	docker build -f Dockerfile.server-fast --build-arg TARGETARCH=$(TARGETARCH) -t anchor-server:local .
+	@echo "[build-fast] Building worker image (TARGETARCH=$(TARGETARCH))..."
+	docker build -f Dockerfile.worker-fast --build-arg TARGETARCH=$(TARGETARCH) -t anchor-worker:local .
+	@echo "[build-fast] Done! Images: anchor-server:local, anchor-worker:local"
 
 # ============================================================
 #  Development Environment
@@ -170,31 +181,61 @@ test:
 
 test-unit: test
 
+E2E_TOKEN ?= test-e2e-token
+E2E_PLAYWRIGHT_ENV = ANCHOR_API_TOKEN=$(E2E_TOKEN) ANCHOR_E2E_SKIP_DOCKER=1
+
 test-e2e:
 	@echo "[test-e2e] Starting E2E Docker environment..."
-	@docker compose -f docker-compose.e2e.yml up -d --build
+	@ANCHOR_API_TOKEN=$(E2E_TOKEN) docker compose -f docker-compose.e2e.yml up -d --build
 	@echo "[test-e2e] Waiting for services..."
 	@sleep 5
-	@cd frontend && npx playwright test --project=chromium
+	@cd frontend && $(E2E_PLAYWRIGHT_ENV) npx playwright test --project=chromium
 
 test-e2e-smoke:
-	@docker compose -f docker-compose.e2e.yml up -d --build
+	@ANCHOR_API_TOKEN=$(E2E_TOKEN) docker compose -f docker-compose.e2e.yml up -d --build
 	@sleep 5
-	@cd frontend && npx playwright test e2e/tests/smoke.spec.ts --project=chromium
+	@cd frontend && $(E2E_PLAYWRIGHT_ENV) npx playwright test e2e/tests/smoke.spec.ts --project=chromium
 
 test-e2e-full:
-	@docker compose -f docker-compose.e2e.yml up -d --build
+	@ANCHOR_API_TOKEN=$(E2E_TOKEN) docker compose -f docker-compose.e2e.yml up -d --build
 	@sleep 5
-	@cd frontend && npx playwright test e2e/tests/full-flow.spec.ts --project=chromium-auth
+	@cd frontend && $(E2E_PLAYWRIGHT_ENV) npx playwright test e2e/tests/full-flow.spec.ts --project=chromium-auth
 
 test-e2e-up:
-	docker compose -f docker-compose.e2e.yml up -d --build
+	ANCHOR_API_TOKEN=$(E2E_TOKEN) docker compose -f docker-compose.e2e.yml up -d --build
 
 test-unit-frontend:
 	@cd frontend && npm run test:unit
 
 test-e2e-down:
 	docker compose -f docker-compose.e2e.yml down --remove-orphans
+
+# ============================================================
+#  Local E2E (使用本地构建的新代码进行测试)
+# ============================================================
+
+# 使用本地构建的新代码启动 E2E 环境
+e2e-local: build-fast
+	@echo "[e2e-local] Starting E2E environment with local code..."
+	ANCHOR_API_TOKEN=test-e2e-token docker compose -f docker-compose.e2e-local.yml up -d
+	@echo "[e2e-local] Waiting for services..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		if curl -sf http://localhost:17421/health > /dev/null 2>&1; then \
+			echo "Server ready!"; \
+			break; \
+		fi; \
+		sleep 1; \
+	done
+	@echo "[e2e-local] Services are ready. Run tests manually or use:"
+	@echo "  curl -H 'Authorization: Bearer test-e2e-token' http://localhost:17421/health"
+
+# 停止本地 E2E 环境
+e2e-local-down:
+	docker compose -f docker-compose.e2e-local.yml down --remove-orphans
+
+# 查看本地 E2E 日志
+e2e-local-logs:
+	docker compose -f docker-compose.e2e-local.yml logs -f
 
 # ============================================================
 #  Rangefield (靶场)

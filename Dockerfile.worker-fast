@@ -1,0 +1,15 @@
+# Anchor Worker - 基于 base 镜像的快速构建版本
+# 用法：先构建 base，再构建此镜像
+#   docker build -f Dockerfile.worker-runtime-base -t anchor-worker-base:latest .
+#   make build-linux TARGETARCH=arm64
+#   docker build -f Dockerfile.worker-fast --build-arg TARGETARCH=arm64 -t anchor-worker:local .
+
+FROM anchor-worker-base:latest
+
+WORKDIR /app
+
+ARG TARGETARCH=arm64
+COPY bin/anchor-linux-${TARGETARCH} /app/anchor
+RUN chmod +x /app/anchor
+
+ENTRYPOINT ["./anchor", "--worker"]

@@ -1,0 +1,25 @@
+{
+  "name": "dnsx",
+  "tool_id": "dnsx",
+  "params": {
+    "host_file": "/tmp/hosts.txt",
+    "rate_limit": 100,
+    "threads": 50,
+    "timeout": 5
+  },
+  "want_argv": [
+    "-a",
+    "-aaaa",
+    "-cname",
+    "-json",
+    "-l",
+    "-rl",
+    "-t",
+    "-timeout",
+    "/tmp/hosts.txt",
+    "100",
+    "5",
+    "50",
+    "dnsx"
+  ]
+}

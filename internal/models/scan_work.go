@@ -25,6 +25,7 @@ type ScanWorkItem struct {
 	ProjectID   string     `json:"project_id" db:"project_id"`
 	AssetID     string     `json:"asset_id" db:"asset_id"`
 	Action      string     `json:"action" db:"action"`
+	TaskID      *string    `json:"task_id,omitempty" db:"task_id"`
 	Status      WorkStatus `json:"status" db:"status"`
 	SkipReason  string     `json:"skip_reason,omitempty" db:"skip_reason"`
 	Stage       string     `json:"stage,omitempty" db:"stage"`

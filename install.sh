@@ -149,7 +149,7 @@ collect_config() {
       read -rp "API Token（留空自动生成）: " input_token
       if [ -z "$input_token" ]; then
         TOKEN=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 32)
-        ok "自动生成 Token: $TOKEN"
+        ok "已自动生成 API Token（已写入 .env，不在终端显示）"
       else
         TOKEN="$input_token"
       fi
@@ -178,7 +178,7 @@ collect_config() {
       read -rp "API Token（留空自动生成）: " input_token
       if [ -z "$input_token" ]; then
         TOKEN=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 32)
-        ok "自动生成 Token: $TOKEN"
+        ok "已自动生成 API Token（已写入 .env，不在终端显示）"
       else
         TOKEN="$input_token"
       fi
@@ -309,7 +309,7 @@ print_result() {
     server|server_worker)
       echo "  浏览器访问: http://localhost"
       echo "  API 地址:   http://localhost:${PORT}"
-      echo "  Token:      $TOKEN"
+      echo "  API Token:  已保存到 .env（请妥善保管；轮换时编辑 .env 后执行 install.sh restart）"
       ;;
     worker)
       echo "  Worker 已连接到: $CORE_URL"

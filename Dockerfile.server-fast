@@ -1,0 +1,25 @@
+# Anchor Server - 基于 base 镜像的快速构建版本
+# 用法：先构建 base，再构建此镜像
+#   docker build -f Dockerfile.server-runtime-base -t anchor-server-base:latest .
+#   make build-linux TARGETARCH=arm64
+#   docker build -f Dockerfile.server-fast --build-arg TARGETARCH=arm64 -t anchor-server:local .
+
+FROM anchor-server-base:latest
+
+WORKDIR /app
+
+ARG TARGETARCH=arm64
+COPY bin/anchor-linux-${TARGETARCH} /app/anchor
+RUN chmod +x /app/anchor
+
+# 漏洞模板知识库
+RUN curl -fsSL -o /tmp/templates.tar.gz \
+      "https://github.com/P0m32Kun/Anchor/archive/refs/heads/main.tar.gz" && \
+    mkdir -p /tmp/anchor-src && \
+    tar xzf /tmp/templates.tar.gz -C /tmp/anchor-src --strip-components=1 && \
+    cp -r /tmp/anchor-src/docs/templates /app/templates && \
+    rm -rf /tmp/templates.tar.gz /tmp/anchor-src
+
+ENV ANCHOR_TEMPLATES_SEED=/app/templates/vuln-templates.json
+
+ENTRYPOINT ["./anchor"]

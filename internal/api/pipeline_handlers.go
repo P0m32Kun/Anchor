@@ -12,6 +12,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/scanengine"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
+	"github.com/P0m32Kun/Anchor/internal/scanengine/seed"
 	"github.com/P0m32Kun/Anchor/internal/util"
 	"github.com/P0m32Kun/Anchor/internal/toolregistry"
 )
@@ -312,27 +313,30 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Asset-driven scan engine
-		profile := core.DefaultInternalProfile()
-		if req.Mode == "external" {
-			profile = core.DefaultExternalProfile()
-		}
+		profile := core.ProfileFromConfig(req.Mode, cfg)
 		engineCfg := scanengine.DefaultEngineConfig()
 		engineCfg.Pipeline = cfg
 		engine := scanengine.New(
 			s.queries, s.worker, toolregistry.DefaultRegistry(),
-			s.assetMerger, profile, s.excludeMgr, s.dataDir, runID, projectID, engineCfg,
+			s.assetMerger, profile, s.excludeMgr, s.scopeEng, s.dataDir, runID, projectID, engineCfg,
 			func(rid, stage, status, errMsg string) {
 				stageCallback(rid, stage, status, errMsg)
 			},
 		)
-		// Get targets for seeding
+		// Get targets for seeding (expand company targets via FOFA when configured)
 		targets, _ := s.queries.ListTargetsByProject(projectID)
-		var targetVals []string
-		for _, t := range targets {
-			targetVals = append(targetVals, t.Value)
+		targetVals := seed.ExpandTargets(ctx, s.queries, targets)
+		if len(targetVals) == 0 {
+			for _, t := range targets {
+				targetVals = append(targetVals, t.Value)
+			}
 		}
 		if err := engine.Run(ctx, targetVals); err != nil {
 			log.Printf("scan engine run %s for project %s: %v", runID, projectID, err)
+			_ = s.queries.UpdatePipelineRunError(runID, err.Error())
+			_ = s.queries.UpdatePipelineRunStatus(runID, "failed")
+		} else if updateErr := s.queries.UpdatePipelineRunCompleted(runID, time.Now().UTC()); updateErr != nil {
+			log.Printf("update pipeline run %s completed: %v", runID, updateErr)
 		}
 		// Trigger evaluation asynchronously
 		go func() {

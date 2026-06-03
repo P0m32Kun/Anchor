@@ -2,6 +2,7 @@ import { execSync, spawn } from "child_process";
 import { existsSync, unlinkSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { E2E_SKIP_DOCKER } from "./fixtures/e2e-env";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const E2E_COMPOSE_FILE = "../../docker-compose.e2e.yml";
@@ -36,6 +37,13 @@ async function runDockerCompose(args: string[], cwd: string): Promise<void> {
 export default async function globalTeardown(): Promise<void> {
 	if (existsSync(STORAGE_STATE_PATH)) {
 		unlinkSync(STORAGE_STATE_PATH);
+	}
+
+	if (E2E_SKIP_DOCKER) {
+		console.log(
+			"[global-teardown] ANCHOR_E2E_SKIP_DOCKER=1 — skipping Docker teardown.",
+		);
+		return;
 	}
 
 	if (!isDockerRunning()) {

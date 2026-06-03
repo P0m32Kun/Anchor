@@ -27,9 +27,12 @@
 | `project_handlers.go` | `POST/GET/DELETE /projects[/{id}]` | `projectSvc` | 项目 CRUD;业务逻辑在 service 包 |
 | `target_handlers.go` | `POST/GET/DELETE /projects/{id}/targets[/{targetId}]`, `POST .../targets/import` | `targetSvc` | 目标管理 + 批量导入 |
 | `asset_handlers.go` | `GET /projects/{id}/assets`, `/web-endpoints`, `/service-ports`, `GET /assets/{id}/ports`, `/services` | `queries` | 资产/端点/服务端口查询(只读) |
-| `scope_handlers.go` | `POST/GET/DELETE /scope-rules`, `POST /scope-rules/parse`, `POST /projects/{id}/scope-rules/batch` | `queries`, `scopeEng` | 范围(scope)规则 CRUD + 解析 |
+| `scope_handlers.go` | `POST/GET/DELETE /scope-rules`, `POST /scope-rules/parse`, `POST /projects/{id}/scope-rules/batch` | `queries`, `scopeEng` | 范围规则 CRUD；评估为 **exclusion-only**（include 废弃） |
 | `run_handlers.go` | `POST/GET /projects/{id}/runs`, `GET /runs/{id}`, `/runs/{id}/tasks`, `POST /runs/{id}/cancel` | `queries`, `scopeEng`, `worker`, `dataDir`, **`taskQueue`**, **`mu`** | 扫描运行生命周期;触碰任务分发四件套 |
-| `pipeline_handlers.go` | `POST /projects/{id}/pipeline/run`, `GET /pipeline/runs`, `/runs/{runId}/stages`, `POST /pipeline/runs/{runId}/cancel`, `GET/POST /pipeline/config` | `queries`, `scopeEng`, `worker`, `dataDir` | Pipeline 编排入口(本包最大文件,~461 行) |
+| `pipeline_handlers.go` | `POST /projects/{id}/scan`, `GET /pipeline/runs`, `/runs/{runId}/stages`, `POST /pipeline/runs/{runId}/cancel`, `GET/POST /pipeline/config` | `queries`, `scopeEng`, `worker`, `assetMerger`, `excludeMgr`, `dataDir` | 资产驱动 ScanEngine 启动；`ProfileFromConfig` |
+| `scan_work_handlers.go` | `GET /projects/{id}/pipeline/runs/{runId}/works`, `GET /assets/{id}/works` | `queries` | Work 列表；经 `scan_run_auth` 校验 run∈project |
+| `scan_metrics_handlers.go` | `GET /projects/{id}/pipeline/runs/{runId}/metrics` | `queries` | Run metrics；校验 run∈project |
+| `scan_run_auth.go` | — | `queries` | `requireRunInProject` 共享 helper（非路由） |
 | `workflow_handlers.go` | `POST /projects/{id}/workflows/asset-discovery`, `/web-screening`, `POST /projects/{id}/scan`, `GET /projects/{id}/scan/runs` | `queries`, `scopeEng`, `worker`, `dataDir` | 预定义工作流入口 + 统一扫描 |
 | `finding_handlers.go` | `GET /projects/{id}/findings`, `GET/PATCH /findings/{id}[...]`, `POST /findings/{id}/evidence`, `PATCH /findings/batch-status`, `GET /findings/{id}/curl` | `findingSvc` | 发现 CRUD + 状态变更 + 证据上传 |
 | `finding_template_handlers.go` | `GET/POST/PATCH/DELETE /finding-templates[/{id}]`, `/finding-templates/export`, `/finding-templates/{id}/accept-upstream` | `queries` | 漏洞知识库模板 |

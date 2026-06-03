@@ -1,0 +1,38 @@
+{
+  "name": "nuclei_light_both",
+  "tool_id": "nuclei",
+  "params": {
+    "concurrency": 10,
+    "profile": "light",
+    "rate_limit": 150,
+    "scan_depth": "both",
+    "tags": [
+      "rce"
+    ],
+    "target_file": "/tmp/targets.txt",
+    "workflow_dir": "/root/workflows"
+  },
+  "ignore_tokens": [
+    "-stats",
+    "-si",
+    "30"
+  ],
+  "want_argv": [
+    "-c",
+    "-jsonl",
+    "-l",
+    "-rl",
+    "-severity",
+    "-tags",
+    "-timeout",
+    "-w",
+    "/root/workflows",
+    "/tmp/targets.txt",
+    "10",
+    "150",
+    "3",
+    "critical,high",
+    "nuclei",
+    "rce"
+  ]
+}

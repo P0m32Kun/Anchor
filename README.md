@@ -18,7 +18,7 @@
 
 **核心设计**：指纹驱动 Nuclei 模板筛选 — httpx 识别的技术栈（WordPress/nginx/Apache Druid 等）精确映射到 Nuclei `-tags`，无指纹目标自动跳过，避免全量扫描。
 
-**当前执行模型**：扫描由资产驱动引擎调度。目标先进入资产图，再按资产类型派生 `Work(资产 × 动作)`，工具输出继续回注新资产。前端「扫描执行」页展示的是运行观察台：引擎状态、扫描动作进度和 Work Items 明细；阶段只作为 UI 聚合标签，不代表固定线性流水线。
+**当前执行模型**：扫描由资产驱动引擎调度。目标先进入资产图，再按资产类型派生 `Work(资产 × 动作)`，工具输出继续回注新资产；Nuclei 命中写入 Findings。项目 scope 为 **仅排除**（未命中 exclude 默认允许）。前端「扫描执行」页展示的是运行观察台：引擎状态、扫描动作进度和 Work Items 明细；阶段只作为 UI 聚合标签，不代表固定线性流水线。设计说明见 [`docs/current/asset-driven-remediation-design.md`](docs/current/asset-driven-remediation-design.md)。
 
 ## 技术栈
 
@@ -142,7 +142,20 @@ make e2e-local-down
 | Worker Only | 远程扫描节点，连接已有 Server |
 | Server+Worker | 本地开发/测试，完整功能 |
 
-Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可。
+Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可（任务拉取、心跳、结果上报均为 Worker → Server）。
+
+**Server 是否需要访问 Worker HTTP？** 任务调度与结果回传不依赖 Server 入站连 Worker。若要在 UI 中实时查看远端 Worker 上**仍在运行**任务的 stdout/stderr，Server 会按 Worker 注册时上报的 `endpoint` 反向请求 Worker HTTP（见 `internal/api/task_output_handlers.go`）。因此：
+
+- 仅跑扫描、不看实时日志：Worker 只需能访问 Server，无需对 Server 暴露端口。
+- 需要实时任务输出：Worker 的 `endpoint` 必须对 Server 可达（内网 IP/主机名、Docker 服务名 `worker`、或 Tailscale 等）。
+
+**Docker 镜像 tag 策略**（与 GitHub Release 对齐）：
+
+- 推送 `v*` tag 后：`release.yml` 上传 `anchor-linux-{amd64,arm64}`；`docker-push.yml` 在 Release 成功后 checkout **该 tag**（非 main HEAD），并以同一版本构建镜像。
+- ACR 镜像同时打 `anchor-*:<tag>` 与 `anchor-*:latest`；`Dockerfile.server` / `Dockerfile.worker` 通过 `RELEASE_VERSION` build-arg 从 GitHub Release 下载对应 tag 的二进制（CI 中不会默认拉 `latest` 资产）。
+- 本地 `install.sh` 默认拉 `:latest`；要锁定版本可改 compose/`ANCHOR_REGISTRY` 镜像 tag 为 `v0.x.x`。
+
+**API Token 轮换**：Token 保存在项目根目录 `.env` 的 `ANCHOR_API_TOKEN`。轮换时编辑 `.env` 后执行 `bash install.sh restart`（或对应 compose 重启）。安装向导不会在终端打印完整 Token，请从 `.env` 读取或自行记录。
 
 ## 目录结构
 

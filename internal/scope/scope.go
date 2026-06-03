@@ -122,35 +122,42 @@ func (e *Engine) ValidateBeforeRun(ctx context.Context, projectID string, target
 	return latest, nil
 }
 
+// evaluate applies exclusion-only scope: exclude rules deny; include rules are
+// ignored; no matching exclude → allow (asset discovery may expand the graph).
 func (e *Engine) evaluate(target *models.Target, rules []*models.ScopeRule) (models.ScopeDecisionResult, *models.ScopeRule, string) {
-	var includeMatched, excludeMatched *models.ScopeRule
+	var excludeMatched *models.ScopeRule
 
 	for _, rule := range rules {
-		matched := e.matchRule(target, rule)
-		if !matched {
+		if rule.Action != models.ScopeActionExclude {
 			continue
 		}
-		switch rule.Action {
-		case models.ScopeActionInclude:
-			if includeMatched == nil {
-				includeMatched = rule
-			}
-		case models.ScopeActionExclude:
-			if excludeMatched == nil {
-				excludeMatched = rule
-			}
+		if !e.matchRule(target, rule) {
+			continue
+		}
+		if excludeMatched == nil {
+			excludeMatched = rule
 		}
 	}
 
-	// Exclude has priority over include.
 	if excludeMatched != nil {
 		return models.ScopeDeny, excludeMatched, fmt.Sprintf("命中排除规则: %s", excludeMatched.Value)
 	}
-	if includeMatched != nil {
-		return models.ScopeAllow, includeMatched, fmt.Sprintf("命中包含规则: %s", includeMatched.Value)
+	return models.ScopeAllow, nil, "未命中排除规则，默认允许"
+}
+
+// IsExcluded reports whether the target hits any project exclude rule.
+func (e *Engine) IsExcluded(target *models.Target, rules []*models.ScopeRule) bool {
+	decision, _, _ := e.evaluate(target, rules)
+	return decision == models.ScopeDeny
+}
+
+// IsExcludedForProject loads scope rules and checks exclusion for a target.
+func (e *Engine) IsExcludedForProject(projectID string, target *models.Target) (bool, error) {
+	rules, err := e.queries.ListScopeRulesByProject(projectID)
+	if err != nil {
+		return false, fmt.Errorf("list scope rules: %w", err)
 	}
-	// No rule matched → deny by default (whitelist mode).
-	return models.ScopeDeny, nil, "未命中任何包含规则，默认拒绝"
+	return e.IsExcluded(target, rules), nil
 }
 
 func (e *Engine) matchRule(target *models.Target, rule *models.ScopeRule) bool {
@@ -341,9 +348,8 @@ const MaxCIDRHostBits = 16
 //     (~65k hosts) to bound memory usage.
 //  2. CIDR expansion: replace each `cidr` Target with the underlying
 //     `ip` Targets (using ExpandCIDR's existing network/broadcast trim).
-//  3. Rule evaluation: drop any Target denied by the project's ScopeRules
-//     (exclude rules win over include rules; default is deny unless an
-//     include rule matches).
+//  3. Rule evaluation: drop any Target that matches a project exclude rule
+//     (exclusion-only; default allow when no exclude matches).
 //
 // `company` Targets are passed through unevaluated — they're expanded later
 // in runCompanyFlow via FOFA, which re-enters Check on each derived target.

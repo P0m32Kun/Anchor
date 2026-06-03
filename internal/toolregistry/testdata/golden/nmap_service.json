@@ -1,0 +1,27 @@
+{
+  "name": "nmap_service",
+  "tool_id": "nmap_service",
+  "params": {
+    "host_file": "/tmp/hosts.txt",
+    "host_timeout": 180,
+    "ports": [
+      "80",
+      "443"
+    ]
+  },
+  "want_argv": [
+    "-",
+    "--host-timeout",
+    "--open",
+    "-T4",
+    "-iL",
+    "-n",
+    "-oX",
+    "-p",
+    "-sV",
+    "/tmp/hosts.txt",
+    "180s",
+    "80,443",
+    "nmap"
+  ]
+}
