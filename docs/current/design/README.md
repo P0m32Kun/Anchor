@@ -2,7 +2,7 @@
 status: active
 source_of_truth: true
 owner: kun
-last_updated: 2026-05-12
+last_updated: 2026-06-03
 scope: design-index
 ---
 
@@ -16,6 +16,12 @@ This index separates active proposal material from baseline architecture.
 | --- | --- | --- | --- |
 | [`../../design/custom-nuclei-template-management.md`](../../design/custom-nuclei-template-management.md) | In review | No | The task is specifically about managing custom Nuclei templates |
 | [`../../refactoring-plan.md`](../../refactoring-plan.md) | Backlog | No | The task is specifically about structural refactoring options |
+
+## Implemented Design Documents
+
+| Document | Status | Source of truth? | Use it when |
+| --- | --- | --- | --- |
+| [`../../design/src-bounty-workstation.md`](../../design/src-bounty-workstation.md) | Implemented | No | The task is specifically about SRC bounty workflow, Bounty Queue, Program rules, or Submission Pack |
 
 ## Archived Design Material
 

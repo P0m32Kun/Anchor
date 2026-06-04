@@ -361,6 +361,13 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("DELETE /engines/credentials/{engine}", auth(http.HandlerFunc(s.handleDeleteEngineCredential)))
 	mux.Handle("GET /engines/search", auth(http.HandlerFunc(s.handleSearchEngine)))
 		mux.Handle("GET /engines/quota", auth(http.HandlerFunc(s.handleGetEngineQuota)))
+	// SRC platform credentials and sources
+	mux.Handle("GET /credentials", auth(http.HandlerFunc(s.handleListDiscoveredCredentials)))
+	mux.Handle("GET /credentials/platforms", auth(http.HandlerFunc(s.handleListCredentialPlatforms)))
+	mux.Handle("GET /credentials/{id}", auth(http.HandlerFunc(s.handleCheckCredential)))
+	mux.Handle("GET /sources", auth(http.HandlerFunc(s.handleListSources)))
+	mux.Handle("GET /sources/type", auth(http.HandlerFunc(s.handleListSourcesByType)))
+	mux.Handle("GET /sources/{id}", auth(http.HandlerFunc(s.handleGetSource)))
 	// Nuclei custom template sources
 	mux.Handle("GET /nuclei/custom/sources", auth(http.HandlerFunc(s.handleListNucleiCustomSources)))
 	mux.Handle("POST /nuclei/custom/sources/git", auth(http.HandlerFunc(s.handleCreateNucleiCustomGitSource)))
