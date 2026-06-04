@@ -1,6 +1,7 @@
 package stageagg
 
 import (
+	"log"
 	"sync"
 	"time"
 
@@ -14,6 +15,14 @@ import (
 // It mirrors the workflow.StageEventCallback signature for SSE compatibility.
 type StageEventCallback func(runID, stage, status, errMsg string)
 
+// stageCounters tracks incremental work counts for a stage.
+type stageCounters struct {
+	total   int
+	done    int
+	running int
+	failed  int
+}
+
 // Aggregator projects work-item state changes into pipeline_run_stages
 // records and fires SSE callbacks.
 type Aggregator struct {
@@ -25,6 +34,8 @@ type Aggregator struct {
 	created map[string]bool
 	// track round numbers per stage
 	rounds map[string]int
+	// incremental counters per stage (avoids full DB scan)
+	counters map[string]*stageCounters
 }
 
 // NewAggregator creates a new Aggregator.
@@ -35,7 +46,27 @@ func NewAggregator(queries *db.Queries, runID string, callback StageEventCallbac
 		callback: callback,
 		created:  make(map[string]bool),
 		rounds:   make(map[string]int),
+		counters: make(map[string]*stageCounters),
 	}
+}
+
+// getOrCreateCounters returns counters for a stage, creating if needed.
+func (a *Aggregator) getOrCreateCounters(stage string) *stageCounters {
+	c, ok := a.counters[stage]
+	if !ok {
+		c = &stageCounters{}
+		a.counters[stage] = c
+	}
+	return c
+}
+
+// OnWorkCreated is called when a new work item is created.
+func (a *Aggregator) OnWorkCreated(action core.TaskAction) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	stage := core.ActionToStage[action]
+	c := a.getOrCreateCounters(stage)
+	c.total++
 }
 
 // OnWorkStarted is called when a work item transitions to running.
@@ -49,15 +80,53 @@ func (a *Aggregator) OnWorkStarted(action core.TaskAction) error {
 	}
 	// Increment round on transition to running
 	a.rounds[stage]++
-	return a.refreshCounts(stage)
+	return a.updateStageCounts(stage)
 }
 
 // OnWorkCompleted is called when a work item reaches a terminal state.
-func (a *Aggregator) OnWorkCompleted(action core.TaskAction) error {
+func (a *Aggregator) OnWorkCompleted(action core.TaskAction) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	stage := core.ActionToStage[action]
-	return a.refreshCounts(stage)
+	c := a.getOrCreateCounters(stage)
+	c.done++
+	if c.running > 0 {
+		c.running--
+	}
+	if err := a.updateStageCounts(stage); err != nil {
+		log.Printf("[stageagg] updateStageCounts error: %v", err)
+	}
+}
+
+// OnWorkFailed is called when a work item fails.
+func (a *Aggregator) OnWorkFailed(action core.TaskAction) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	stage := core.ActionToStage[action]
+	c := a.getOrCreateCounters(stage)
+	c.done++
+	c.failed++
+	if c.running > 0 {
+		c.running--
+	}
+	if err := a.updateStageCounts(stage); err != nil {
+		log.Printf("[stageagg] updateStageCounts error: %v", err)
+	}
+}
+
+// OnWorkSkipped is called when a work item is skipped.
+func (a *Aggregator) OnWorkSkipped(action core.TaskAction) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	stage := core.ActionToStage[action]
+	c := a.getOrCreateCounters(stage)
+	c.done++
+	if c.running > 0 {
+		c.running--
+	}
+	if err := a.updateStageCounts(stage); err != nil {
+		log.Printf("[stageagg] updateStageCounts error: %v", err)
+	}
 }
 
 // ensureStage creates the pipeline_run_stages record if it doesn't exist yet.
@@ -87,44 +156,24 @@ func (a *Aggregator) ensureStage(stage string) error {
 	return nil
 }
 
-// refreshCounts recalculates work counts for a stage and updates the DB.
-func (a *Aggregator) refreshCounts(stage string) error {
-	// Count works for this run+stage
-	allWorks, err := a.queries.ListScanWorkItemsByRun(a.runID)
-	if err != nil {
-		return err
-	}
-	var total, done, running int
-	for _, w := range allWorks {
-		if w.Stage != stage {
-			continue
-		}
-		total++
-		switch w.Status {
-		case models.WorkStatusDone, models.WorkStatusSkipped, models.WorkStatusFailed:
-			done++
-		case models.WorkStatusRunning:
-			running++
-		}
-	}
-
+// updateStageCounts updates DB with current counters and manages stage status.
+func (a *Aggregator) updateStageCounts(stage string) error {
+	c := a.getOrCreateCounters(stage)
 	round := a.rounds[stage]
-	if err := a.queries.UpdatePipelineRunStageWorkCounts(a.runID, stage, total, done, running, round); err != nil {
+
+	if err := a.queries.UpdatePipelineRunStageWorkCounts(a.runID, stage, c.total, c.done, c.running, round); err != nil {
 		return err
 	}
 
 	// Determine stage status
 	status := "running"
 	errMsg := ""
-	if total > 0 && done == total {
-		status = "completed"
-		// Check if any failed
-		for _, w := range allWorks {
-			if w.Stage == stage && w.Status == models.WorkStatusFailed {
-				status = "failed"
-				errMsg = "one or more work items failed"
-				break
-			}
+	if c.total > 0 && c.done == c.total {
+		if c.failed > 0 {
+			status = "failed"
+			errMsg = "one or more work items failed"
+		} else {
+			status = "completed"
 		}
 	}
 
@@ -147,6 +196,33 @@ func (a *Aggregator) refreshCounts(stage string) error {
 	// Fire SSE callback
 	if a.callback != nil {
 		a.callback(a.runID, stage, status, errMsg)
+	}
+	return nil
+}
+
+// LoadFromDB initializes counters from database (for engine restart recovery).
+func (a *Aggregator) LoadFromDB() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	allWorks, err := a.queries.ListScanWorkItemsByRun(a.runID)
+	if err != nil {
+		return err
+	}
+
+	for _, w := range allWorks {
+		stage := w.Stage
+		c := a.getOrCreateCounters(stage)
+		c.total++
+		switch w.Status {
+		case models.WorkStatusDone, models.WorkStatusSkipped:
+			c.done++
+		case models.WorkStatusFailed:
+			c.done++
+			c.failed++
+		case models.WorkStatusRunning:
+			c.running++
+		}
 	}
 	return nil
 }

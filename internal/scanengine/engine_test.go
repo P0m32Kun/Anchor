@@ -232,7 +232,8 @@ func TestEngine_FailedTaskDoesNotBlock(t *testing.T) {
 
 	engine.Run(ctx, []string{"10.0.0.1"})
 
-	// Check that some work items completed despite early failure
+	// With retry logic, the first failure is retried and succeeds
+	// So we expect all work items to be done (no failures)
 	works, _ := queries.ListScanWorkItemsByRun("run1")
 	failed := 0
 	done := 0
@@ -244,9 +245,11 @@ func TestEngine_FailedTaskDoesNotBlock(t *testing.T) {
 			done++
 		}
 	}
-	t.Logf("total works: %d, failed: %d, done: %d", len(works), failed, done)
-	if failed == 0 && len(works) > 0 {
-		t.Error("expected at least one failed work item")
+	t.Logf("total works: %d, failed: %d, done: %d, calls: %d", len(works), failed, done, atomic.LoadInt64(&callCount))
+	// With retry, the first call fails but retry succeeds
+	// We should see more calls than works due to retries
+	if len(works) > 0 && atomic.LoadInt64(&callCount) <= int64(len(works)) {
+		t.Error("expected retry calls > work items due to first-call failure")
 	}
 }
 

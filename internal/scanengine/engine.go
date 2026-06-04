@@ -71,11 +71,13 @@ type ScanEngine struct {
 
 	mu             sync.Mutex
 	engineState    string
-	lastNewAssetAt time.Time
+	startedAt      time.Time     // when the engine started (for absolute timeout)
+	lastNewAssetAt time.Time     // last time a new asset was discovered (for idle timeout)
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
 	inFlight       int32
 	sem            chan struct{} // concurrency limiter
+	maxRetries     int          // max retries for failed work items
 }
 
 // New creates a new ScanEngine.
@@ -114,6 +116,7 @@ func NewWithExecutor(
 	store := work.NewStore(queries)
 	agg := stageagg.NewAggregator(queries, runID, stageCallback)
 
+	now := time.Now().UTC()
 	return &ScanEngine{
 		queries:        queries,
 		merger:         merger,
@@ -131,8 +134,10 @@ func NewWithExecutor(
 		runID:          runID,
 		projectID:      projectID,
 		engineState:    "running",
-		lastNewAssetAt: time.Now().UTC(),
+		startedAt:      now,
+		lastNewAssetAt: now,
 		sem:            make(chan struct{}, config.BatchSize),
+		maxRetries:     3,
 	}
 }
 
@@ -259,6 +264,8 @@ func (e *ScanEngine) processNewAsset(ctx context.Context, a *core.DiscoveryAsset
 			log.Printf("[scanengine] create work: %v", err)
 			continue
 		}
+		// Notify aggregator of new work item
+		e.agg.OnWorkCreated(dw.Action)
 		priority := queue.ClassifyAction(string(dw.Action))
 		e.pq.Push(queue.Item{
 			WorkID:   w.ID,
@@ -276,14 +283,16 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 	state := e.engineState
 	e.mu.Unlock()
 
-	// Check absolute timeout
-	if time.Since(lastAsset) > e.config.AbsoluteTimeout {
+	// Check absolute timeout (based on run start time, not last asset)
+	if time.Since(e.startedAt) > e.config.AbsoluteTimeout {
+		log.Printf("[scanengine] absolute timeout reached (%v), stopping", e.config.AbsoluteTimeout)
 		e.setEngineState("stopped")
 		return nil
 	}
 
 	// Check idle timeout → wind_down
 	if state == "running" && time.Since(lastAsset) > e.config.IdleTimeout {
+		log.Printf("[scanengine] idle timeout reached (%v), entering wind_down", e.config.IdleTimeout)
 		e.setEngineState("wind_down")
 		state = "wind_down"
 	}
@@ -340,7 +349,7 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 	return nil
 }
 
-// executeWork claims and executes a single work item.
+// executeWork claims and executes a single work item with retry logic.
 func (e *ScanEngine) executeWork(ctx context.Context, item queue.Item) {
 	atomic.AddInt32(&e.inFlight, 1)
 	defer atomic.AddInt32(&e.inFlight, -1)
@@ -349,6 +358,7 @@ func (e *ScanEngine) executeWork(ctx context.Context, item queue.Item) {
 	if e.EngineState() == "wind_down" {
 		if !isWindDownAllowed(item.Action) {
 			e.store.MarkSkipped(item.WorkID, "wind_down")
+			e.agg.OnWorkSkipped(core.TaskAction(item.Action))
 			return
 		}
 	}
@@ -362,37 +372,67 @@ func (e *ScanEngine) executeWork(ctx context.Context, item queue.Item) {
 	// Notify aggregator
 	e.agg.OnWorkStarted(core.TaskAction(w.Action))
 
-	// Build params based on action
-	params, cleanup, err := e.buildParams(ctx, w)
-	if cleanup != nil {
-		defer cleanup()
-	}
-	if err != nil {
-		e.store.MarkFailed(w.ID, err.Error())
-		e.agg.OnWorkCompleted(core.TaskAction(w.Action))
-		return
+	// Retry loop
+	var lastErr error
+	for attempt := 0; attempt <= e.maxRetries; attempt++ {
+		if attempt > 0 {
+			log.Printf("[scanengine] retrying work %s (attempt %d/%d)", w.ID, attempt, e.maxRetries)
+			// Exponential backoff: 1s, 2s, 4s
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			select {
+			case <-ctx.Done():
+				e.store.MarkFailed(w.ID, "cancelled during retry backoff")
+				e.agg.OnWorkFailed(core.TaskAction(w.Action))
+				return
+			case <-time.After(backoff):
+			}
+		}
+
+		// Build params based on action
+		params, cleanup, buildErr := e.buildParams(ctx, w)
+		if buildErr != nil {
+			// Build errors are not retryable (wrong config, etc.)
+			e.store.MarkFailed(w.ID, buildErr.Error())
+			e.agg.OnWorkFailed(core.TaskAction(w.Action))
+			return
+		}
+
+		// Execute
+		res, execErr := e.exec.Execute(ctx, w, params)
+		if cleanup != nil {
+			cleanup()
+		}
+
+		if execErr == nil {
+			// Success
+			if res != nil && res.Task != nil {
+				_ = e.store.SetTaskID(w.ID, res.Task.ID)
+				w.TaskID = &res.Task.ID
+			}
+
+			// Mark done
+			if markErr := e.store.MarkDone(w.ID); markErr != nil {
+				log.Printf("[scanengine] MarkDone failed for %s: %v", w.ID, markErr)
+			}
+
+			// Process output: discover new assets and update attrs
+			e.onWorkComplete(ctx, w, res.Stdout)
+
+			// Notify aggregator
+			e.agg.OnWorkCompleted(core.TaskAction(w.Action))
+			return
+		}
+
+		lastErr = execErr
+		// Check if error is retryable (context canceled = not retryable)
+		if ctx.Err() != nil {
+			break
+		}
 	}
 
-	// Execute
-	res, err := e.exec.Execute(ctx, w, params)
-	if err != nil {
-		e.store.MarkFailed(w.ID, err.Error())
-		e.agg.OnWorkCompleted(core.TaskAction(w.Action))
-		return
-	}
-	if res != nil && res.Task != nil {
-		_ = e.store.SetTaskID(w.ID, res.Task.ID)
-		w.TaskID = &res.Task.ID
-	}
-
-	// Mark done
-	e.store.MarkDone(w.ID)
-
-	// Process output: discover new assets and update attrs
-	e.onWorkComplete(ctx, w, res.Stdout)
-
-	// Notify aggregator
-	e.agg.OnWorkCompleted(core.TaskAction(w.Action))
+	// All retries exhausted
+	e.store.MarkFailed(w.ID, fmt.Sprintf("failed after %d attempts: %v", e.maxRetries+1, lastErr))
+	e.agg.OnWorkFailed(core.TaskAction(w.Action))
 }
 
 // onWorkComplete processes tool output to discover new assets and update attrs.
