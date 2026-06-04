@@ -150,10 +150,9 @@ func (d *Discoverer) DiscoverFromEnv() ([]*Credential, error) {
 }
 
 // DiscoverFromBrowser 从浏览器 cookie 发现凭证
-// TODO: Phase 2 实现
 func (d *Discoverer) DiscoverFromBrowser() ([]*Credential, error) {
-	// 预留接口，Phase 2 实现
-	return nil, nil
+	browserDiscoverer := NewBrowserDiscoverer(d.config.BrowserCookiePaths)
+	return browserDiscoverer.DiscoverFromBrowser()
 }
 
 // GetCredentialForPlatform 获取指定平台的凭证
