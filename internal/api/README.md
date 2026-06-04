@@ -44,6 +44,7 @@
 | `engine_handlers.go` | `GET/POST/DELETE /engines/credentials[/{engine}]`, `GET /engines/search`, `/engines/quota` | `queries` | FOFA/Hunter/Quake 等情报引擎统一接入 |
 | `credential_handlers.go` | `GET /credentials`, `GET /credentials/platforms`, `GET /credentials/{id}`, `GET /sources`, `GET /sources/type`, `GET /sources/{id}` | — | SRC 平台凭证发现与源注册表查询 |
 | `program_handlers.go` | `POST/GET/PUT/DELETE /projects/{id}/src-program`, `GET /src-programs` | `queries` | SRC 程序规则管理；每个项目一个程序配置 |
+| `bounty_handlers.go` | `GET /projects/{id}/bounty-candidates`, `POST .../refresh`, `GET/PATCH/DELETE /bounty-candidates/{id}` | `queries` | 赏金候选队列管理；评分排序与状态跟踪 |
 | `nuclei_custom_handlers.go` | `GET/POST/PATCH/DELETE /nuclei/custom/sources[/{id}][/...]`, `PATCH /nuclei/custom/sources/{id}/enabled`, `/files`, `/validate`, `/publish`, `/manifest`, `/bundles/{version}` | `nucleiCustomMgr` | Nuclei 模板源；内置只读，见下表 |
 | `dictionary_handlers.go` | `GET/POST/PATCH/DELETE /dictionaries[/{id}][/content]`, `PATCH /dictionaries/{id}/enabled` | `dictMgr` | 字典管理(ffuf 等)；内置只读，见下表 |
 | `httpx_fingerprint_handlers.go` | `GET/POST/PATCH/DELETE /httpx/fingerprints[/{id}][/content]`, `PATCH /httpx/fingerprints/{id}/enabled` | `httpxFpMgr` | HTTPX 指纹；内置只读，见下表 |
