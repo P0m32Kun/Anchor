@@ -1,5 +1,5 @@
 ---
-status: in_review
+status: implemented
 source_of_truth: false
 owner: kun
 last_updated: 2026-06-04
@@ -11,6 +11,17 @@ scope: src-bounty-workstation
 This document reviews and replaces the pasted Claude Code plan for turning Anchor into an SRC bounty workstation.
 
 It is a proposal, not the current architecture baseline. Promote it only after implementation and acceptance evidence are complete.
+
+## Implementation Status
+
+Phase 1-3 completed on 2026-06-04:
+- ✅ Credential Discovery (`internal/credentials/discovery.go`)
+- ✅ Source Registry (`internal/sources/registry.go`)
+- ✅ Browser Session Token Discovery (`internal/credentials/browser.go`)
+- ✅ ScanPolicy Integration (`internal/credentials/policy.go`)
+- ✅ API Handlers (`internal/api/credential_handlers.go`)
+- ✅ CLI Tool (`cmd/anchor-cred/`)
+- ✅ Unit Tests (29 tests passing)
 
 ## Verdict
 
