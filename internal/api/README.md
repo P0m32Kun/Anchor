@@ -43,6 +43,7 @@
 | `worker_handlers.go` | `GET /workers`, `POST /workers/register`, `POST /workers/{id}/heartbeat`, `GET /workers/{id}/tasks/poll`, `POST /tasks/{id}/result`, `POST /workers/{id}/revoke`, `DELETE /workers/{id}` | `queries`, `dataDir`, **`taskQueue`**, **`taskResults`**, **`mu`** | 远程 worker 节点管理 + 任务长轮询 + 结果回报 |
 | `engine_handlers.go` | `GET/POST/DELETE /engines/credentials[/{engine}]`, `GET /engines/search`, `/engines/quota` | `queries` | FOFA/Hunter/Quake 等情报引擎统一接入 |
 | `credential_handlers.go` | `GET /credentials`, `GET /credentials/platforms`, `GET /credentials/{id}`, `GET /sources`, `GET /sources/type`, `GET /sources/{id}` | — | SRC 平台凭证发现与源注册表查询 |
+| `program_handlers.go` | `POST/GET/PUT/DELETE /projects/{id}/src-program`, `GET /src-programs` | `queries` | SRC 程序规则管理；每个项目一个程序配置 |
 | `nuclei_custom_handlers.go` | `GET/POST/PATCH/DELETE /nuclei/custom/sources[/{id}][/...]`, `PATCH /nuclei/custom/sources/{id}/enabled`, `/files`, `/validate`, `/publish`, `/manifest`, `/bundles/{version}` | `nucleiCustomMgr` | Nuclei 模板源；内置只读，见下表 |
 | `dictionary_handlers.go` | `GET/POST/PATCH/DELETE /dictionaries[/{id}][/content]`, `PATCH /dictionaries/{id}/enabled` | `dictMgr` | 字典管理(ffuf 等)；内置只读，见下表 |
 | `httpx_fingerprint_handlers.go` | `GET/POST/PATCH/DELETE /httpx/fingerprints[/{id}][/content]`, `PATCH /httpx/fingerprints/{id}/enabled` | `httpxFpMgr` | HTTPX 指纹；内置只读，见下表 |

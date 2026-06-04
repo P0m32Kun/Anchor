@@ -146,6 +146,10 @@ func boolToInt(b bool) int {
 	return 0
 }
 
+func intToBool(i int) bool {
+	return i != 0
+}
+
 // --- Nuclei Custom Bundles (Phase 2 wires these; Phase 1 ships placeholders) ---
 
 func (q *Queries) CreateNucleiCustomBundle(b *models.NucleiCustomBundle) error {

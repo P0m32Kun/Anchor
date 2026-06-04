@@ -368,6 +368,12 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /sources", auth(http.HandlerFunc(s.handleListSources)))
 	mux.Handle("GET /sources/type", auth(http.HandlerFunc(s.handleListSourcesByType)))
 	mux.Handle("GET /sources/{id}", auth(http.HandlerFunc(s.handleGetSource)))
+	// SRC programs
+	mux.Handle("POST /projects/{id}/src-program", auth(http.HandlerFunc(s.handleCreateSRCProgram)))
+	mux.Handle("GET /projects/{id}/src-program", auth(http.HandlerFunc(s.handleGetSRCProgram)))
+	mux.Handle("PUT /projects/{id}/src-program", auth(http.HandlerFunc(s.handleUpdateSRCProgram)))
+	mux.Handle("DELETE /projects/{id}/src-program", auth(http.HandlerFunc(s.handleDeleteSRCProgram)))
+	mux.Handle("GET /src-programs", auth(http.HandlerFunc(s.handleListSRCPrograms)))
 	// Nuclei custom template sources
 	mux.Handle("GET /nuclei/custom/sources", auth(http.HandlerFunc(s.handleListNucleiCustomSources)))
 	mux.Handle("POST /nuclei/custom/sources/git", auth(http.HandlerFunc(s.handleCreateNucleiCustomGitSource)))
