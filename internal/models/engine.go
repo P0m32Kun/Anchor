@@ -67,6 +67,9 @@ type PipelineConfig struct {
 	// synced to remote workers via the dispatcher's input_files mechanism.
 	// Leave empty to use the worker's default (~/.config/subfinder/provider-config.yaml).
 	SubfinderProviderConfig string `json:"subfinder_provider_config,omitempty"`
+	// ScanMode is the scan mode preset: "default" | "src_low_noise"
+	// src_low_noise enables only bounded ffuf dictionaries and high-signal Nuclei workflows.
+	ScanMode string `json:"scan_mode,omitempty"`
 }
 
 func DefaultPipelineConfig() PipelineConfig {
@@ -136,4 +139,43 @@ func DefaultExternalPipelineConfig() PipelineConfig {
 	cfg.PassiveSearchResultLimit = 500
 	cfg.PassiveSearchConcurrency = 3
 	return cfg
+}
+
+// DefaultLowNoisePipelineConfig returns the configuration for SRC low-noise scans.
+// It enables only bounded ffuf dictionaries and high-signal Nuclei workflows.
+// Use this for SRC bounty programs where noise must be minimized.
+func DefaultLowNoisePipelineConfig() PipelineConfig {
+	cfg := DefaultExternalPipelineConfig()
+	cfg.ScanMode = "src_low_noise"
+	// Port scanning: top100 only
+	cfg.PortRange = "top100"
+	cfg.NaabuRate = 200
+	cfg.NaabuThreads = 30
+	// Nuclei: high-signal only, low rate
+	cfg.EnableNuclei = true
+	cfg.NucleiScanDepth = "tags"        // tags only, no full workflows
+	cfg.NucleiRateLimit = 5             // very low rate
+	cfg.NucleiConcurrency = 3
+	cfg.NucleiRateLimitPerMinute = 20
+	cfg.NucleiRequireFingerprint = true
+	// Ffuf: enabled with small dictionary only
+	cfg.EnableFfuf = true
+	cfg.FfufTier = "small"
+	cfg.FfufRateLimit = 3
+	cfg.FfufTimeout = 20
+	// Katana: disabled (too noisy)
+	cfg.EnableKatana = false
+	// Passive: enabled
+	cfg.EnablePassiveSearch = true
+	cfg.EnablePassiveCert = true
+	cfg.EnablePassiveURL = true
+	cfg.SubfinderMode = "passive"
+	cfg.PassiveSearchResultLimit = 300
+	cfg.PassiveSearchConcurrency = 2
+	return cfg
+}
+
+// IsLowNoiseMode returns true if the scan mode is src_low_noise.
+func (c PipelineConfig) IsLowNoiseMode() bool {
+	return c.ScanMode == "src_low_noise"
 }
