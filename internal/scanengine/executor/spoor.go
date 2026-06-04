@@ -42,13 +42,24 @@ func ParseSpoorOutput(stdout []byte, runID, projectID string) ([]*core.Discovery
 				continue
 			}
 			seen[entry.Value] = true
-			endpoints = append(endpoints, &core.DiscoveryAsset{
+			asset := &core.DiscoveryAsset{
 				ID:              util.GenerateID(),
 				Type:            core.AssetHTTPPath,
 				Value:           entry.Value,
 				NormalizedValue: entry.Value,
 				SourceTool:      "spoor",
-			})
+			}
+			// Store sensitivity and auth hint in attrs for later use
+			if entry.Sensitivity != "" {
+				asset.Attrs.Sensitivity = entry.Sensitivity
+			}
+			if entry.RequiresAuth != nil {
+				asset.Attrs.RequiresAuth = *entry.RequiresAuth
+			}
+			if len(entry.Tags) > 0 {
+				asset.Attrs.Tags = entry.Tags
+			}
+			endpoints = append(endpoints, asset)
 
 		case "secret":
 			if entry.Value == "" {
@@ -88,14 +99,17 @@ func ParseSpoorOutput(stdout []byte, runID, projectID string) ([]*core.Discovery
 
 // spoorFinding represents a single finding from Spoor JSONL output.
 type spoorFinding struct {
-	File       string        `json:"file"`
-	Kind       string        `json:"kind"`
-	Value      string        `json:"value"`
-	Confidence string        `json:"confidence"`
-	Method     string        `json:"method"`
-	SecretType string        `json:"secret_type"`
-	Severity   string        `json:"severity"`
-	Origin     spoorOrigin   `json:"origin"`
+	File            string        `json:"file"`
+	Kind            string        `json:"kind"`
+	Value           string        `json:"value"`
+	Confidence      string        `json:"confidence"`
+	Method          string        `json:"method"`
+	SecretType      string        `json:"secret_type"`
+	Severity        string        `json:"severity"`
+	Origin          spoorOrigin   `json:"origin"`
+	Tags            []string      `json:"tags"`
+	Sensitivity     string        `json:"sensitivity"`
+	RequiresAuth    *bool         `json:"requires_auth_hint"`
 }
 
 // spoorOrigin represents the origin context of a Spoor finding.
