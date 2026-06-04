@@ -380,6 +380,13 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /bounty-candidates/{id}", auth(http.HandlerFunc(s.handleGetBountyCandidate)))
 	mux.Handle("PATCH /bounty-candidates/{id}", auth(http.HandlerFunc(s.handleUpdateBountyCandidate)))
 	mux.Handle("DELETE /bounty-candidates/{id}", auth(http.HandlerFunc(s.handleDeleteBountyCandidate)))
+	// Submission packs
+	mux.Handle("POST /bounty-candidates/{id}/submission-pack", auth(http.HandlerFunc(s.handleCreateSubmissionPack)))
+	mux.Handle("GET /bounty-candidates/{id}/submission-packs", auth(http.HandlerFunc(s.handleListSubmissionPacks)))
+	mux.Handle("GET /submission-packs/{id}", auth(http.HandlerFunc(s.handleGetSubmissionPack)))
+	mux.Handle("PATCH /submission-packs/{id}", auth(http.HandlerFunc(s.handleUpdateSubmissionPack)))
+	mux.Handle("DELETE /submission-packs/{id}", auth(http.HandlerFunc(s.handleDeleteSubmissionPack)))
+	mux.Handle("POST /submission-packs/{id}/redact", auth(http.HandlerFunc(s.handleRedactSubmissionPack)))
 	// Nuclei custom template sources
 	mux.Handle("GET /nuclei/custom/sources", auth(http.HandlerFunc(s.handleListNucleiCustomSources)))
 	mux.Handle("POST /nuclei/custom/sources/git", auth(http.HandlerFunc(s.handleCreateNucleiCustomGitSource)))
