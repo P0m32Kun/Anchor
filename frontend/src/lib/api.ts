@@ -1125,3 +1125,216 @@ export interface NucleiCustomManifest {
   created_at: string;
 }
 
+// --- SRC Program ---
+
+export interface SRCProgram {
+  id: string;
+  project_id: string;
+  name: string;
+  platform: string;
+  program_url: string;
+  rules_url: string;
+  allow_automation: boolean;
+  allow_dir_brute: boolean;
+  allow_weak_password: boolean;
+  allow_authenticated_test: boolean;
+  max_rps: number;
+  max_concurrency: number;
+  preferred_vuln_types: string[];
+  payout_hint: Record<string, unknown>;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSRCProgramRequest {
+  name: string;
+  platform: string;
+  program_url?: string;
+  rules_url?: string;
+  allow_automation?: boolean;
+  allow_dir_brute?: boolean;
+  allow_weak_password?: boolean;
+  allow_authenticated_test?: boolean;
+  max_rps?: number;
+  max_concurrency?: number;
+  preferred_vuln_types?: string[];
+  payout_hint?: Record<string, unknown>;
+  notes?: string;
+}
+
+// --- Bounty Candidate ---
+
+export interface BountyCandidate {
+  id: string;
+  project_id: string;
+  program_id?: string;
+  finding_id?: string;
+  endpoint_id?: string;
+  source_kind: string;
+  title: string;
+  vuln_type: string;
+  severity: string;
+  confidence: string;
+  value_score: number;
+  impact_score: number;
+  novelty_score: number;
+  repro_score: number;
+  scope_score: number;
+  safety_score: number;
+  duplicate_risk: string;
+  ranking_reason: string;
+  verify_status: string;
+  submission_status: string;
+  submission_url: string;
+  submission_id: string;
+  paid_amount: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BountyCandidateStats {
+  total: number;
+  pending: number;
+  verified: number;
+  submitted: number;
+  accepted: number;
+  paid: number;
+  total_value: number;
+  average_value: number;
+}
+
+// --- Submission Pack ---
+
+export interface SubmissionPack {
+  id: string;
+  candidate_id: string;
+  format: string;
+  template: string;
+  content: string;
+  checklist_json: string;
+  redaction_status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- SRC API Functions ---
+
+export const srcApi = {
+  // SRC Programs
+  async getProgram(projectId: string): Promise<SRCProgram | null> {
+    const res = await request(`/projects/${projectId}/src-program`);
+    if (res.status === 404) return null;
+    return res.json();
+  },
+
+  async createProgram(projectId: string, data: CreateSRCProgramRequest): Promise<SRCProgram> {
+    const res = await request(`/projects/${projectId}/src-program`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async updateProgram(projectId: string, data: Partial<CreateSRCProgramRequest>): Promise<SRCProgram> {
+    const res = await request(`/projects/${projectId}/src-program`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async deleteProgram(projectId: string): Promise<void> {
+    await request(`/projects/${projectId}/src-program`, { method: "DELETE" });
+  },
+
+  async listPrograms(): Promise<{ programs: SRCProgram[]; count: number }> {
+    const res = await request("/src-programs");
+    return res.json();
+  },
+
+  // Bounty Candidates
+  async listCandidates(projectId: string, params?: { verify_status?: string; submission_status?: string }): Promise<{ candidates: BountyCandidate[]; count: number; stats: BountyCandidateStats }> {
+    const qs = new URLSearchParams();
+    if (params?.verify_status) qs.append("verify_status", params.verify_status);
+    if (params?.submission_status) qs.append("submission_status", params.submission_status);
+    const query = qs.toString();
+    const res = await request(`/projects/${projectId}/bounty-candidates${query ? `?${query}` : ""}`);
+    return res.json();
+  },
+
+  async getCandidate(id: string): Promise<BountyCandidate> {
+    const res = await request(`/bounty-candidates/${id}`);
+    return res.json();
+  },
+
+  async updateCandidate(id: string, data: { verify_status?: string; submission_status?: string; submission_url?: string; submission_id?: string; paid_amount?: number; notes?: string }): Promise<BountyCandidate> {
+    const res = await request(`/bounty-candidates/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async deleteCandidate(id: string): Promise<void> {
+    await request(`/bounty-candidates/${id}`, { method: "DELETE" });
+  },
+
+  async refreshCandidates(projectId: string): Promise<{ status: string; created: number; stats: BountyCandidateStats }> {
+    const res = await request(`/projects/${projectId}/bounty-candidates/refresh`, { method: "POST" });
+    return res.json();
+  },
+
+  // Submission Packs
+  async createPack(candidateId: string, template?: string): Promise<SubmissionPack> {
+    const res = await request(`/bounty-candidates/${candidateId}/submission-pack`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ template: template || "generic" }),
+    });
+    return res.json();
+  },
+
+  async getPack(id: string): Promise<SubmissionPack> {
+    const res = await request(`/submission-packs/${id}`);
+    return res.json();
+  },
+
+  async listPacks(candidateId: string): Promise<{ packs: SubmissionPack[]; count: number }> {
+    const res = await request(`/bounty-candidates/${candidateId}/submission-packs`);
+    return res.json();
+  },
+
+  async updatePack(id: string, data: { content?: string; checklist_json?: string; redaction_status?: string }): Promise<SubmissionPack> {
+    const res = await request(`/submission-packs/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async deletePack(id: string): Promise<void> {
+    await request(`/submission-packs/${id}`, { method: "DELETE" });
+  },
+
+  async redactPack(id: string): Promise<SubmissionPack> {
+    const res = await request(`/submission-packs/${id}/redact`, { method: "POST" });
+    return res.json();
+  },
+
+  // Credentials & Sources
+  async listCredentials(): Promise<{ credentials: Array<{ platform: string; username?: string; has_api: boolean; has_token: boolean; source: string }>; count: number }> {
+    const res = await request("/credentials");
+    return res.json();
+  },
+
+  async listSources(): Promise<{ sources: Array<{ ID: string; Name: string; Type: string; Domains: string[]; HasAPI: boolean; HasSession: boolean }>; count: number }> {
+    const res = await request("/sources");
+    return res.json();
+  },
+};

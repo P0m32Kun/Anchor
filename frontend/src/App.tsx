@@ -59,6 +59,9 @@ import DictionariesPage from "./pages/DictionariesPage";
 import HttpxFingerprintsPage from "./pages/HttpxFingerprintsPage";
 import VulnTemplatesPage from "./pages/VulnTemplatesPage";
 import ExcludedDomainsPage from "./pages/ExcludedDomainsPage";
+import SRCProgramPage from "./pages/SRCProgramPage";
+import BountyQueuePage from "./pages/BountyQueuePage";
+import SubmissionPackPage from "./pages/SubmissionPackPage";
 
 function LegacyRouteGuard() {
   const location = useLocation();
@@ -227,6 +230,9 @@ function AppContent() {
               <Route path="runs" element={<RunsPage />} />
               <Route path="findings" element={<FindingsPage />} />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="src-program" element={<SRCProgramPage />} />
+              <Route path="bounty-queue" element={<BountyQueuePage />} />
+              <Route path="submission-packs/:packId" element={<SubmissionPackPage />} />
             </Route>
             {/* Legacy routes for backward compat — Sprint 1.11 will remove */}
             <Route path="/projects/:id" element={<ProjectPage />} />

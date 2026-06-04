@@ -118,6 +118,8 @@ export function Navbar() {
         { path: `/projects/${currentProjectId}/runs`, label: "扫描执行", icon: Play, color: "text-violet-400" },
         { path: `/projects/${currentProjectId}/findings`, label: "发现审核", icon: AlertTriangle, color: "text-rose-400" },
         { path: `/projects/${currentProjectId}/reports`, label: "报告交付", icon: FileText, color: "text-amber-400" },
+        { path: `/projects/${currentProjectId}/src-program`, label: "SRC 程序", icon: Shield, color: "text-cyan-400" },
+        { path: `/projects/${currentProjectId}/bounty-queue`, label: "赏金队列", icon: Sparkles, color: "text-yellow-400" },
       ]
     : [];
 
