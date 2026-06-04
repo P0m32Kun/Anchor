@@ -883,6 +883,7 @@ export interface PipelineConfig {
   passive_search_result_limit: number;
   passive_search_concurrency: number;
   subfinder_provider_config: string;
+  scan_mode?: string; // "default" | "src_low_noise"
 }
 
 export interface Dictionary {
@@ -1022,6 +1023,30 @@ export const DEFAULT_EXTERNAL_PIPELINE_CONFIG: PipelineConfig = {
   nuclei_require_fingerprint: true,
   passive_search_result_limit: 500,
   passive_search_concurrency: 3,
+};
+
+export const DEFAULT_LOW_NOISE_PIPELINE_CONFIG: PipelineConfig = {
+  ...DEFAULT_EXTERNAL_PIPELINE_CONFIG,
+  scan_mode: "src_low_noise",
+  port_range: "top100",
+  naabu_rate: 200,
+  naabu_threads: 30,
+  nuclei_scan_depth: "tags",
+  nuclei_rate_limit: 5,
+  nuclei_concurrency: 3,
+  nuclei_rate_limit_per_min: 20,
+  nuclei_require_fingerprint: true,
+  enable_ffuf: true,
+  ffuf_tier: "small",
+  ffuf_rate_limit: 3,
+  ffuf_timeout: 20,
+  enable_katana: false,
+  enable_passive_search: true,
+  enable_passive_cert: true,
+  enable_passive_url: true,
+  subfinder_mode: "passive",
+  passive_search_result_limit: 300,
+  passive_search_concurrency: 2,
 };
 
 // Mirrors internal/worker/commands.go:HighRiskPorts — curated list of high-value

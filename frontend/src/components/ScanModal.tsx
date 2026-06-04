@@ -6,6 +6,7 @@ import {
   PipelineConfig,
   DEFAULT_PIPELINE_CONFIG,
   DEFAULT_EXTERNAL_PIPELINE_CONFIG,
+  DEFAULT_LOW_NOISE_PIPELINE_CONFIG,
   DEFAULT_HIGH_RISK_PORTS,
   TP_PRESET_VALUES,
   TP_PRESET_LABELS,
@@ -16,13 +17,23 @@ import {
 import { cn } from "../lib/utils";
 import { Zap, Globe, Shield, Gauge, Cpu, CheckCircle2, RotateCcw, ChevronRight, ChevronDown, Search } from "lucide-react";
 
-export type ScanMode = "external" | "internal";
+export type ScanMode = "external" | "internal" | "src_low_noise";
 
 const SCAN_CONFIG_STORAGE_KEY = "anchor.scanModal.config";
 const SCAN_MODE_STORAGE_KEY = "anchor.scanModal.mode";
 
 function loadStoredConfig(mode: ScanMode): PipelineConfig {
-  const base = mode === "external" ? DEFAULT_EXTERNAL_PIPELINE_CONFIG : DEFAULT_PIPELINE_CONFIG;
+  let base: PipelineConfig;
+  switch (mode) {
+    case "external":
+      base = DEFAULT_EXTERNAL_PIPELINE_CONFIG;
+      break;
+    case "src_low_noise":
+      base = DEFAULT_LOW_NOISE_PIPELINE_CONFIG;
+      break;
+    default:
+      base = DEFAULT_PIPELINE_CONFIG;
+  }
   try {
     const raw = localStorage.getItem(SCAN_CONFIG_STORAGE_KEY);
     if (!raw) return { ...base };
@@ -69,6 +80,14 @@ const MODE_OPTIONS: {
     tools: ["nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Katana", "Ffuf"],
     icon: Shield,
     color: "text-emerald-400",
+  },
+  {
+    mode: "src_low_noise",
+    label: "SRC 低噪音",
+    description: "SRC 赏金专用，只运行高信号模板，最小化噪音",
+    tools: ["Subfinder", "Naabu top100", "HTTPX", "Nuclei (高信号)", "Ffuf (小字典)"],
+    icon: Search,
+    color: "text-amber-400",
   },
 ];
 
