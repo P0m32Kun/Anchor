@@ -846,6 +846,8 @@ func assetToScopeTarget(a *core.DiscoveryAsset) *models.Target {
 		return &models.Target{Type: models.TargetTypeDomain, Value: value}
 	case core.AssetIP:
 		return &models.Target{Type: models.TargetTypeIP, Value: value}
+	case core.AssetCIDR:
+		return &models.Target{Type: models.TargetTypeCIDR, Value: value}
 	case core.AssetIPPort:
 		host, _, err := net.SplitHostPort(value)
 		if err != nil {
@@ -869,6 +871,8 @@ func assetTypeToString(t core.AssetType) string {
 		return "domain"
 	case core.AssetIP:
 		return "ip"
+	case core.AssetCIDR:
+		return "cidr"
 	case core.AssetIPPort:
 		return "ip"
 	case core.AssetHTTPService:

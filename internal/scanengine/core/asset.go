@@ -11,6 +11,7 @@ type AssetType string
 const (
 	AssetSubdomain   AssetType = "SUBDOMAIN"
 	AssetIP          AssetType = "IP"
+	AssetCIDR        AssetType = "CIDR"
 	AssetIPPort      AssetType = "IP_PORT"
 	AssetHTTPService AssetType = "HTTP_SERVICE"
 	AssetHTTPPath    AssetType = "HTTP_PATH"
@@ -40,6 +41,10 @@ func ClassifySeedTarget(target string) AssetType {
 			return AssetIP
 		}
 		return AssetSubdomain
+	}
+	// CIDR notation (e.g., 172.30.0.0/24)
+	if _, _, err := net.ParseCIDR(target); err == nil {
+		return AssetCIDR
 	}
 	if net.ParseIP(target) != nil {
 		return AssetIP
