@@ -61,12 +61,15 @@ func (p *NucleiPersister) Persist(projectID, runID, taskID, assetID string, stdo
 			summary := fmt.Sprintf("Host: %s\nMatched: %s\nMatcher: %s", nr.Host, nr.MatchedAt, nr.MatcherName)
 			_ = p.queries.UpdateFindingEvidence(findingID, severity, confidence, priority, summary, existing.Remediation, now)
 		} else {
-			var aid, runIDPtr *string
+			var aid, runIDPtr, taskIDPtr *string
 			if assetID != "" {
 				aid = &assetID
 			}
 			if runID != "" {
 				runIDPtr = &runID
+			}
+			if taskID != "" {
+				taskIDPtr = &taskID
 			}
 			f := &models.Finding{
 				ID:             util.GenerateID(),
@@ -83,6 +86,7 @@ func (p *NucleiPersister) Persist(projectID, runID, taskID, assetID string, stdo
 				Status:         models.FindingPendingReview,
 				Summary:        fmt.Sprintf("Host: %s\nMatched: %s\nMatcher: %s", nr.Host, nr.MatchedAt, nr.MatcherName),
 				MatchedTemplate: nr.TemplateID,
+				SourceTaskID:   taskIDPtr,
 				CreatedAt:      time.Now().UTC(),
 				UpdatedAt:      time.Now().UTC(),
 			}

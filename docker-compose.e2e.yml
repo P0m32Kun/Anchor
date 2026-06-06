@@ -10,7 +10,10 @@ services:
   server:
     build:
       context: .
-      dockerfile: Dockerfile.server
+      dockerfile: Dockerfile.server-fast
+      args:
+        TARGETARCH: ${TARGETARCH:-arm64}
+    image: anchor-server:local
     container_name: anchor-server
     ports:
       - "17421:17421"
@@ -27,17 +30,20 @@ services:
       - anchor-net
     healthcheck:
       test:
-        ["CMD", "sh", "-c", "wget -qO- http://localhost:17421/health >/dev/null 2>&1"]
+        ["CMD", "sh", "-c", "curl -sf http://localhost:17421/health >/dev/null 2>&1"]
       interval: 5s
       timeout: 3s
       retries: 5
-      start_period: 5s
+      start_period: 10s
 
   # --- Remote Worker ---
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.worker
+      dockerfile: Dockerfile.worker-fast
+      args:
+        TARGETARCH: ${TARGETARCH:-arm64}
+    image: anchor-worker:local
     container_name: anchor-worker
     environment:
       - ANCHOR_DATA_DIR=/data

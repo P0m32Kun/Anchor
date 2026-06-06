@@ -4,14 +4,20 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/** 完整 pipeline 扫描 spec；单文件最长 30 分钟，须用 --project=chromium-scan */
+const LONG_SCAN_SPEC =
+	/(high-risk-pipeline|internal-scan-live|live-scan|log-audit|sse-realtime|trace-audit)\.spec\.ts$/;
+
+const DEFAULT_TIMEOUT = 120 * 1000;
+const LONG_SCAN_TIMEOUT = 30 * 60 * 1000;
+
 export default defineConfig({
 	testDir: "./e2e",
 	fullyParallel: false,
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 2 : 0,
 	workers: 1,
-	timeout: 30 * 60 * 1000, // 30 minutes for long-running scan tests
-	globalTimeout: 35 * 60 * 1000, // 35 minutes total
+	timeout: DEFAULT_TIMEOUT,
 	reporter: [["html", { open: "never" }], ["list"]],
 	globalSetup: path.join(__dirname, "e2e/global-setup.ts"),
 	globalTeardown: path.join(__dirname, "e2e/global-teardown.ts"),
@@ -24,14 +30,25 @@ export default defineConfig({
 	projects: [
 		{
 			name: "chromium",
+			timeout: DEFAULT_TIMEOUT,
 			use: {
 				...devices["Desktop Chrome"],
 				storageState: path.join(__dirname, "e2e/storage-state.json"),
 			},
-			testIgnore: /full-flow\.spec\.ts$/,
+			testIgnore: [LONG_SCAN_SPEC, /full-flow\.spec\.ts$/],
+		},
+		{
+			name: "chromium-scan",
+			timeout: LONG_SCAN_TIMEOUT,
+			use: {
+				...devices["Desktop Chrome"],
+				storageState: path.join(__dirname, "e2e/storage-state.json"),
+			},
+			testMatch: LONG_SCAN_SPEC,
 		},
 		{
 			name: "chromium-auth",
+			timeout: LONG_SCAN_TIMEOUT,
 			use: {
 				...devices["Desktop Chrome"],
 				storageState: undefined,

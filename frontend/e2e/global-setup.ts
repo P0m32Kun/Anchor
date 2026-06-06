@@ -132,6 +132,10 @@ async function runDockerCompose(args: string[], cwd: string): Promise<void> {
 		const proc = spawn("docker", ["compose", ...args], {
 			stdio: "inherit",
 			cwd,
+			env: {
+				...process.env,
+				ANCHOR_API_TOKEN: E2E_API_TOKEN,
+			},
 		});
 		proc.on("close", (code) => {
 			if (code === 0 || code === null) {

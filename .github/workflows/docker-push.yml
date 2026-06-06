@@ -56,6 +56,9 @@ jobs:
       - name: Login to ACR
         run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ${ACR_REGISTRY} -u ${{ secrets.ACR_USERNAME }} --password-stdin
 
+      - name: Ensure bin/ exists for Dockerfile COPY
+        run: mkdir -p bin
+
       - name: Build and push server
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}

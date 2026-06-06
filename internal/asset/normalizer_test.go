@@ -57,6 +57,41 @@ func TestNormalizeIP(t *testing.T) {
 	}
 }
 
+func TestNormalizeCIDR(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"172.30.0.0/24", "172.30.0.0/24"},
+		{"192.168.1.0/24", "192.168.1.0/24"},
+		{"10.0.0.0/8", "10.0.0.0/8"},
+		{"  172.30.0.0/24  ", "172.30.0.0/24"},
+		{"invalid", "invalid"},
+	}
+	for _, c := range cases {
+		got := NormalizeCIDR(c.in)
+		if got != c.want {
+			t.Errorf("NormalizeCIDR(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestInferStorageType_IP(t *testing.T) {
+	if got := InferStorageType("172.31.0.13"); got != "ip" {
+		t.Fatalf("InferStorageType = %q, want ip", got)
+	}
+}
+
+func TestNormalize_IPNotAliasedAsDomain(t *testing.T) {
+	ipNorm := Normalize("ip", "172.31.0.13")
+	domainNorm := Normalize("domain", "172.31.0.13")
+	if ipNorm != "172.31.0.13" {
+		t.Fatalf("ip normalize = %q", ipNorm)
+	}
+	if domainNorm != "172.31.0.13" {
+		t.Fatalf("domain normalize should coerce to ip, got %q", domainNorm)
+	}
+}
+
 func TestExtractHostFromURL(t *testing.T) {
 	if got := ExtractHostFromURL("https://sub.example.com:8443/path"); got != "sub.example.com" {
 		t.Errorf("ExtractHostFromURL = %q, want sub.example.com", got)

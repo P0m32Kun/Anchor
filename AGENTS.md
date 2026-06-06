@@ -29,10 +29,25 @@ Anchor is a web application (React + TypeScript frontend, Go backend) that orche
 - Integration tests for database operations (use temp DB)
 - E2E tests for critical user flows
 - Mock external services (HTTP clients, tool executors), not the database
+- **Workflow**: SDD → BDD → TDD → E2E — see `docs/conventions/testing-workflow.md`
+- **build/typecheck alone is not done** — must verify in Docker stack or functional-test checklist
 
 ## Skill Auto-Loading Rules
 
 When working on Anchor, **automatically load the following skills** based on task type:
+
+### Feature Development & Testing
+
+**Trigger `develop-feature`（`~/.p-skills/skills/develop-feature/`）when:**
+- Developing a new feature end-to-end
+- Fixing a user-visible bug
+- User asks about test workflow, SDD/BDD/TDD, acceptance, or "code written but feature not working"
+
+**Then load `anchor-dev-test`（`.cursor/skills/anchor-dev-test/`）for:**
+- Anchor-specific doc paths (`docs/conventions/testing*.md`, `docs/functional-test.md`)
+- E2E §3.3 rules, handler README sync, example spec paths
+
+**Skill chain**（通用，不重复写流程）: `openspec` → `bdd` → `test-strategy` → `tdd` → `e2e-write` → `verify` → `doc-sync`
 
 ### Security Tasks
 

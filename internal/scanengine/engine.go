@@ -153,14 +153,15 @@ func (e *ScanEngine) Run(ctx context.Context, targets []string) error {
 
 	// Seed initial targets as assets
 	for _, target := range targets {
-		e.processNewAsset(ctx, &core.DiscoveryAsset{
-			ID:              util.GenerateID(),
-			Type:            core.ClassifySeedTarget(target),
-			Value:           target,
-			NormalizedValue: target,
-			DiscoveryDepth:  0,
-			SourceTool:      "seed",
-		})
+		seedAsset := &core.DiscoveryAsset{
+			ID:             util.GenerateID(),
+			Type:           core.ClassifySeedTarget(target),
+			Value:          target,
+			DiscoveryDepth: 0,
+			SourceTool:     "seed",
+		}
+		core.ReconcileDiscoveryAsset(seedAsset)
+		e.processNewAsset(ctx, seedAsset)
 	}
 
 	// External profile: passive cert discovery for root domains (crt.sh)
@@ -182,7 +183,7 @@ func (e *ScanEngine) Run(ctx context.Context, targets []string) error {
 	for {
 		select {
 		case <-ctx.Done():
-			e.wg.Wait() // wait for in-flight work to finish
+			e.waitForWorkers()
 			e.setEngineState("stopped")
 			return ctx.Err()
 		case <-ticker.C:
@@ -190,10 +191,26 @@ func (e *ScanEngine) Run(ctx context.Context, targets []string) error {
 				log.Printf("[scanengine] tick error: %v", err)
 			}
 			if e.EngineState() == "stopped" {
-				e.wg.Wait()
+				e.waitForWorkers()
 				return nil
 			}
 		}
+	}
+}
+
+const workerDrainTimeout = 2 * time.Minute
+
+// waitForWorkers waits for in-flight goroutines with a bounded timeout so Run can exit.
+func (e *ScanEngine) waitForWorkers() {
+	done := make(chan struct{})
+	go func() {
+		e.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(workerDrainTimeout):
+		log.Printf("[scanengine] timed out after %v waiting for in-flight work", workerDrainTimeout)
 	}
 }
 
@@ -213,6 +230,8 @@ func (e *ScanEngine) EngineState() string {
 
 // processNewAsset handles a newly discovered asset: dedup, derive works, enqueue.
 func (e *ScanEngine) processNewAsset(ctx context.Context, a *core.DiscoveryAsset) {
+	core.ReconcileDiscoveryAsset(a)
+
 	// Dedup check
 	if !e.dedup.IsNew(a.NormalizedValue) {
 		return
@@ -741,6 +760,9 @@ func (e *ScanEngine) buildParams(ctx context.Context, w *models.ScanWorkItem) (t
 		}, cleanup, nil
 
 	case core.ActionCDNCheck:
+		if net.ParseIP(host) == nil {
+			return nil, nil, fmt.Errorf("cdncheck requires IP, got domain: %s", host)
+		}
 		return toolregistry.RenderParams{
 			"ips": host,
 		}, nil, nil

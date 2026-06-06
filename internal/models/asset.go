@@ -13,6 +13,7 @@ type AssetType string
 const (
 	AssetTypeDomain AssetType = "domain"
 	AssetTypeIP     AssetType = "ip"
+	AssetTypeCIDR   AssetType = "cidr"
 	AssetTypeURL    AssetType = "url"
 )
 

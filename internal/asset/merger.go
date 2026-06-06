@@ -21,6 +21,9 @@ func NewMerger(queries *db.Queries) *Merger {
 // MergeOrCreateAsset looks up an asset by normalized value. If found, updates last_seen
 // and merges source_tools. If not found, creates a new asset.
 func (m *Merger) MergeOrCreateAsset(projectID, assetType, value, sourceTool string) (*models.Asset, bool, error) {
+	if inferred := InferStorageType(value); inferred == "ip" || inferred == "cidr" || inferred == "url" {
+		assetType = inferred
+	}
 	normalized := Normalize(assetType, value)
 	existing, err := m.queries.GetAssetByNormalizedValue(projectID, normalized)
 	if err != nil {

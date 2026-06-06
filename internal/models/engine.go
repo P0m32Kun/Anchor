@@ -86,7 +86,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		DNSxThreads:              50,
 		DNSxTimeout:              5,
 		EnableCDNFilter:          true,
-		PortRange:                "top1000",
+		PortRange:                "high-risk",
 		NaabuRate:                1000,
 		NaabuThreads:             100,
 		NaabuTimeout:             5000, // milliseconds (naabu CLI default is 1000ms)

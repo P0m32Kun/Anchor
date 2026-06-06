@@ -20,7 +20,7 @@ import {
   SeverityBadge,
   StatusBadge
 } from "../components";
-import type { Finding, Evidence } from "../lib/api";
+import type { Finding, Evidence, ToolCallTrace } from "../lib/api";
 import {
   Search,
   AlertCircle,
@@ -31,7 +31,8 @@ import {
   ShieldAlert,
   MessageSquare,
   X,
-  Plus
+  Plus,
+  Activity,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { dedupeFindingsForDisplay } from "../lib/finding-dedup";
@@ -412,7 +413,27 @@ function FindingDetail({
 }) {
   const [note, setNote] = useState("");
   const [adding, setAdding] = useState(false);
+  const [trace, setTrace] = useState<ToolCallTrace | null>(null);
+  const [traceLoading, setTraceLoading] = useState(true);
   const toast = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    setTraceLoading(true);
+    api.getFindingTrace(finding.id)
+      .then((data) => {
+        if (!cancelled) setTrace(data);
+      })
+      .catch(() => {
+        if (!cancelled) setTrace(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTraceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [finding.id]);
 
   const addNote = async () => {
     if (!note.trim()) return;
@@ -470,6 +491,40 @@ function FindingDetail({
           </div>
 
           <div className="space-y-8">
+             <section>
+                <h3 className="text-sm font-bold flex items-center gap-2 mb-3">
+                    <Activity className="h-4 w-4 text-primary" />
+                    调用溯源
+                </h3>
+                <div className="rounded-xl border p-4 bg-muted/10 space-y-2 text-sm">
+                    {traceLoading ? (
+                        <p className="text-xs text-muted-foreground italic">加载溯源链...</p>
+                    ) : trace?.run || trace?.tool_call_log ? (
+                        <>
+                            {trace.run && (
+                                <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-muted-foreground">Run</span>
+                                    <span className="font-mono font-semibold">{trace.run.id.slice(-12)}</span>
+                                    <Badge variant="outline" className="h-4 px-1 text-[9px] uppercase">{trace.run.status}</Badge>
+                                </div>
+                            )}
+                            {trace.tool_call_log && (
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    <Badge variant="secondary" className="font-mono text-[10px]">{trace.tool_call_log.tool}</Badge>
+                                    <span className="text-muted-foreground">{trace.tool_call_log.action}</span>
+                                    <Badge variant="outline" className="h-4 px-1 text-[9px]">{trace.tool_call_log.status}</Badge>
+                                </div>
+                            )}
+                            {!trace.tool_call_log && (
+                                <p className="text-xs text-muted-foreground">工具调用日志尚未关联到此 Finding</p>
+                            )}
+                        </>
+                    ) : (
+                        <p className="text-xs text-muted-foreground italic">暂无溯源数据（可能来自历史扫描或未记录 source_task_id）</p>
+                    )}
+                </div>
+             </section>
+
              <section>
                 <h3 className="text-sm font-bold flex items-center gap-2 mb-3">
                     <MessageSquare className="h-4 w-4 text-primary" />

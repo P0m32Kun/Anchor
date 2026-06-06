@@ -1,6 +1,10 @@
 # 测试分层约定
 
 > Anchor 测试金字塔与编写规范。明确每层的职责、允许使用的工具、典型反例。
+>
+> **流程与 DoD**：何时写 SDD/BDD/TDD、PR 评审清单 → [`testing-workflow.md`](testing-workflow.md)
+> **通用编排**：`~/.p-skills/skills/develop-feature/SKILL.md`
+> **Anchor 约定**：→ [`.cursor/skills/anchor-dev-test/SKILL.md`](../../.cursor/skills/anchor-dev-test/SKILL.md)
 
 ---
 
@@ -196,6 +200,8 @@ review integration PR 时:
 | 模式 | 文件 | 关键技巧 |
 |------|------|----------|
 | 完整流程(认证 → 项目 → 扫描 → 报告) | `frontend/e2e/tests/full-flow.spec.ts` | UI 走 ScanModal,API 仅做长扫描进度轮询;最终结果回 UI 断言 |
+| SSE 实时连接 | `frontend/e2e/tests/sse-realtime.spec.ts` | UI 断言「SSE 实时连接」+ 扫描完成后 run 状态自动更新 |
+| 工具调用溯源 | `frontend/e2e/tests/trace-audit.spec.ts` | UI 断言 RunsPage「工具调用日志」+ FindingsPage「调用溯源」 |
 | 端口策略验证 | `frontend/e2e/tests/high-risk-pipeline.spec.ts` | UI 选 ScanModal "高危端口" preset → UI 看到 6379 → UI 看到 critical/high finding |
 | FIXME 范例(产品下线 UI) | `frontend/e2e/tests/v0.4-company-flow.spec.ts` | `test.fixme` 跳过,文件头说明 A/B/C 处置选项 |
 | 后端 integration | `internal/api/handlers_test.go` | in-mem sqlite + httptest |
@@ -225,6 +231,18 @@ lsof -i :17421 -i :1420
 ```
 
 任何长期占用 17421 / 1420 的本地进程都需要先停掉。`global-setup.ts` / `global-teardown.ts` 只清自己 compose project 的容器,**不会**清这些孤儿,因此清理是手动义务。
+
+### Playwright 超时与 project 分工
+
+`frontend/playwright.config.ts` 按耗时拆分 project,**不设 `globalTimeout`**(避免整次 run 在 setup + 长扫描未完成时被掐断):
+
+| Project | 单测 timeout | 包含 spec | 入口 |
+|---------|-------------|-----------|------|
+| `chromium` | 2 分钟 | 页面/smoke/回归(不含完整 pipeline) | `make test-e2e` / `npm run test:e2e` |
+| `chromium-scan` | 30 分钟 | `high-risk-pipeline`、`internal-scan-live`、`log-audit`、`sse-realtime`、`trace-audit` 等 | `make test-e2e-scan` / `npm run test:e2e:scan` |
+| `chromium-auth` | 30 分钟 | `full-flow`(无预置 storageState,走 Token 页) | `make test-e2e-full` |
+
+长扫描 spec 内 `waitForPipeline` 默认轮询 20 分钟;单测 30 分钟含 UI 步骤与 setup 余量。**勿把多条 30 分钟扫描塞进一次带 `globalTimeout` 的命令**——每条 pipeline spec 应单独或按 `chromium-scan` 整包跑(可能数小时)。
 
 ## 10. 扫描测试靶标
 

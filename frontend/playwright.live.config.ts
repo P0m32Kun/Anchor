@@ -11,7 +11,6 @@ export default defineConfig({
 	retries: 0,
 	workers: 1,
 	timeout: 30 * 60 * 1000,
-	globalTimeout: 35 * 60 * 1000,
 	reporter: [["list"]],
 	use: {
 		baseURL: "http://localhost:80",

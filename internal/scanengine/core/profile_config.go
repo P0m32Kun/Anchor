@@ -60,7 +60,8 @@ func actionEnabledByConfig(cfg models.PipelineConfig, action TaskAction) bool {
 	case ActionFFUFBrute:
 		return cfg.EnableFfuf
 	case ActionPassiveSearch, ActionPassiveCert, ActionPassiveURL:
-		return cfg.EnablePassiveSearch || cfg.EnablePassiveCert || cfg.EnablePassiveURL
+		// Passive discovery is handled by seed injectors / ExpandTargets, not executor work items.
+		return false
 	case ActionSpoorScan:
 		return cfg.EnableKatana // spoor follows katana enable for external surface crawl
 	default:

@@ -59,6 +59,18 @@ func NormalizeIP(v string) string {
 	return ip.String()
 }
 
+// NormalizeCIDR parses and returns canonical CIDR representation.
+func NormalizeCIDR(v string) string {
+	v = strings.TrimSpace(v)
+	ip, ipNet, err := net.ParseCIDR(v)
+	if err != nil {
+		return v
+	}
+	// Use the network address as the canonical form
+	_ = ip
+	return ipNet.String()
+}
+
 // stripIPv4LeadingZeros removes leading zeros from each IPv4 octet.
 func stripIPv4LeadingZeros(s string) string {
 	parts := strings.Split(s, ".")
@@ -76,8 +88,36 @@ func atoiOrZero(s string) int {
 	return n
 }
 
+// InferStorageType detects the storage type from a raw value.
+// IP/CIDR/URL literals must not be stored as domains (NormalizeDomain would alias them).
+func InferStorageType(value string) string {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return ""
+	}
+	if strings.HasPrefix(v, "http://") || strings.HasPrefix(v, "https://") {
+		return "url"
+	}
+	if _, _, err := net.ParseCIDR(v); err == nil {
+		return "cidr"
+	}
+	if host, _, err := net.SplitHostPort(v); err == nil {
+		if net.ParseIP(host) != nil {
+			return "ip"
+		}
+		return "domain"
+	}
+	if net.ParseIP(v) != nil {
+		return "ip"
+	}
+	return "domain"
+}
+
 // Normalize chooses the appropriate normalizer based on asset type.
 func Normalize(assetType, value string) string {
+	if inferred := InferStorageType(value); inferred == "ip" || inferred == "cidr" || inferred == "url" {
+		assetType = inferred
+	}
 	switch assetType {
 	case "domain":
 		return NormalizeDomain(value)
@@ -85,6 +125,8 @@ func Normalize(assetType, value string) string {
 		return NormalizeURL(value)
 	case "ip":
 		return NormalizeIP(value)
+	case "cidr":
+		return NormalizeCIDR(value)
 	default:
 		return strings.ToLower(strings.TrimSpace(value))
 	}

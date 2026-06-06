@@ -299,6 +299,14 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 			delete(s.pipelineCancels, runID)
 			s.mu.Unlock()
 			cancel()
+			// Safety net: engine may stop while run status is still "running" (e.g. blocked drain).
+			run, err := s.queries.GetPipelineRun(runID)
+			if err == nil && run != nil && run.Status == "running" &&
+				(run.EngineState == "stopped" || run.EngineState == "wind_down") {
+				if err := s.queries.UpdatePipelineRunCompleted(runID, time.Now().UTC()); err != nil {
+					log.Printf("[scan] finalize run %s after engine stop: %v", runID, err)
+				}
+			}
 		}()
 
 		stageCallback := func(rid string, stage string, status string, errMsg string) {

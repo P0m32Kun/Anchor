@@ -21,6 +21,20 @@ func TestProfileFromConfig_DisablesNuclei(t *testing.T) {
 	}
 }
 
+func TestProfileFromConfig_PassiveNotEnqueued(t *testing.T) {
+	cfg := models.DefaultExternalPipelineConfig()
+	p := ProfileFromConfig("external", cfg)
+	works := DeriveEligibleWorks(&DiscoveryAsset{
+		ID: "s1", Type: AssetSubdomain, Value: "example.com", DiscoveryDepth: 0,
+	}, p)
+	for _, w := range works {
+		switch w.Action {
+		case ActionPassiveSearch, ActionPassiveCert, ActionPassiveURL:
+			t.Fatalf("passive action %s must not be enqueued as work item", w.Action)
+		}
+	}
+}
+
 func TestProfileFromConfig_HTTPXCandidateSubdomain(t *testing.T) {
 	cfg := models.DefaultPipelineConfig()
 	p := ProfileFromConfig("internal", cfg)

@@ -306,6 +306,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/stages", auth(http.HandlerFunc(s.handleGetPipelineRunStages)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/metrics", auth(http.HandlerFunc(s.handleGetScanRunMetrics)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/works", auth(http.HandlerFunc(s.handleListScanRunWorks)))
+	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/tool-calls", auth(http.HandlerFunc(s.handleListToolCallLogs)))
 	mux.Handle("GET /assets/{id}/works", auth(http.HandlerFunc(s.handleListAssetWorks)))
 	mux.Handle("POST /projects/{id}/pipeline/runs/{runId}/cancel", auth(http.HandlerFunc(s.handleCancelPipelineRun)))
 	mux.Handle("GET /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleGetPipelineConfig)))
@@ -319,6 +320,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /projects/{id}/scan/runs", auth(http.HandlerFunc(s.handleListScanRuns)))
 	mux.Handle("GET /projects/{id}/findings", auth(http.HandlerFunc(s.handleListFindings)))
 	mux.Handle("GET /findings/{id}", auth(http.HandlerFunc(s.handleGetFinding)))
+	mux.Handle("GET /findings/{findingId}/trace", auth(http.HandlerFunc(s.handleGetFindingTrace)))
 	mux.Handle("PATCH /findings/{id}/status", auth(http.HandlerFunc(s.handlePatchFindingStatus)))
 	mux.Handle("POST /findings/{id}/evidence", auth(http.HandlerFunc(s.handleAddEvidence)))
 	mux.Handle("POST /findings/{id}/retest", auth(http.HandlerFunc(s.handleRetestFinding)))
@@ -342,7 +344,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /artifacts/content", auth(http.HandlerFunc(s.handleGetArtifactContent)))
 	mux.Handle("GET /health/tools", auth(http.HandlerFunc(s.handleToolHealth)))
 	mux.Handle("POST /health/check", auth(http.HandlerFunc(s.handleHealthCheck)))
-	mux.Handle("GET /projects/{id}/events", auth(http.HandlerFunc(s.handleProjectSSE)))
+	// SSE uses dedicated auth middleware that accepts both Bearer token and JWT query param
+	sseAuth := s.SSEAuthMiddleware
+	mux.Handle("GET /projects/{id}/events", sseAuth(http.HandlerFunc(s.handleProjectSSE)))
+	// SSE token issuance (requires standard auth)
+	mux.Handle("POST /projects/{id}/sse-token", auth(http.HandlerFunc(s.handleIssueSSEToken)))
 	mux.Handle("GET /projects/{id}/reports/export.md", auth(http.HandlerFunc(s.handleExportReportMD)))
 	mux.Handle("POST /projects/{id}/archive", auth(http.HandlerFunc(s.handleCreateArchive)))
 	mux.Handle("GET /projects/{id}/archive/download", auth(http.HandlerFunc(s.handleDownloadArchive)))

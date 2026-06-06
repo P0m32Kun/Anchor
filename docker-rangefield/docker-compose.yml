@@ -26,7 +26,7 @@ services:
       anchor-net:
         ipv4_address: 172.30.0.11
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/manager/html"]
+      test: ["CMD", "wget", "-qO-", "--http-user=tomcat", "--http-password=tomcat", "http://127.0.0.1:8080/manager/html"]
       interval: 10s
       timeout: 5s
       retries: 5

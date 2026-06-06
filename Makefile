@@ -5,7 +5,8 @@
 .PHONY: dev-rebuild e2e-local e2e-local-down e2e-local-logs
 .PHONY: logs logs-server logs-worker status shell-server shell-worker
 .PHONY: build-server-runtime-base push-server-runtime-base pull-server-runtime-base
-.PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-full
+.PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-scan test-e2e-full
+.PHONY: release-verify release-verify-build release-verify-down
 .PHONY: range-up range-down range-status range-logs
 .PHONY: dev-web
 
@@ -189,7 +190,7 @@ E2E_TOKEN ?= test-e2e-token
 E2E_PLAYWRIGHT_ENV = ANCHOR_API_TOKEN=$(E2E_TOKEN) ANCHOR_E2E_SKIP_DOCKER=1
 
 test-e2e:
-	@echo "[test-e2e] Starting E2E Docker environment..."
+	@echo "[test-e2e] Starting E2E Docker environment (fast suite: chromium project)..."
 	@ANCHOR_API_TOKEN=$(E2E_TOKEN) docker compose -f docker-compose.e2e.yml up -d --build
 	@echo "[test-e2e] Waiting for services..."
 	@sleep 5
@@ -199,6 +200,12 @@ test-e2e-smoke:
 	@ANCHOR_API_TOKEN=$(E2E_TOKEN) docker compose -f docker-compose.e2e.yml up -d --build
 	@sleep 5
 	@cd frontend && $(E2E_PLAYWRIGHT_ENV) npx playwright test e2e/tests/smoke.spec.ts --project=chromium
+
+test-e2e-scan:
+	@echo "[test-e2e-scan] Long pipeline specs (chromium-scan + chromium-auth)..."
+	@ANCHOR_API_TOKEN=$(E2E_TOKEN) docker compose -f docker-compose.e2e.yml up -d --build
+	@sleep 5
+	@cd frontend && $(E2E_PLAYWRIGHT_ENV) npx playwright test --project=chromium-scan --project=chromium-auth
 
 test-e2e-full:
 	@ANCHOR_API_TOKEN=$(E2E_TOKEN) docker compose -f docker-compose.e2e.yml up -d --build
@@ -213,6 +220,30 @@ test-unit-frontend:
 
 test-e2e-down:
 	docker compose -f docker-compose.e2e.yml down --remove-orphans
+
+# ============================================================
+#  上线前验证（tag 推送前必做 — 用户部署镜像路径）
+# ============================================================
+
+RELEASE_VERIFY_TAG ?= release-candidate
+
+release-verify:
+	@chmod +x scripts/verify-release-images.sh
+	@./scripts/verify-release-images.sh
+
+release-verify-build:
+	@arch=$$(uname -m); \
+	case "$$arch" in x86_64) ta=amd64;; aarch64|arm64) ta=arm64;; *) echo "unsupported arch: $$arch"; exit 1;; esac; \
+	$(MAKE) build-linux TARGETARCH=$${TARGETARCH:-$$ta}
+	docker build -f Dockerfile.server --build-arg RELEASE_VERSION=local \
+		-t anchor-server:$(RELEASE_VERIFY_TAG) .
+	docker build -f Dockerfile.worker --build-arg RELEASE_VERSION=local \
+		-t anchor-worker:$(RELEASE_VERIFY_TAG) .
+	docker build -f Dockerfile.frontend -t anchor-frontend:$(RELEASE_VERIFY_TAG) .
+	@echo "Candidate images: anchor-{server,worker,frontend}:$(RELEASE_VERIFY_TAG)"
+
+release-verify-down:
+	docker compose -f docker-compose.release-verify.yml down --remove-orphans
 
 # ============================================================
 #  本地测试 Docker（build-fast / e2e-local，非用户部署）

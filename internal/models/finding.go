@@ -50,6 +50,7 @@ type Finding struct {
 	RawRequest      string          `json:"raw_request" db:"raw_request"`
 	RawResponse     string          `json:"raw_response" db:"raw_response"`
 	MatchedTemplate string          `json:"matched_template" db:"matched_template"`
+	SourceTaskID    *string         `json:"source_task_id,omitempty" db:"source_task_id"`
 	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
 }

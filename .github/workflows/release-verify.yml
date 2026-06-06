@@ -1,0 +1,37 @@
+# 上线前验证 — 在推送 v* tag 之前手动触发，模拟用户部署路径。
+# 通过后再: git tag v0.x.x && git push --tags
+#
+# 与 docker-push 的区别：不推 ACR，使用 RELEASE_VERSION=local 本地二进制构建候选镜像。
+
+name: Release Verify
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Playwright browsers
+        run: cd frontend && npm ci && npx playwright install chromium --with-deps
+
+      - name: Verify release images (user deploy path)
+        env:
+          SKIP_UNIT: "0"
+          SKIP_SMOKE: "0"
+          ANCHOR_API_BASE: http://localhost:17422
+        run: |
+          chmod +x scripts/verify-release-images.sh
+          ./scripts/verify-release-images.sh

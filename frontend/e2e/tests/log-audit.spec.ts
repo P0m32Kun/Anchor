@@ -35,7 +35,7 @@ const REDIS_IP = "172.31.0.13";
 // 日志审计目标工具(内网 pipeline 实际触发的工具)
 const TOOLS_TO_AUDIT = ["nmap_alive", "naabu", "nmap_service", "nuclei"];
 
-test.setTimeout(35 * 60 * 1000);
+test.setTimeout(30 * 60 * 1000);
 
 test.describe.serial("日志审计 E2E — UI + 审计双通道", () => {
 	test.beforeAll(async () => {

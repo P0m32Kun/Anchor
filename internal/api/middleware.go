@@ -64,3 +64,47 @@ func (s *Server) TokenAuthMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// SSEAuthMiddleware verifies authentication for SSE endpoints.
+// It accepts two authentication methods:
+//  1. Standard Bearer token (Authorization header)
+//  2. Short-lived SSE JWT token (query parameter "token")
+//
+// The JWT path also validates that the token's project_id claim matches
+// the URL path parameter to prevent cross-project SSE access.
+func (s *Server) SSEAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Try standard Bearer token first
+		authHeader := r.Header.Get("Authorization")
+		const prefix = "Bearer "
+		if strings.HasPrefix(authHeader, prefix) && authHeader[len(prefix):] == s.apiToken {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Try SSE JWT token from query parameter
+		if tokenStr := r.URL.Query().Get("token"); tokenStr != "" {
+			claims, err := s.ValidateSSEToken(tokenStr)
+			if err == nil && claims.Type == sseTokenTypeValue {
+				// Verify project_id matches URL path to prevent cross-project access
+				projectID := r.PathValue("id")
+				if projectID == "" || claims.ProjectID == projectID {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+		}
+
+		// Authentication failed
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": map[string]string{"message": "Unauthorized: invalid or missing token"},
+		})
+	})
+}

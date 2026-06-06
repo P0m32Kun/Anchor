@@ -20,11 +20,24 @@ docker info
 
 ## Running Tests
 
-### 快速运行所有测试
+### 快速套件（页面 + smoke，约数分钟）
 
 ```bash
 cd frontend
-npm run test:e2e
+npm run test:e2e          # --project=chromium
+# 或从仓库根目录
+make test-e2e-smoke
+```
+
+### 长扫描套件（单 spec 最长 30 分钟，勿与 globalTimeout 混用）
+
+```bash
+make test-e2e-scan        # chromium-scan + chromium-auth
+npm run test:e2e:scan
+
+# 单条 pipeline
+make test-e2e-full        # 仅 full-flow
+npx playwright test e2e/tests/sse-realtime.spec.ts --project=chromium-scan
 ```
 
 Playwright 会自动：
@@ -32,7 +45,7 @@ Playwright 会自动：
 1. 通过 `globalSetup` 启动 Docker 后端（如果未运行）
 2. 生成本地 `storage-state.json`，注入 API Base 和测试 token
 3. 通过 `webServer` 启动前端 dev server
-4. 并行执行所有 `.spec.ts` 测试
+4. 按 project 执行 `.spec.ts`（`chromium` 与 `chromium-scan` 分离）
 5. 通过 `globalTeardown` 停止 Docker 后端并删除 `storage-state.json`
 
 ### 交互式调试（UI 模式）

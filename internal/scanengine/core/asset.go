@@ -30,6 +30,66 @@ type DiscoveryAsset struct {
 	SourceTool      string     `json:"source_tool,omitempty"`
 }
 
+// ReconcileDiscoveryAsset corrects asset type/normalized value before work derivation.
+func ReconcileDiscoveryAsset(a *DiscoveryAsset) {
+	if a == nil {
+		return
+	}
+	switch InferStorageType(a.Value) {
+	case "ip":
+		a.Type = AssetIP
+	case "cidr":
+		a.Type = AssetCIDR
+	case "url":
+		a.Type = AssetHTTPService
+	}
+	a.NormalizedValue = normalizedDiscoveryValue(a)
+}
+
+func normalizedDiscoveryValue(a *DiscoveryAsset) string {
+	switch a.Type {
+	case AssetSubdomain:
+		return strings.ToLower(strings.TrimSpace(a.Value))
+	case AssetIP, AssetCIDR:
+		if ip := net.ParseIP(strings.TrimSpace(a.Value)); ip != nil {
+			if ip4 := ip.To4(); ip4 != nil {
+				return ip4.String()
+			}
+			return ip.String()
+		}
+		if _, ipNet, err := net.ParseCIDR(strings.TrimSpace(a.Value)); err == nil {
+			return ipNet.String()
+		}
+		return strings.TrimSpace(a.Value)
+	default:
+		return strings.TrimSpace(a.Value)
+	}
+}
+
+// InferStorageType mirrors asset.InferStorageType for scanengine without importing asset.
+func InferStorageType(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://") {
+		return "url"
+	}
+	if _, _, err := net.ParseCIDR(value); err == nil {
+		return "cidr"
+	}
+	if host, _, err := net.SplitHostPort(value); err == nil {
+		if net.ParseIP(host) != nil {
+			return "ip"
+		}
+		return "domain"
+	}
+	if net.ParseIP(value) != nil {
+		return "ip"
+	}
+	return "domain"
+}
+
 // ClassifySeedTarget infers asset type from a scan seed value.
 func ClassifySeedTarget(target string) AssetType {
 	target = strings.TrimSpace(target)

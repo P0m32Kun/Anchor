@@ -24,21 +24,14 @@ RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/source
 
 WORKDIR /app
 
-# 从 GitHub Release 下载预编译二进制
+# 预编译二进制：RELEASE_VERSION=local 时从 build context bin/ 注入（上线前验证）；
+# 否则从 GitHub Release 下载（CI docker-push / 用户拉取镜像）。
+COPY docker/install-anchor-binary.sh /tmp/install-anchor-binary.sh
+COPY bin /tmp/anchor-bin
 ARG RELEASE_VERSION=latest
-RUN ARCH=$(uname -m); \
-    case "${ARCH}" in \
-      x86_64)  TARGETARCH=amd64 ;; \
-      aarch64) TARGETARCH=arm64 ;; \
-      *) echo "Unsupported architecture: ${ARCH}"; exit 1 ;; \
-    esac; \
-    if [ "${RELEASE_VERSION}" = "latest" ]; then \
-      URL="https://github.com/P0m32Kun/Anchor/releases/latest/download/anchor-linux-${TARGETARCH}"; \
-    else \
-      URL="https://github.com/P0m32Kun/Anchor/releases/download/${RELEASE_VERSION}/anchor-linux-${TARGETARCH}"; \
-    fi; \
-    echo "Downloading anchor ${RELEASE_VERSION} for ${TARGETARCH}..."; \
-    curl -fsSL -o /app/anchor "${URL}" && chmod +x /app/anchor
+RUN chmod +x /tmp/install-anchor-binary.sh \
+    && /tmp/install-anchor-binary.sh "${RELEASE_VERSION}" \
+    && rm -rf /tmp/install-anchor-binary.sh /tmp/anchor-bin
 
 # Vulnerability template knowledge base seed (read on every startup).
 RUN curl -fsSL -o /tmp/templates.tar.gz \

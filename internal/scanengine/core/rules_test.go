@@ -180,6 +180,32 @@ func TestDeriveEligibleWorks_FFUFMaxDepth1(t *testing.T) {
 	}
 }
 
+func TestDeriveEligibleWorks_CDNCheckOnlyOnIP(t *testing.T) {
+	profile := DefaultExternalProfile()
+
+	// IP asset: CDN check eligible
+	ip := &DiscoveryAsset{ID: "ip-1", Type: AssetIP, DiscoveryDepth: 0}
+	works := DeriveEligibleWorks(ip, profile)
+	var hasCDN bool
+	for _, w := range works {
+		if w.Action == ActionCDNCheck {
+			hasCDN = true
+		}
+	}
+	if !hasCDN {
+		t.Fatal("CDN check should be eligible on IP asset")
+	}
+
+	// Subdomain asset: CDN check NOT eligible (cdncheck only accepts IPs)
+	sub := &DiscoveryAsset{ID: "sub-1", Type: AssetSubdomain, DiscoveryDepth: 0}
+	works = DeriveEligibleWorks(sub, profile)
+	for _, w := range works {
+		if w.Action == ActionCDNCheck {
+			t.Fatal("CDN check should NOT be eligible on subdomain asset")
+		}
+	}
+}
+
 func TestDeriveEligibleWorks_HTTPXOnHTTPService(t *testing.T) {
 	profile := DefaultInternalProfile()
 
@@ -206,5 +232,18 @@ func TestDeriveEligibleWorks_HTTPXOnHTTPService(t *testing.T) {
 	}
 	if !ipHttpx {
 		t.Fatal("httpx should be eligible on IP asset (HTTPX candidate)")
+	}
+
+	// CIDR: httpx candidate for web discovery
+	cidr := &DiscoveryAsset{ID: "cidr-1", Type: AssetCIDR, DiscoveryDepth: 0}
+	works = DeriveEligibleWorks(cidr, profile)
+	var cidrHttpx bool
+	for _, w := range works {
+		if w.Action == ActionHTTPXFingerprint {
+			cidrHttpx = true
+		}
+	}
+	if !cidrHttpx {
+		t.Fatal("httpx should be eligible on CIDR asset (HTTPX candidate)")
 	}
 }

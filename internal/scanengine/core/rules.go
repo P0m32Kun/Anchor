@@ -74,7 +74,11 @@ func isSubdomain(a *DiscoveryAsset, _ Profile) bool {
 }
 
 func isSubdomainOrIP(a *DiscoveryAsset, _ Profile) bool {
-	return a.Type == AssetSubdomain || a.Type == AssetIP
+	return a.Type == AssetSubdomain || a.Type == AssetIP || a.Type == AssetCIDR
+}
+
+func isIP(a *DiscoveryAsset, _ Profile) bool {
+	return a.Type == AssetIP
 }
 
 func isIPAndAlive(a *DiscoveryAsset, _ Profile) bool {
@@ -103,7 +107,7 @@ func isWebEntry(a *DiscoveryAsset, _ Profile) bool {
 // isHTTPXCandidate covers assets that should be probed by httpx before becoming HTTP services.
 func isHTTPXCandidate(a *DiscoveryAsset, _ Profile) bool {
 	switch a.Type {
-	case AssetSubdomain, AssetIP, AssetIPPort:
+	case AssetSubdomain, AssetIP, AssetCIDR, AssetIPPort:
 		return true
 	default:
 		return false

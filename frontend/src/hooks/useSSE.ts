@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "../lib/api";
 
 export type SSEStatus = "connecting" | "open" | "closed" | "error";
 
@@ -11,7 +12,7 @@ export interface UseSSEOptions {
   maxRetries?: number;
   /** Heartbeat timeout in ms; default 30000 */
   heartbeatTimeout?: number;
-  /** Project ID to filter events */
+  /** Project ID to filter events and fetch SSE token */
   projectId?: string;
 }
 
@@ -30,8 +31,24 @@ const INITIAL_RETRY_DELAY = 1000;
 const MAX_RETRY_DELAY = 30000;
 
 /**
+ * Fetch a short-lived SSE token for the given project.
+ * Returns the token string, or null if the fetch fails.
+ */
+async function fetchSSEToken(projectId: string): Promise<string | null> {
+  try {
+    const data = await api.fetchSSEToken(projectId);
+    return data.token;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * useSSE — robust EventSource hook with auto-reconnect, heartbeat detection,
  * page-visibility management, and max-retry cap.
+ *
+ * When projectId is provided, automatically fetches a short-lived SSE JWT token
+ * and passes it via query parameter, avoiding the EventSource header limitation.
  */
 export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
   const {
@@ -108,17 +125,31 @@ export function useSSE(url: string, options: UseSSEOptions = {}): UseSSEReturn {
     }, heartbeatTimeout);
   }, [closeConnection, enableReconnect, maxRetries, heartbeatTimeout]);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (esRef.current) return; // already connected or connecting
 
     isManualCloseRef.current = false;
     setStatus("connecting");
 
+    // Build the URL with project_id filter
     let fullUrl = url;
     if (projectId) {
       const sep = url.includes("?") ? "&" : "?";
       fullUrl = `${url}${sep}project_id=${encodeURIComponent(projectId)}`;
     }
+
+    // Fetch SSE token if projectId is available
+    if (projectId) {
+      const sseToken = await fetchSSEToken(projectId);
+      if (sseToken) {
+        const sep = fullUrl.includes("?") ? "&" : "?";
+        fullUrl = `${fullUrl}${sep}token=${encodeURIComponent(sseToken)}`;
+      }
+      // If token fetch fails, try without token (will rely on Bearer auth if possible)
+    }
+
+    // Check if we were manually closed while waiting for the token
+    if (isManualCloseRef.current) return;
 
     try {
       const es = new EventSource(fullUrl);

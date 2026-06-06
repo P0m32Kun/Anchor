@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/asset"
 	"github.com/P0m32Kun/Anchor/internal/db"
@@ -55,6 +56,29 @@ func (e *ToolExecutor) Execute(ctx context.Context, w *models.ScanWorkItem, para
 		return nil, fmt.Errorf("no tool mapping for action %s", w.Action)
 	}
 
+	paramsJSON := "{}"
+	if pj, err := json.Marshal(params); err == nil {
+		paramsJSON = string(pj)
+	}
+
+	logID := util.GenerateID()
+	now := time.Now().UTC()
+	callLog := &models.ToolCallLog{
+		ID:         logID,
+		RunID:      w.RunID,
+		WorkItemID: &w.ID,
+		Tool:       toolID,
+		Action:     w.Action,
+		AssetID:    &w.AssetID,
+		ParamsJSON: paramsJSON,
+		StartedAt:  now,
+		Status:     models.ToolCallRunning,
+		CreatedAt:  now,
+	}
+	if err := e.queries.CreateToolCallLog(callLog); err != nil {
+		fmt.Printf("[executor] failed to create tool call log: %v\n", err)
+	}
+
 	res := toolrun.Invoke(ctx, e.queries, e.runner, e.tools, toolrun.InvokeInput{
 		ProjectID: w.ProjectID,
 		RunID:     &w.RunID,
@@ -62,6 +86,40 @@ func (e *ToolExecutor) Execute(ctx context.Context, w *models.ScanWorkItem, para
 		ToolID:    toolID,
 		Params:    params,
 	})
+
+	finishedAt := time.Now().UTC()
+	durationMs := finishedAt.Sub(now).Milliseconds()
+
+	var exitCode *int
+	var status models.ToolCallStatus
+	var outputSummary, errorMsg string
+
+	if res.Err != nil {
+		status = models.ToolCallFailed
+		errorMsg = res.Err.Error()
+	} else {
+		status = models.ToolCallCompleted
+	}
+
+	if res.Task != nil {
+		e.queries.UpdateToolCallLogTaskID(logID, res.Task.ID)
+		if res.Task.ExitCode != nil {
+			exitCode = res.Task.ExitCode
+		}
+	}
+
+	if len(res.Stdout) > 0 {
+		summary := string(res.Stdout)
+		if len(summary) > 500 {
+			summary = summary[:500]
+		}
+		outputSummary = summary
+	}
+
+	if updateErr := e.queries.UpdateToolCallLogOnComplete(logID, finishedAt, exitCode, status, durationMs, outputSummary, errorMsg); updateErr != nil {
+		fmt.Printf("[executor] failed to update tool call log: %v\n", updateErr)
+	}
+
 	if res.Err != nil {
 		return nil, res.Err
 	}

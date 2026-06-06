@@ -110,7 +110,8 @@ make build-fast     # 快速构建 Docker 镜像
 make e2e-local      # 启动 E2E 测试环境
 
 # 运行测试
-make test-e2e       # 运行 Playwright E2E 测试
+make test-e2e       # Playwright 快速套件（页面/smoke，chromium project）
+make test-e2e-scan  # 长 pipeline E2E（chromium-scan，单 spec 最长 30 分钟）
 
 # 停止环境
 make e2e-local-down
@@ -153,6 +154,7 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可（任务
 
 **Docker 镜像 tag 策略**（与 GitHub Release 对齐）：
 
+- **打 tag 前**：`make release-verify`（或 GitHub Actions **Release Verify**）— 用生产 Dockerfile 构建候选镜像，按用户 `docker-compose.yml` 路径验收；通过后再 `git tag v0.x.x && git push --tags`。
 - 推送 `v*` tag 后：`release.yml` 上传 `anchor-linux-{amd64,arm64}`；`docker-push.yml` 在 Release 成功后 checkout **该 tag**（非 main HEAD），并以同一版本构建镜像。
 - ACR 镜像同时打 `anchor-*:<tag>` 与 `anchor-*:latest`；`Dockerfile.server` / `Dockerfile.worker` 通过 `RELEASE_VERSION` build-arg 从 GitHub Release 下载对应 tag 的二进制（CI 中不会默认拉 `latest` 资产）。
 - 本地 `install.sh` 默认拉 `:latest`；要锁定版本可改 compose/`ANCHOR_REGISTRY` 镜像 tag 为 `v0.x.x`。

@@ -26,7 +26,7 @@ import {
 } from "../components";
 import { useToast } from "../components/Toast";
 import { getApiBase } from "../lib/config";
-import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig, ScanRunMetrics, ScanWorkItem } from "../lib/api";
+import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig, ScanRunMetrics, ScanWorkItem, ToolCallLog } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
 import {
   Play,
@@ -72,6 +72,8 @@ export default function RunsPage() {
   const [stagesLoading, setStagesLoading] = useState(false);
   const [works, setWorks] = useState<ScanWorkItem[]>([]);
   const [worksLoading, setWorksLoading] = useState(false);
+  const [toolCallLogs, setToolCallLogs] = useState<ToolCallLog[]>([]);
+  const [toolCallsLoading, setToolCallsLoading] = useState(false);
   const [workStatusFilter, setWorkStatusFilter] = useState<WorkStatusFilter>("all");
   const [metrics, setMetrics] = useState<ScanRunMetrics | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
@@ -137,8 +139,9 @@ export default function RunsPage() {
     setTasksLoading(true);
     setStagesLoading(true);
     setWorksLoading(true);
+    setToolCallsLoading(true);
     try {
-      const [taskData, stageData, metricsData, workData] = await Promise.all([
+      const [taskData, stageData, metricsData, workData, toolCallsData] = await Promise.all([
         api.getRunTasks(runId, signal).catch(() => [] as ScanTask[]),
         projectId
           ? api.listPipelineRunStages(projectId, runId, signal).catch(() => ({ stages: [] as PipelineRunStage[] }))
@@ -149,11 +152,15 @@ export default function RunsPage() {
         projectId
           ? api.listScanRunWorks(projectId, runId, signal).catch(() => ({ items: [] as ScanWorkItem[], total: 0 }))
           : Promise.resolve({ items: [] as ScanWorkItem[], total: 0 }),
+        projectId
+          ? api.listToolCallLogs(projectId, runId, signal).catch(() => ({ items: [] as ToolCallLog[], total: 0 }))
+          : Promise.resolve({ items: [] as ToolCallLog[], total: 0 }),
       ]);
       setTasks(taskData ?? []);
       setStages(stageData.stages ?? []);
       setMetrics(metricsData);
       setWorks(workData.items ?? []);
+      setToolCallLogs(toolCallsData.items ?? []);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "加载任务详情失败";
@@ -162,13 +169,14 @@ export default function RunsPage() {
       setTasksLoading(false);
       setStagesLoading(false);
       setWorksLoading(false);
+      setToolCallsLoading(false);
     }
   };
 
   const refreshRunDetails = useCallback(
     async (runId: string, signal?: AbortSignal) => {
       try {
-        const [taskData, stageData, metricsData, workData] = await Promise.all([
+        const [taskData, stageData, metricsData, workData, toolCallsData] = await Promise.all([
           api.getRunTasks(runId, signal).catch(() => null),
           projectId
             ? api.listPipelineRunStages(projectId, runId, signal).catch(() => null)
@@ -179,11 +187,15 @@ export default function RunsPage() {
           projectId
             ? api.listScanRunWorks(projectId, runId, signal).catch(() => null)
             : Promise.resolve(null),
+          projectId
+            ? api.listToolCallLogs(projectId, runId, signal).catch(() => null)
+            : Promise.resolve(null),
         ]);
         if (taskData) setTasks(taskData);
         if (stageData) setStages(stageData.stages ?? []);
         if (metricsData) setMetrics(metricsData);
         if (workData) setWorks(workData.items ?? []);
+        if (toolCallsData) setToolCallLogs(toolCallsData.items ?? []);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
       }
@@ -775,6 +787,53 @@ export default function RunsPage() {
                                             </div>
                                         );
                                     })}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="overflow-hidden">
+                        <CardHeader className="bg-muted/30 pb-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <CardTitle className="text-sm">工具调用日志</CardTitle>
+                                    <CardDescription className="text-xs">每次 CLI 调用的参数、状态与耗时</CardDescription>
+                                </div>
+                                <Badge variant="secondary" className="font-mono text-[10px]">{toolCallLogs.length}</Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {toolCallsLoading ? (
+                                <div className="p-8 text-center flex flex-col items-center gap-2">
+                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                    <span className="text-xs text-muted-foreground font-mono">Loading tool calls...</span>
+                                </div>
+                            ) : toolCallLogs.length === 0 ? (
+                                <div className="p-8 text-center text-xs text-muted-foreground italic">
+                                    暂无工具调用记录
+                                </div>
+                            ) : (
+                                <div className="max-h-[360px] overflow-y-auto divide-y">
+                                    {toolCallLogs.map((log) => (
+                                        <div key={log.id} className="p-3 hover:bg-muted/20 transition-colors space-y-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-mono shrink-0">
+                                                        {log.tool}
+                                                    </Badge>
+                                                    <span className="text-xs font-semibold truncate">{log.action}</span>
+                                                </div>
+                                                <Badge variant={statusVariant(log.status)} className="h-5 px-1.5 text-[10px] shrink-0">
+                                                    {log.status}
+                                                </Badge>
+                                            </div>
+                                            {log.duration_ms != null && (
+                                                <div className="text-[10px] text-muted-foreground font-mono">
+                                                    {log.duration_ms}ms
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </CardContent>

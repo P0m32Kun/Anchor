@@ -13,7 +13,7 @@ Anchor 使用 GitHub Actions：**PR/push 跑单元门禁**（`ci.yml`），**tag
 | `backend` | `go vet ./...`、`go test ./...` |
 | `frontend` | `npm ci`、`typecheck`、`test:unit`、`build` |
 
-长耗时 E2E（rangefield Docker 全栈）**不在**默认 PR 门禁内；本地或 nightly 使用 `make test-e2e-smoke` / `make test-e2e-full`。E2E 使用 `docker-compose.e2e.yml`（含 `build`，网络 `anchor-net-e2e` / `172.31.0.0/24`），与用户部署用的 `docker-compose.yml`（仅 ACR `image`、无 `build`）分离。环境变量见 `frontend/e2e/fixtures/e2e-env.ts`。
+长耗时 E2E（rangefield Docker 全栈）**不在**默认 PR 门禁内；本地或 nightly 使用 `make test-e2e`（快速套件）/ `make test-e2e-smoke` / `make test-e2e-scan` / `make test-e2e-full`。Playwright 已按 `chromium` / `chromium-scan` 拆分超时，无整次 `globalTimeout`。E2E 使用 `docker-compose.e2e.yml`（含 `build`，网络 `anchor-net-e2e` / `172.31.0.0/24`），与用户部署用的 `docker-compose.yml`（仅 ACR `image`、无 `build`）分离。环境变量见 `frontend/e2e/fixtures/e2e-env.ts`。
 
 ## 发布流程图
 
@@ -39,7 +39,64 @@ git tag v0.x.x && git push --tags
 └─────────────────┘
 ```
 
+## 上线前验证（tag 推送前必做）
+
+推送 `v*` tag 会触发 Release + ACR 发布，**不可逆**。在打 tag 之前，必须用与生产相同的 Dockerfile 构建候选镜像，并按**用户部署路径**跑通验证。
+
+### 验证内容
+
+| 步骤 | 说明 |
+|------|------|
+| 单元门禁 | `go vet ./...`、`go test ./...` |
+| 候选镜像构建 | `Dockerfile.server` / `Dockerfile.worker`（`RELEASE_VERSION=local` + 本地 `bin/anchor-linux-*`）+ `Dockerfile.frontend` |
+| 用户 compose 路径 | `docker-compose.release-verify.yml` — 仅 `image`、无 `build`，nginx 反代 `/api` |
+| 健康检查 | server `/health`、frontend HTTP 200、worker 注册上线 |
+| API smoke | 认证后创建项目 |
+| UI smoke | Playwright `release-verify-smoke.spec.ts`（`playwright.release-verify.config.ts`，走 `:18080` nginx） |
+
+### 本地执行
+
+```bash
+# 完整验证（worker 镜像首次构建可能需数分钟）
+make release-verify
+
+# 仅复测已构建候选镜像
+SKIP_BUILD=1 make release-verify
+
+# 快速门禁（跳过 Playwright）
+SKIP_SMOKE=1 make release-verify
+
+# 仅构建三镜像，不启动栈
+make release-verify-build
+```
+
+验证通过后：
+
+```bash
+git tag v0.x.x
+git push --tags
+```
+
+### CI 手动触发
+
+GitHub Actions → **Release Verify** → Run workflow（`release-verify.yml`）。与本地 `make release-verify` 等价，适合发布负责人 merge 后、打 tag 前的最后一道门禁。
+
+### 与 E2E 测试栈的区别
+
+| | `make test-e2e` | `make release-verify` |
+|--|-----------------|----------------------|
+| Compose | `docker-compose.e2e.yml`（含 build / fast 镜像） | `docker-compose.release-verify.yml`（仅 image，同用户 `docker-compose.yml` 结构） |
+| 前端 | Vite dev `:1420` | 生产 nginx `:18080`（默认，可 env 覆盖） |
+| Dockerfile | `Dockerfile.*-fast` | `Dockerfile.server` / `Dockerfile.worker` / `Dockerfile.frontend` |
+| 时机 | 开发 / PR 后 | **tag 推送前** |
+
 ## 发布新版本
+
+### 0. 上线前验证
+
+```bash
+make release-verify   # 或 Actions: Release Verify
+```
 
 ### 1. 提交代码
 
@@ -218,5 +275,6 @@ docker pull crpi-wthv8jhah5ufmzlr.cn-hangzhou.personal.cr.aliyuncs.com/p0m32kun/
 
 1. **版本号规范**: 使用语义化版本（v0.x.x）
 2. **提交信息规范**: 使用 Conventional Commits（feat/fix/docs/chore）
-3. **测试优先**: 推送前确保本地测试通过
-4. **文档同步**: 修改代码时同步更新文档
+3. **上线前验证**: `make release-verify` 通过后再 `git tag`（见上文「上线前验证」）
+4. **测试优先**: PR 门禁 + release-verify 双轨，build/typecheck alone 不算发布就绪
+5. **文档同步**: 修改代码时同步更新文档

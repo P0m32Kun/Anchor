@@ -567,8 +567,13 @@ Server NewServer():
 
 **触发条件**：
 - `ci.yml`：push/PR 到 `main` 时跑 `go test`/`go vet` 与前端 typecheck/unit/build（见 [`ci-cd-guide.md`](ci-cd-guide.md)）
+- `release-verify.yml`：**tag 推送前**手动触发，本地等价 `make release-verify`；用生产 Dockerfile 构建候选镜像并按用户 compose 路径验收
 - `release.yml`：tag 推送时触发，构建 Go 二进制并上传到 GitHub Release
 - `docker-push.yml`：Release 完成后自动触发，或通过 `workflow_dispatch` 手动触发
+
+**上线前验证**（`RELEASE_VERSION=local`）：
+- `Dockerfile.server` / `Dockerfile.worker` 通过 `docker/install-anchor-binary.sh` 安装二进制：`local` 用 `bin/anchor-linux-*`，否则 curl GitHub Release（`docker-push.yml` 构建前 `mkdir -p bin`）
+- `docker-compose.release-verify.yml` 镜像结构与 `docker-compose.yml` 一致，端口/网络隔离（默认 frontend `:18080`、API `:17422`）
 
 **构建流程**（`docker-push.yml`）：
 1. 解析 `RELEASE_VERSION`（Release workflow 的 `head_branch` = tag，或 `workflow_dispatch` 输入）

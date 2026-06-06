@@ -375,8 +375,39 @@ export interface Finding {
   summary?: string;
   remediation?: string;
   matched_template?: string;
+  run_id?: string;
+  source_task_id?: string;
   created_at: string;
   updated_at: string;
+}
+
+export type ToolCallStatus = "running" | "completed" | "failed";
+
+export interface ToolCallLog {
+  id: string;
+  run_id: string;
+  work_item_id?: string;
+  task_id?: string;
+  tool: string;
+  action: string;
+  asset_id?: string;
+  params_json: string;
+  started_at: string;
+  finished_at?: string;
+  duration_ms?: number;
+  exit_code?: number;
+  status: ToolCallStatus;
+  output_summary?: string;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface ToolCallTrace {
+  finding?: Finding;
+  work_item?: ScanWorkItem;
+  task?: ScanTask;
+  tool_call_log?: ToolCallLog;
+  run?: PipelineRun;
 }
 
 export interface Evidence {
@@ -487,6 +518,10 @@ export const api = {
 
   healthCheck: async () => fetchAPI<{ status: string }>("/health", { timeout: 5000 }),
 
+  // --- SSE Token ---
+  fetchSSEToken: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<{ token: string; expires_in: number; project_id: string }>(`/projects/${projectId}/sse-token`, { method: "POST", signal }),
+
   startAssetDiscovery: (projectId: string, signal?: AbortSignal) =>
     fetchAPI<{ status: string }>(`/projects/${projectId}/workflows/asset-discovery`, { method: "POST", signal }),
 
@@ -556,6 +591,10 @@ export const api = {
   // --- Scan Work Items ---
   listScanRunWorks: (projectId: string, runId: string, signal?: AbortSignal) =>
     fetchAPI<{ items: ScanWorkItem[]; total: number }>(`/projects/${projectId}/pipeline/runs/${runId}/works`, { signal }),
+  listToolCallLogs: (projectId: string, runId: string, signal?: AbortSignal) =>
+    fetchAPI<{ items: ToolCallLog[]; total: number }>(`/projects/${projectId}/pipeline/runs/${runId}/tool-calls`, { signal }),
+  getFindingTrace: (findingId: string, signal?: AbortSignal) =>
+    fetchAPI<ToolCallTrace>(`/findings/${findingId}/trace`, { signal }),
   listAssetWorks: (assetId: string, runId: string, signal?: AbortSignal) =>
     fetchAPI<{ asset_id: string; run_id: string; items: ScanWorkItem[]; total: number }>(`/assets/${assetId}/works?run_id=${runId}`, { signal }),
 

@@ -1,5 +1,8 @@
 # Environment (contains secrets)
 .env
+functional-test.env
+scripts/functional-test.env
+.env.functional-test
 
 # Binaries
 secbench-server
@@ -34,6 +37,7 @@ frontend/.vite/
 frontend/playwright-report/
 frontend/test-results/
 frontend/e2e/storage-state.json
+frontend/e2e/release-verify-storage-state.json
 frontend/e2e/screenshots/
 
 # OS
