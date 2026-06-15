@@ -141,11 +141,28 @@ func (q *Queries) applyFindingTemplateSeeds(seeds []SeedFindingTemplate) (*SyncR
 			continue
 		}
 
+		// Detect whether the user actually edited content fields (title/severity/summary/remediation)
+		// or just toggled enabled. If upstream JSON changed a content field and the user hasn't
+		// touched it, adopt the upstream value even when user_modified=1.
+		hasContentEdit := false
+		if row.UserModified && strings.TrimSpace(row.BuiltinPayload) != "" {
+			var oldSeed SeedFindingTemplate
+			if json.Unmarshal([]byte(row.BuiltinPayload), &oldSeed) == nil {
+				// User edited a content field if current value differs from old upstream.
+				if row.Title != strings.TrimSpace(oldSeed.Title) ||
+					row.Severity != strings.TrimSpace(oldSeed.Severity) ||
+					row.Summary != oldSeed.Summary ||
+					row.Remediation != oldSeed.Remediation {
+					hasContentEdit = true
+				}
+			}
+		}
+
 		// Always refresh the builtin_payload so UI can show "upstream updated".
 		row.BuiltinPayload = string(payload)
 
-		if row.UserModified {
-			// Preserve user edits; only payload pointer moves.
+		if row.UserModified && hasContentEdit {
+			// User genuinely edited content fields; preserve their edits, only payload moves.
 			row.UpdatedAt = now
 			if err := q.UpdateFindingTemplate(row); err != nil {
 				return nil, fmt.Errorf("refresh payload (%s/%s): %w", tool, match, err)
