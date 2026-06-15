@@ -26,7 +26,7 @@ import {
 } from "../components";
 import { useToast } from "../components/Toast";
 import { getApiBase } from "../lib/config";
-import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig, ScanRunMetrics, ScanWorkItem, ToolCallLog } from "../lib/api";
+import type { ScanTask, PipelineRun, PipelineRunStage, PipelineConfig, ScanRunMetrics, ScanWorkItem, ToolCallLog, RunSummaryResponse } from "../lib/api";
 import type { ScanMode } from "../components/ScanModal";
 import {
   Play,
@@ -76,6 +76,7 @@ export default function RunsPage() {
   const [toolCallsLoading, setToolCallsLoading] = useState(false);
   const [workStatusFilter, setWorkStatusFilter] = useState<WorkStatusFilter>("all");
   const [metrics, setMetrics] = useState<ScanRunMetrics | null>(null);
+  const [runSummary, setRunSummary] = useState<RunSummaryResponse | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -141,7 +142,7 @@ export default function RunsPage() {
     setWorksLoading(true);
     setToolCallsLoading(true);
     try {
-      const [taskData, stageData, metricsData, workData, toolCallsData] = await Promise.all([
+      const [taskData, stageData, metricsData, workData, toolCallsData, summaryData] = await Promise.all([
         api.getRunTasks(runId, signal).catch(() => [] as ScanTask[]),
         projectId
           ? api.listPipelineRunStages(projectId, runId, signal).catch(() => ({ stages: [] as PipelineRunStage[] }))
@@ -155,12 +156,16 @@ export default function RunsPage() {
         projectId
           ? api.listToolCallLogs(projectId, runId, signal).catch(() => ({ items: [] as ToolCallLog[], total: 0 }))
           : Promise.resolve({ items: [] as ToolCallLog[], total: 0 }),
+        projectId
+          ? api.getRunSummary(projectId, runId, signal).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setTasks(taskData ?? []);
       setStages(stageData.stages ?? []);
       setMetrics(metricsData);
       setWorks(workData.items ?? []);
       setToolCallLogs(toolCallsData.items ?? []);
+      setRunSummary(summaryData);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "加载任务详情失败";
@@ -176,7 +181,7 @@ export default function RunsPage() {
   const refreshRunDetails = useCallback(
     async (runId: string, signal?: AbortSignal) => {
       try {
-        const [taskData, stageData, metricsData, workData, toolCallsData] = await Promise.all([
+        const [taskData, stageData, metricsData, workData, toolCallsData, summaryData] = await Promise.all([
           api.getRunTasks(runId, signal).catch(() => null),
           projectId
             ? api.listPipelineRunStages(projectId, runId, signal).catch(() => null)
@@ -190,12 +195,16 @@ export default function RunsPage() {
           projectId
             ? api.listToolCallLogs(projectId, runId, signal).catch(() => null)
             : Promise.resolve(null),
+          projectId
+            ? api.getRunSummary(projectId, runId, signal).catch(() => null)
+            : Promise.resolve(null),
         ]);
         if (taskData) setTasks(taskData);
         if (stageData) setStages(stageData.stages ?? []);
         if (metricsData) setMetrics(metricsData);
         if (workData) setWorks(workData.items ?? []);
         if (toolCallsData) setToolCallLogs(toolCallsData.items ?? []);
+        if (summaryData) setRunSummary(summaryData);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
       }
@@ -206,6 +215,7 @@ export default function RunsPage() {
   // SSE for real-time updates
   const sseUrl = projectId ? `${getApiBase()}/projects/${projectId}/events` : `${getApiBase()}/events`;
   const { status: sseStatus } = useSSE(sseUrl, {
+    projectId: projectId ?? undefined,
     onMessage: (raw) => {
       const msg = raw as {
         event?: string;
@@ -495,7 +505,13 @@ export default function RunsPage() {
                                 <div className={cn(
                                     "h-10 w-10 rounded-full flex items-center justify-center shrink-0 border",
                                     run.status === 'running' ? 'bg-primary/10 border-primary/20 text-primary animate-pulse' :
-                                    run.status === 'completed' ? 'bg-brand-success/10 border-brand-success/20 text-brand-success' :
+                                    run.status === 'completed' ? (
+                                        selectedRun === run.id && runSummary?.complete === true
+                                            ? 'bg-brand-success/10 border-brand-success/20 text-brand-success'
+                                            : selectedRun === run.id && runSummary?.complete === false
+                                                ? 'bg-warning/10 border-warning/20 text-warning'
+                                                : 'bg-brand-success/10 border-brand-success/20 text-brand-success'
+                                    ) :
                                     run.status === 'failed' ? 'bg-destructive/10 border-destructive/20 text-destructive' :
                                     'bg-muted border-border text-muted-foreground'
                                 )}>
@@ -531,7 +547,11 @@ export default function RunsPage() {
                                     <div className={cn(
                                         "text-xs font-bold uppercase",
                                         run.status === 'running' ? 'text-primary' :
-                                        run.status === 'completed' ? 'text-brand-success' :
+                                        run.status === 'completed' ? (
+                                            selectedRun === run.id && runSummary?.complete === false
+                                                ? 'text-warning'
+                                                : 'text-brand-success'
+                                        ) :
                                         run.status === 'failed' ? 'text-destructive' :
                                         'text-muted-foreground'
                                     )}>
@@ -637,6 +657,64 @@ export default function RunsPage() {
                                         </div>
                                     )}
                                 </div>
+                                {/* BW3: Run Summary */}
+                                {runSummary && (
+                                    <div className="mt-3 pt-3 border-t border-white/5 grid grid-cols-2 gap-3 text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-muted-foreground">新发现:</span>
+                                            <span className="font-medium text-accent-red">{runSummary.new_findings}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-muted-foreground">新信号:</span>
+                                            <span className="font-medium text-primary">{runSummary.new_signals}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Phase Coverage Card */}
+                    {runSummary && runSummary.phases && runSummary.phases.length > 0 && (
+                        <Card className="overflow-hidden">
+                            <CardHeader className="bg-muted/30 pb-3">
+                                <CardTitle className="text-sm">阶段覆盖率</CardTitle>
+                                <CardDescription className="text-xs">
+                                    各阶段 work item 完成度
+                                    {runSummary.complete ? (
+                                        <span className="ml-2 text-brand-success font-medium">✓ 已全部完成</span>
+                                    ) : runSummary.incomplete_reason ? (
+                                        <span className="ml-2 text-warning font-medium">⏳ {runSummary.incomplete_reason}</span>
+                                    ) : null}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-3">
+                                {runSummary.phases.map((phase) => (
+                                    <div key={phase.stage} className="space-y-1">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="font-medium truncate">{STAGE_LABELS[phase.stage] || stageLabel(phase.stage)}</span>
+                                            <span className="text-muted-foreground font-mono">
+                                                {phase.done}/{phase.total} <span className={cn(
+                                                    "font-bold",
+                                                    phase.pct >= 100 ? "text-brand-success" :
+                                                    phase.pct > 0 ? "text-primary" :
+                                                    "text-muted-foreground"
+                                                )}>{phase.pct}%</span>
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                            <div
+                                                className={cn(
+                                                    "h-full rounded-full transition-all",
+                                                    phase.pct >= 100 ? "bg-brand-success" :
+                                                    phase.pct > 0 ? "bg-primary" :
+                                                    "bg-muted-foreground/20"
+                                                )}
+                                                style={{ width: `${Math.max(0, Math.min(100, phase.pct))}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
                             </CardContent>
                         </Card>
                     )}

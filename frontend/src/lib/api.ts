@@ -206,6 +206,11 @@ export interface Project {
   default_profile?: string;
   port_range?: string;
   pipeline_config?: string;
+  scope_boundary_mode?: string;
+  watch_enabled?: boolean;
+  watch_interval_hours?: number;
+  watch_passive_only?: boolean;
+  watch_last_tick_at?: string;
   created_at: string;
 }
 
@@ -381,6 +386,23 @@ export interface Finding {
   updated_at: string;
 }
 
+export interface Signal {
+  id: string;
+  project_id: string;
+  source_kind: string; // finding | spoor | endpoint | asset_new
+  source_id: string;
+  title: string;
+  severity: string;
+  score: number;
+  scope_status: string; // in_scope | out_of_scope
+  status: string; // new | dismissed | pinned
+  metadata: string;
+  first_seen: string;
+  last_seen: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ToolCallStatus = "running" | "completed" | "failed";
 
 export interface ToolCallLog {
@@ -451,6 +473,12 @@ export const api = {
   deleteProject: (id: string, signal?: AbortSignal) =>
     fetchAPI<{ status: string }>(`/projects/${id}`, { method: "DELETE", signal }),
 
+  updateProjectScopeBoundaryMode: (id: string, mode: "off" | "strict", signal?: AbortSignal) =>
+    fetchAPI<Project>(`/projects/${id}/scope-boundary-mode`, { method: "PATCH", body: JSON.stringify({ scope_boundary_mode: mode }), signal }),
+
+  updateProjectWatchConfig: (id: string, config: { watch_enabled?: boolean; watch_interval_hours?: number; watch_passive_only?: boolean }, signal?: AbortSignal) =>
+    fetchAPI<Project>(`/projects/${id}/watch-config`, { method: "PATCH", body: JSON.stringify(config), signal }),
+
   createTarget: (projectId: string, data: { type: string; value: string }, signal?: AbortSignal) =>
     fetchAPI<Target | ScopeConfirmationResponse>(`/projects/${projectId}/targets`, { method: "POST", body: JSON.stringify(data), signal }),
 
@@ -484,9 +512,6 @@ export const api = {
       signal,
     });
   },
-
-  runTask: (data: { project_id: string; plan_id?: string; tool: string; target_id: string; command: string }, signal?: AbortSignal) =>
-    fetchAPI<ScanTask>("/tasks/run", { method: "POST", body: JSON.stringify(data), signal }),
 
   getTask: (id: string, signal?: AbortSignal) => fetchAPI<ScanTask>(`/scan-tasks/${id}`, { signal }),
 
@@ -522,9 +547,6 @@ export const api = {
   fetchSSEToken: (projectId: string, signal?: AbortSignal) =>
     fetchAPI<{ token: string; expires_in: number; project_id: string }>(`/projects/${projectId}/sse-token`, { method: "POST", signal }),
 
-  startAssetDiscovery: (projectId: string, signal?: AbortSignal) =>
-    fetchAPI<{ status: string }>(`/projects/${projectId}/workflows/asset-discovery`, { method: "POST", signal }),
-
   listAssets: (projectId: string, pagination?: PaginationParams, signal?: AbortSignal) =>
     fetchAPI<PaginatedResponse<Asset>>(buildQueryString(`/projects/${projectId}/assets`, { page: pagination?.page, page_size: pagination?.page_size }), { signal }),
 
@@ -538,9 +560,6 @@ export const api = {
   listServicePorts: (projectId: string, signal?: AbortSignal) =>
     fetchAPI<ServicePort[]>(`/projects/${projectId}/service-ports`, { signal }),
 
-  startWebScreening: (projectId: string, signal?: AbortSignal) =>
-    fetchAPI<{ status: string }>(`/projects/${projectId}/workflows/web-screening`, { method: "POST", signal }),
-
   listFindings: (projectId: string, status?: string, pagination?: PaginationParams, signal?: AbortSignal) =>
     fetchAPI<PaginatedResponse<Finding>>(buildQueryString(`/projects/${projectId}/findings`, { status, page: pagination?.page, page_size: pagination?.page_size }), { signal }),
 
@@ -552,6 +571,25 @@ export const api = {
 
   addEvidence: (findingId: string, data: { type: string; excerpt: string; created_by?: string }, signal?: AbortSignal) =>
     fetchAPI<Evidence>(`/findings/${findingId}/evidence`, { method: "POST", body: JSON.stringify(data), signal }),
+
+  // --- Signals (Inbox) ---
+  listSignals: (projectId: string, params?: { min_score?: number; scope?: string; status?: string }, signal?: AbortSignal) => {
+    const query = buildQueryString(`/projects/${projectId}/signals`, {
+      min_score: params?.min_score,
+      scope: params?.scope,
+      status: params?.status,
+    });
+    return fetchAPI<{ data: Signal[]; total: number }>(query, { signal });
+  },
+
+  countSignals: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<{ total: number; new: number }>(`/projects/${projectId}/signals/count`, { signal }),
+
+  getSignal: (id: string, signal?: AbortSignal) =>
+    fetchAPI<Signal>(`/signals/${id}`, { signal }),
+
+  updateSignalStatus: (id: string, status: "new" | "dismissed" | "pinned", signal?: AbortSignal) =>
+    fetchAPI<{ status: string }>(`/signals/${id}`, { method: "PATCH", body: JSON.stringify({ status }), signal }),
 
   exportReportMD: (projectId: string, signal?: AbortSignal) =>
     fetchBlob(`/projects/${projectId}/reports/export.md`, { signal }),
@@ -576,6 +614,9 @@ export const api = {
       signal,
     }),
 
+  getScanDefaults: (signal?: AbortSignal) =>
+    fetchAPI<ScanDefaultsResponse>("/scan/defaults", { signal }),
+
   // --- Tool Templates ---
   listToolTemplates: (signal?: AbortSignal) =>
     fetchAPI<ToolTemplate[]>("/tool-templates", { signal }),
@@ -597,6 +638,12 @@ export const api = {
     fetchAPI<ToolCallTrace>(`/findings/${findingId}/trace`, { signal }),
   listAssetWorks: (assetId: string, runId: string, signal?: AbortSignal) =>
     fetchAPI<{ asset_id: string; run_id: string; items: ScanWorkItem[]; total: number }>(`/assets/${assetId}/works?run_id=${runId}`, { signal }),
+
+  // --- Run Summary (BW3) ---
+  getRunSummary: (projectId: string, runId: string, signal?: AbortSignal) =>
+    fetchAPI<RunSummaryResponse>(
+      `/projects/${projectId}/pipeline/runs/${runId}/summary`, { signal }
+    ),
 
   // --- Unified Scan ---
   createScan: (projectId: string, data: { mode: string; config: PipelineConfig }, signal?: AbortSignal) =>
@@ -876,6 +923,23 @@ export interface PipelineRun {
   created_at: string;
 }
 
+export interface PhaseCoverage {
+  stage: string;
+  total: number;
+  done: number;
+  pct: number;
+}
+
+export interface RunSummaryResponse {
+  run_id: string;
+  new_findings: number;
+  new_signals: number;
+  status: string;
+  phases: PhaseCoverage[];
+  complete: boolean;
+  incomplete_reason: string;
+}
+
 export interface PipelineConfig {
   enable_fofa: boolean;
   fofa_result_limit: number;
@@ -921,8 +985,12 @@ export interface PipelineConfig {
   nuclei_require_fingerprint: boolean;
   passive_search_result_limit: number;
   passive_search_concurrency: number;
+  enable_passive_junk_filter: boolean;
+  passive_junk_keywords?: string[];
   subfinder_provider_config: string;
-  scan_mode?: string; // "default" | "src_low_noise"
+  scan_mode?: string; // "internal" | "external" | "watch" (legacy: "src_low_noise", "bounty")
+  noise_level?: string; // "low" | "standard" — only for external mode
+  enable_spoor: boolean;
 }
 
 export interface Dictionary {
@@ -989,11 +1057,13 @@ export interface DashboardFindingItem {
 export interface DashboardStats {
   total_projects: number;
   active_runs: number;
-  pending_findings: number;
+  new_findings: number;
   online_workers: number;
   recent_runs: DashboardRunItem[];
   recent_findings: DashboardFindingItem[];
 }
+
+export const DEFAULT_FFUF_DICTIONARY_ID = "builtin:path/top100.txt";
 
 export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   enable_fofa: true,
@@ -1025,7 +1095,7 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   enable_ffuf: true,
   ffuf_rate_limit: 6,
   ffuf_timeout: 30,
-  ffuf_dictionary_id: "",
+  ffuf_dictionary_id: DEFAULT_FFUF_DICTIONARY_ID,
   enable_katana: true,
   katana_max_depth: 2,
   katana_rate_limit: 10,
@@ -1039,7 +1109,9 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   nuclei_require_fingerprint: false,
   passive_search_result_limit: 500,
   passive_search_concurrency: 3,
+  enable_passive_junk_filter: false,
   subfinder_provider_config: "",
+  enable_spoor: false,
 };
 
 export const DEFAULT_EXTERNAL_PIPELINE_CONFIG: PipelineConfig = {
@@ -1062,11 +1134,16 @@ export const DEFAULT_EXTERNAL_PIPELINE_CONFIG: PipelineConfig = {
   nuclei_require_fingerprint: true,
   passive_search_result_limit: 500,
   passive_search_concurrency: 3,
+  enable_passive_junk_filter: true,
+  passive_junk_keywords: [],
+  enable_ffuf: false,
+  enable_katana: false,
 };
 
 export const DEFAULT_LOW_NOISE_PIPELINE_CONFIG: PipelineConfig = {
   ...DEFAULT_EXTERNAL_PIPELINE_CONFIG,
-  scan_mode: "src_low_noise",
+  scan_mode: "external",
+  noise_level: "low",
   port_range: "top100",
   naabu_rate: 200,
   naabu_threads: 30,
@@ -1080,13 +1157,74 @@ export const DEFAULT_LOW_NOISE_PIPELINE_CONFIG: PipelineConfig = {
   ffuf_rate_limit: 3,
   ffuf_timeout: 20,
   enable_katana: false,
+  enable_spoor: true,
   enable_passive_search: true,
   enable_passive_cert: true,
   enable_passive_url: true,
   subfinder_mode: "passive",
   passive_search_result_limit: 300,
   passive_search_concurrency: 2,
+  enable_passive_junk_filter: true,
 };
+
+// Canonical name alias
+export const DEFAULT_EXTERNAL_LOW_NOISE_PIPELINE_CONFIG = DEFAULT_LOW_NOISE_PIPELINE_CONFIG;
+
+export const DEFAULT_EXTERNAL_STANDARD_PIPELINE_CONFIG: PipelineConfig = {
+  ...DEFAULT_EXTERNAL_PIPELINE_CONFIG,
+  scan_mode: "external",
+  noise_level: "standard",
+  port_range: "top100",
+  naabu_rate: 300,
+  naabu_threads: 50,
+  nuclei_scan_depth: "workflow",
+  nuclei_rate_limit: 10,
+  nuclei_concurrency: 5,
+  nuclei_rate_limit_per_min: 30,
+  nuclei_require_fingerprint: true,
+  enable_ffuf: true,
+  ffuf_tier: "small",
+  ffuf_rate_limit: 4,
+  enable_katana: false,
+  enable_spoor: true,
+  enable_passive_search: true,
+  enable_passive_cert: true,
+  enable_passive_url: true,
+  subfinder_mode: "passive",
+  passive_search_result_limit: 500,
+  passive_search_concurrency: 3,
+  enable_passive_junk_filter: true,
+};
+
+export const DEFAULT_BOUNTY_PIPELINE_CONFIG: PipelineConfig = {
+  ...DEFAULT_EXTERNAL_PIPELINE_CONFIG,
+  scan_mode: "watch",
+  enable_spoor: true,
+  enable_katana: false,
+  enable_passive_search: true,
+  enable_passive_cert: true,
+  enable_passive_url: true,
+  subfinder_mode: "passive",
+  passive_search_result_limit: 500,
+  passive_search_concurrency: 3,
+  nuclei_scan_depth: "workflow",
+  nuclei_rate_limit: 10,
+  nuclei_concurrency: 5,
+  nuclei_rate_limit_per_min: 30,
+  nuclei_require_fingerprint: true,
+  port_range: "top100",
+  naabu_rate: 300,
+  naabu_threads: 50,
+  skip_portscan_on_cdn_host: true,
+  enable_ffuf: true,
+  ffuf_tier: "small",
+  ffuf_rate_limit: 4,
+  ffuf_timeout: 20,
+  enable_passive_junk_filter: true,
+};
+
+// Canonical name alias
+export const DEFAULT_WATCH_PIPELINE_CONFIG = DEFAULT_BOUNTY_PIPELINE_CONFIG;
 
 // Mirrors internal/worker/commands.go:HighRiskPorts — curated list of high-value
 // attack-surface ports (Redis/ES/MongoDB/Docker/K8s/Ollama, …) that Naabu's
@@ -1101,6 +1239,16 @@ export const DEFAULT_HIGH_RISK_PORTS =
   "10000,10250,10255,11211,11434,15672,15692,16379,18091," +
   "27017,27018,27019,28017,50000,50070,50075,61613,61616";
 
+/** Deployment scan defaults from GET /scan/defaults (server-side scan.config.yaml). */
+export interface ScanDefaultsResponse {
+  high_risk_ports: string;
+  ffuf_dictionary_default: string;
+  presets: Partial<Record<"external" | "internal" | "watch" | "external_low" | "external_standard" | "src_low_noise" | "bounty", PipelineConfig>>;
+  junk_keyword_count: number;
+  exclude_domain_count: number;
+  config_path?: string;
+}
+
 // Maps to naabu's -tp flag values supported by the backend (see
 // internal/worker/commands.go:BuildNaabuCommand).
 export const TP_PRESET_VALUES = ["top100", "top1000", "full"] as const;
@@ -1111,6 +1259,24 @@ export const TP_PRESET_LABELS: Record<TpPresetValue, string> = {
   top1000: "Top 1000 常用端口",
   full: "全端口 (1-65535)",
 };
+
+/** One keyword per line (commas also accepted) for ScanModal textarea display. */
+export function formatPassiveJunkKeywords(keywords?: string[]): string {
+  return (keywords ?? []).join("\n");
+}
+
+/** Parse user-edited junk keyword text into a deduped list for passive_junk_keywords. */
+export function parsePassiveJunkKeywords(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of text.split(/[\n,，]+/)) {
+    const kw = part.trim();
+    if (!kw || seen.has(kw)) continue;
+    seen.add(kw);
+    out.push(kw);
+  }
+  return out;
+}
 
 // --- Engine Search ---
 
