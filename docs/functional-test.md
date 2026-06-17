@@ -15,6 +15,7 @@
 | FT-SRV-01 | Given 环境就绪 → When 启动 Server → Then 监听 :17421 且无 fatal 日志 | — | 仅手工 |
 | FT-SRV-02 | Given on-start 同步 → When 启动 Server → Then 三个 builtin 仓库克隆成功 | — | 仅手工 |
 | FT-WRK-01 | Given Worker 配置正确 → When 启动 Worker → Then Workers 页显示 Online | `frontend/e2e/tests/WorkersPage.spec.ts` | 已自动化 |
+| FT-WRK-02 | Given ≥2 worker 在线 → When 2×60 domain 并行扫描完成 → Then task 分散到 ≥2 worker | `frontend/e2e/tests/multi-worker-dispatch.spec.ts` | 已自动化 |
 | FT-DATA-01 | Given Server 已启动 → When 查 API → Then Templates builtin 源存在且 enabled | `internal/api/builtin_assets_handlers_test.go` | 已自动化(集成) |
 | FT-DATA-02 | Given Server 已启动 → When 查 API → Then Fingerprints builtin 存在 | `internal/api/builtin_assets_handlers_test.go` | 已自动化(集成) |
 | FT-DATA-03 | Given Server 已启动 → When 查 API → Then Dictionaries builtin 存在 | `internal/api/builtin_assets_handlers_test.go` | 已自动化(集成) |
@@ -26,6 +27,9 @@
 | E2E-FLOW-03 | Given 5 个靶标 IP → When UI 启动内网扫描 → Then AssetPage 有数据 | `frontend/e2e/tests/internal-scan-live.spec.ts` | 已自动化 |
 | E2E-SSE-01 | Given RunsPage 已打开 → When SSE 连接成功 → Then 显示「SSE 实时连接」且扫描完成后 UI 显示 completed | `frontend/e2e/tests/sse-realtime.spec.ts` | 已自动化 |
 | E2E-TRACE-01 | Given 扫描完成 → When 查看 Runs/Findings → Then 工具调用日志与调用溯源在 UI 可见 | `frontend/e2e/tests/trace-audit.spec.ts` | 已自动化 |
+| FT-BATCH-01 | Given 120 domain → When 外网 low-noise 扫描完成 → Then work≤400 且 tool_calls≤200 且含 batch work | `frontend/e2e/tests/batch-scan-scale.spec.ts` | 已自动化 |
+| FT-BATCH-02 | Given httpx technologies → When nuclei 路由 → Then 按 tech 分桶、low noise 无 tech skip | `internal/scanconfig/nuclei_routing_test.go` | 已自动化(单测) |
+| FT-BATCH-03 | Given running run + zombie work → When RecoverOrphanRuns → Then run=failed、work 终态 | `internal/scanengine/recovery/orphan_test.go` | 已自动化(单测) |
 
 **状态说明**：`仅手工` = 按本文档章节勾选；`已自动化` = Playwright spec 覆盖核心路径；`待自动化` = 有计划但未实现。
 

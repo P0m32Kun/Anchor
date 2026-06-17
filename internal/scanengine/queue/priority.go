@@ -15,10 +15,11 @@ const (
 
 // Item is a work item in the priority queue.
 type Item struct {
-	WorkID   string
-	Action   string
-	AssetID  string
-	Priority Priority
+	WorkID    string
+	Action    string
+	AssetID   string
+	Priority  Priority
+	BucketKey string // fair-scheduling bucket (e.g. target:id)
 }
 
 // Depth returns the queue depth per priority tier.

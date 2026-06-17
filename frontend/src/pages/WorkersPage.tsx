@@ -62,8 +62,8 @@ export default function WorkersPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-         <SummaryCard title="在线节点" value={workers.filter(w => w.status === 'online').length} total={workers.length} icon={Activity} color="text-emerald-400" />
-         <SummaryCard title="活跃任务" value={workers.reduce((acc, w) => acc + (w.busy ? 1 : 0), 0)} total={workers.length} icon={Zap} color="text-amber-400" />
+         <SummaryCard title="在线节点" value={workers.filter(w => w.status === 'online' || w.status === 'busy').length} total={workers.length} icon={Activity} color="text-emerald-400" />
+         <SummaryCard title="活跃任务" value={workers.reduce((acc, w) => acc + (w.running_tasks ?? 0), 0)} icon={Zap} color="text-amber-400" />
          <SummaryCard title="系统版本" value="v0.4.2" icon={Shield} color="text-blue-400" />
       </div>
 
@@ -116,9 +116,27 @@ export default function WorkersPage() {
                       <div className="flex-1 p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                          <InfoItem label="内网 IP" value={worker.endpoint || 'Unknown'} icon={Network} />
                          <InfoItem label="节点名称" value={worker.name || worker.id.slice(0, 8)} icon={HardDrive} />
-                         <InfoItem label="负载状态" value={worker.busy ? "BUSY" : worker.status === 'online' ? "IDLE" : "OFFLINE"} icon={Zap} highlight={worker.busy} />
+                         <InfoItem
+                           label="运行任务"
+                           value={`${worker.running_tasks ?? 0} / ${worker.max_concurrency ?? 10}`}
+                           icon={Zap}
+                           highlight={(worker.running_tasks ?? 0) > 0}
+                         />
                          <InfoItem label="最后心跳" value={worker.last_seen ? new Date(worker.last_seen).toLocaleTimeString() : '--'} icon={Activity} />
                       </div>
+                      {/* System resource metrics */}
+                      {(worker.cpu_percent != null || worker.mem_percent != null || worker.disk_percent != null) && (
+                        <div className="mt-3 space-y-2">
+                          <ResourceBar label="CPU" value={worker.cpu_percent} icon={Cpu} color="bg-blue-500" />
+                          <ResourceBar label="内存" value={worker.mem_percent} icon={Activity} color="bg-emerald-500" />
+                          <ResourceBar label="磁盘" value={worker.disk_percent} icon={HardDrive} color="bg-amber-500" />
+                          {worker.metrics_updated_at && (
+                            <p className="text-[9px] text-muted-foreground/40 mt-1">
+                              指标更新于 {new Date(worker.metrics_updated_at).toLocaleTimeString()}
+                            </p>
+                          )}
+                        </div>
+                      )}
                       {worker.status === 'offline' && (
                         <div className="flex items-center justify-end p-4 border-t border-white/5">
                           <Button variant="ghost" size="sm" className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10" onClick={() => deleteWorker(worker.id)}>
@@ -155,6 +173,27 @@ function SummaryCard({ title, value, total, icon: Icon, color }: any) {
             </CardContent>
         </Card>
     )
+}
+
+function ResourceBar({ label, value, icon: Icon, color }: { label: string; value?: number; icon: any; color: string }) {
+    if (value == null) return null;
+    const pct = Math.min(100, Math.max(0, value));
+    return (
+        <div className="space-y-1">
+            <div className="flex items-center justify-between text-[10px]">
+                <span className="flex items-center gap-1 font-bold uppercase tracking-wider text-muted-foreground/50">
+                    <Icon className="h-3 w-3" />{label}
+                </span>
+                <span className="font-mono text-muted-foreground">{pct.toFixed(1)}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                    className={cn("h-full rounded-full transition-all", color)}
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+        </div>
+    );
 }
 
 function InfoItem({ label, value, icon: Icon, highlight }: any) {

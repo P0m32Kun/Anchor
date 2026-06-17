@@ -419,3 +419,47 @@ func (e *Engine) filterTargetsWithRules(targets []*models.Target, rules []*model
 	}
 	return out, nil
 }
+
+
+
+// matchRule checks if a target value matches a rule value (simple string match or wildcard).
+func matchRule(target, rule string) bool {
+	if rule == "*" {
+		return true
+	}
+	// Simple suffix match for wildcard domains (*.example.com)
+	if len(rule) > 2 && rule[:2] == "*." {
+		suffix := rule[1:] // .example.com
+		if target == suffix[1:] || strings.HasSuffix(target, suffix) {
+			return true
+		}
+		return false
+	}
+	return target == rule
+}
+
+// EvaluateBoundary checks if a target is in scope for boundary filtering.
+// Returns (allow, decision, reason).
+func (e *Engine) EvaluateBoundary(target *models.Target, rules []*models.ScopeRule, mode string) (bool, string, string) {
+	if mode == "" || mode == string(models.ScopeBoundaryOff) {
+		return true, string(models.ScopeAllow), "boundary off"
+	}
+	for _, rule := range rules {
+		if rule.Type != target.Type {
+			continue
+		}
+		if matchRule(target.Value, rule.Value) {
+			switch rule.Action {
+			case models.ScopeActionInclude:
+				return true, string(models.ScopeAllow), "matched include rule"
+			case models.ScopeActionExclude:
+				return false, string(models.ScopeDeny), "matched exclude rule"
+			}
+		}
+	}
+	// Default: allow in off mode, deny in strict mode
+	if mode == string(models.ScopeBoundaryStrict) {
+		return false, string(models.ScopeDeny), "no matching rule in strict mode"
+	}
+	return true, string(models.ScopeAllow), "default allow"
+}

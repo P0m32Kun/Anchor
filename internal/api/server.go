@@ -22,6 +22,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/nuclei/custom"
 	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/scanengine/recovery"
 	"github.com/P0m32Kun/Anchor/internal/service"
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
@@ -40,9 +41,9 @@ import (
 // 改任何字段前,先在 README.md 找消费者列表,再决定动手范围。
 type Server struct {
 	// queries: 持久化层。绝大多数 handler 都直接使用,改签名前慎重。
-	// 消费者: archive / asset / dashboard / engine / evaluation / finding_template /
-	//   pipeline / retest / run / scope / slow_scan / task /
-	//   worker / workdir_cleanup / workflow / handlers
+	// 消费者: archive / asset / dashboard / engine / finding_template /
+	//   pipeline / retest / run / scope / task /
+	//   worker / workdir_cleanup / handlers
 	queries *db.Queries
 
 	// rawDB: 原始 sql.DB,仅在需要事务/低层 API 时使用。
@@ -50,11 +51,11 @@ type Server struct {
 	rawDB *sql.DB
 
 	// scopeEng: 范围(scope)校验引擎。
-	// 消费者: pipeline / run / scope / workflow
+	// 消费者: pipeline / run / scope
 	scopeEng *scope.Engine
 
 	// worker: 本地 worker.Runner(注意区别于 worker 包内的 RemoteAgent)。
-	// 消费者: pipeline / run / slow_scan / task / workflow
+	// 消费者: pipeline / run / task
 	worker *worker.Runner
 
 	// assetMerger: 资产合并器,用于 scanengine 的资产去重。
@@ -66,8 +67,8 @@ type Server struct {
 	health *health.Checker
 
 	// dataDir: 数据/产物目录根路径。
-	// 消费者: archive / evaluation / handlers / pipeline / run /
-	//   worker / workdir_cleanup / workflow
+	// 消费者: archive / handlers / pipeline / run /
+	//   worker / workdir_cleanup
 	dataDir string
 
 	// 任务分发与 SSE 子系统 ↓↓↓ 这 4 个字段绑在一起,要改一起改。
@@ -152,10 +153,7 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 		targetSvc:   service.NewTargetService(queries, rawDB, scopeEng),
 		findingSvc:  service.NewFindingService(queries),
 	}
-	s.nucleiCustomMgr = custom.NewManager(queries, rawDB, dataDir, custom.ExecCloner{})
-	if err := s.nucleiCustomMgr.EnsureLayout(); err != nil {
-		log.Printf("[server] nuclei custom layout init: %v (continuing)", err)
-	}
+	s.nucleiCustomMgr = custom.NewManager(queries)
 	s.dictMgr = dictionary.NewManager(queries, dataDir)
 	if err := s.dictMgr.EnsureLayout(); err != nil {
 		log.Printf("[server] dictionary layout init: %v (continuing)", err)
@@ -193,6 +191,11 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	}
 
 	s.markAllWorkersOffline()
+	if n, err := recovery.RecoverOrphanRuns(queries); err != nil {
+		log.Printf("[server] orphan run recovery: %v", err)
+	} else if n > 0 {
+		log.Printf("[server] recovered %d orphan pipeline run(s)", n)
+	}
 	go s.cleanupStaleWorkers()
 	go s.startWorkdirCleanup()
 	return s
@@ -294,27 +297,24 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /runs/{id}", auth(http.HandlerFunc(s.handleGetRun)))
 	mux.Handle("GET /runs/{id}/tasks", auth(http.HandlerFunc(s.handleGetRunTasks)))
 	mux.Handle("POST /runs/{id}/cancel", auth(http.HandlerFunc(s.handleCancelRun)))
-	mux.Handle("POST /projects/{id}/workflows/asset-discovery", auth(http.HandlerFunc(s.handleStartAssetDiscovery)))
 	mux.Handle("GET /projects/{id}/assets", auth(http.HandlerFunc(s.handleListAssetsFiltered)))
 	mux.Handle("GET /projects/{id}/web-endpoints", auth(http.HandlerFunc(s.handleListWebEndpointsByProject)))
 	mux.Handle("GET /projects/{id}/service-ports", auth(http.HandlerFunc(s.handleListServicePorts)))
 	mux.Handle("GET /assets/{id}/ports", auth(http.HandlerFunc(s.handleListPorts)))
 	mux.Handle("GET /assets/{id}/services", auth(http.HandlerFunc(s.handleListServices)))
-	mux.Handle("POST /projects/{id}/workflows/web-screening", auth(http.HandlerFunc(s.handleStartWebScreening)))
+	mux.Handle("GET /assets/{id}/lineage", auth(http.HandlerFunc(s.handleGetAssetLineage)))
 	mux.Handle("GET /projects/{id}/pipeline/runs", auth(http.HandlerFunc(s.handleListPipelineRuns)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}", auth(http.HandlerFunc(s.handleGetPipelineRun)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/stages", auth(http.HandlerFunc(s.handleGetPipelineRunStages)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/metrics", auth(http.HandlerFunc(s.handleGetScanRunMetrics)))
+	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/summary", auth(http.HandlerFunc(s.handleGetRunSummary)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/works", auth(http.HandlerFunc(s.handleListScanRunWorks)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/tool-calls", auth(http.HandlerFunc(s.handleListToolCallLogs)))
 	mux.Handle("GET /assets/{id}/works", auth(http.HandlerFunc(s.handleListAssetWorks)))
 	mux.Handle("POST /projects/{id}/pipeline/runs/{runId}/cancel", auth(http.HandlerFunc(s.handleCancelPipelineRun)))
 	mux.Handle("GET /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleGetPipelineConfig)))
 	mux.Handle("POST /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleUpdatePipelineConfig)))
-	// Evaluation
-	mux.Handle("GET /projects/{id}/runs/{runId}/evaluation", auth(http.HandlerFunc(s.handleGetEvaluation)))
-	mux.Handle("POST /projects/{id}/runs/{runId}/evaluation/retry", auth(http.HandlerFunc(s.handleRetryEvaluation)))
-	mux.Handle("GET /projects/{id}/evaluations", auth(http.HandlerFunc(s.handleListEvaluations)))
+	mux.Handle("GET /scan/defaults", auth(http.HandlerFunc(s.handleGetScanDefaults)))
 	// Unified scan
 	mux.Handle("POST /projects/{id}/scan", auth(http.HandlerFunc(s.handleCreateScan)))
 	mux.Handle("GET /projects/{id}/scan/runs", auth(http.HandlerFunc(s.handleListScanRuns)))
@@ -332,9 +332,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("DELETE /scope-rules/{id}", auth(http.HandlerFunc(s.handleDeleteScopeRule)))
 	mux.Handle("POST /scope-rules/parse", auth(http.HandlerFunc(s.handleParseScopeValue)))
 	mux.Handle("POST /projects/{id}/scope-rules/batch", auth(http.HandlerFunc(s.handleBatchCreateScopeRules)))
-	mux.Handle("POST /scan-plans", auth(http.HandlerFunc(s.handleCreateScanPlan)))
-	mux.Handle("POST /scan-plans/{id}/approve", auth(http.HandlerFunc(s.handleApprovePlan)))
-	mux.Handle("POST /scan-plans/dry-run", auth(http.HandlerFunc(s.handleDryRun)))
 	mux.Handle("GET /scan-tasks/{id}", auth(http.HandlerFunc(s.handleGetTask)))
 	mux.Handle("POST /scan-tasks/{id}/cancel", auth(http.HandlerFunc(s.handleCancelTask)))
 	// POST /tasks/run removed — all tool execution goes through toolrun.Invoke
@@ -367,51 +364,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("DELETE /engines/credentials/{engine}", auth(http.HandlerFunc(s.handleDeleteEngineCredential)))
 	mux.Handle("GET /engines/search", auth(http.HandlerFunc(s.handleSearchEngine)))
 		mux.Handle("GET /engines/quota", auth(http.HandlerFunc(s.handleGetEngineQuota)))
-	// SRC platform credentials and sources
-	mux.Handle("GET /credentials", auth(http.HandlerFunc(s.handleListDiscoveredCredentials)))
-	mux.Handle("GET /credentials/platforms", auth(http.HandlerFunc(s.handleListCredentialPlatforms)))
-	mux.Handle("GET /credentials/{id}", auth(http.HandlerFunc(s.handleCheckCredential)))
-	mux.Handle("GET /sources", auth(http.HandlerFunc(s.handleListSources)))
-	mux.Handle("GET /sources/type", auth(http.HandlerFunc(s.handleListSourcesByType)))
-	mux.Handle("GET /sources/{id}", auth(http.HandlerFunc(s.handleGetSource)))
-	// SRC programs
-	mux.Handle("POST /projects/{id}/src-program", auth(http.HandlerFunc(s.handleCreateSRCProgram)))
-	mux.Handle("GET /projects/{id}/src-program", auth(http.HandlerFunc(s.handleGetSRCProgram)))
-	mux.Handle("PUT /projects/{id}/src-program", auth(http.HandlerFunc(s.handleUpdateSRCProgram)))
-	mux.Handle("DELETE /projects/{id}/src-program", auth(http.HandlerFunc(s.handleDeleteSRCProgram)))
-	mux.Handle("GET /src-programs", auth(http.HandlerFunc(s.handleListSRCPrograms)))
-	// Bounty candidates
-	mux.Handle("GET /projects/{id}/bounty-candidates", auth(http.HandlerFunc(s.handleListBountyCandidates)))
-	mux.Handle("POST /projects/{id}/bounty-candidates/refresh", auth(http.HandlerFunc(s.handleRefreshBountyCandidates)))
-	mux.Handle("GET /bounty-candidates/{id}", auth(http.HandlerFunc(s.handleGetBountyCandidate)))
-	mux.Handle("PATCH /bounty-candidates/{id}", auth(http.HandlerFunc(s.handleUpdateBountyCandidate)))
-	mux.Handle("DELETE /bounty-candidates/{id}", auth(http.HandlerFunc(s.handleDeleteBountyCandidate)))
-	// Submission packs
-	mux.Handle("POST /bounty-candidates/{id}/submission-pack", auth(http.HandlerFunc(s.handleCreateSubmissionPack)))
-	mux.Handle("GET /bounty-candidates/{id}/submission-packs", auth(http.HandlerFunc(s.handleListSubmissionPacks)))
-	mux.Handle("GET /submission-packs/{id}", auth(http.HandlerFunc(s.handleGetSubmissionPack)))
-	mux.Handle("PATCH /submission-packs/{id}", auth(http.HandlerFunc(s.handleUpdateSubmissionPack)))
-	mux.Handle("DELETE /submission-packs/{id}", auth(http.HandlerFunc(s.handleDeleteSubmissionPack)))
-	mux.Handle("POST /submission-packs/{id}/redact", auth(http.HandlerFunc(s.handleRedactSubmissionPack)))
-	// Nuclei custom template sources
+	// Nuclei RBKD builtin template source (read-only; enable/disable only)
 	mux.Handle("GET /nuclei/custom/sources", auth(http.HandlerFunc(s.handleListNucleiCustomSources)))
-	mux.Handle("POST /nuclei/custom/sources/git", auth(http.HandlerFunc(s.handleCreateNucleiCustomGitSource)))
-	mux.Handle("POST /nuclei/custom/sources/upload", auth(http.HandlerFunc(s.handleCreateNucleiCustomUploadSource)))
-	mux.Handle("POST /nuclei/custom/sources/{id}/refresh", auth(http.HandlerFunc(s.handleRefreshNucleiCustomSource)))
-	mux.Handle("PATCH /nuclei/custom/sources/{id}", auth(http.HandlerFunc(s.handlePatchNucleiCustomSource)))
 	mux.Handle("PATCH /nuclei/custom/sources/{id}/enabled", auth(http.HandlerFunc(s.handlePatchNucleiCustomSourceEnabled)))
-	mux.Handle("DELETE /nuclei/custom/sources/{id}", auth(http.HandlerFunc(s.handleDeleteNucleiCustomSource)))
-	mux.Handle("GET /nuclei/custom/sources/{id}/files", auth(http.HandlerFunc(s.handleListNucleiCustomFiles)))
-	mux.Handle("GET /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleReadNucleiCustomFile)))
-	mux.Handle("PUT /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleWriteNucleiCustomFile)))
-	mux.Handle("DELETE /nuclei/custom/sources/{id}/files/{path...}", auth(http.HandlerFunc(s.handleDeleteNucleiCustomFile)))
-		mux.Handle("GET /nuclei/custom/sources/{id}/bundle", auth(http.HandlerFunc(s.handleDownloadNucleiCustomSourceBundle)))
-	// Phase 2: Validation & Publishing
-	mux.Handle("POST /nuclei/custom/sources/{id}/validate", auth(http.HandlerFunc(s.handleValidateNucleiCustomSource)))
-	mux.Handle("POST /nuclei/custom/validate", auth(http.HandlerFunc(s.handleValidateAllNucleiCustom)))
-	mux.Handle("POST /nuclei/custom/publish", auth(http.HandlerFunc(s.handlePublishNucleiCustom)))
-	mux.Handle("GET /nuclei/custom/manifest", auth(http.HandlerFunc(s.handleGetNucleiCustomManifest)))
-	mux.Handle("GET /nuclei/custom/bundles/{version}", auth(http.HandlerFunc(s.handleDownloadNucleiCustomBundle)))
 	// Dictionaries
 	mux.Handle("GET /dictionaries", auth(http.HandlerFunc(s.handleListDictionaries)))
 	mux.Handle("POST /dictionaries", auth(http.HandlerFunc(s.handleCreateDictionary)))
@@ -430,10 +385,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("DELETE /httpx/fingerprints/{id}", auth(http.HandlerFunc(s.handleDeleteHttpxFingerprint)))
 	mux.Handle("GET /httpx/fingerprints/{id}/content", auth(http.HandlerFunc(s.handleReadHttpxFingerprintContent)))
 	mux.Handle("PUT /httpx/fingerprints/{id}/content", auth(http.HandlerFunc(s.handleWriteHttpxFingerprintContent)))
-	// Slow scan tasks
-	mux.Handle("GET /projects/{id}/slow-scans", auth(http.HandlerFunc(s.handleListSlowScans)))
-	mux.Handle("GET /slow-scans/{id}", auth(http.HandlerFunc(s.handleGetSlowScan)))
-	mux.Handle("POST /slow-scans/{id}/cancel", auth(http.HandlerFunc(s.handleCancelSlowScan)))
 	// Excluded domains (global domain exclusion list)
 	mux.Handle("GET /excluded-domains", auth(http.HandlerFunc(s.handleListExcludedDomains)))
 	mux.Handle("GET /excluded-domains/defaults", auth(http.HandlerFunc(s.handleListDefaultDomains)))

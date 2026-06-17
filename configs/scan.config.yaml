@@ -1,0 +1,185 @@
+# Anchor 扫描部署配置 — 复制到 $ANCHOR_DATA_DIR/scan.config.yaml
+# 相对路径均相对于 ANCHOR_DATA_DIR 解析。
+# 修改后重启 server 生效；ScanModal / pipeline_config 可覆盖 preset 默认值。
+
+paths:
+  high_risk_ports_file: high-risk-ports.txt
+  exclude_domains_file: exclude-domains.txt
+  junk_keywords_file: junk-keywords.txt
+  ffuf_dictionary_default: builtin:path/top100.txt
+
+passive:
+  result_limit: 500
+  concurrency: 3
+  fofa_queries:
+    - 'org="{{company}}"'
+    - 'cert="{{company}}"'
+    - 'title="{{company}}"'
+  hunter_queries:
+    - 'icp.name="{{company}}"'
+    - 'cert="{{company}}"'
+  quake_query: 'cert:"{{company}}" OR title:"{{company}}"'
+
+presets:
+  external:
+    port_range: top100
+    enable_passive_search: true
+    enable_passive_cert: true
+    enable_passive_url: true
+    enable_passive_junk_filter: true
+    subfinder_mode: passive
+    subfinder_rate_limit: 30
+    subfinder_threads: 8
+    dnsx_rate_limit: 80
+    dnsx_threads: 30
+    httpx_rate_limit: 40
+    httpx_threads: 15
+    enable_ffuf: false
+    enable_katana: false
+    skip_portscan_on_cdn_host: true
+    nuclei_require_fingerprint: true
+    nuclei_scan_depth: workflow
+    naabu_rate: 150
+    naabu_threads: 30
+    nuclei_rate_limit: 10
+    nuclei_concurrency: 5
+    nuclei_rate_limit_per_min: 30
+    ffuf_rate_limit: 4
+    passive_search_result_limit: 500
+    passive_search_concurrency: 3
+    ffuf_tier: small
+
+  internal:
+    port_range: high-risk
+    enable_passive_search: false
+    enable_passive_cert: false
+    enable_passive_url: false
+    enable_passive_junk_filter: false
+    subfinder_mode: active
+    enable_ffuf: true
+    enable_katana: true
+    skip_portscan_on_cdn_host: false
+    nuclei_require_fingerprint: false
+    nuclei_scan_depth: tags
+    naabu_rate: 1000
+    naabu_threads: 100
+    httpx_rate_limit: 150
+    httpx_threads: 50
+    nuclei_rate_limit: 100
+    nuclei_concurrency: 25
+    katana_rate_limit: 10
+    ffuf_rate_limit: 6
+    ffuf_tier: "off"
+
+  # external + noise_level=low (外网默认，护网推荐)
+  external_low:
+    scan_mode: external
+    noise_level: low
+    port_range: top100
+    enable_passive_search: true
+    enable_passive_cert: true
+    enable_passive_url: true
+    enable_passive_junk_filter: true
+    subfinder_mode: passive
+    subfinder_rate_limit: 20
+    subfinder_threads: 5
+    dnsx_rate_limit: 50
+    dnsx_threads: 20
+    httpx_rate_limit: 25
+    httpx_threads: 10
+    enable_ffuf: false
+    enable_katana: false
+    enable_spoor: true
+    skip_portscan_on_cdn_host: true
+    nuclei_require_fingerprint: true
+    nuclei_scan_depth: tags
+    naabu_rate: 100
+    naabu_threads: 20
+    nuclei_rate_limit: 5
+    nuclei_concurrency: 3
+    nuclei_rate_limit_per_min: 20
+    ffuf_rate_limit: 3
+    ffuf_timeout: 20
+    ffuf_tier: small
+    passive_search_result_limit: 300
+    passive_search_concurrency: 2
+
+nuclei_tech_routing:
+  jenkins:
+    tags: [jenkins]
+    max_templates: 25
+  nginx:
+    tags: [nginx, nginx-version]
+    max_templates: 10
+  apache:
+    tags: [apache, apache-detect]
+    max_templates: 10
+  tomcat:
+    tags: [tomcat]
+    max_templates: 15
+  _default:
+    action: skip
+  _fallback:
+    tags: [tech-detect]
+    max_templates: 5
+
+  # external + noise_level=standard (外网标准)
+  external_standard:
+    scan_mode: external
+    noise_level: standard
+    port_range: top100
+    enable_passive_search: true
+    enable_passive_cert: true
+    enable_passive_url: true
+    enable_passive_junk_filter: true
+    subfinder_mode: passive
+    subfinder_rate_limit: 30
+    subfinder_threads: 8
+    dnsx_rate_limit: 80
+    dnsx_threads: 30
+    httpx_rate_limit: 40
+    httpx_threads: 15
+    enable_ffuf: true
+    enable_katana: false
+    katana_rate_limit: 5
+    enable_spoor: true
+    skip_portscan_on_cdn_host: true
+    nuclei_require_fingerprint: true
+    nuclei_scan_depth: workflow
+    naabu_rate: 150
+    naabu_threads: 30
+    nuclei_rate_limit: 10
+    nuclei_concurrency: 5
+    nuclei_rate_limit_per_min: 30
+    ffuf_rate_limit: 4
+    ffuf_tier: small
+    passive_search_result_limit: 500
+    passive_search_concurrency: 3
+
+  # watch (长期监控) — replaces bounty
+  watch:
+    scan_mode: watch
+    port_range: top100
+    enable_passive_search: true
+    enable_passive_cert: true
+    enable_passive_url: true
+    enable_passive_junk_filter: true
+    subfinder_mode: passive
+    subfinder_rate_limit: 30
+    subfinder_threads: 8
+    dnsx_rate_limit: 80
+    dnsx_threads: 30
+    httpx_rate_limit: 40
+    httpx_threads: 15
+    enable_ffuf: false
+    enable_katana: false
+    enable_spoor: true
+    skip_portscan_on_cdn_host: true
+    nuclei_require_fingerprint: true
+    nuclei_scan_depth: workflow
+    naabu_rate: 150
+    naabu_threads: 30
+    nuclei_rate_limit: 10
+    nuclei_concurrency: 5
+    nuclei_rate_limit_per_min: 30
+    skip_stable_asset_days: 7

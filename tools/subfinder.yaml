@@ -6,8 +6,10 @@ output:
 parameters:
   domain:
     type: string
-    required: true
     flag: "-d"
+  domain_file:
+    type: path
+    flag: "-dL"
   rate_limit:
     type: int
     flag: "-rate-limit"

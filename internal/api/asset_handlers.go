@@ -12,6 +12,23 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
+// GET /projects/{id}/web-endpoints
+func (s *Server) handleListWebEndpointsByProject(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	page := parsePagination(r)
+	total, err := s.queries.CountWebEndpointsByProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "count web endpoints failed: %v", err))
+		return
+	}
+	endpoints, err := s.queries.ListWebEndpointsByProjectPaginated(projectID, page.PageSize, page.Offset())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "list web endpoints failed: %v", err))
+		return
+	}
+	writePaginatedJSON(w, endpoints, total, page)
+}
+
 // GET /projects/{id}/assets (with filtering)
 func (s *Server) handleListAssetsFiltered(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
@@ -346,4 +363,35 @@ func appendUnique(slice []string, s string) []string {
 		}
 	}
 	return append(slice, s)
+}
+
+// GET /assets/{id}/lineage?run_id=
+func (s *Server) handleGetAssetLineage(w http.ResponseWriter, r *http.Request) {
+	assetID := r.PathValue("id")
+	if assetID == "" {
+		writeError(w, http.StatusBadRequest, errors.Newf(errors.ErrBadRequest, "missing asset id"))
+		return
+	}
+
+	asset, err := s.queries.GetAssetByID(assetID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get asset: %v", err))
+		return
+	}
+	if asset == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "asset not found"))
+		return
+	}
+
+	var runID *string
+	if rid := strings.TrimSpace(r.URL.Query().Get("run_id")); rid != "" {
+		runID = &rid
+	}
+
+	lineage, err := s.queries.BuildAssetLineage(asset.ProjectID, assetID, runID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, lineage)
 }

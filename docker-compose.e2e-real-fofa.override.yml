@@ -1,0 +1,5 @@
+# 临时覆盖：真实 FOFA API（去掉 fofa-mock）
+services:
+  server:
+    environment:
+      FOFA_BASE_URL: ""

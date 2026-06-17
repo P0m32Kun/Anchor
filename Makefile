@@ -5,7 +5,7 @@
 .PHONY: dev-rebuild e2e-local e2e-local-down e2e-local-logs
 .PHONY: logs logs-server logs-worker status shell-server shell-worker
 .PHONY: build-server-runtime-base push-server-runtime-base pull-server-runtime-base
-.PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-scan test-e2e-full
+.PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-scan test-e2e-full test-e2e-multi-worker-up test-e2e-multi-worker-down test-e2e-multi-worker-scan
 .PHONY: release-verify release-verify-build release-verify-down
 .PHONY: range-up range-down range-status range-logs
 .PHONY: dev-web
@@ -221,6 +221,20 @@ test-unit-frontend:
 test-e2e-down:
 	docker compose -f docker-compose.e2e.yml down --remove-orphans
 
+E2E_MULTI_WORKER_COMPOSE = docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-multi-worker.override.yml
+
+test-e2e-multi-worker-up:
+	ANCHOR_API_TOKEN=$(E2E_TOKEN) $(E2E_MULTI_WORKER_COMPOSE) up -d --build server worker worker-b nginx fofa-mock
+
+test-e2e-multi-worker-down:
+	$(E2E_MULTI_WORKER_COMPOSE) down --remove-orphans
+
+test-e2e-multi-worker-scan: build-fast
+	@echo "[test-e2e-multi-worker-scan] Dual-worker dispatch E2E (rebuild binary + images)..."
+	@ANCHOR_API_TOKEN=$(E2E_TOKEN) $(E2E_MULTI_WORKER_COMPOSE) up -d --build server worker worker-b nginx fofa-mock
+	@sleep 8
+	@cd frontend && ANCHOR_API_TOKEN=$(E2E_TOKEN) ANCHOR_E2E_SKIP_DOCKER=1 ANCHOR_E2E_MULTI_WORKER=1 $(E2E_PLAYWRIGHT_ENV) npx playwright test e2e/tests/multi-worker-dispatch.spec.ts --project=chromium-scan
+
 # ============================================================
 #  上线前验证（tag 推送前必做 — 用户部署镜像路径）
 # ============================================================
@@ -314,5 +328,4 @@ clean:
 
 dev-web:
 	@echo "Starting Vite dev server..."
-	cd frontend && npm install
-	./frontend/node_modules/.bin/vite --host
+	cd frontend && npm install && ./node_modules/.bin/vite --host

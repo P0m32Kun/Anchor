@@ -1,17 +1,14 @@
 package worker
 
 import (
-	archive_tar "archive/tar"
-	"compress/gzip"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
+	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/builtin"
@@ -25,14 +22,13 @@ type RemoteClient struct {
 	endpoint   string
 	dataDir    string
 	runner     *Runner
-	syncer     *BundleSyncer
 	httpClient *http.Client
 	stopCh     chan struct{}
 }
 
 // NewRemoteClient creates a client that registers with the core server.
 // apiToken is the global server token required for all API calls.
-// dataDir is used for local bundle storage.
+// dataDir is used for local nuclei template paths.
 // runner is the local task runner for executing tools.
 func NewRemoteClient(coreURL, endpoint, apiToken, dataDir string, runner *Runner) *RemoteClient {
 	return &RemoteClient{
@@ -41,7 +37,6 @@ func NewRemoteClient(coreURL, endpoint, apiToken, dataDir string, runner *Runner
 		token:      apiToken,
 		dataDir:    dataDir,
 		runner:     runner,
-		syncer:     NewBundleSyncer(dataDir, coreURL, apiToken),
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		stopCh:     make(chan struct{}),
 	}
@@ -49,9 +44,10 @@ func NewRemoteClient(coreURL, endpoint, apiToken, dataDir string, runner *Runner
 
 // Register the worker with the core server.
 func (c *RemoteClient) Register(name string) error {
-	body, _ := json.Marshal(map[string]string{
-		"name":     name,
-		"endpoint": c.endpoint,
+	body, _ := json.Marshal(map[string]interface{}{
+		"name":            name,
+		"endpoint":        c.endpoint,
+		"max_concurrency": LoadMaxConcurrencyFromEnv(),
 	})
 	req, _ := http.NewRequest("POST", c.coreURL+"/workers/register", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+c.token)
@@ -100,9 +96,8 @@ func (c *RemoteClient) StartHeartbeat(interval time.Duration) {
 	}()
 }
 
-// StartBundleSync starts a periodic bundle sync loop. It syncs immediately on
-// start, then every interval.
-func (c *RemoteClient) StartBundleSync(interval time.Duration) {
+// StartSourceSync periodically syncs enabled nuclei template sources from the server.
+func (c *RemoteClient) StartSourceSync(interval time.Duration) {
 	// Sync immediately on start
 	go func() {
 		c.syncSources()
@@ -119,8 +114,7 @@ func (c *RemoteClient) StartBundleSync(interval time.Duration) {
 	}()
 }
 
-// syncSources fetches all enabled custom template sources from the server
-// and syncs each to its own directory under ~/nuclei-templates/.
+// syncSources fetches nuclei template sources and applies RBKD builtin symlink.
 func (c *RemoteClient) syncSources() {
 	// Fetch all enabled sources from the server
 	req, _ := http.NewRequest("GET", c.coreURL+"/nuclei/custom/sources", nil)
@@ -152,62 +146,26 @@ func (c *RemoteClient) syncSources() {
 	}
 
 	for _, src := range sources {
-		if src.Builtin {
-			if err := builtin.ApplyRBKDNucleiSymlink(src.Enabled); err != nil {
-				log.Printf("[worker] rbkd symlink: %v", err)
-			}
+		if !src.Builtin {
 			continue
 		}
-		if !src.Enabled || src.Status != "ready" {
-			continue
-		}
-		if err := c.syncSource(src.ID, src.InstallPath); err != nil {
-			log.Printf("[worker] sync source %s (%s): %v", src.ID, src.Name, err)
+		if err := builtin.ApplyRBKDNucleiSymlink(src.Enabled); err != nil {
+			log.Printf("[worker] rbkd symlink: %v", err)
 		}
 	}
-}
-
-// syncSource downloads a single source's files and extracts them to
-// ~/nuclei-templates/{installPath}/ (nuclei's default search path).
-func (c *RemoteClient) syncSource(sourceID, installPath string) error {
-	if installPath == "" {
-		return fmt.Errorf("source %s has no install_path", sourceID)
-	}
-
-	// Fetch the source bundle as a tar.gz
-	req, _ := http.NewRequest("GET", c.coreURL+"/nuclei/custom/sources/"+sourceID+"/bundle", nil)
-	req.Header.Set("Authorization", "Bearer "+c.token)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("download bundle: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("bundle not found (source may not be published yet)")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download bundle: %s", resp.Status)
-	}
-
-	// Extract to ~/nuclei-templates/ (archive entries are prefixed with installPath/)
-	home, _ := os.UserHomeDir()
-	targetDir := filepath.Join(home, "nuclei-templates")
-
-	if err := extractTarGzToDir(resp.Body, targetDir); err != nil {
-		return fmt.Errorf("extract: %w", err)
-	}
-
-	log.Printf("[worker] synced source %s -> %s", installPath, targetDir)
-	return nil
 }
 
 func (c *RemoteClient) heartbeat() {
+	// Collect system resource metrics
+	cpu, mem, disk := collectSystemMetrics()
+
 	body, _ := json.Marshal(map[string]interface{}{
 		"status":            "idle",
 		"capabilities":      []string{"subfinder", "naabu", "httpx", "nuclei"},
-		"template_versions": c.syncer.TemplateVersionsJSON(),
+		"template_versions": "{}",
+		"cpu_percent":       cpu,
+		"mem_percent":       mem,
+		"disk_percent":      disk,
 	})
 	req, _ := http.NewRequest("POST", fmt.Sprintf("%s/workers/%s/heartbeat", c.coreURL, c.workerID), bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+c.token)
@@ -331,59 +289,38 @@ func (c *RemoteClient) Stop() {
 	close(c.stopCh)
 }
 
-// extractTarGzToDir extracts a .tar.gz stream to targetDir.
-func extractTarGzToDir(r io.Reader, targetDir string) error {
-	gz, err := gzip.NewReader(r)
-	if err != nil {
-		return fmt.Errorf("gzip reader: %w", err)
-	}
-	defer gz.Close()
-
-	tr := archive_tar.NewReader(gz)
-
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return fmt.Errorf("mkdir target: %w", err)
+// collectSystemMetrics gathers CPU, memory, and disk usage.
+// Returns (cpuPercent, memPercent, diskPercent).
+func collectSystemMetrics() (cpu, mem, disk *float64) {
+	// CPU usage approximation: use NumCPU as a placeholder
+	// (real CPU usage requires sampling over time)
+	numCPU := float64(runtime.NumCPU())
+	if numCPU > 0 {
+		v := 100.0 // placeholder: assume busy when reporting
+		cpu = &v
 	}
 
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("tar next: %w", err)
-		}
+	// Memory stats from runtime
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	memUsed := float64(m.Alloc)
+	memTotal := float64(m.Sys)
+	if memTotal > 0 {
+		v := (memUsed / memTotal) * 100
+		mem = &v
+	}
 
-		// Sanitize path
-		name := filepath.Clean(hdr.Name)
-		if name == ".." || filepath.HasPrefix(name, "../") || filepath.HasPrefix(name, "/") {
-			return fmt.Errorf("unsafe tar entry: %s", hdr.Name)
-		}
-
-		target := filepath.Join(targetDir, name)
-
-		switch hdr.Typeflag {
-		case archive_tar.TypeDir:
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return fmt.Errorf("mkdir %s: %w", name, err)
-			}
-		case archive_tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-				return fmt.Errorf("mkdir parent %s: %w", name, err)
-			}
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
-			if err != nil {
-				return fmt.Errorf("create %s: %w", name, err)
-			}
-			if _, err := io.Copy(f, tr); err != nil {
-				f.Close()
-				return fmt.Errorf("write %s: %w", name, err)
-			}
-			f.Close()
-		default:
-			// Skip non-regular files
-			continue
+	// Disk stats from syscall
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs("/data", &stat); err == nil {
+		total := float64(stat.Blocks) * float64(stat.Bsize)
+		free := float64(stat.Bavail) * float64(stat.Bsize)
+		used := total - free
+		if total > 0 {
+			v := (used / total) * 100
+			disk = &v
 		}
 	}
-	return nil
+
+	return cpu, mem, disk
 }

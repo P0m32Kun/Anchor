@@ -4,8 +4,18 @@ import (
 	"net/http"
 )
 
-// handleListScanRunWorks returns all work items for a pipeline run.
-// GET /projects/{id}/pipeline/runs/{runId}/works
+const scanDetailDefaultPageSize = 50
+
+func parseScanDetailPagination(r *http.Request) PaginationParams {
+	pg := parsePagination(r)
+	if r.URL.Query().Get("page_size") == "" {
+		pg.PageSize = scanDetailDefaultPageSize
+	}
+	return pg
+}
+
+// handleListScanRunWorks returns paginated work items for a pipeline run.
+// GET /projects/{id}/pipeline/runs/{runId}/works?page=1&page_size=50
 func (s *Server) handleListScanRunWorks(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
 	runID := r.PathValue("runId")
@@ -17,15 +27,24 @@ func (s *Server) handleListScanRunWorks(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	works, err := s.queries.ListScanWorkItemsByRun(runID)
+	pg := parseScanDetailPagination(r)
+	total, err := s.queries.CountScanWorkItemsByRun(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	works, err := s.queries.ListScanWorkItemsByRunPaginated(runID, pg.PageSize, pg.Offset())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"items": works,
-		"total": len(works),
+		"items":     works,
+		"total":     total,
+		"page":      pg.Page,
+		"page_size": pg.PageSize,
 	})
 }
 
@@ -64,8 +83,8 @@ func (s *Server) handleListAssetWorks(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleListToolCallLogs returns all tool call logs for a pipeline run.
-// GET /projects/{id}/pipeline/runs/{runId}/tool-calls
+// handleListToolCallLogs returns paginated tool call logs for a pipeline run.
+// GET /projects/{id}/pipeline/runs/{runId}/tool-calls?page=1&page_size=50
 func (s *Server) handleListToolCallLogs(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
 	runID := r.PathValue("runId")
@@ -77,15 +96,24 @@ func (s *Server) handleListToolCallLogs(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	logs, err := s.queries.ListToolCallLogsByRun(runID)
+	pg := parseScanDetailPagination(r)
+	total, err := s.queries.CountToolCallLogsByRun(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	logs, err := s.queries.ListToolCallLogsByRunPaginated(runID, pg.PageSize, pg.Offset())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"items": logs,
-		"total": len(logs),
+		"items":     logs,
+		"total":     total,
+		"page":      pg.Page,
+		"page_size": pg.PageSize,
 	})
 }
 

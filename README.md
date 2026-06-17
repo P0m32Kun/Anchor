@@ -38,128 +38,40 @@
 - Agent 迭代指南：[`docs/current/agent-guide.md`](docs/current/agent-guide.md)
 - 当前计划：[`docs/current/plan.md`](docs/current/plan.md)
 - 当前架构：[`docs/current/architecture.md`](docs/current/architecture.md)
+- **客户部署**：[`docs/current/deployment.md`](docs/current/deployment.md)
+- **开发者 E2E**：[`docs/current/e2e-testing.md`](docs/current/e2e-testing.md)
 - 候选设计索引：[`docs/current/design/README.md`](docs/current/design/README.md)
 - 历史归档：[`docs/archived/`](docs/archived/)
 
 ## 快速开始
 
-### Docker 一键部署（推荐）
+### 客户部署（生产环境）
 
 ```bash
-# 交互式安装向导（支持 Server / Worker / Server+Worker 三种模式）
-bash install.sh
+bash install.sh   # 交互式向导：拉 ACR 镜像，无本地 build
 ```
 
-安装向导会自动：
-1. 检测 Docker 环境
-2. 选择部署模式
-3. 配置端口和 API Token
-4. 从阿里云 ACR 拉取预构建镜像（国内加速）
-5. 启动容器并等待健康检查
-
-完成后浏览器访问 `http://localhost` 即可使用。
-
-**管理命令：**
-
-```bash
-bash install.sh status   # 查看状态
-bash install.sh logs     # 查看日志
-bash install.sh down     # 停止服务
-```
+详见 [`docs/current/deployment.md`](docs/current/deployment.md)。
 
 ### 本地开发
 
-> 本地开发直接运行 Go 二进制，不经过 Docker。
-
-**运行后端：**
+> 日常开发直接运行 Go 二进制，不经过 Docker。
 
 ```bash
-# 启动 server
-go run .
-# 服务监听 :17421，数据目录 ~/.anchor
-
-# 或本地 worker 连接本地 server
-make run-worker
+go run .                    # Server :17421
+cd frontend && npm run dev  # 前端 :5173
+make build && make test     # 构建与单元测试
 ```
 
-**运行前端：**
+### 开发者 E2E 测试
 
 ```bash
-cd frontend
-npm install
-npm run dev
-# 打开 http://localhost:5173
+make build-base && make build-fast   # 首次或工具版本变更后
+make test-e2e                        # Playwright 快速套件
+make test-e2e-scan                   # 长 pipeline（最长 30 分钟/spec）
 ```
 
-**构建：**
-
-```bash
-make build    # 构建 Go 后端
-make test     # 运行测试
-```
-
-**本地 E2E 测试（使用新代码）：**
-
-```bash
-# 首次使用或工具版本更新时，构建 base 镜像（耗时较长，只需执行一次）
-make build-base
-
-# 日常测试迭代（约 10-30 秒）
-make build-linux    # 交叉编译 Linux 二进制
-make build-fast     # 快速构建 Docker 镜像
-make e2e-local      # 启动 E2E 测试环境
-
-# 运行测试
-make test-e2e       # Playwright 快速套件（页面/smoke，chromium project）
-make test-e2e-scan  # 长 pipeline E2E（chromium-scan，单 spec 最长 30 分钟）
-
-# 停止环境
-make e2e-local-down
-```
-
-**分层构建架构**：
-- `anchor-server-base` / `anchor-worker-base`：预装运行时依赖，极少更新
-- `anchor-server:local` / `anchor-worker:local`：基于 base，仅 COPY 二进制，构建速度快
-
-## 部署架构
-
-三个 Docker 镜像通过 docker-compose 编排：
-
-```
-[浏览器] --HTTP--> [Nginx :80] --/api/--> [Server :17421] <--HTTP 长轮询-- [Worker]
-                           |
-                     [React 静态文件]
-```
-
-- **Frontend**：Nginx 静态 serve React 构建产物 + `/api/` 反向代理到 Server
-- **Server**：纯管理面，负责 API、任务调度、数据持久化
-- **Worker**：预装所有安全工具，通过长轮询拉取任务执行
-
-**三种部署模式**（均只拉取阿里云 ACR 预构建三镜像，`docker-compose*.yml` 不含 `build`）：
-
-| 模式 | compose | 适用场景 |
-|------|---------|---------|
-| Server Only | `docker-compose.server.yml` | VPS，Worker 远程连接 |
-| Worker Only | `docker-compose.worker.yml` | 远程扫描节点 |
-| Server+Worker | `docker-compose.yml` | 同机完整部署 |
-
-**与测试 Docker 区分**：本地 / CI 使用 `docker-compose.e2e.yml`（build 发布版 Dockerfile）或 `docker-compose.e2e-local.yml`（`make build-fast` + fast Dockerfile），勿与上表混用。
-
-Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可（任务拉取、心跳、结果上报均为 Worker → Server）。
-
-**Server 是否需要访问 Worker HTTP？** 任务调度与结果回传不依赖 Server 入站连 Worker。若要在 UI 中实时查看远端 Worker 上**仍在运行**任务的 stdout/stderr，Server 会按 Worker 注册时上报的 `endpoint` 反向请求 Worker HTTP（见 `internal/api/task_output_handlers.go`）。因此：
-
-- 仅跑扫描、不看实时日志：Worker 只需能访问 Server，无需对 Server 暴露端口。
-- 需要实时任务输出：Worker 的 `endpoint` 必须对 Server 可达（内网 IP/主机名、Docker 服务名 `worker`、或 Tailscale 等）。
-
-**Docker 镜像 tag 策略**（与 GitHub Release 对齐）：
-
-- **打 tag 前**：`make release-verify`（或 GitHub Actions **Release Verify**）— 用生产 Dockerfile 构建候选镜像，按用户 `docker-compose.yml` 路径验收；通过后再 `git tag v0.x.x && git push --tags`。
-- 推送 `v*` tag 后：`release.yml` 上传 `anchor-linux-{amd64,arm64}`；`docker-push.yml` 在 Release 成功后 checkout **该 tag**（非 main HEAD），并以同一版本构建镜像。
-- ACR 镜像同时打 `anchor-*:<tag>` 与 `anchor-*:latest`；`Dockerfile.server` / `Dockerfile.worker` 通过 `RELEASE_VERSION` build-arg 从 GitHub Release 下载对应 tag 的二进制（CI 中不会默认拉 `latest` 资产）。
-- 本地 `install.sh` 默认拉 `:latest`；要锁定版本可改 compose/`ANCHOR_REGISTRY` 镜像 tag 为 `v0.x.x`。
-
-**API Token 轮换**：Token 保存在项目根目录 `.env` 的 `ANCHOR_API_TOKEN`。轮换时编辑 `.env` 后执行 `bash install.sh restart`（或对应 compose 重启）。安装向导不会在终端打印完整 Token，请从 `.env` 读取或自行记录。
+详见 [`docs/current/e2e-testing.md`](docs/current/e2e-testing.md)。**勿**对客户环境使用 `docker-compose.e2e*.yml`。
 
 ## 目录结构
 
@@ -168,34 +80,68 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可（任务
 ├── main.go                     # Go 服务入口（单二进制，server/worker 双模式）
 ├── go.mod / go.sum            # Go 模块
 ├── Makefile                    # 构建脚本 + Docker 生命周期命令
-├── docker-compose.yml          # 用户部署：仅 ACR image（server+worker+frontend）
-├── docker-compose.server.yml   # 用户部署：Server + Frontend
-├── docker-compose.worker.yml   # 用户部署：Worker only
-├── docker-compose.e2e.yml      # 测试/CI：本地 build + rangefield
-├── docker-compose.e2e-local.yml  # 本地迭代：Dockerfile.*-fast
-├── Dockerfile.server           # CI/本地 build 用（ACR 镜像由 CI 构建推送）
-├── Dockerfile.worker           # CI/本地 build 用
-├── Dockerfile.server-runtime-base # Server 运行时 base 镜像
-├── Dockerfile.worker-runtime-base # Worker 运行时 base 镜像（含安全工具）
-├── Dockerfile.server-fast      # Server 快速构建（基于 base）
-├── Dockerfile.worker-fast      # Worker 快速构建（基于 base）
+├── install.sh                  # 客户部署安装向导
+├── docker-compose.yml               # 【部署】Server+Worker+Frontend（仅 ACR image）
+├── docker-compose.server.yml        # 【部署】Server + Frontend
+├── docker-compose.worker.yml        # 【部署】Worker only
+├── docker-compose.e2e.yml           # 【E2E】Playwright + fast build + 内嵌靶场
+├── docker-compose.e2e-local.yml     # 【E2E】手动迭代 + ACR frontend
+├── docker-compose.release-verify.yml # 【验证】上线前镜像验收
+├── Dockerfile.server           # 【发布】生产 Server（CI / release-verify）
+├── Dockerfile.worker           # 【发布】生产 Worker
+├── Dockerfile.frontend         # 【发布】生产 Frontend
+├── Dockerfile.*-runtime-base   # 【E2E】预装运行时依赖（make build-base）
+├── Dockerfile.*-fast           # 【E2E】快速 COPY 本地二进制
 ├── Dockerfile.compile          # 交叉编译 Linux 二进制
 ├── plan.md                     # 旧计划跳转页（非当前真相）
 ├── README.md                   # 本文件
 ├── docs/                       # 文档中心
-│   ├── README.md              # 文档导航入口
-│   ├── current/               # 当前唯一有效的计划/架构入口
+│   ├── README.md              # 文档导航入口 + 维护规则
+│   ├── current/               # 当前有效文档
+│   │   ├── agent-guide.md     # Coding agent 迭代协议
+│   │   ├── architecture.md    # 当前唯一架构基线
+│   │   ├── plan.md            # 当前唯一仓库级计划
+│   │   ├── deployment.md      # 客户部署指南
+│   │   ├── e2e-testing.md     # 开发者 E2E 指南
+│   │   ├── ci-cd-guide.md     # CI/CD 流程指南
+│   │   ├── scan-api-guide.md  # 扫描 API 指南
+│   │   ├── code-health-audit.md # 代码健康审计
+│   │   ├── short-term-plan.md # 短期计划
+│   │   ├── asset-driven-remediation-design.md
+│   │   ├── design/            # 候选设计索引
+│   │   ├── decisions/         # 决策索引
+│   │   └── audit-reports/     # 审计报告
+│   ├── active/                # 活跃评审材料
 │   ├── design/                # 候选设计稿
+│   ├── features/              # 功能专项文档
+│   ├── plans/                 # 计划材料
+│   ├── superpowers/           # 设计规格
+│   ├── templates/             # 漏洞模板
+│   ├── conventions/           # 编码规范
+│   ├── pitfalls/              # 踩坑记录
 │   ├── archived/              # 历史归档
-│   └── 部署指南.md             # 部署指南
-├── internal/                   # Go 内部包
-│   ├── api/                   # HTTP API handlers（已按 domain 拆分）
+│   ├── CHANGELOG.md           # 变更日志
+│   ├── schema-migrations.md   # Schema 迁移策略
+│   ├── api-error-contract.md  # API 错误约定
+│   ├── refactoring-plan.md    # 重构想法（backlog）
+│   └── functional-test.md     # 功能测试清单
+├── internal/                   # Go 内部包（38 个子包）
+│   ├── api/                   # HTTP API handlers（按 domain 拆分，48 个文件）
 │   ├── asset/                 # 资产归一化与去重
-│   ├── db/                    # SQLite + queries（按 domain 拆分）+ migrations（v1~v13 独立文件）
+│   ├── builtin/               # RBKD-SEC 内置资源同步（dict/templates/finger）
+│   ├── cdn/                   # CDN 响应解析
+│   ├── credentials/           # 凭证发现与策略引擎
+│   ├── db/                    # SQLite + queries（按 domain 拆分）+ migrations（v1~v39）
+│   ├── dictionary/            # 字典管理（ffuf 字典）
 │   ├── errors/                # 结构化错误模型
+│   ├── evaluator/             # 扫描评估引擎（规则 + 趋势分析 + 报告）
+│   ├── exclude/               # 全局域名排除列表
+│   ├── finding/               # Finding 持久化（NucleiPersister、Buffer）
+│   ├── fingerprint/           # 指纹管理
 │   ├── health/                # 工具健康检查
-│   ├── models/                # 数据模型（按 domain 拆分为 14 个文件）
-│   ├── nuclei/                # Nuclei 指纹-Tag 映射
+│   ├── httpxfp/               # httpx 指纹管理
+│   ├── models/                # 数据模型（按 domain 拆分为 28 个文件）
+│   ├── nuclei/                # Nuclei 自定义模板管理 + 指纹-Tag 映射
 │   ├── parser/                # 工具输出解析器（共享 parseJSONLines 泛型骨架）
 │   │   ├── common.go          # 泛型解析骨架 + 共享类型
 │   │   ├── subfinder.go       # Subfinder JSONL 解析
@@ -203,23 +149,48 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可（任务
 │   │   ├── httpx.go           # httpx JSONL 解析
 │   │   ├── naabu.go           # Naabu 输出解析
 │   │   ├── nmap.go            # Nmap 输出解析
-│   │   └── nuclei.go          # Nuclei JSONL 解析
+│   │   ├── nuclei.go          # Nuclei JSONL 解析
+│   │   ├── ffuf.go            # ffuf 输出解析
+│   │   ├── gau.go             # gau JSONL 解析
+│   │   └── katana.go          # Katana JSONL 解析
+│   ├── passive/               # 被动搜索编排（FOFA/Hunter/Quake 并行调用）
+│   ├── report/                # Markdown / JSON 报告生成
+│   ├── resolve/               # DNS 解析
+│   ├── safefs/                # 安全文件系统操作
+│   ├── scanconfig/            # 扫描配置（PipelineConfig、nuclei tech 路由）
+│   ├── scanengine/            # 资产驱动扫描引擎
+│   │   ├── core/              # DiscoveryAsset、TaskAction、DeriveEligibleWorks
+│   │   ├── work/              # Store (TryClaim/MarkDone/AllTerminal)
+│   │   ├── queue/             # PriorityQueue + Fair/Staged 调度
+│   │   ├── dedup/             # Run 级 normalized value 去重
+│   │   ├── executor/          # ToolExecutor + 各工具 parser（httpx/katana/ffuf/spoor）
+│   │   ├── stageagg/          # Stage 聚合（仅 UI 投影，不影响执行）
+│   │   ├── pool/              # 通用池、httpx 候选、IP port 聚合、nuclei 分桶
+│   │   ├── scheduler/         # ComputeLimits、IPThrottler、SeedBucketKey
+│   │   ├── seed/              # 种子资产注入（被动搜索、边界过滤、垃圾过滤）
+│   │   ├── domainpool/        # 域名批处理池
+│   │   ├── recovery/          # orphan run 恢复
+│   │   ├── engine.go          # ScanEngine 主循环
+│   │   ├── engine_tier1.go    # Tier1 池化接线（DNS/CDN/Port/Subfinder）
+│   │   └── engine_tier2.go    # Tier2 池化接线（httpx/nmap/nuclei）
+│   ├── scope/                 # Scope Check 引擎
+│   ├── scoring/               # Finding confidence/priority 评分
 │   ├── search/                # 互联网搜索引擎客户端（共享 baseClient HTTP 基础）
 │   │   ├── fofa.go            # FOFA API 客户端
 │   │   ├── hunter.go          # Hunter API 客户端
 │   │   ├── quake.go           # Quake API 客户端
 │   │   └── engine.go          # 统一搜索引擎接口
-│   ├── report/                # Markdown / JSON 报告生成
-│   ├── scope/                 # Scope Check 引擎
-│   ├── scoring/               # Finding confidence/priority 评分
+│   ├── service/               # 服务层
+│   ├── signal/                # 信号处理
+│   ├── sources/               # 数据源管理（nuclei 源 bundle 同步）
+│   ├── submission/            # 提交包管理
 │   ├── toolguard/             # 外部工具执行白名单（binary + arg 安全检查）
+│   ├── toolregistry/          # 工具注册表
+│   ├── toolrun/               # 工具运行管理
 │   ├── util/                  # 工具函数（脱敏、ID 生成、shutdown manager 等）
+│   ├── watch/                 # 监控
 │   ├── worker/                # Worker subprocess runner + 远程客户端 + 资源治理
-│   ├── workflows/             # 独立工作流（资产发现、Web 筛选）
-│   │   ├── discovery.go       # AssetDiscoveryWorkflow
-│   │   ├── screenshot.go      # WebScreeningWorkflow
-│   │   └── dedup.go           # URL 去重工具
-│   └── scanengine/            # 资产驱动扫描引擎
+│   └── workflows/             # 独立工作流（资产发现、Web 筛选、URL 去重）
 ├── frontend/                   # React 前端
 │   ├── src/
 │   │   ├── lib/              # API 客户端 + Zustand store
@@ -232,10 +203,15 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可（任务
 ├── docker-rangefield/          # 靶场环境（用于测试）
 │   ├── docker-compose.yml
 │   └── README.md
-└── docs/                       # 项目文档
-    ├── current/               # 当前有效文档（agent-guide / architecture / plan）
+└── docs/                       # 文档中心
+    ├── README.md              # 文档导航入口 + 维护规则
+    ├── current/               # 当前有效文档（agent-guide / architecture / plan / deployment / e2e-testing 等）
+    ├── active/                # 活跃评审材料
+    ├── design/                # 候选设计稿
+    ├── features/              # 功能专项文档
+    ├── templates/             # 漏洞模板
     ├── archived/              # 历史版本归档
-    ├── conventions/           # 编码约定
+    ├── conventions/           # 编码规范
     ├── pitfalls/              # 踩坑记录
     └── CHANGELOG.md           # 变更日志
 ```
@@ -338,14 +314,16 @@ Worker **不需要公网 IP**，只要 outbound 能访问 Server 即可（任务
 | 工具                                                       | 用途                 | 最低版本 |
 | ---------------------------------------------------------- | -------------------- | -------- |
 | [Subfinder](https://github.com/projectdiscovery/subfinder) | 子域名枚举           | v2.6+    |
-| [dnsx](https://github.com/projectdiscovery/dnsx)           | DNS 解析             | latest   |
+| [dnsx](https://github.com/projectdiscovery/dnsx)           | DNS 解析             | v1.2+    |
 | [httpx](https://github.com/projectdiscovery/httpx)         | Web 存活与指纹       | v1.3+    |
 | [Naabu](https://github.com/projectdiscovery/naabu)         | 端口发现             | v2.1+    |
-| [nmap](https://nmap.org/)                                | 服务指纹识别 (-sV)   | system   |
-| [cdncheck](https://github.com/projectdiscovery/cdncheck)   | CDN/WAF 过滤         | latest   |
+| [nmap](https://nmap.org/)                                  | 服务指纹识别 (-sV)   | v7.92+   |
+| [cdncheck](https://github.com/projectdiscovery/cdncheck)   | CDN/WAF 过滤         | v1.2+    |
 | [Nuclei](https://github.com/projectdiscovery/nuclei)       | 漏洞初筛             | v3.0+    |
+| [Katana](https://github.com/projectdiscovery/katana)       | Web 爬虫（JS 端点发现） | v1.6+  |
+| [ffuf](https://github.com/ffuf/ffuf)                       | 目录/参数爆破        | v2.1+    |
+| [gau](https://github.com/lc/gau)                           | 历史 URL 枚举        | v2.2+    |
 | [Spoor](https://github.com/P0m32Kun/Spoor)                 | JS 静态分析（路径/端点/密钥） | v0.2.0+ |
-| [Nmap](https://nmap.org/)                                  | 深度服务识别（可选） | v7.92+   |
 
 ## 版本
 

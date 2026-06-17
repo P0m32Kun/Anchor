@@ -28,6 +28,10 @@ type DiscoveryAsset struct {
 	DiscoveryDepth  int        `json:"discovery_depth"`
 	Attrs           AssetAttrs `json:"attrs"`
 	SourceTool      string     `json:"source_tool,omitempty"`
+	// Lineage fields for tracking discovery relationships
+	LineageSourceType string `json:"lineage_source_type,omitempty"`
+	LineageSourceID   string `json:"lineage_source_id,omitempty"`
+	LineageRelationType string `json:"lineage_relation_type,omitempty"`
 }
 
 // ReconcileDiscoveryAsset corrects asset type/normalized value before work derivation.

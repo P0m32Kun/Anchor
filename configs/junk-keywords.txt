@@ -1,0 +1,23 @@
+# Passive search junk keywords — one per line
+# Append ' word_boundary' for short ASCII tokens
+
+博彩
+赌博
+彩票
+娱乐城
+赌场
+六合彩
+时时彩
+百家乐
+棋牌
+网赌
+色情
+代发
+网赚
+刷单
+私服
+casino word_boundary
+gambling word_boundary
+porn word_boundary
+xxx word_boundary
+lottery word_boundary

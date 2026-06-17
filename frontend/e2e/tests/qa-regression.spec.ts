@@ -63,7 +63,7 @@ async function openScanModalToStep2(page: any, projectId: string) {
 		page.getByRole("heading", { name: /新建扫描流水线/ }),
 	).toBeVisible();
 	await page.getByRole("button", { name: /内网扫描/ }).first().click();
-	await page.getByRole("button", { name: /配置参数/ }).click();
+	await page.getByRole("button", { name: /高级配置/ }).click();
 	await expect(page.getByText("端口探测范围")).toBeVisible();
 }
 

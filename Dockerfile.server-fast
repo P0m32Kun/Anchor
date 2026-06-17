@@ -1,4 +1,4 @@
-# Anchor Server - 基于 base 镜像的快速构建版本
+# Anchor Server - 【E2E】基于 runtime-base 的快速构建版本
 # 用法：先构建 base，再构建此镜像
 #   docker build -f Dockerfile.server-runtime-base -t anchor-server-base:latest .
 #   make build-linux TARGETARCH=arm64

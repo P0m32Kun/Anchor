@@ -1,4 +1,4 @@
-# Anchor Cross-Compilation Dockerfile
+# Anchor Cross-Compilation Dockerfile — 【E2E/构建】交叉编译 Linux 二进制
 # 用于在 macOS / CI 上交叉编译 Linux 二进制
 # 用法：
 #   docker buildx build --platform linux/arm64 -f Dockerfile.compile \

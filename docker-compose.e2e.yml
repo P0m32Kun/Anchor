@@ -1,4 +1,4 @@
-# 开发 / CI 测试专用 — 本地 build server/worker（Dockerfile.server / Dockerfile.worker），非用户部署路径。
+# 开发 / CI E2E 专用 — 本地 build server/worker（Dockerfile.*-fast），非用户部署路径。
 # 与 docker-compose.yml 分离：独立网络 anchor-net-e2e（172.31.0.0/24），避免与生产 compose 子网冲突。
 #
 # Usage:
@@ -92,7 +92,7 @@ services:
       anchor-net:
         ipv4_address: 172.31.0.11
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/manager/html"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
       interval: 10s
       timeout: 5s
       retries: 5

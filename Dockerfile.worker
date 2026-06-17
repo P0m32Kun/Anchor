@@ -1,4 +1,4 @@
-# Anchor Remote Worker Dockerfile
+# Anchor Remote Worker Dockerfile — 【发布】生产镜像（CI / ACR / release-verify）
 # 使用 GitHub Release 预编译二进制，无需 Go 工具链
 #
 # 用法：

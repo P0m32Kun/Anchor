@@ -105,7 +105,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="总览项目" value={stats?.total_projects ?? 0} loading={loading} icon={Box} color="blue" description="Active engagements" />
         <StatCard title="运行中扫描" value={stats?.active_runs ?? 0} loading={loading} active={(stats?.active_runs ?? 0) > 0} icon={Zap} color="emerald" description="Real-time execution" />
-        <StatCard title="待审核漏洞" value={stats?.pending_findings ?? 0} loading={loading} active={(stats?.pending_findings ?? 0) > 0} icon={Flame} color="rose" description="Requires attention" />
+        <StatCard title="待审核漏洞" value={stats?.new_findings ?? 0} loading={loading} active={(stats?.new_findings ?? 0) > 0} icon={Flame} color="rose" description="Requires attention" />
         <StatCard title="在线节点" value={stats?.online_workers ?? 0} loading={loading} active={(stats?.online_workers ?? 0) > 0} icon={Users} color="indigo" description="Processing power" />
       </div>
 

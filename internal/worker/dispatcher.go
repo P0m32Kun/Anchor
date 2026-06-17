@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/db"
@@ -21,6 +22,10 @@ import (
 type Dispatcher struct {
 	queries    *db.Queries
 	httpClient *http.Client
+
+	inflightMu sync.Mutex
+	inflight   map[string]int // tasks dispatched but not yet finished (server-side)
+	pickSeq    uint64         // round-robin tie-break among equal load
 }
 
 // NewDispatcher creates a new Dispatcher.
@@ -28,37 +33,120 @@ func NewDispatcher(queries *db.Queries) *Dispatcher {
 	return &Dispatcher{
 		queries:    queries,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
+		inflight:   make(map[string]int),
 	}
 }
 
-// PickOnlineWorker returns the most recently seen online remote worker, or nil if none.
+// PickOnlineWorker returns the least-loaded eligible online worker.
 func (d *Dispatcher) PickOnlineWorker() *models.WorkerNode {
 	return d.PickOnlineWorkerExcluding(nil)
 }
 
-// PickOnlineWorkerExcluding returns the most recently seen online remote worker
-// whose ID is not in excludeIDs. Returns nil if no eligible worker exists.
+// PickOnlineWorkerExcluding selects the least-loaded eligible worker not in
+// excludeIDs, increments its in-flight counter, and returns it. Call
+// ReleaseWorker when dispatch finishes (success or failure).
 func (d *Dispatcher) PickOnlineWorkerExcluding(excludeIDs []string) *models.WorkerNode {
+	w := d.pickLeastLoaded(excludeIDs)
+	if w == nil {
+		return nil
+	}
+	d.trackInflight(w.ID, +1)
+	return w
+}
+
+// ReleaseWorker decrements the in-flight counter for a worker after dispatch
+// completes or is abandoned.
+func (d *Dispatcher) ReleaseWorker(workerID string) {
+	d.trackInflight(workerID, -1)
+}
+
+func (d *Dispatcher) trackInflight(workerID string, delta int) {
+	if workerID == "" {
+		return
+	}
+	d.inflightMu.Lock()
+	defer d.inflightMu.Unlock()
+	d.inflight[workerID] += delta
+	if d.inflight[workerID] <= 0 {
+		delete(d.inflight, workerID)
+	}
+}
+
+func (d *Dispatcher) currentInflight(workerID string) int {
+	d.inflightMu.Lock()
+	defer d.inflightMu.Unlock()
+	return d.inflight[workerID]
+}
+
+func (d *Dispatcher) isEligible(w *models.WorkerNode, exclude map[string]struct{}) bool {
+	if w == nil || w.Endpoint == "" || w.RevokedAt != nil {
+		return false
+	}
+	if _, skip := exclude[w.ID]; skip {
+		return false
+	}
+	switch w.Status {
+	case models.WorkerStatusOnline, models.WorkerStatusBusy:
+		return true
+	default:
+		return false
+	}
+}
+
+func workerAtCapacity(w *models.WorkerNode, load int) bool {
+	if w.MaxConcurrency <= 0 {
+		return false
+	}
+	return load >= w.MaxConcurrency
+}
+
+// pickLeastLoaded chooses the online worker with the fewest running + in-flight
+// tasks. Ties rotate round-robin so new workers with zero load receive work
+// immediately alongside existing idle peers.
+func (d *Dispatcher) pickLeastLoaded(excludeIDs []string) *models.WorkerNode {
 	workers, err := d.queries.ListWorkerNodes()
-	if err != nil {
+	if err != nil || len(workers) == 0 {
 		return nil
 	}
 	exclude := make(map[string]struct{}, len(excludeIDs))
 	for _, id := range excludeIDs {
 		exclude[id] = struct{}{}
 	}
-	var latest *models.WorkerNode
+
+	running, err := d.queries.CountRunningScanTasksPerWorker()
+	if err != nil {
+		running = map[string]int{}
+	}
+
+	var candidates []*models.WorkerNode
+	minLoad := -1
 	for _, w := range workers {
-		if _, skip := exclude[w.ID]; skip {
+		if !d.isEligible(w, exclude) {
 			continue
 		}
-		if w.Status == models.WorkerStatusOnline && w.Endpoint != "" && w.RevokedAt == nil {
-			if latest == nil || (w.LastSeen != nil && latest.LastSeen != nil && w.LastSeen.After(*latest.LastSeen)) {
-				latest = w
-			}
+		load := running[w.ID] + d.currentInflight(w.ID)
+		if workerAtCapacity(w, load) {
+			continue
+		}
+		if minLoad < 0 || load < minLoad {
+			minLoad = load
+			candidates = []*models.WorkerNode{w}
+		} else if load == minLoad {
+			candidates = append(candidates, w)
 		}
 	}
-	return latest
+	if len(candidates) == 0 {
+		return nil
+	}
+	if len(candidates) == 1 {
+		return candidates[0]
+	}
+
+	d.inflightMu.Lock()
+	idx := d.pickSeq % uint64(len(candidates))
+	d.pickSeq++
+	d.inflightMu.Unlock()
+	return candidates[idx]
 }
 
 // MarkWorkerOffline marks a worker as offline (used when dispatch fails to a worker
@@ -121,6 +209,9 @@ func (d *Dispatcher) dispatchOnce(ctx context.Context, task *models.ScanTask, wo
 		return fmt.Errorf("post task to worker: %w", err)
 	}
 	resp.Body.Close()
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		return fmt.Errorf("worker at capacity: %s", resp.Status)
+	}
 	if resp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("worker rejected task: %s", resp.Status)
 	}

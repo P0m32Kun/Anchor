@@ -42,8 +42,9 @@ func generateToken() string {
 
 func (s *Server) handleRegisterWorker(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name     string `json:"name"`
-		Endpoint string `json:"endpoint"`
+		Name            string `json:"name"`
+		Endpoint        string `json:"endpoint"`
+		MaxConcurrency  int    `json:"max_concurrency"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid request body"))
@@ -54,15 +55,21 @@ func (s *Server) handleRegisterWorker(w http.ResponseWriter, r *http.Request) {
 	token := generateToken()
 	now := time.Now().UTC()
 
+	maxConc := 10
+	if req.MaxConcurrency > 0 {
+		maxConc = req.MaxConcurrency
+	}
+
 	worker := &models.WorkerNode{
-		ID:         id,
-		Name:       req.Name,
-		Endpoint:   req.Endpoint,
-		Mode:       models.WorkerModeRemote,
-		Status:     models.WorkerStatusOnline,
-		TrustLevel: "standard",
-		LastSeen:   &now,
-		CreatedAt:  now,
+		ID:             id,
+		Name:           req.Name,
+		Endpoint:       req.Endpoint,
+		Mode:           models.WorkerModeRemote,
+		Status:         models.WorkerStatusOnline,
+		TrustLevel:     "standard",
+		MaxConcurrency: maxConc,
+		LastSeen:       &now,
+		CreatedAt:      now,
 	}
 
 	if err := s.queries.CreateWorkerNode(worker); err != nil {
@@ -88,6 +95,9 @@ func (s *Server) handleWorkerHeartbeat(w http.ResponseWriter, r *http.Request) {
 		Status            string   `json:"status"`
 		Capabilities      []string `json:"capabilities"`
 		TemplateVersions  string   `json:"template_versions"`
+		CPUPercent        *float64 `json:"cpu_percent"`
+		MemPercent        *float64 `json:"mem_percent"`
+		DiskPercent       *float64 `json:"disk_percent"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid body"))
@@ -112,7 +122,20 @@ func (s *Server) handleWorkerHeartbeat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Update resource metrics if provided
+	s.updateWorkerMetrics(id, req.CPUPercent, req.MemPercent, req.DiskPercent)
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+// updateWorkerMetrics updates worker resource metrics if provided.
+func (s *Server) updateWorkerMetrics(id string, cpu, mem, disk *float64) {
+	if cpu == nil && mem == nil && disk == nil {
+		return
+	}
+	now := time.Now().UTC()
+	if err := s.queries.UpdateWorkerNodeMetrics(id, cpu, mem, disk, now); err != nil {
+		log.Printf("[worker] update metrics for %s: %v", id, err)
+	}
 }
 
 func (s *Server) handlePollTasks(w http.ResponseWriter, r *http.Request) {

@@ -13,7 +13,7 @@ Anchor 使用 GitHub Actions：**PR/push 跑单元门禁**（`ci.yml`），**tag
 | `backend` | `go vet ./...`、`go test ./...` |
 | `frontend` | `npm ci`、`typecheck`、`test:unit`、`build` |
 
-长耗时 E2E（rangefield Docker 全栈）**不在**默认 PR 门禁内；本地或 nightly 使用 `make test-e2e`（快速套件）/ `make test-e2e-smoke` / `make test-e2e-scan` / `make test-e2e-full`。Playwright 已按 `chromium` / `chromium-scan` 拆分超时，无整次 `globalTimeout`。E2E 使用 `docker-compose.e2e.yml`（含 `build`，网络 `anchor-net-e2e` / `172.31.0.0/24`），与用户部署用的 `docker-compose.yml`（仅 ACR `image`、无 `build`）分离。环境变量见 `frontend/e2e/fixtures/e2e-env.ts`。
+长耗时 E2E（rangefield Docker 全栈）**不在**默认 PR 门禁内；本地或 nightly 使用 `make test-e2e`（快速套件）/ `make test-e2e-smoke` / `make test-e2e-scan` / `make test-e2e-full`。Playwright 已按 `chromium` / `chromium-scan` 拆分超时，无整次 `globalTimeout`。E2E 使用 `docker-compose.e2e.yml`（`Dockerfile.*-fast` build，网络 `anchor-net-e2e` / `172.31.0.0/24`），与用户部署用的 `docker-compose.yml`（仅 ACR `image`、无 `build`）分离。详见 [`e2e-testing.md`](e2e-testing.md)。
 
 ## 发布流程图
 
@@ -182,51 +182,28 @@ docker pull p0m32kun/anchor-frontend:latest
 
 ## 镜像构建说明
 
-### Server 镜像
+### 生产 Server / Worker 镜像
 
-```dockerfile
-# 基础镜像
-FROM anchor-server-runtime-base:latest
+`Dockerfile.server` / `Dockerfile.worker` 基于 `debian:bookworm-slim`，通过 `docker/install-anchor-binary.sh` 注入二进制（`RELEASE_VERSION=local` 时用 `bin/anchor-linux-*`，否则从 GitHub Release 下载）。**不**依赖 runtime-base 镜像。
 
-# 从 GitHub Release 下载预编译二进制
-RUN curl -fsSL -o /app/anchor "${RELEASE_URL}"
+### E2E 快速镜像（仅开发）
 
-# 内置模板
-RUN curl -fsSL -o /tmp/templates.tar.gz "..."
-```
-
-### Worker 镜像
-
-```dockerfile
-# 运行时 base（预装安全工具，见 Dockerfile.worker-runtime-base）
-FROM anchor-worker-runtime-base:latest
-
-# 从 GitHub Release 下载与 RELEASE_VERSION 对齐的二进制
-RUN curl -fsSL -o /app/anchor "${RELEASE_URL}"
-```
-
-### 运行时 Base 镜像
-
-Server/Worker 运行时 base 很少更新，本地快速迭代用 `make build-linux` + `make build-fast`（见 [`architecture.md`](architecture.md) Docker 章节）。
+`Dockerfile.*-runtime-base` + `Dockerfile.*-fast` 供 `make build-base` / `make build-fast` 与 E2E compose 使用，详见 [`e2e-testing.md`](e2e-testing.md)。
 
 生产 `docker-compose.yml` 中 Server 与 Worker 使用**独立数据卷**（`anchor-server-data` / `anchor-worker-data`），避免 SQLite 共库冲突。
 
 ## 常见问题
 
-### Q: 如何更新 Worker Base 镜像？
+### Q: 如何更新 Worker runtime-base 镜像？
 
-A: Worker Base 镜像包含系统依赖和安全工具，很少需要更新：
+A: `Dockerfile.worker-runtime-base` 包含系统依赖和安全工具，很少需要更新：
 
 ```bash
-# 1. 修改 Dockerfile.worker-base
-# 2. 本地构建并测试
-make build-worker-base
-
-# 3. 推送到 Docker Hub
-make push-worker-base
-
-# 4. 推送到阿里云 ACR
-make push-worker-base-cn
+# 1. 修改 Dockerfile.worker-runtime-base
+# 2. 本地重建并验证 E2E 链
+make build-base
+make build-fast
+make test-e2e-smoke
 ```
 
 ### Q: 如何手动触发镜像构建？

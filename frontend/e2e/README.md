@@ -2,6 +2,8 @@
 
 基于 **Playwright** 的自动化端到端测试，覆盖全部页面和核心用户流程。
 
+> **Docker 栈与 compose 说明**：见 [`docs/current/e2e-testing.md`](../../docs/current/e2e-testing.md)（与客户部署 [`deployment.md`](../../docs/current/deployment.md) 分离）。
+>
 > 旧的 `.e2e.md` 手工测试计划文档仍保留在 `tests/` 目录中作为参考，但不再维护。
 > 所有新的测试用例应编写为 `.spec.ts` 文件。
 

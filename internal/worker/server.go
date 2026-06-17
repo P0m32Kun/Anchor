@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -21,33 +22,40 @@ import (
 
 // WorkerServer runs in worker mode, receiving tasks via HTTP and executing them.
 type WorkerServer struct {
-	dataDir    string
-	coreURL    string
-	token      string
-	httpClient *http.Client
-	governor   *ResourceGovernor
-	allowlist  *toolguard.Allowlist
-	procs      map[string]*exec.Cmd
-	workdirs   map[string]string // taskID -> workdir for live output tail
-	mu         sync.Mutex
+	dataDir        string
+	coreURL        string
+	token          string
+	httpClient     *http.Client
+	governor       *ResourceGovernor
+	allowlist      *toolguard.Allowlist
+	procs          map[string]*exec.Cmd
+	workdirs       map[string]string // taskID -> workdir for live output tail
+	maxConcurrency int
+	runningTasks   atomic.Int32
+	mu             sync.Mutex
 }
 
 func NewWorkerServer(dataDir string, coreURL string, token string) *WorkerServer {
 	return &WorkerServer{
-		dataDir:    dataDir,
-		coreURL:    coreURL,
-		token:      token,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
-		governor:   NewResourceGovernor(LoadGovernorConfigFromEnv(), nil),
-		allowlist:  toolguard.NewAllowlist(),
-		procs:      make(map[string]*exec.Cmd),
-		workdirs:   make(map[string]string),
+		dataDir:        dataDir,
+		coreURL:        coreURL,
+		token:          token,
+		httpClient:     &http.Client{Timeout: 30 * time.Second},
+		governor:       NewResourceGovernor(LoadGovernorConfigFromEnv(), nil),
+		allowlist:      toolguard.NewAllowlist(),
+		procs:          make(map[string]*exec.Cmd),
+		workdirs:       make(map[string]string),
+		maxConcurrency: LoadMaxConcurrencyFromEnv(),
 	}
 }
 
 // SetGovernor swaps the resource governor (used by tests).
 func (ws *WorkerServer) SetGovernor(g *ResourceGovernor) {
 	ws.governor = g
+}
+
+func (ws *WorkerServer) atCapacity() bool {
+	return ws.maxConcurrency > 0 && ws.runningTasks.Load() >= int32(ws.maxConcurrency)
 }
 
 func (ws *WorkerServer) Register(mux *http.ServeMux) {
@@ -96,9 +104,18 @@ func (ws *WorkerServer) handleTask(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[worker] task %s materialised input file: %s (%dB)", req.TaskID, path, len(data))
 	}
 
+	if ws.atCapacity() {
+		http.Error(w, "worker at capacity", http.StatusServiceUnavailable)
+		return
+	}
+	ws.runningTasks.Add(1)
+
 	// Execute task asynchronously
 	// Use background context so task execution survives HTTP connection close.
-	go ws.executeTask(context.Background(), req.TaskID, req.Tool, req.Command, req.Workdir, req.RateLimit, req.ScanDepth)
+	go func() {
+		defer ws.runningTasks.Add(-1)
+		ws.executeTask(context.Background(), req.TaskID, req.Tool, req.Command, req.Workdir, req.RateLimit, req.ScanDepth)
+	}()
 
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]string{"status": "accepted"})

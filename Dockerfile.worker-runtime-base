@@ -1,5 +1,4 @@
-# Anchor Worker Runtime Base Image
-# 包含所有安全工具和系统依赖，极少更新
+# Anchor Worker Runtime Base Image — 【E2E】预装安全工具与系统依赖，极少更新
 # 构建: docker build -f Dockerfile.worker-runtime-base -t anchor-worker-base:latest .
 
 FROM debian:bookworm-slim

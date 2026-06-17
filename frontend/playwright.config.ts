@@ -6,7 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** 完整 pipeline 扫描 spec；单文件最长 30 分钟，须用 --project=chromium-scan */
 const LONG_SCAN_SPEC =
-	/(high-risk-pipeline|internal-scan-live|live-scan|log-audit|sse-realtime|trace-audit)\.spec\.ts$/;
+	/(high-risk-pipeline|internal-scan-live|live-scan|log-audit|sse-realtime|trace-audit|batch-scan-scale|external-scan-conv|company-scan-flow|multi-worker-dispatch)\.spec\.ts$/;
 
 const DEFAULT_TIMEOUT = 120 * 1000;
 const LONG_SCAN_TIMEOUT = 30 * 60 * 1000;

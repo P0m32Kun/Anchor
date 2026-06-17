@@ -572,6 +572,30 @@ func (q *Queries) ListPipelineRunsByProject(projectID string) ([]*models.Pipelin
 	return list, rows.Err()
 }
 
+func (q *Queries) ListPipelineRunsByStatus(status string) ([]*models.PipelineRun, error) {
+	rows, err := q.db.Query(`SELECT id, project_id, mode, status, stage, error, engine_state, last_new_asset_at, started_at, completed_at, created_at FROM pipeline_runs WHERE status = ? ORDER BY created_at DESC`, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.PipelineRun
+	for rows.Next() {
+		r := &models.PipelineRun{}
+		var completedAt, lastNewAssetAt sql.NullTime
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Mode, &r.Status, &r.Stage, &r.Error, &r.EngineState, &lastNewAssetAt, &r.StartedAt, &completedAt, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		if completedAt.Valid {
+			r.CompletedAt = &completedAt.Time
+		}
+		if lastNewAssetAt.Valid {
+			r.LastNewAssetAt = &lastNewAssetAt.Time
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
 func (q *Queries) CountPipelineRunsByProject(projectID string) (int, error) {
 	var count int
 	err := q.db.QueryRow(`SELECT COUNT(*) FROM pipeline_runs WHERE project_id = ?`, projectID).Scan(&count)
@@ -686,6 +710,28 @@ func (q *Queries) CountPendingFindings() (int, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+// CountRunningScanTasksPerWorker returns running task counts keyed by worker_id.
+func (q *Queries) CountRunningScanTasksPerWorker() (map[string]int, error) {
+	rows, err := q.db.Query(
+		`SELECT worker_id, COUNT(*) FROM scan_tasks WHERE status = ? AND worker_id IS NOT NULL AND worker_id != '' GROUP BY worker_id`,
+		models.TaskRunning,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string]int)
+	for rows.Next() {
+		var workerID string
+		var count int
+		if err := rows.Scan(&workerID, &count); err != nil {
+			return nil, err
+		}
+		out[workerID] = count
+	}
+	return out, rows.Err()
 }
 
 func (q *Queries) CountOnlineWorkers() (int, error) {

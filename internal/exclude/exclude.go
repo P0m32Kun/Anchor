@@ -232,3 +232,16 @@ func (m *Manager) ClearDirty() {
 	defer m.mu.Unlock()
 	m.dirty = false
 }
+
+// builtinDomainsVar is the mutable list of builtin excluded domains.
+var builtinDomainsVar []string
+
+// BuiltinDomainsFunc returns the current builtin excluded domains.
+func BuiltinDomainsFunc() []string {
+	return builtinDomainsVar
+}
+
+// SetBuiltinDomains overrides the builtin excluded domains at runtime.
+func SetBuiltinDomains(domains []string) {
+	builtinDomainsVar = domains
+}

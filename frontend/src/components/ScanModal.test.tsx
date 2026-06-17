@@ -1,63 +1,86 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ScanModal from "./ScanModal";
+import { DEFAULT_FFUF_DICTIONARY_ID } from "../lib/api";
 
-// Stub the dictionary list API. enable_ffuf=true triggers a fetch on mount of
-// step 2; returning [] keeps the modal in "no dictionaries available" mode,
-// which mirrors the production default seed and exercises the ffufMisconfigured
-// branch without needing a real backend.
+const mockDictionary = {
+  id: DEFAULT_FFUF_DICTIONARY_ID,
+  name: "top100",
+  category: "dirscan" as const,
+  file_path: "/opt/dict/top100.txt",
+  line_count: 100,
+  size_bytes: 1024,
+  builtin: true,
+  enabled: true,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
+
 vi.mock("../lib/api", async () => {
   const actual: any = await vi.importActual("../lib/api");
   return {
     ...actual,
     api: {
       ...actual.api,
-      listDictionaries: vi.fn(() => Promise.resolve([])),
+      listDictionaries: vi.fn(() => Promise.resolve([mockDictionary])),
     },
   };
 });
 
+function openAdvanced() {
+  fireEvent.click(screen.getByRole("button", { name: /高级选项/ }));
+}
+
 function goToStep2() {
-  fireEvent.click(screen.getByRole("button", { name: /配置参数/ }));
+  fireEvent.click(screen.getByRole("button", { name: /高级配置/ }));
+}
+
+async function ensureFfufMisconfigured() {
+  goToStep2();
+  openAdvanced();
+  const ffufBtn = screen.getByText("Ffuf").closest("button");
+  expect(ffufBtn).not.toBeNull();
+  if (!screen.queryByLabelText("Ffuf 字典")) {
+    fireEvent.click(ffufBtn!);
+  }
+  const select = await screen.findByLabelText("Ffuf 字典");
+  fireEvent.change(select, { target: { value: "" } });
+  await waitFor(() => {
+    expect(screen.getByText(/请选择 Ffuf 字典,或关闭 Ffuf/)).toBeInTheDocument();
+  });
 }
 
 describe("ScanModal — ffuf dictionary guard (Fix 3 frontend)", () => {
   beforeEach(() => {
-    // ScanModal persists state in localStorage; clear between cases to avoid
-    // bleed-over.
     window.localStorage.clear();
   });
 
   it("disables the start button when ffuf is enabled but no dictionary is selected", async () => {
     render(<ScanModal open onClose={() => {}} onStart={() => {}} />);
-    goToStep2();
+    await ensureFfufMisconfigured();
 
-    // Default config has enable_ffuf=true and ffuf_dictionary_id="", so the
-    // guard should fire immediately on step 2.
-    const startBtn = screen.getByRole("button", { name: /立即启动扫描/ });
-    expect(startBtn).toBeDisabled();
+    const startBtn = screen.getByRole("button", { name: "立即启动扫描" });
+    await waitFor(() => expect(startBtn).toBeDisabled());
     expect(startBtn).toHaveAttribute("title", expect.stringMatching(/请选择 Ffuf 字典/));
   });
 
-  it("shows the inline misconfiguration message", () => {
+  it("shows the inline misconfiguration message", async () => {
     render(<ScanModal open onClose={() => {}} onStart={() => {}} />);
-    goToStep2();
+    await ensureFfufMisconfigured();
     expect(screen.getByText(/请选择 Ffuf 字典,或关闭 Ffuf/)).toBeInTheDocument();
   });
 
-  it("re-enables the start button when ffuf is disabled", () => {
+  it("re-enables the start button when ffuf is disabled", async () => {
     render(<ScanModal open onClose={() => {}} onStart={() => {}} />);
-    goToStep2();
+    await ensureFfufMisconfigured();
 
-    // The Ffuf toggle button has two child divs ("Ffuf" + "目录与文件爆破").
-    // Find it by walking up from the visible "Ffuf" label to its button parent.
     const ffufLabel = screen.getByText("Ffuf");
     const toggleBtn = ffufLabel.closest("button");
     expect(toggleBtn).not.toBeNull();
     fireEvent.click(toggleBtn!);
 
-    const startBtn = screen.getByRole("button", { name: /立即启动扫描/ });
-    expect(startBtn).not.toBeDisabled();
+    const startBtn = screen.getByRole("button", { name: "立即启动扫描" });
+    await waitFor(() => expect(startBtn).not.toBeDisabled());
     expect(startBtn).not.toHaveAttribute("title");
   });
 });

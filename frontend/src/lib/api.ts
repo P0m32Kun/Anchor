@@ -207,10 +207,6 @@ export interface Project {
   port_range?: string;
   pipeline_config?: string;
   scope_boundary_mode?: string;
-  watch_enabled?: boolean;
-  watch_interval_hours?: number;
-  watch_passive_only?: boolean;
-  watch_last_tick_at?: string;
   created_at: string;
 }
 
@@ -247,15 +243,6 @@ export interface ImportResult {
     type: string;
     value: string;
   }[];
-}
-
-export interface DryRunResult {
-  project_id: string;
-  mode: string;
-  time_window_valid?: boolean;
-  rate_limit?: number;
-  estimated_duration_seconds?: number;
-  results: { target: string; decision: string; reason: string }[];
 }
 
 export interface ScopeRule {
@@ -386,23 +373,6 @@ export interface Finding {
   updated_at: string;
 }
 
-export interface Signal {
-  id: string;
-  project_id: string;
-  source_kind: string; // finding | spoor | endpoint | asset_new
-  source_id: string;
-  title: string;
-  severity: string;
-  score: number;
-  scope_status: string; // in_scope | out_of_scope
-  status: string; // new | dismissed | pinned
-  metadata: string;
-  first_seen: string;
-  last_seen: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export type ToolCallStatus = "running" | "completed" | "failed";
 
 export interface ToolCallLog {
@@ -449,8 +419,14 @@ export interface WorkerNode {
   mode: string;
   status: string;
   busy: boolean;
+  running_tasks?: number;
+  max_concurrency?: number;
   last_seen?: string;
   created_at: string;
+  cpu_percent?: number;
+  mem_percent?: number;
+  disk_percent?: number;
+  metrics_updated_at?: string;
 }
 
 export const api = {
@@ -476,9 +452,6 @@ export const api = {
   updateProjectScopeBoundaryMode: (id: string, mode: "off" | "strict", signal?: AbortSignal) =>
     fetchAPI<Project>(`/projects/${id}/scope-boundary-mode`, { method: "PATCH", body: JSON.stringify({ scope_boundary_mode: mode }), signal }),
 
-  updateProjectWatchConfig: (id: string, config: { watch_enabled?: boolean; watch_interval_hours?: number; watch_passive_only?: boolean }, signal?: AbortSignal) =>
-    fetchAPI<Project>(`/projects/${id}/watch-config`, { method: "PATCH", body: JSON.stringify(config), signal }),
-
   createTarget: (projectId: string, data: { type: string; value: string }, signal?: AbortSignal) =>
     fetchAPI<Target | ScopeConfirmationResponse>(`/projects/${projectId}/targets`, { method: "POST", body: JSON.stringify(data), signal }),
 
@@ -499,9 +472,6 @@ export const api = {
 
   listScopeRules: (projectId: string, pagination?: PaginationParams, signal?: AbortSignal) =>
     fetchAPI<PaginatedResponse<ScopeRule>>(buildQueryString("/scope-rules", { project_id: projectId, page: pagination?.page, page_size: pagination?.page_size }), { signal }),
-
-  dryRun: (projectId: string, signal?: AbortSignal) =>
-    fetchAPI<DryRunResult>(`/scan-plans/dry-run?project_id=${projectId}`, { method: "POST", signal }),
 
   importTargets: (projectId: string, file: File, signal?: AbortSignal) => {
     const formData = new FormData();
@@ -572,25 +542,6 @@ export const api = {
   addEvidence: (findingId: string, data: { type: string; excerpt: string; created_by?: string }, signal?: AbortSignal) =>
     fetchAPI<Evidence>(`/findings/${findingId}/evidence`, { method: "POST", body: JSON.stringify(data), signal }),
 
-  // --- Signals (Inbox) ---
-  listSignals: (projectId: string, params?: { min_score?: number; scope?: string; status?: string }, signal?: AbortSignal) => {
-    const query = buildQueryString(`/projects/${projectId}/signals`, {
-      min_score: params?.min_score,
-      scope: params?.scope,
-      status: params?.status,
-    });
-    return fetchAPI<{ data: Signal[]; total: number }>(query, { signal });
-  },
-
-  countSignals: (projectId: string, signal?: AbortSignal) =>
-    fetchAPI<{ total: number; new: number }>(`/projects/${projectId}/signals/count`, { signal }),
-
-  getSignal: (id: string, signal?: AbortSignal) =>
-    fetchAPI<Signal>(`/signals/${id}`, { signal }),
-
-  updateSignalStatus: (id: string, status: "new" | "dismissed" | "pinned", signal?: AbortSignal) =>
-    fetchAPI<{ status: string }>(`/signals/${id}`, { method: "PATCH", body: JSON.stringify({ status }), signal }),
-
   exportReportMD: (projectId: string, signal?: AbortSignal) =>
     fetchBlob(`/projects/${projectId}/reports/export.md`, { signal }),
 
@@ -630,10 +581,22 @@ export const api = {
     fetchAPI<ScanRunMetrics>(`/projects/${projectId}/pipeline/runs/${runId}/metrics`, { signal }),
 
   // --- Scan Work Items ---
-  listScanRunWorks: (projectId: string, runId: string, signal?: AbortSignal) =>
-    fetchAPI<{ items: ScanWorkItem[]; total: number }>(`/projects/${projectId}/pipeline/runs/${runId}/works`, { signal }),
-  listToolCallLogs: (projectId: string, runId: string, signal?: AbortSignal) =>
-    fetchAPI<{ items: ToolCallLog[]; total: number }>(`/projects/${projectId}/pipeline/runs/${runId}/tool-calls`, { signal }),
+  listScanRunWorks: (projectId: string, runId: string, pagination?: PaginationParams, signal?: AbortSignal) =>
+    fetchAPI<{ items: ScanWorkItem[]; total: number; page: number; page_size: number }>(
+      buildQueryString(`/projects/${projectId}/pipeline/runs/${runId}/works`, {
+        page: pagination?.page,
+        page_size: pagination?.page_size,
+      }),
+      { signal }
+    ),
+  listToolCallLogs: (projectId: string, runId: string, pagination?: PaginationParams, signal?: AbortSignal) =>
+    fetchAPI<{ items: ToolCallLog[]; total: number; page: number; page_size: number }>(
+      buildQueryString(`/projects/${projectId}/pipeline/runs/${runId}/tool-calls`, {
+        page: pagination?.page,
+        page_size: pagination?.page_size,
+      }),
+      { signal }
+    ),
   getFindingTrace: (findingId: string, signal?: AbortSignal) =>
     fetchAPI<ToolCallTrace>(`/findings/${findingId}/trace`, { signal }),
   listAssetWorks: (assetId: string, runId: string, signal?: AbortSignal) =>
@@ -677,57 +640,12 @@ export const api = {
   getEngineQuota: (engine: string, signal?: AbortSignal) =>
     fetchAPI<{ engine: string; quota: { points: { name: string; value: number; unit: string }[] } }>(`/engines/quota?engine=${engine}`, { signal, skipGlobalError: true }),
 
-  // --- Nuclei Custom Templates ---
+  // --- Nuclei Templates (RBKD builtin) ---
   listNucleiCustomSources: (signal?: AbortSignal) =>
     fetchAPI<NucleiCustomSource[]>("/nuclei/custom/sources", { signal }),
 
-  createNucleiCustomGitSource: (data: { name: string; install_path: string; uri: string; branch?: string }, signal?: AbortSignal) =>
-    fetchAPI<NucleiCustomSource>("/nuclei/custom/sources/git", { method: "POST", body: JSON.stringify(data), signal }),
-
-  createNucleiCustomUploadSource: (name: string, installPath: string, file: File, signal?: AbortSignal) => {
-    const formData = new FormData();
-    formData.append("name", name);
-    formData.append("install_path", installPath);
-    formData.append("routing_policy", "manual");
-    formData.append("file", file);
-    return fetchAPI<NucleiCustomSource>("/nuclei/custom/sources/upload", { method: "POST", body: formData, signal });
-  },
-
-  refreshNucleiCustomSource: (id: string, signal?: AbortSignal) =>
-    fetchAPI<NucleiCustomSource>(`/nuclei/custom/sources/${id}/refresh`, { method: "POST", signal }),
-
-  patchNucleiCustomSource: (id: string, data: { name?: string; enabled?: boolean; routing_policy?: string }, signal?: AbortSignal) =>
-    fetchAPI<NucleiCustomSource>(`/nuclei/custom/sources/${id}`, { method: "PATCH", body: JSON.stringify(data), signal }),
-
   patchNucleiCustomSourceEnabled: (id: string, enabled: boolean, signal?: AbortSignal) =>
     fetchAPI<NucleiCustomSource>(`/nuclei/custom/sources/${id}/enabled`, { method: "PATCH", body: JSON.stringify({ enabled }), signal }),
-
-  deleteNucleiCustomSource: (id: string, signal?: AbortSignal) =>
-    fetchAPI<void>(`/nuclei/custom/sources/${id}`, { method: "DELETE", signal }),
-
-  listNucleiCustomFiles: (id: string, signal?: AbortSignal) =>
-    fetchAPI<NucleiCustomFileEntry[]>(`/nuclei/custom/sources/${id}/files`, { signal }),
-
-  readNucleiCustomFile: (id: string, path: string, signal?: AbortSignal) =>
-    fetchBlob(`/nuclei/custom/sources/${id}/files/${path}`, { signal }),
-
-  writeNucleiCustomFile: (id: string, path: string, content: string, signal?: AbortSignal) =>
-    fetchAPI<void>(`/nuclei/custom/sources/${id}/files/${path}`, { method: "PUT", body: content, signal }),
-
-  deleteNucleiCustomFile: (id: string, path: string, signal?: AbortSignal) =>
-    fetchAPI<void>(`/nuclei/custom/sources/${id}/files/${path}`, { method: "DELETE", signal }),
-
-  validateNucleiCustomSource: (id: string, signal?: AbortSignal) =>
-    fetchAPI<NucleiCustomValidationResult>(`/nuclei/custom/sources/${id}/validate`, { method: "POST", signal }),
-
-  validateAllNucleiCustom: (signal?: AbortSignal) =>
-    fetchAPI<NucleiCustomValidationResult[]>("/nuclei/custom/validate", { method: "POST", signal }),
-
-  publishNucleiCustom: (signal?: AbortSignal) =>
-    fetchAPI<{ version: string }>("/nuclei/custom/publish", { method: "POST", signal }),
-
-  getNucleiCustomManifest: (signal?: AbortSignal) =>
-    fetchAPI<NucleiCustomManifest>("/nuclei/custom/manifest", { signal }),
 
   // --- Dictionaries ---
   listDictionaries: (category?: string, signal?: AbortSignal) =>
@@ -933,7 +851,6 @@ export interface PhaseCoverage {
 export interface RunSummaryResponse {
   run_id: string;
   new_findings: number;
-  new_signals: number;
   status: string;
   phases: PhaseCoverage[];
   complete: boolean;
@@ -988,7 +905,7 @@ export interface PipelineConfig {
   enable_passive_junk_filter: boolean;
   passive_junk_keywords?: string[];
   subfinder_provider_config: string;
-  scan_mode?: string; // "internal" | "external" | "watch" (legacy: "src_low_noise", "bounty")
+  scan_mode?: string; // "internal" | "external" (legacy: external_low → external + noise_level=low)
   noise_level?: string; // "low" | "standard" — only for external mode
   enable_spoor: boolean;
 }
@@ -1140,36 +1057,6 @@ export const DEFAULT_EXTERNAL_PIPELINE_CONFIG: PipelineConfig = {
   enable_katana: false,
 };
 
-export const DEFAULT_LOW_NOISE_PIPELINE_CONFIG: PipelineConfig = {
-  ...DEFAULT_EXTERNAL_PIPELINE_CONFIG,
-  scan_mode: "external",
-  noise_level: "low",
-  port_range: "top100",
-  naabu_rate: 200,
-  naabu_threads: 30,
-  nuclei_scan_depth: "tags",
-  nuclei_rate_limit: 5,
-  nuclei_concurrency: 3,
-  nuclei_rate_limit_per_min: 20,
-  nuclei_require_fingerprint: true,
-  enable_ffuf: true,
-  ffuf_tier: "small",
-  ffuf_rate_limit: 3,
-  ffuf_timeout: 20,
-  enable_katana: false,
-  enable_spoor: true,
-  enable_passive_search: true,
-  enable_passive_cert: true,
-  enable_passive_url: true,
-  subfinder_mode: "passive",
-  passive_search_result_limit: 300,
-  passive_search_concurrency: 2,
-  enable_passive_junk_filter: true,
-};
-
-// Canonical name alias
-export const DEFAULT_EXTERNAL_LOW_NOISE_PIPELINE_CONFIG = DEFAULT_LOW_NOISE_PIPELINE_CONFIG;
-
 export const DEFAULT_EXTERNAL_STANDARD_PIPELINE_CONFIG: PipelineConfig = {
   ...DEFAULT_EXTERNAL_PIPELINE_CONFIG,
   scan_mode: "external",
@@ -1196,36 +1083,6 @@ export const DEFAULT_EXTERNAL_STANDARD_PIPELINE_CONFIG: PipelineConfig = {
   enable_passive_junk_filter: true,
 };
 
-export const DEFAULT_BOUNTY_PIPELINE_CONFIG: PipelineConfig = {
-  ...DEFAULT_EXTERNAL_PIPELINE_CONFIG,
-  scan_mode: "watch",
-  enable_spoor: true,
-  enable_katana: false,
-  enable_passive_search: true,
-  enable_passive_cert: true,
-  enable_passive_url: true,
-  subfinder_mode: "passive",
-  passive_search_result_limit: 500,
-  passive_search_concurrency: 3,
-  nuclei_scan_depth: "workflow",
-  nuclei_rate_limit: 10,
-  nuclei_concurrency: 5,
-  nuclei_rate_limit_per_min: 30,
-  nuclei_require_fingerprint: true,
-  port_range: "top100",
-  naabu_rate: 300,
-  naabu_threads: 50,
-  skip_portscan_on_cdn_host: true,
-  enable_ffuf: true,
-  ffuf_tier: "small",
-  ffuf_rate_limit: 4,
-  ffuf_timeout: 20,
-  enable_passive_junk_filter: true,
-};
-
-// Canonical name alias
-export const DEFAULT_WATCH_PIPELINE_CONFIG = DEFAULT_BOUNTY_PIPELINE_CONFIG;
-
 // Mirrors internal/worker/commands.go:HighRiskPorts — curated list of high-value
 // attack-surface ports (Redis/ES/MongoDB/Docker/K8s/Ollama, …) that Naabu's
 // built-in top-N presets miss. Used as the default pre-fill for the -p custom
@@ -1243,7 +1100,7 @@ export const DEFAULT_HIGH_RISK_PORTS =
 export interface ScanDefaultsResponse {
   high_risk_ports: string;
   ffuf_dictionary_default: string;
-  presets: Partial<Record<"external" | "internal" | "watch" | "external_low" | "external_standard" | "src_low_noise" | "bounty", PipelineConfig>>;
+  presets: Partial<Record<"external" | "internal" | "external_low" | "external_standard", PipelineConfig>>;
   junk_keyword_count: number;
   exclude_domain_count: number;
   config_path?: string;
@@ -1317,11 +1174,12 @@ export interface SearchEngineResponse {
   data: SearchResult[];
 }
 
-// --- Nuclei Custom Templates ---
+// --- Nuclei Templates (RBKD builtin) ---
 
 export interface NucleiCustomSource {
   id: string;
   name: string;
+  install_path?: string;
   type: "git" | "upload" | "file";
   uri?: string;
   branch?: string;
@@ -1330,241 +1188,7 @@ export interface NucleiCustomSource {
   routing_policy: string;
   status: "draft" | "ready" | "error";
   last_sync_at?: string;
-  last_validate_at?: string;
   last_error?: string;
   created_at: string;
   updated_at: string;
 }
-
-export interface NucleiCustomFileEntry {
-  path: string;
-  is_dir: boolean;
-  size: number;
-  mod_time: string;
-}
-
-export interface NucleiCustomValidationResult {
-  source_id: string;
-  ok: boolean;
-  errors?: string[];
-}
-
-export interface NucleiCustomManifest {
-  version: string;
-  sources: { id: string; name: string; files: string[]; checksum: string }[];
-  created_at: string;
-}
-
-// --- SRC Program ---
-
-export interface SRCProgram {
-  id: string;
-  project_id: string;
-  name: string;
-  platform: string;
-  program_url: string;
-  rules_url: string;
-  allow_automation: boolean;
-  allow_dir_brute: boolean;
-  allow_weak_password: boolean;
-  allow_authenticated_test: boolean;
-  max_rps: number;
-  max_concurrency: number;
-  preferred_vuln_types: string[];
-  payout_hint: Record<string, unknown>;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateSRCProgramRequest {
-  name: string;
-  platform: string;
-  program_url?: string;
-  rules_url?: string;
-  allow_automation?: boolean;
-  allow_dir_brute?: boolean;
-  allow_weak_password?: boolean;
-  allow_authenticated_test?: boolean;
-  max_rps?: number;
-  max_concurrency?: number;
-  preferred_vuln_types?: string[];
-  payout_hint?: Record<string, unknown>;
-  notes?: string;
-}
-
-// --- Bounty Candidate ---
-
-export interface BountyCandidate {
-  id: string;
-  project_id: string;
-  program_id?: string;
-  finding_id?: string;
-  endpoint_id?: string;
-  source_kind: string;
-  title: string;
-  vuln_type: string;
-  severity: string;
-  confidence: string;
-  value_score: number;
-  impact_score: number;
-  novelty_score: number;
-  repro_score: number;
-  scope_score: number;
-  safety_score: number;
-  duplicate_risk: string;
-  ranking_reason: string;
-  verify_status: string;
-  submission_status: string;
-  submission_url: string;
-  submission_id: string;
-  paid_amount: number;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface BountyCandidateStats {
-  total: number;
-  pending: number;
-  verified: number;
-  submitted: number;
-  accepted: number;
-  paid: number;
-  total_value: number;
-  average_value: number;
-}
-
-// --- Submission Pack ---
-
-export interface SubmissionPack {
-  id: string;
-  candidate_id: string;
-  format: string;
-  template: string;
-  content: string;
-  checklist_json: string;
-  redaction_status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-// --- SRC API Functions ---
-
-export const srcApi = {
-  // SRC Programs
-  async getProgram(projectId: string): Promise<SRCProgram | null> {
-    const res = await request(`/projects/${projectId}/src-program`);
-    if (res.status === 404) return null;
-    return res.json();
-  },
-
-  async createProgram(projectId: string, data: CreateSRCProgramRequest): Promise<SRCProgram> {
-    const res = await request(`/projects/${projectId}/src-program`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    return res.json();
-  },
-
-  async updateProgram(projectId: string, data: Partial<CreateSRCProgramRequest>): Promise<SRCProgram> {
-    const res = await request(`/projects/${projectId}/src-program`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    return res.json();
-  },
-
-  async deleteProgram(projectId: string): Promise<void> {
-    await request(`/projects/${projectId}/src-program`, { method: "DELETE" });
-  },
-
-  async listPrograms(): Promise<{ programs: SRCProgram[]; count: number }> {
-    const res = await request("/src-programs");
-    return res.json();
-  },
-
-  // Bounty Candidates
-  async listCandidates(projectId: string, params?: { verify_status?: string; submission_status?: string }): Promise<{ candidates: BountyCandidate[]; count: number; stats: BountyCandidateStats }> {
-    const qs = new URLSearchParams();
-    if (params?.verify_status) qs.append("verify_status", params.verify_status);
-    if (params?.submission_status) qs.append("submission_status", params.submission_status);
-    const query = qs.toString();
-    const res = await request(`/projects/${projectId}/bounty-candidates${query ? `?${query}` : ""}`);
-    return res.json();
-  },
-
-  async getCandidate(id: string): Promise<BountyCandidate> {
-    const res = await request(`/bounty-candidates/${id}`);
-    return res.json();
-  },
-
-  async updateCandidate(id: string, data: { verify_status?: string; submission_status?: string; submission_url?: string; submission_id?: string; paid_amount?: number; notes?: string }): Promise<BountyCandidate> {
-    const res = await request(`/bounty-candidates/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    return res.json();
-  },
-
-  async deleteCandidate(id: string): Promise<void> {
-    await request(`/bounty-candidates/${id}`, { method: "DELETE" });
-  },
-
-  async refreshCandidates(projectId: string): Promise<{ status: string; created: number; stats: BountyCandidateStats }> {
-    const res = await request(`/projects/${projectId}/bounty-candidates/refresh`, { method: "POST" });
-    return res.json();
-  },
-
-  // Submission Packs
-  async createPack(candidateId: string, template?: string): Promise<SubmissionPack> {
-    const res = await request(`/bounty-candidates/${candidateId}/submission-pack`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ template: template || "generic" }),
-    });
-    return res.json();
-  },
-
-  async getPack(id: string): Promise<SubmissionPack> {
-    const res = await request(`/submission-packs/${id}`);
-    return res.json();
-  },
-
-  async listPacks(candidateId: string): Promise<{ packs: SubmissionPack[]; count: number }> {
-    const res = await request(`/bounty-candidates/${candidateId}/submission-packs`);
-    return res.json();
-  },
-
-  async updatePack(id: string, data: { content?: string; checklist_json?: string; redaction_status?: string }): Promise<SubmissionPack> {
-    const res = await request(`/submission-packs/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    return res.json();
-  },
-
-  async deletePack(id: string): Promise<void> {
-    await request(`/submission-packs/${id}`, { method: "DELETE" });
-  },
-
-  async redactPack(id: string): Promise<SubmissionPack> {
-    const res = await request(`/submission-packs/${id}/redact`, { method: "POST" });
-    return res.json();
-  },
-
-  // Credentials & Sources
-  async listCredentials(): Promise<{ credentials: Array<{ platform: string; username?: string; has_api: boolean; has_token: boolean; source: string }>; count: number }> {
-    const res = await request("/credentials");
-    return res.json();
-  },
-
-  async listSources(): Promise<{ sources: Array<{ ID: string; Name: string; Type: string; Domains: string[]; HasAPI: boolean; HasSession: boolean }>; count: number }> {
-    const res = await request("/sources");
-    return res.json();
-  },
-};

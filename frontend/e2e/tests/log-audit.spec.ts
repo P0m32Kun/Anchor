@@ -112,7 +112,7 @@ test.describe.serial("日志审计 E2E — UI + 审计双通道", () => {
 		).toBeVisible();
 
 		await page.locator("button", { hasText: "内网扫描" }).first().click();
-		await page.getByRole("button", { name: /配置参数/ }).click();
+		await page.getByRole("button", { name: /高级配置/ }).click();
 
 		await page.getByLabel("端口模式 -p 自定义").click();
 		const portTextarea = page.getByLabel("自定义端口列表");

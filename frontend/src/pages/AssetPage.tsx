@@ -5,7 +5,6 @@ import { useStore } from "../lib/store";
 import { useResource } from "../hooks";
 import {
   useProjectId,
-  useToast,
   EmptyState,
   Table,
   TableHeader,
@@ -27,7 +26,6 @@ import {
   ChevronLeft,
   ArrowRight,
   ExternalLink,
-  RefreshCcw,
   Layers,
   Terminal
 } from "lucide-react";
@@ -73,7 +71,6 @@ export default function AssetPage() {
   const webEndpoints = useStore((state) => state.webEndpoints) ?? [];
   const setWebEndpoints = useStore((state) => state.setWebEndpoints);
   const [activeTab, setActiveTab] = useState<"assets" | "web" | "ports">("assets");
-  const toast = useToast();
 
   const servicePorts = useStore((state) => state.servicePorts);
   const servicePortsLoading = useStore((state) => state.servicePortsLoading);
@@ -138,19 +135,6 @@ export default function AssetPage() {
     return () => ctrl.abort();
   }, [activeTab, projectId, servicePorts.length, loadServicePorts]);
 
-  const [discoveryLoading, setDiscoveryLoading] = useState(false);
-
-  const startDiscovery = async () => {
-    if (!projectId) return;
-    setDiscoveryLoading(true);
-    try {
-      await api.startAssetDiscovery(projectId);
-      toast("资产发现工作流已启动", "success");
-    } catch (err) {
-    } finally {
-      setDiscoveryLoading(false);
-    }
-  };
 
   const [filterTitle, setFilterTitle] = useState("");
   const [filterAsset, setFilterAsset] = useState("");
@@ -225,10 +209,6 @@ export default function AssetPage() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">资产清单</h1>
           <p className="text-muted-foreground mt-1">汇总管理域名、IP、Web 端点及开放端口。</p>
         </div>
-        <Button variant="primary" onClick={startDiscovery} loading={discoveryLoading}>
-          <RefreshCcw className={cn("mr-2 h-4 w-4", discoveryLoading && "animate-spin")} />
-          资产发现
-        </Button>
       </div>
 
       <div className="flex items-center gap-1 border-b border-border w-full">

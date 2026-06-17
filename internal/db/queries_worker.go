@@ -40,7 +40,7 @@ func (q *Queries) GetWorkerNode(id string) (*models.WorkerNode, error) {
 
 func (q *Queries) ListWorkerNodes() ([]*models.WorkerNode, error) {
 	rows, err := q.db.Query(`
-		SELECT id, name, endpoint, mode, status, trust_level, network_profile, capabilities, tool_versions, template_versions, max_concurrency, last_seen, created_at, revoked_at
+		SELECT id, name, endpoint, mode, status, trust_level, network_profile, capabilities, tool_versions, template_versions, max_concurrency, last_seen, cpu_percent, mem_percent, disk_percent, metrics_updated_at, created_at, revoked_at
 		FROM worker_nodes ORDER BY created_at`)
 	if err != nil {
 		return nil, err
@@ -49,8 +49,9 @@ func (q *Queries) ListWorkerNodes() ([]*models.WorkerNode, error) {
 	list := make([]*models.WorkerNode, 0)
 	for rows.Next() {
 		w := &models.WorkerNode{}
-		var lastSeen, revokedAt sql.NullTime
-		if err := rows.Scan(&w.ID, &w.Name, &w.Endpoint, &w.Mode, &w.Status, &w.TrustLevel, &w.NetworkProfile, &w.Capabilities, &w.ToolVersions, &w.TemplateVersions, &w.MaxConcurrency, &lastSeen, &w.CreatedAt, &revokedAt); err != nil {
+		var lastSeen, revokedAt, metricsAt sql.NullTime
+		var cpu, mem, disk sql.NullFloat64
+		if err := rows.Scan(&w.ID, &w.Name, &w.Endpoint, &w.Mode, &w.Status, &w.TrustLevel, &w.NetworkProfile, &w.Capabilities, &w.ToolVersions, &w.TemplateVersions, &w.MaxConcurrency, &lastSeen, &cpu, &mem, &disk, &metricsAt, &w.CreatedAt, &revokedAt); err != nil {
 			return nil, err
 		}
 		if lastSeen.Valid {
@@ -58,6 +59,18 @@ func (q *Queries) ListWorkerNodes() ([]*models.WorkerNode, error) {
 		}
 		if revokedAt.Valid {
 			w.RevokedAt = &revokedAt.Time
+		}
+		if cpu.Valid {
+			w.CPUPercent = &cpu.Float64
+		}
+		if mem.Valid {
+			w.MemPercent = &mem.Float64
+		}
+		if disk.Valid {
+			w.DiskPercent = &disk.Float64
+		}
+		if metricsAt.Valid {
+			w.MetricsUpdatedAt = &metricsAt.Time
 		}
 		list = append(list, w)
 	}
@@ -74,6 +87,13 @@ func (q *Queries) UpdateWorkerNodeStatus(id string, status models.WorkerStatus, 
 func (q *Queries) UpdateWorkerNodeTemplateVersions(id string, status models.WorkerStatus, lastSeen time.Time, templateVersions string) error {
 	_, err := q.db.Exec(`UPDATE worker_nodes SET status = ?, last_seen = ?, template_versions = ? WHERE id = ?`,
 		status, lastSeen, templateVersions, id)
+	return err
+}
+
+// UpdateWorkerNodeMetrics persists the worker's resource metrics.
+func (q *Queries) UpdateWorkerNodeMetrics(id string, cpu, mem, disk *float64, updatedAt time.Time) error {
+	_, err := q.db.Exec(`UPDATE worker_nodes SET cpu_percent = ?, mem_percent = ?, disk_percent = ?, metrics_updated_at = ? WHERE id = ?`,
+		cpu, mem, disk, updatedAt, id)
 	return err
 }
 

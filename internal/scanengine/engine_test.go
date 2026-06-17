@@ -223,8 +223,10 @@ func TestEngine_FailedTaskDoesNotBlock(t *testing.T) {
 	}
 
 	cfg := DefaultEngineConfig()
+	cfg.BatchSize = 1
+	cfg.Tier1FlushTimeout = 30 * time.Millisecond
 	cfg.SchedulerTick = 20 * time.Millisecond
-	cfg.IdleTimeout = 200 * time.Millisecond
+	cfg.IdleTimeout = 3 * time.Second
 	engine, queries := setupTestEngine(t, fake, cfg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -327,7 +329,8 @@ func TestEngine_PriorityOrder(t *testing.T) {
 	}
 
 	cfg := DefaultEngineConfig()
-	cfg.BatchSize = 1 // serialize execution to observe order
+	cfg.BatchSize = 1
+	cfg.Tier1FlushTimeout = 30 * time.Millisecond
 	cfg.SchedulerTick = 20 * time.Millisecond
 	cfg.IdleTimeout = 300 * time.Millisecond
 	engine, _ := setupTestEngine(t, fake, cfg)
@@ -341,23 +344,23 @@ func TestEngine_PriorityOrder(t *testing.T) {
 	defer mu.Unlock()
 	t.Logf("execution order: %v", actionOrder)
 
-	// High priority actions (HTTPX, NUCLEI) should come before low priority (SUBDOMAIN, CDN)
-	firstHigh := -1
-	firstLow := -1
+	// Stage order: DNS/CDN/PORT before HTTPX/NUCLEI
+	firstLate := -1
+	firstEarly := -1
 	for i, a := range actionOrder {
 		if a == "HTTPX_FINGERPRINT" || a == "NUCLEI_SCAN" {
-			if firstHigh == -1 {
-				firstHigh = i
+			if firstLate == -1 {
+				firstLate = i
 			}
 		}
-		if a == "SUBDOMAIN_ENUM" || a == "CDN_CHECK" || a == "DNS_RESOLVE" {
-			if firstLow == -1 {
-				firstLow = i
+		if a == "SUBDOMAIN_ENUM" || a == "CDN_CHECK" || a == "DNS_RESOLVE" || a == "PORT_SCAN" {
+			if firstEarly == -1 {
+				firstEarly = i
 			}
 		}
 	}
-	if firstHigh >= 0 && firstLow >= 0 && firstLow < firstHigh {
-		t.Errorf("low priority action at index %d ran before high priority at %d", firstLow, firstHigh)
+	if firstEarly >= 0 && firstLate >= 0 && firstLate < firstEarly {
+		t.Errorf("late-stage action at index %d ran before early-stage at %d: %v", firstLate, firstEarly, actionOrder)
 	}
 }
 

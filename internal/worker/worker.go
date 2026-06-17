@@ -145,22 +145,28 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 			break
 		}
 		log.Printf("[runner] dispatching task %s to worker %s (%s)", task.ID, worker.ID, worker.Endpoint)
-		if err := r.dispatcher.DispatchToWorker(ctx, task, worker, workdir, project); err != nil {
-			log.Printf("[runner] remote dispatch to %s failed: %v", worker.ID, err)
-			if isUnreachableError(err) {
-				if markErr := r.dispatcher.MarkWorkerOffline(worker.ID); markErr != nil {
-					log.Printf("[runner] mark worker %s offline failed: %v", worker.ID, markErr)
-				} else {
-					log.Printf("[runner] worker %s marked offline (unreachable)", worker.ID)
+			err := r.dispatcher.DispatchToWorker(ctx, task, worker, workdir, project)
+			r.dispatcher.ReleaseWorker(worker.ID)
+			if err != nil {
+				log.Printf("[runner] remote dispatch to %s failed: %v", worker.ID, err)
+				if isAtCapacityError(err) {
+					triedWorkerIDs = append(triedWorkerIDs, worker.ID)
+					continue
 				}
-				triedWorkerIDs = append(triedWorkerIDs, worker.ID)
-				continue
+				if isUnreachableError(err) {
+					if markErr := r.dispatcher.MarkWorkerOffline(worker.ID); markErr != nil {
+						log.Printf("[runner] mark worker %s offline failed: %v", worker.ID, markErr)
+					} else {
+						log.Printf("[runner] worker %s marked offline (unreachable)", worker.ID)
+					}
+					triedWorkerIDs = append(triedWorkerIDs, worker.ID)
+					continue
+				}
+				// Task-level failure (worker reachable but task failed/cancelled/timed out).
+				// Do not silently fall back to local — propagate the failure.
+				return err
 			}
-			// Task-level failure (worker reachable but task failed/cancelled/timed out).
-			// Do not silently fall back to local — propagate the failure.
-			return err
-		}
-		return nil
+			return nil
 	}
 
 	// All online workers exhausted (none registered or all marked offline).
@@ -423,4 +429,11 @@ func isUnreachableError(err error) bool {
 		}
 	}
 	return false
+}
+
+func isAtCapacityError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "at capacity")
 }

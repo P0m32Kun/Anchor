@@ -106,7 +106,7 @@ test.describe.serial("High-risk port preset E2E — UI 主导", () => {
 
 		// step 1: 内网扫描(rangefield 是内网)
 		await page.locator("button", { hasText: "内网扫描" }).first().click();
-		await page.getByRole("button", { name: /配置参数/ }).click();
+		await page.getByRole("button", { name: /高级配置/ }).click();
 
 		// step 2: 切到 -p 自定义模式（textarea 自动填充高危端口列表，
 		// 后端 BuildNaabuCommand 收到 -p <ports> 与旧的 "high-risk" 别名等价）

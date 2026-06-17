@@ -107,7 +107,7 @@ test.describe.serial("内网扫描 E2E — UI 主导", () => {
 		).toBeVisible();
 
 		await page.locator("button", { hasText: "内网扫描" }).first().click();
-		await page.getByRole("button", { name: /配置参数/ }).click();
+		await page.getByRole("button", { name: /高级配置/ }).click();
 		// 切到 -p 自定义模式(textarea 自动填高危端口列表,含 6379 Redis 等高价值目标)
 		await page.getByLabel("端口模式 -p 自定义").click();
 		await expect(page.getByLabel("自定义端口列表")).toHaveValue(/6379/);

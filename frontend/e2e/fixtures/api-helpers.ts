@@ -98,6 +98,16 @@ export interface Worker {
 	name: string;
 	mode: string;
 	status: string;
+	endpoint?: string;
+	running_tasks?: number;
+	max_concurrency?: number;
+}
+
+export interface ScanTask {
+	id: string;
+	tool: string;
+	status: string;
+	worker_id?: string | null;
 }
 
 export interface ToolTemplate {
@@ -146,6 +156,27 @@ export async function deleteProject(id: string): Promise<void> {
 
 // --- Targets ---
 
+type ScopeRuleSuggestion = {
+	action: string;
+	type: string;
+	value: string;
+};
+
+type CreateTargetResponse = Target & {
+	needs_scope_confirmation?: boolean;
+	suggested_rule?: ScopeRuleSuggestion;
+};
+
+export async function addScopeRule(
+	projectId: string,
+	rule: { action: string; type: string; value: string; reason?: string },
+): Promise<void> {
+	await apiFetch("/scope-rules", {
+		method: "POST",
+		body: JSON.stringify({ project_id: projectId, ...rule }),
+	});
+}
+
 export async function addTarget(
 	projectId: string,
 	data: { type: string; value: string },
@@ -154,7 +185,21 @@ export async function addTarget(
 		method: "POST",
 		body: JSON.stringify(data),
 	});
-	return res.json();
+	const body = (await res.json()) as CreateTargetResponse;
+	if (body.needs_scope_confirmation && body.suggested_rule) {
+		await addScopeRule(projectId, {
+			action: body.suggested_rule.action,
+			type: body.suggested_rule.type,
+			value: body.suggested_rule.value,
+			reason: "E2E auto scope",
+		});
+		const retry = await apiFetch(`/projects/${projectId}/targets`, {
+			method: "POST",
+			body: JSON.stringify(data),
+		});
+		return retry.json();
+	}
+	return body;
 }
 
 export async function listTargets(projectId: string): Promise<Target[]> {
@@ -219,7 +264,24 @@ export async function updateFindingStatus(
 // --- Workers ---
 
 export async function listWorkers(): Promise<Worker[]> {
-	return fetchList<Worker>("/workers");
+	const res = await apiFetch("/workers");
+	return res.json();
+}
+
+export async function listRunTasks(runId: string): Promise<ScanTask[]> {
+	const res = await apiFetch(`/runs/${runId}/tasks`);
+	return res.json();
+}
+
+export function groupTasksByWorker(
+	tasks: ScanTask[],
+): Map<string, number> {
+	const counts = new Map<string, number>();
+	for (const t of tasks) {
+		if (!t.worker_id) continue;
+		counts.set(t.worker_id, (counts.get(t.worker_id) ?? 0) + 1);
+	}
+	return counts;
 }
 
 // --- Tool Templates ---
@@ -274,4 +336,173 @@ export async function waitForPipeline(
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// --- Paginated list helpers ---
+
+export interface PaginatedResponse<T> {
+	items: T[];
+	total: number;
+	page: number;
+	page_size: number;
+}
+
+async function fetchPaginated<T>(path: string): Promise<PaginatedResponse<T>> {
+	const res = await apiFetch(path);
+	const body = await res.json();
+	if (body && Array.isArray(body.items)) {
+		return {
+			items: body.items as T[],
+			total: typeof body.total === "number" ? body.total : body.items.length,
+			page: body.page ?? 1,
+			page_size: body.page_size ?? body.items.length,
+		};
+	}
+	if (Array.isArray(body)) {
+		return { items: body as T[], total: body.length, page: 1, page_size: body.length };
+	}
+	if (body && Array.isArray(body.data)) {
+		return {
+			items: body.data as T[],
+			total: body.total ?? body.data.length,
+			page: body.page ?? 1,
+			page_size: body.page_size ?? body.data.length,
+		};
+	}
+	return { items: [], total: 0, page: 1, page_size: 0 };
+}
+
+export interface ScanWorkItem {
+	id: string;
+	run_id: string;
+	asset_id: string;
+	action: string;
+	status: string;
+	batch_mode?: boolean;
+	stage?: string;
+}
+
+export interface ScanRunMetrics {
+	engine_state: string;
+	works_pending: number;
+	works_done: number;
+	works_skipped: number;
+	works_running: number;
+	works_failed: number;
+}
+
+export interface ToolCallLog {
+	id: string;
+	tool: string;
+	action: string;
+	status: string;
+}
+
+export interface Asset {
+	id: string;
+	project_id: string;
+	type: string;
+	value: string;
+}
+
+export interface ScanRun {
+	id: string;
+	project_id: string;
+	status: string;
+	engine_state?: string;
+}
+
+export interface LineageNode {
+	node_type: string;
+	value: string;
+	relation?: string;
+	source_engine?: string;
+}
+
+export interface AssetLineage {
+	chain: LineageNode[];
+}
+
+export async function listScanRuns(projectId: string): Promise<ScanRun[]> {
+	return fetchList<ScanRun>(`/projects/${projectId}/scan/runs`);
+}
+
+export async function listAssets(projectId: string): Promise<Asset[]> {
+	return fetchList<Asset>(`/projects/${projectId}/assets`);
+}
+
+export async function getAssetLineage(
+	assetId: string,
+	runId: string,
+): Promise<AssetLineage> {
+	const res = await apiFetch(
+		`/assets/${assetId}/lineage?run_id=${encodeURIComponent(runId)}`,
+	);
+	return res.json();
+}
+
+export async function listScanRunWorks(
+	projectId: string,
+	runId: string,
+	pageSize = 500,
+): Promise<{ items: ScanWorkItem[]; total: number }> {
+	const data = await fetchPaginated<ScanWorkItem>(
+		`/projects/${projectId}/pipeline/runs/${runId}/works?page=1&page_size=${pageSize}`,
+	);
+	return { items: data.items, total: data.total };
+}
+
+export async function listToolCallLogs(
+	projectId: string,
+	runId: string,
+	pageSize = 500,
+): Promise<{ items: ToolCallLog[]; total: number }> {
+	const data = await fetchPaginated<ToolCallLog>(
+		`/projects/${projectId}/pipeline/runs/${runId}/tool-calls?page=1&page_size=${pageSize}`,
+	);
+	return { items: data.items, total: data.total };
+}
+
+export async function getScanRunMetrics(
+	projectId: string,
+	runId: string,
+): Promise<ScanRunMetrics> {
+	const res = await apiFetch(
+		`/projects/${projectId}/pipeline/runs/${runId}/metrics`,
+	);
+	return res.json();
+}
+
+export async function startScan(
+	projectId: string,
+	body: { mode: string; config?: Record<string, unknown> },
+): Promise<{ run_id: string }> {
+	const res = await apiFetch(`/projects/${projectId}/scan`, {
+		method: "POST",
+		body: JSON.stringify(body),
+	});
+	return res.json();
+}
+
+export async function getPipelineRun(
+	projectId: string,
+	runId: string,
+): Promise<{ status: string; engine_state?: string }> {
+	const res = await apiFetch(`/projects/${projectId}/pipeline/runs/${runId}`);
+	return res.json();
+}
+
+export async function waitForPipelineRun(
+	projectId: string,
+	runId: string,
+	timeoutMs = 20 * 60 * 1000,
+): Promise<{ status: string }> {
+	const start = Date.now();
+	let status = "running";
+	while ((status === "running" || status === "pending") && Date.now() - start < timeoutMs) {
+		await sleep(5_000);
+		const run = await getPipelineRun(projectId, runId);
+		status = run.status;
+	}
+	return { status };
 }

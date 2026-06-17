@@ -1,13 +1,27 @@
 package work
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/db"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
+	"github.com/P0m32Kun/Anchor/internal/scanengine/pool"
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
+
+// PooledBatchInput describes a Tier-1 batch work item to persist.
+type PooledBatchInput struct {
+	RunID      string
+	ProjectID  string
+	Action     core.TaskAction
+	Stage      string
+	InputFile  string
+	Members    []pool.Member
+	BucketKey  string
+	Generation int
+}
 
 // Store wraps db.Queries to provide work-item lifecycle operations
 // specific to the scan engine.
@@ -59,6 +73,43 @@ func (s *Store) CreateBatch(runID, projectID string, works []core.DerivedWork) (
 		created = append(created, w)
 	}
 	return created, nil
+}
+
+// CreatePooledBatch inserts one batch work item covering multiple assets.
+func (s *Store) CreatePooledBatch(in PooledBatchInput) (*models.ScanWorkItem, error) {
+	workID := util.GenerateID()
+	batchMembers := make([]models.WorkBatchMember, 0, len(in.Members))
+	for _, m := range in.Members {
+		batchMembers = append(batchMembers, models.WorkBatchMember{
+			AssetID:   m.AssetID,
+			Value:     m.Value,
+			BucketKey: m.BucketKey,
+		})
+	}
+	membersJSON, err := json.Marshal(batchMembers)
+	if err != nil {
+		return nil, err
+	}
+
+	w := &models.ScanWorkItem{
+		ID:             workID,
+		RunID:          in.RunID,
+		ProjectID:      in.ProjectID,
+		AssetID:        "batch:" + workID,
+		Action:         string(in.Action),
+		Status:         models.WorkStatusPending,
+		Stage:          in.Stage,
+		InputFile:      in.InputFile,
+		MemberAssetIDs: string(membersJSON),
+		BucketKey:      in.BucketKey,
+		Generation:     in.Generation,
+		BatchMode:      true,
+		CreatedAt:      time.Now().UTC(),
+	}
+	if err := s.q.CreateScanWorkItem(w); err != nil {
+		return nil, err
+	}
+	return w, nil
 }
 
 // TryClaim atomically transitions a pending work item to running.

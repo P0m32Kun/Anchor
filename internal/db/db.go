@@ -348,6 +348,72 @@ func migrate(db *sql.DB) error {
 		}
 		version = 32
 	}
+	if version < 33 {
+		if err := migrateV33(db); err != nil {
+			return fmt.Errorf("migrate v33 (asset_relations): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 33"); err != nil {
+			return fmt.Errorf("set user_version 33: %w", err)
+		}
+		version = 33
+	}
+	if version < 34 {
+		if err := migrateV34(db); err != nil {
+			return fmt.Errorf("migrate v34 (assets.state_json): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 34"); err != nil {
+			return fmt.Errorf("set user_version 34: %w", err)
+		}
+		version = 34
+	}
+	if version < 35 {
+		if err := migrateV35(db); err != nil {
+			return fmt.Errorf("migrate v35 (scope_boundary): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 35"); err != nil {
+			return fmt.Errorf("set user_version 35: %w", err)
+		}
+		version = 35
+	}
+	if version < 36 {
+		if err := migrateV36(db); err != nil {
+			return fmt.Errorf("migrate v36 (signals): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 36"); err != nil {
+			return fmt.Errorf("set user_version 36: %w", err)
+		}
+		version = 36
+	}
+	if version < 37 {
+		if err := migrateV37(db); err != nil {
+			return fmt.Errorf("migrate v37 (watch fields): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 37"); err != nil {
+			return fmt.Errorf("set user_version 37: %w", err)
+		}
+		version = 37
+	}
+
+	if version < 38 {
+		if err := migrateV38(db); err != nil {
+			return fmt.Errorf("migrate v38 (worker_metrics): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 38"); err != nil {
+			return fmt.Errorf("set user_version 38: %w", err)
+		}
+		version = 38
+	}
+
+	if version < 39 {
+		if err := migrateV39(db); err != nil {
+			return fmt.Errorf("migrate v39 (batch work items): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 39"); err != nil {
+			return fmt.Errorf("set user_version 39: %w", err)
+		}
+		version = 39
+	}
+
 	if err := ensureProjectsColumns(db); err != nil {
 		return fmt.Errorf("ensure projects columns: %w", err)
 	}

@@ -140,7 +140,7 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 
 		// step 1: 选内网扫描
 		await page.locator("button", { hasText: "内网扫描" }).first().click();
-		await page.getByRole("button", { name: /配置参数/ }).click();
+		await page.getByRole("button", { name: /高级配置/ }).click();
 
 		// step 2: 选 Top 100 端口(最快)
 		await expect(page.getByText("端口探测范围")).toBeVisible();

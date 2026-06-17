@@ -57,21 +57,27 @@ type PipelineConfig struct {
 	KatanaRateLimit          int    `json:"katana_rate_limit"`
 	KatanaTimeout            int    `json:"katana_timeout"` // per-request seconds
 	FfufTier                 string `json:"ffuf_tier"`                  // small | medium | off
+	NoiseLevel               string `json:"noise_level"`
 	SkipPortscanOnCDNHost    bool   `json:"skip_portscan_on_cdn_host"`
 	NucleiRequireFingerprint bool   `json:"nuclei_require_fingerprint"`
 	PassiveSearchResultLimit int    `json:"passive_search_result_limit"`
 	PassiveSearchConcurrency int    `json:"passive_search_concurrency"`
+	EnablePassiveJunkFilter  bool   `json:"enable_passive_junk_filter"`
+	PassiveJunkKeywords      string `json:"passive_junk_keywords"`
 	// SubfinderProviderConfig is an optional YAML string for subfinder's
 	// provider-config.yaml. When non-empty, the pipeline writes it to a temp
 	// file and passes -pc <path> to subfinder. The file is automatically
 	// synced to remote workers via the dispatcher's input_files mechanism.
 	// Leave empty to use the worker's default (~/.config/subfinder/provider-config.yaml).
 	SubfinderProviderConfig string `json:"subfinder_provider_config,omitempty"`
-	// ScanMode is the scan mode preset: "default" | "src_low_noise"
-	// src_low_noise enables only bounded ffuf dictionaries and high-signal Nuclei workflows.
+	// ScanMode is the scan mode preset: "external" | "internal"
 	ScanMode string `json:"scan_mode,omitempty"`
 }
 
+
+
+// DefaultFfufDictionaryID is the default dictionary ID for ffuf.
+const DefaultFfufDictionaryID = "builtin:path/top100.txt"
 func DefaultPipelineConfig() PipelineConfig {
 	return PipelineConfig{
 		EnableFOFA:               true,
@@ -141,31 +147,24 @@ func DefaultExternalPipelineConfig() PipelineConfig {
 	return cfg
 }
 
-// DefaultLowNoisePipelineConfig returns the configuration for SRC low-noise scans.
-// It enables only bounded ffuf dictionaries and high-signal Nuclei workflows.
-// Use this for SRC bounty programs where noise must be minimized.
-func DefaultLowNoisePipelineConfig() PipelineConfig {
+// DefaultExternalLowNoisePipelineConfig returns a low-noise external config.
+func DefaultExternalLowNoisePipelineConfig() PipelineConfig {
 	cfg := DefaultExternalPipelineConfig()
-	cfg.ScanMode = "src_low_noise"
-	// Port scanning: top100 only
+	cfg.ScanMode = "external"
+	cfg.NoiseLevel = "low"
 	cfg.PortRange = "top100"
 	cfg.NaabuRate = 200
 	cfg.NaabuThreads = 30
-	// Nuclei: high-signal only, low rate
-	cfg.EnableNuclei = true
-	cfg.NucleiScanDepth = "tags"        // tags only, no full workflows
-	cfg.NucleiRateLimit = 5             // very low rate
+	cfg.NucleiScanDepth = "tags"
+	cfg.NucleiRateLimit = 5
 	cfg.NucleiConcurrency = 3
 	cfg.NucleiRateLimitPerMinute = 20
 	cfg.NucleiRequireFingerprint = true
-	// Ffuf: enabled with small dictionary only
 	cfg.EnableFfuf = true
 	cfg.FfufTier = "small"
 	cfg.FfufRateLimit = 3
 	cfg.FfufTimeout = 20
-	// Katana: disabled (too noisy)
 	cfg.EnableKatana = false
-	// Passive: enabled
 	cfg.EnablePassiveSearch = true
 	cfg.EnablePassiveCert = true
 	cfg.EnablePassiveURL = true
@@ -175,7 +174,32 @@ func DefaultLowNoisePipelineConfig() PipelineConfig {
 	return cfg
 }
 
-// IsLowNoiseMode returns true if the scan mode is src_low_noise.
-func (c PipelineConfig) IsLowNoiseMode() bool {
-	return c.ScanMode == "src_low_noise"
+// NormalizeScanMode normalizes the scan mode and noise level.
+func NormalizeScanMode(mode, noise string) (string, string) {
+	switch mode {
+	case "external", "standard", "external_low", "src_low_noise":
+		if noise == "" {
+			if mode == "external_low" || mode == "src_low_noise" {
+				noise = "low"
+			} else {
+				noise = "standard"
+			}
+		}
+		return "external", noise
+	case "internal":
+		return "internal", noise
+	case "watch":
+		// legacy watch mode → external
+		if noise == "" {
+			noise = "standard"
+		}
+		return "external", noise
+	default:
+		return "external", noise
+	}
+}
+
+// DefaultExternalStandardPipelineConfig returns a standard external config.
+func DefaultExternalStandardPipelineConfig() PipelineConfig {
+	return DefaultExternalPipelineConfig()
 }

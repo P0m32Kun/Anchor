@@ -47,9 +47,27 @@ func (q *Queries) GetToolCallLog(id string) (*models.ToolCallLog, error) {
 
 // ListToolCallLogsByRun returns all tool call logs for a pipeline run, ordered by start time.
 func (q *Queries) ListToolCallLogsByRun(runID string) ([]*models.ToolCallLog, error) {
-	rows, err := q.db.Query(`
-		SELECT `+toolCallLogColumns+`
-		FROM tool_call_logs WHERE run_id = ? ORDER BY started_at`, runID)
+	return q.ListToolCallLogsByRunPaginated(runID, 0, 0)
+}
+
+func (q *Queries) CountToolCallLogsByRun(runID string) (int, error) {
+	var count int
+	err := q.db.QueryRow(`SELECT COUNT(*) FROM tool_call_logs WHERE run_id = ?`, runID).Scan(&count)
+	return count, err
+}
+
+func (q *Queries) ListToolCallLogsByRunPaginated(runID string, limit, offset int) ([]*models.ToolCallLog, error) {
+	query := `
+		SELECT ` + toolCallLogColumns + `
+		FROM tool_call_logs WHERE run_id = ? ORDER BY started_at`
+	var rows *sql.Rows
+	var err error
+	if limit > 0 {
+		query += ` LIMIT ? OFFSET ?`
+		rows, err = q.db.Query(query, runID, limit, offset)
+	} else {
+		rows, err = q.db.Query(query, runID)
+	}
 	if err != nil {
 		return nil, err
 	}

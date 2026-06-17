@@ -6,7 +6,6 @@ import {
   PipelineConfig,
   DEFAULT_PIPELINE_CONFIG,
   DEFAULT_EXTERNAL_PIPELINE_CONFIG,
-  DEFAULT_LOW_NOISE_PIPELINE_CONFIG,
   DEFAULT_HIGH_RISK_PORTS,
   TP_PRESET_VALUES,
   TP_PRESET_LABELS,
@@ -17,23 +16,14 @@ import {
 import { cn } from "../lib/utils";
 import { Zap, Globe, Shield, Gauge, Cpu, CheckCircle2, RotateCcw, ChevronRight, ChevronDown, Search } from "lucide-react";
 
-export type ScanMode = "external" | "internal" | "src_low_noise";
+export type ScanMode = "external" | "internal";
 
 const SCAN_CONFIG_STORAGE_KEY = "anchor.scanModal.config";
 const SCAN_MODE_STORAGE_KEY = "anchor.scanModal.mode";
 
 function loadStoredConfig(mode: ScanMode): PipelineConfig {
-  let base: PipelineConfig;
-  switch (mode) {
-    case "external":
-      base = DEFAULT_EXTERNAL_PIPELINE_CONFIG;
-      break;
-    case "src_low_noise":
-      base = DEFAULT_LOW_NOISE_PIPELINE_CONFIG;
-      break;
-    default:
-      base = DEFAULT_PIPELINE_CONFIG;
-  }
+  const base =
+    mode === "external" ? DEFAULT_EXTERNAL_PIPELINE_CONFIG : DEFAULT_PIPELINE_CONFIG;
   try {
     const raw = localStorage.getItem(SCAN_CONFIG_STORAGE_KEY);
     if (!raw) return { ...base };
@@ -46,7 +36,16 @@ function loadStoredConfig(mode: ScanMode): PipelineConfig {
 
 function loadStoredMode(): ScanMode {
   const raw = localStorage.getItem(SCAN_MODE_STORAGE_KEY);
-  return raw === "internal" ? "internal" : "external";
+  if (raw === "internal") return "internal";
+  // legacy: external_low / src_low_noise merged into external
+  if (raw === "external_low" || raw === "src_low_noise") return "external";
+  return "external";
+}
+
+function modeDefaults(m: ScanMode): PipelineConfig {
+  return m === "external"
+    ? { ...DEFAULT_EXTERNAL_PIPELINE_CONFIG }
+    : { ...DEFAULT_PIPELINE_CONFIG };
 }
 
 interface ScanModalProps {
@@ -80,14 +79,6 @@ const MODE_OPTIONS: {
     tools: ["nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Katana", "Ffuf"],
     icon: Shield,
     color: "text-emerald-400",
-  },
-  {
-    mode: "src_low_noise",
-    label: "SRC 低噪音",
-    description: "SRC 赏金专用，只运行高信号模板，最小化噪音",
-    tools: ["Subfinder", "Naabu top100", "HTTPX", "Nuclei (高信号)", "Ffuf (小字典)"],
-    icon: Search,
-    color: "text-amber-400",
   },
 ];
 
@@ -222,6 +213,7 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   const [step, setStep] = useState<1 | 2>(1);
   const [mode, setMode] = useState<ScanMode>(() => loadStoredMode());
   const [config, setConfig] = useState<PipelineConfig>(() => loadStoredConfig(loadStoredMode()));
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Merge project pipeline config on mount so saved settings (e.g.
   // nuclei_scan_depth) are honoured even when localStorage is stale.
@@ -269,6 +261,7 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
 
   const handleReset = () => {
     setStep(1);
+    setAdvancedOpen(false);
   };
 
   const handleClose = () => {
@@ -287,6 +280,12 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
     setStep(2);
   };
 
+  const handleQuickStart = () => {
+    const cfg = modeDefaults(mode);
+    localStorage.setItem(SCAN_MODE_STORAGE_KEY, mode);
+    onStart(mode, cfg);
+  };
+
   const handleStart = () => {
     localStorage.setItem(SCAN_CONFIG_STORAGE_KEY, JSON.stringify(config));
     localStorage.setItem(SCAN_MODE_STORAGE_KEY, mode);
@@ -294,7 +293,7 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   };
 
   const handleResetDefaults = () => {
-    const base = mode === "external" ? DEFAULT_EXTERNAL_PIPELINE_CONFIG : DEFAULT_PIPELINE_CONFIG;
+    const base = modeDefaults(mode);
     setConfig({ ...base });
     const reset = decodePortRange(base.port_range);
     setPortMode(reset.mode);
@@ -347,7 +346,7 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 mb-4">选择执行环境</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {MODE_OPTIONS.map((opt) => (
                   <button
                     key={opt.mode}
@@ -389,8 +388,11 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
             <Button variant="ghost" onClick={handleClose} disabled={loading} className="rounded-xl">
               取消
             </Button>
+            <Button variant="secondary" onClick={handleQuickStart} disabled={!mode || loading} className="rounded-xl px-6 font-bold">
+              快速启动
+            </Button>
             <Button onClick={handleNext} disabled={!mode || loading} className="rounded-xl px-8 font-bold">
-              配置参数
+              高级配置
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -509,6 +511,21 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
               </div>
           </div>
 
+          <div className="border-t border-white/5 pt-4">
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen((v) => !v)}
+              className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <Gauge className="h-3 w-3" />
+                高级选项（Ffuf / Katana / 性能调优）
+              </span>
+              {advancedOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+
+            {advancedOpen && (
+              <div className="mt-4 space-y-6 animate-in fade-in slide-in-from-top-1 duration-150">
           {/* 后台慢速扫描 */}
           <div className="space-y-4">
             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
@@ -576,6 +593,7 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
                         <select
                           value={config.ffuf_dictionary_id}
                           onChange={(e) => setConfig((prev) => ({ ...prev, ffuf_dictionary_id: e.target.value }))}
+                          aria-label="Ffuf 字典"
                           aria-invalid={ffufMisconfigured || undefined}
                           className={cn(
                             "w-full h-8 px-2 rounded-md bg-white/5 border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30",
@@ -746,6 +764,9 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
                  )}
                </div>
              )}
+          </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between pt-6 border-t border-white/5">

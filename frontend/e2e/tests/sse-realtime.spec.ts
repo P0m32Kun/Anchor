@@ -96,7 +96,7 @@ test.describe.serial("SSE 实时连接 E2E", () => {
 			page.getByRole("heading", { name: /新建扫描流水线/ }),
 		).toBeVisible();
 		await page.locator("button", { hasText: "内网扫描" }).first().click();
-		await page.getByRole("button", { name: /配置参数/ }).click();
+		await page.getByRole("button", { name: /高级配置/ }).click();
 		await page.getByLabel("端口模式 -tp 预设").click();
 		await page.getByLabel("Top-N 端口预设").selectOption("top100");
 		const ffufLabel = page.getByText("Ffuf", { exact: true });

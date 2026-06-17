@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, APIError, type ImportResult, type DryRunResult, type Project, type Target, type ScopeConfirmationResponse, type ScopeRule, PAGE_ALL, friendlyMessage } from "../lib/api";
+import { api, APIError, type ImportResult, type Project, type Target, type ScopeConfirmationResponse, type ScopeRule, PAGE_ALL, friendlyMessage } from "../lib/api";
 import { useStore } from "../lib/store";
 import { useResource } from "../hooks";
 import {
@@ -315,7 +315,6 @@ export default function TargetPage() {
   const [targetType, setTargetType] = useState("auto");
   const [scopeAction, setScopeAction] = useState<"include" | "exclude">("include");
   const [scopeValue, setScopeValue] = useState("");
-  const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const [scopeConfirmOpen, setScopeConfirmOpen] = useState(false);
   const [pendingScopeConfirm, setPendingScopeConfirm] = useState<{
     message: string;
@@ -330,8 +329,6 @@ export default function TargetPage() {
 
   const [addingTarget, setAddingTarget] = useState(false);
   const [addingScope, setAddingScope] = useState(false);
-  const [dryRunLoading, setDryRunLoading] = useState(false);
-  const [dryRunConfirmOpen, setDryRunConfirmOpen] = useState(false);
   const [deletingTargetId, setDeletingTargetId] = useState<string | null>(null);
   const [deletingScopeRuleId, setDeletingScopeRuleId] = useState<string | null>(null);
 
@@ -517,20 +514,6 @@ export default function TargetPage() {
     }
   };
 
-  const runDryRun = async () => {
-    if (!projectId || dryRunLoading) return;
-    setDryRunLoading(true);
-    try {
-      const res = await api.dryRun(projectId);
-      setDryRunResult(res);
-      toast("授权检测完成", "success");
-    } catch (err) {
-    } finally {
-      setDryRunLoading(false);
-      setDryRunConfirmOpen(false);
-    }
-  };
-
   if (!currentProject) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -558,10 +541,6 @@ export default function TargetPage() {
           <p className="text-muted-foreground mt-1">确认授权边界，导入需要测试的域名、URL、IP 或 CIDR。</p>
         </div>
         <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setDryRunConfirmOpen(true)} disabled={dryRunLoading}>
-                <Zap className={cn("mr-2 h-4 w-4 text-brand-warning", dryRunLoading && "animate-pulse")} />
-                {dryRunLoading ? "正在评估..." : "授权 Dry Run"}
-            </Button>
             <Button variant="primary" size="sm" onClick={() => navigate(`/projects/${currentProject.id}/runs`)}>
                 <Play className="mr-2 h-4 w-4 fill-current" />
                 下一步：扫描
@@ -798,75 +777,6 @@ export default function TargetPage() {
         </aside>
       </div>
 
-      {dryRunResult && (
-        <Card className="border-brand-warning/30 bg-brand-warning/[0.02]">
-           <CardHeader className="flex flex-row items-center justify-between py-4">
-              <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-brand-warning/10 flex items-center justify-center">
-                    <ShieldCheck className="h-4 w-4 text-brand-warning" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base text-brand-warning">授权检测评估 (Dry Run Result)</CardTitle>
-                    <CardDescription className="text-xs">
-                        基于当前 {dryRunResult.results?.length ?? 0} 个目标的 Scope 评估
-                    </CardDescription>
-                  </div>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setDryRunResult(null)}>关闭报告</Button>
-           </CardHeader>
-           <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div className="p-3 rounded-lg border bg-background/50">
-                        <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Time Window</div>
-                        <div className="flex items-center gap-2">
-                            {dryRunResult.time_window_valid ? 
-                                <span className="text-sm font-semibold text-brand-success flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Valid</span> : 
-                                <span className="text-sm font-semibold text-brand-danger flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Invalid</span>
-                            }
-                        </div>
-                    </div>
-                    <div className="p-3 rounded-lg border bg-background/50">
-                        <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Estimated Time</div>
-                        <div className="text-sm font-semibold">
-                            {dryRunResult.estimated_duration_seconds ? 
-                                (dryRunResult.estimated_duration_seconds < 60 ? `${dryRunResult.estimated_duration_seconds}s` : `${Math.round(dryRunResult.estimated_duration_seconds/60)}m`) 
-                                : "N/A"}
-                        </div>
-                    </div>
-                    <div className="p-3 rounded-lg border bg-background/50">
-                        <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Decision Mode</div>
-                        <div className="text-sm font-semibold uppercase">{dryRunResult.mode}</div>
-                    </div>
-                </div>
-
-                {dryRunResult.results && (
-                   <div className="border rounded-lg overflow-hidden">
-                      <div className="max-h-60 overflow-auto custom-scrollbar">
-                        <Table>
-                            <TableBody>
-                                {dryRunResult.results.map((r, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell className="w-12 text-center p-2">
-                                            {r.decision === "allow" ? 
-                                                <div className="h-2 w-2 rounded-full bg-brand-success mx-auto" /> : 
-                                                <div className="h-2 w-2 rounded-full bg-brand-danger mx-auto" />
-                                            }
-                                        </TableCell>
-                                        <TableCell className="p-2 font-mono text-xs">{r.target}</TableCell>
-                                        <TableCell className={cn("p-2 text-xs", r.decision === 'allow' ? 'text-brand-success' : 'text-brand-danger')}>
-                                            {r.reason}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                      </div>
-                   </div>
-                )}
-           </CardContent>
-        </Card>
-      )}
-
       <ConfirmDialog
         open={!!pendingImportConfirm}
         onClose={() => setPendingImportConfirm(null)}
@@ -898,17 +808,6 @@ export default function TargetPage() {
         confirmText="添加并继续"
         cancelText="取消"
         loading={scopeConfirmLoading}
-      />
-
-      <ConfirmDialog
-        open={dryRunConfirmOpen}
-        onClose={() => setDryRunConfirmOpen(false)}
-        onConfirm={runDryRun}
-        title="启动授权 Dry Run"
-        description="系统将模拟扫描引擎对当前项目的所有目标进行授权校验，并评估预计耗时。此操作不会产生实际扫描流量。"
-        confirmText="开始评估"
-        cancelText="取消"
-        loading={dryRunLoading}
       />
     </div>
   );

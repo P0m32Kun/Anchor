@@ -41,6 +41,12 @@ func (s *Server) handleListWorkers(w http.ResponseWriter, r *http.Request) {
 	workers := []map[string]interface{}{}
 
 	dbWorkers, err := s.queries.ListWorkerNodes()
+	runningByWorker := map[string]int{}
+	if err == nil {
+		if counts, countErr := s.queries.CountRunningScanTasksPerWorker(); countErr == nil {
+			runningByWorker = counts
+		}
+	}
 	if err == nil {
 		// Sort: online/busy first, offline last
 		sort.Slice(dbWorkers, func(i, j int) bool {
@@ -56,17 +62,35 @@ func (s *Server) handleListWorkers(w http.ResponseWriter, r *http.Request) {
 		})
 
 		for _, w := range dbWorkers {
+			maxConc := w.MaxConcurrency
+			if maxConc <= 0 {
+				maxConc = 10
+			}
 			entry := map[string]interface{}{
-				"id":         w.ID,
-				"name":       w.Name,
-				"mode":       w.Mode,
-				"status":     w.Status,
-				"endpoint":   w.Endpoint,
-				"busy":       w.Status == models.WorkerStatusBusy,
-				"created_at": w.CreatedAt,
+				"id":              w.ID,
+				"name":            w.Name,
+				"mode":            w.Mode,
+				"status":          w.Status,
+				"endpoint":        w.Endpoint,
+				"busy":            runningByWorker[w.ID] > 0 || w.Status == models.WorkerStatusBusy,
+				"running_tasks":   runningByWorker[w.ID],
+				"max_concurrency": maxConc,
+				"created_at":      w.CreatedAt,
 			}
 			if w.LastSeen != nil {
 				entry["last_seen"] = w.LastSeen
+			}
+			if w.CPUPercent != nil {
+				entry["cpu_percent"] = w.CPUPercent
+			}
+			if w.MemPercent != nil {
+				entry["mem_percent"] = w.MemPercent
+			}
+			if w.DiskPercent != nil {
+				entry["disk_percent"] = w.DiskPercent
+			}
+			if w.MetricsUpdatedAt != nil {
+				entry["metrics_updated_at"] = w.MetricsUpdatedAt
 			}
 			workers = append(workers, entry)
 		}

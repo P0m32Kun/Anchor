@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/errors"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/util"
-	"github.com/P0m32Kun/Anchor/internal/workflows"
 )
 
 // POST /projects/{id}/runs
@@ -45,58 +43,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auto-start: create scan tasks and dispatch to workers
-	if run.ToolTemplateID != nil {
-		go s.dispatchRun(run)
-	}
-
 	writeJSON(w, http.StatusCreated, run)
-}
-
-// dispatchRun creates scan tasks from tool template and dispatches them to workers.
-func (s *Server) dispatchRun(run *models.Run) {
-	// 1. Get tool template
-	template, err := s.queries.GetToolTemplate(*run.ToolTemplateID)
-	if err != nil {
-		log.Printf("[run] get template: %v", err)
-		s.updateRunStatus(run.ID, models.RunFailed, nil)
-		return
-	}
-	if template == nil {
-		log.Printf("[run] template not found: %s", *run.ToolTemplateID)
-		s.updateRunStatus(run.ID, models.RunFailed, nil)
-		return
-	}
-
-	// 2. Mark run as running
-	now := time.Now().UTC()
-	if err := s.queries.UpdateRunStatus(run.ID, models.RunRunning, &now, nil); err != nil {
-		log.Printf("[run] update status: %v", err)
-		return
-	}
-
-	// 3. Delegate to AssetDiscoveryWorkflow which handles:
-	//    - querying project targets and classifying by type
-	//    - building correct tool commands (subfinder -d, naabu -list, etc.)
-	//    - creating hostlist files for batch tools
-	//    - parsing tool output and creating assets/findings
-	wf := workflows.NewAssetDiscoveryWorkflow(s.queries, s.worker, s.scopeEng, s.dataDir).WithRunID(run.ID)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
-
-	result, err := wf.Run(ctx, run.ProjectID)
-	if err != nil {
-		log.Printf("[run] workflow failed for run %s: %v", run.ID, err)
-		s.updateRunStatus(run.ID, models.RunFailed, nil)
-		return
-	}
-
-	log.Printf("[run] %s completed: domains=%d ips=%d ports=%d web=%d",
-		run.ID, result.DomainsFound, result.IPsFound, result.PortsFound, result.WebEndpointsFound)
-
-	// 4. Check final task states and update run status
-	s.checkRunCompletion(run.ID)
 }
 
 // dispatchTasksToWorkers assigns tasks to available workers.

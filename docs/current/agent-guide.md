@@ -16,7 +16,8 @@ This is the default operating guide for agents working in this repository.
 2. `docs/README.md` for document navigation and lifecycle rules.
 3. `docs/current/plan.md` for the only repository-wide plan.
 4. `docs/current/architecture.md` for the architecture baseline.
-5. `docs/current/design/README.md` only when a task explicitly targets an in-review proposal.
+5. `docs/current/deployment.md` for customer Docker deployment; `docs/current/e2e-testing.md` for developer E2E stacks (do not mix compose files).
+6. `docs/current/design/README.md` only when a task explicitly targets an in-review proposal.
 
 Do not treat archived plans, review notes, redirect files, or proposal documents as current truth unless the user explicitly asks for that context.
 

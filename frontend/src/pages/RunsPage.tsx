@@ -47,6 +47,8 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
+const RUN_DETAIL_PAGE_SIZE = 50;
+
 const modeVariants: Record<string, any> = {
   quick: "warning",
   standard: "info",
@@ -71,8 +73,12 @@ export default function RunsPage() {
   const [stages, setStages] = useState<PipelineRunStage[]>([]);
   const [stagesLoading, setStagesLoading] = useState(false);
   const [works, setWorks] = useState<ScanWorkItem[]>([]);
+  const [worksTotal, setWorksTotal] = useState(0);
+  const [worksPage, setWorksPage] = useState(1);
   const [worksLoading, setWorksLoading] = useState(false);
   const [toolCallLogs, setToolCallLogs] = useState<ToolCallLog[]>([]);
+  const [toolCallsTotal, setToolCallsTotal] = useState(0);
+  const [toolCallsPage, setToolCallsPage] = useState(1);
   const [toolCallsLoading, setToolCallsLoading] = useState(false);
   const [workStatusFilter, setWorkStatusFilter] = useState<WorkStatusFilter>("all");
   const [metrics, setMetrics] = useState<ScanRunMetrics | null>(null);
@@ -137,6 +143,8 @@ export default function RunsPage() {
 
   const loadRunDetails = async (runId: string, signal?: AbortSignal) => {
     setSelectedRun(runId);
+    setWorksPage(1);
+    setToolCallsPage(1);
     setTasksLoading(true);
     setStagesLoading(true);
     setWorksLoading(true);
@@ -151,11 +159,11 @@ export default function RunsPage() {
           ? api.getScanRunMetrics(projectId, runId, signal).catch(() => null)
           : Promise.resolve(null),
         projectId
-          ? api.listScanRunWorks(projectId, runId, signal).catch(() => ({ items: [] as ScanWorkItem[], total: 0 }))
-          : Promise.resolve({ items: [] as ScanWorkItem[], total: 0 }),
+          ? api.listScanRunWorks(projectId, runId, { page: 1, page_size: RUN_DETAIL_PAGE_SIZE }, signal).catch(() => ({ items: [] as ScanWorkItem[], total: 0, page: 1, page_size: RUN_DETAIL_PAGE_SIZE }))
+          : Promise.resolve({ items: [] as ScanWorkItem[], total: 0, page: 1, page_size: RUN_DETAIL_PAGE_SIZE }),
         projectId
-          ? api.listToolCallLogs(projectId, runId, signal).catch(() => ({ items: [] as ToolCallLog[], total: 0 }))
-          : Promise.resolve({ items: [] as ToolCallLog[], total: 0 }),
+          ? api.listToolCallLogs(projectId, runId, { page: 1, page_size: RUN_DETAIL_PAGE_SIZE }, signal).catch(() => ({ items: [] as ToolCallLog[], total: 0, page: 1, page_size: RUN_DETAIL_PAGE_SIZE }))
+          : Promise.resolve({ items: [] as ToolCallLog[], total: 0, page: 1, page_size: RUN_DETAIL_PAGE_SIZE }),
         projectId
           ? api.getRunSummary(projectId, runId, signal).catch(() => null)
           : Promise.resolve(null),
@@ -164,7 +172,9 @@ export default function RunsPage() {
       setStages(stageData.stages ?? []);
       setMetrics(metricsData);
       setWorks(workData.items ?? []);
+      setWorksTotal(workData.total ?? 0);
       setToolCallLogs(toolCallsData.items ?? []);
+      setToolCallsTotal(toolCallsData.total ?? 0);
       setRunSummary(summaryData);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
@@ -181,7 +191,7 @@ export default function RunsPage() {
   const refreshRunDetails = useCallback(
     async (runId: string, signal?: AbortSignal) => {
       try {
-        const [taskData, stageData, metricsData, workData, toolCallsData, summaryData] = await Promise.all([
+        const [taskData, stageData, metricsData, summaryData] = await Promise.all([
           api.getRunTasks(runId, signal).catch(() => null),
           projectId
             ? api.listPipelineRunStages(projectId, runId, signal).catch(() => null)
@@ -190,20 +200,12 @@ export default function RunsPage() {
             ? api.getScanRunMetrics(projectId, runId, signal).catch(() => null)
             : Promise.resolve(null),
           projectId
-            ? api.listScanRunWorks(projectId, runId, signal).catch(() => null)
-            : Promise.resolve(null),
-          projectId
-            ? api.listToolCallLogs(projectId, runId, signal).catch(() => null)
-            : Promise.resolve(null),
-          projectId
             ? api.getRunSummary(projectId, runId, signal).catch(() => null)
             : Promise.resolve(null),
         ]);
         if (taskData) setTasks(taskData);
         if (stageData) setStages(stageData.stages ?? []);
         if (metricsData) setMetrics(metricsData);
-        if (workData) setWorks(workData.items ?? []);
-        if (toolCallsData) setToolCallLogs(toolCallsData.items ?? []);
         if (summaryData) setRunSummary(summaryData);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -295,6 +297,40 @@ export default function RunsPage() {
       pauseOnHidden: true,
     }
   );
+
+  const loadMoreWorks = async () => {
+    if (!projectId || !selectedRun || works.length >= worksTotal) return;
+    const nextPage = worksPage + 1;
+    try {
+      const data = await api.listScanRunWorks(projectId, selectedRun, {
+        page: nextPage,
+        page_size: RUN_DETAIL_PAGE_SIZE,
+      });
+      setWorks((prev) => [...prev, ...(data.items ?? [])]);
+      setWorksPage(nextPage);
+      setWorksTotal(data.total ?? worksTotal);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "加载更多 work items 失败";
+      toast(msg, "error");
+    }
+  };
+
+  const loadMoreToolCalls = async () => {
+    if (!projectId || !selectedRun || toolCallLogs.length >= toolCallsTotal) return;
+    const nextPage = toolCallsPage + 1;
+    try {
+      const data = await api.listToolCallLogs(projectId, selectedRun, {
+        page: nextPage,
+        page_size: RUN_DETAIL_PAGE_SIZE,
+      });
+      setToolCallLogs((prev) => [...prev, ...(data.items ?? [])]);
+      setToolCallsPage(nextPage);
+      setToolCallsTotal(data.total ?? toolCallsTotal);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "加载更多工具调用失败";
+      toast(msg, "error");
+    }
+  };
 
   const handleStartScan = async (mode: ScanMode, config: PipelineConfig) => {
     if (!projectId || creating) return;
@@ -659,14 +695,10 @@ export default function RunsPage() {
                                 </div>
                                 {/* BW3: Run Summary */}
                                 {runSummary && (
-                                    <div className="mt-3 pt-3 border-t border-white/5 grid grid-cols-2 gap-3 text-xs">
+                                    <div className="mt-3 pt-3 border-t border-white/5 text-xs">
                                         <div className="flex items-center gap-2">
                                             <span className="text-muted-foreground">新发现:</span>
                                             <span className="font-medium text-accent-red">{runSummary.new_findings}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-muted-foreground">新信号:</span>
-                                            <span className="font-medium text-primary">{runSummary.new_signals}</span>
                                         </div>
                                     </div>
                                 )}
@@ -792,7 +824,7 @@ export default function RunsPage() {
                                     <CardTitle className="text-sm">Work Items 明细</CardTitle>
                                     <CardDescription className="text-xs">每一行代表一个资产与扫描动作的调度单元</CardDescription>
                                 </div>
-                                <Badge variant="secondary" className="font-mono text-[10px]">{filteredWorks.length}/{works.length}</Badge>
+                                <Badge variant="secondary" className="font-mono text-[10px]">{filteredWorks.length}/{worksTotal}</Badge>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -867,6 +899,17 @@ export default function RunsPage() {
                                     })}
                                 </div>
                             )}
+                            {!worksLoading && works.length < worksTotal && (
+                                <div className="border-t p-3 text-center">
+                                    <button
+                                        type="button"
+                                        className="text-xs text-primary hover:underline"
+                                        onClick={() => void loadMoreWorks()}
+                                    >
+                                        加载更多 ({works.length}/{worksTotal})
+                                    </button>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -877,7 +920,7 @@ export default function RunsPage() {
                                     <CardTitle className="text-sm">工具调用日志</CardTitle>
                                     <CardDescription className="text-xs">每次 CLI 调用的参数、状态与耗时</CardDescription>
                                 </div>
-                                <Badge variant="secondary" className="font-mono text-[10px]">{toolCallLogs.length}</Badge>
+                                <Badge variant="secondary" className="font-mono text-[10px]">{toolCallLogs.length}/{toolCallsTotal}</Badge>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -912,6 +955,17 @@ export default function RunsPage() {
                                             )}
                                         </div>
                                     ))}
+                                </div>
+                            )}
+                            {!toolCallsLoading && toolCallLogs.length < toolCallsTotal && (
+                                <div className="border-t p-3 text-center">
+                                    <button
+                                        type="button"
+                                        className="text-xs text-primary hover:underline"
+                                        onClick={() => void loadMoreToolCalls()}
+                                    >
+                                        加载更多 ({toolCallLogs.length}/{toolCallsTotal})
+                                    </button>
                                 </div>
                             )}
                         </CardContent>

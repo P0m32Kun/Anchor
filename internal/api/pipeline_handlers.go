@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/errors"
-	"github.com/P0m32Kun/Anchor/internal/evaluator"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/scanconfig"
 	"github.com/P0m32Kun/Anchor/internal/scanengine"
@@ -39,6 +38,19 @@ func (s *Server) finalizePipelineRun(runID string, runErr error) {
 			}
 			if len(pending) > 0 {
 				log.Printf("[scan] finalize run %s: skipped %d orphan pending work items", runID, len(pending))
+			}
+		}
+
+		running, listErr := s.queries.ListScanWorkItemsByRunAndStatus(runID, models.WorkStatusRunning)
+		if listErr != nil {
+			log.Printf("[scan] finalize run %s: list running work: %v", runID, listErr)
+		} else {
+			now := time.Now().UTC()
+			for _, w := range running {
+				_ = s.queries.UpdateScanWorkItemError(w.ID, models.WorkStatusFailed, "orphan: engine exited before completion", &now)
+			}
+			if len(running) > 0 {
+				log.Printf("[scan] finalize run %s: failed %d orphan running work items", runID, len(running))
 			}
 		}
 	}
@@ -144,15 +156,6 @@ func (s *Server) handleGetRunSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Count signals created during this run's time window
-	var signalCount int
-	if !run.StartedAt.IsZero() {
-		signals, err := s.queries.ListSignalsByProjectSince(projectID, run.StartedAt)
-		if err == nil {
-			signalCount = len(signals)
-		}
-	}
-
 	// Build per-phase coverage from pipeline_run_stages
 	stages, err := s.queries.ListPipelineRunStages(runID)
 	if err != nil {
@@ -198,7 +201,6 @@ func (s *Server) handleGetRunSummary(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"run_id":            runID,
 		"new_findings":      len(findings),
-		"new_signals":       signalCount,
 		"status":            run.Status,
 		"phases":            phases,
 		"complete":          isComplete,
@@ -391,29 +393,6 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 		cfg.EnableNmapService = true
 		cfg.EnableHttpx = true
 		cfg.EnableNuclei = true
-	case "watch":
-		cfg.EnableFOFA = true
-		cfg.EnableSubfinder = true
-		cfg.EnableDNSx = true
-		cfg.EnableCDNFilter = true
-		cfg.EnableNmapService = true
-		cfg.EnableHttpx = true
-		cfg.EnableNuclei = true
-		cfg.EnablePassiveSearch = defaults.EnablePassiveSearch
-		cfg.EnablePassiveCert = defaults.EnablePassiveCert
-		cfg.EnablePassiveURL = defaults.EnablePassiveURL
-		if cfg.SubfinderMode == "" {
-			cfg.SubfinderMode = defaults.SubfinderMode
-		}
-		if cfg.PassiveSearchResultLimit == 0 {
-			cfg.PassiveSearchResultLimit = defaults.PassiveSearchResultLimit
-		}
-		if cfg.PassiveSearchConcurrency == 0 {
-			cfg.PassiveSearchConcurrency = defaults.PassiveSearchConcurrency
-		}
-		cfg.EnablePassiveJunkFilter = defaults.EnablePassiveJunkFilter
-		cfg.SkipPortscanOnCDNHost = defaults.SkipPortscanOnCDNHost
-		cfg.NucleiRequireFingerprint = defaults.NucleiRequireFingerprint
 	}
 	// Tool toggles (enable_spoor, enable_katana, enable_ffuf) are NOT forced here.
 	// The frontend controls these via the ScanModal tool section; defaults are
@@ -425,7 +404,7 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 // It normalizes legacy mode values before lookup.
 func presetDefaults(mode, noiseLevel string) models.PipelineConfig {
 	if sc := scanconfig.Get(); sc != nil {
-		// Construct the full preset name: "external_low", "external_standard", "watch", "internal"
+		// Construct the full preset name: "external_low", "external_standard", "internal"
 		presetName := mode
 		if mode == "external" && noiseLevel != "" {
 			presetName = "external_" + noiseLevel
@@ -438,8 +417,6 @@ func presetDefaults(mode, noiseLevel string) models.PipelineConfig {
 			return models.DefaultExternalLowNoisePipelineConfig()
 		}
 		return models.DefaultExternalStandardPipelineConfig()
-	case "watch":
-		return models.DefaultWatchPipelineConfig()
 	default:
 		return models.DefaultPipelineConfig()
 	}
@@ -571,7 +548,7 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		// Gate A: filter seeds by scope boundary (strict mode only)
-		if proj, _ := s.queries.GetProject(projectID); proj != nil && proj.ScopeBoundaryMode == models.ScopeBoundaryStrict {
+		if proj, _ := s.queries.GetProject(projectID); proj != nil && proj.ScopeBoundaryMode == string(models.ScopeBoundaryStrict) {
 			scopeRules, _ := s.queries.ListScopeRulesByProject(projectID)
 			before := len(seeds)
 			seeds = seed.FilterSeedsByBoundary(seeds, s.scopeEng, scopeRules, proj.ScopeBoundaryMode)
@@ -584,16 +561,6 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 			log.Printf("scan engine run %s for project %s: %v", runID, projectID, runErr)
 		}
 		s.finalizePipelineRun(runID, runErr)
-		// Trigger evaluation asynchronously
-		go func() {
-			eval := evaluator.NewEvaluator(s.queries, s.dataDir, projectID, runID)
-			_, evalErr := eval.Evaluate(context.Background())
-			if evalErr != nil {
-				log.Printf("[evaluation] failed for run %s: %v", runID, evalErr)
-			} else {
-				log.Printf("[evaluation] report generated for run %s", runID)
-			}
-		}()
 
 		s.broadcastProjectSSE(projectID, map[string]interface{}{
 			"event":  "pipeline_complete",
@@ -691,105 +658,3 @@ func (s *Server) handleCancelPipelineRun(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
 
-// triggerWatchRun is called by the watch scheduler when a project's interval has elapsed.
-// It creates a passive-only pipeline run for the project.
-func (s *Server) triggerWatchRun(ctx context.Context, project *models.Project) error {
-	// Build passive-only config
-	cfg := models.DefaultExternalPipelineConfig()
-	cfg.EnablePassiveSearch = true
-	cfg.EnablePassiveCert = true
-	cfg.EnablePassiveURL = true
-	cfg.SubfinderMode = "passive"
-	cfg.EnableKatana = false
-	cfg.EnableFfuf = false
-	cfg.EnableNuclei = false
-	cfg.EnableNmapService = false
-	cfg.PortRange = "top100"
-
-	// Create pipeline run
-	rid := util.GenerateID()
-	now := time.Now().UTC()
-	if err := s.queries.CreatePipelineRun(&models.PipelineRun{
-		ID:        rid,
-		ProjectID: project.ID,
-		Mode:      "watch_passive",
-		Status:    "running",
-		StartedAt: now,
-		CreatedAt: now,
-	}); err != nil {
-		return fmt.Errorf("create pipeline run: %w", err)
-	}
-
-	// Run the scan in a goroutine
-	go func() {
-		log.Printf("[watch] starting passive scan for project %s (run %s)", project.ID, rid)
-
-		s.broadcastProjectSSE(project.ID, map[string]interface{}{
-			"event":  "pipeline_start",
-			"run_id": rid,
-			"mode":   "watch_passive",
-			"time":   time.Now().UTC().Format(time.RFC3339),
-		})
-
-		profile := core.ProfileFromConfig("external", cfg)
-		engineCfg := scanengine.DefaultEngineConfig()
-		engineCfg.Pipeline = cfg
-		engine := scanengine.New(
-			s.queries, s.worker, toolregistry.DefaultRegistry(),
-			s.assetMerger, profile, s.excludeMgr, s.scopeEng, s.dataDir, rid, project.ID, engineCfg,
-			func(rid, stage, status, errMsg string) {
-				s.broadcastProjectSSE(project.ID, map[string]interface{}{
-					"event":   "pipeline_stage_change",
-					"run_id":  rid,
-					"stage":   stage,
-					"status":  status,
-					"error":   errMsg,
-					"time":    time.Now().UTC().Format(time.RFC3339),
-				})
-			},
-		)
-		// BW4: SSE callback for new assets in watch mode
-		engine.SetOnNewAsset(func(assetID, value, assetType string) {
-			s.broadcastProjectSSE(project.ID, map[string]interface{}{
-				"event":      "asset.new",
-				"run_id":     rid,
-				"asset_id":   assetID,
-				"value":      value,
-				"asset_type": assetType,
-				"time":       time.Now().UTC().Format(time.RFC3339),
-			})
-		})
-
-		targets, _ := s.queries.ListTargetsByProject(project.ID)
-		seeds := seed.ExpandTargets(ctx, s.queries, cfg, targets)
-		if len(seeds) == 0 {
-			for _, t := range targets {
-				if t == nil || t.Value == "" {
-					continue
-				}
-				seeds = append(seeds, seed.SeedAsset{
-					Value:     t.Value,
-					ValueType: string(t.Type),
-					Source:    "target",
-					SourceRef: t.ID,
-				})
-			}
-		}
-
-		runErr := engine.RunWithSeeds(ctx, seeds)
-		if runErr != nil {
-			log.Printf("[watch] scan engine run %s for project %s: %v", rid, project.ID, runErr)
-		}
-		s.finalizePipelineRun(rid, runErr)
-
-		s.broadcastProjectSSE(project.ID, map[string]interface{}{
-			"event":  "pipeline_complete",
-			"run_id": rid,
-			"time":   time.Now().UTC().Format(time.RFC3339),
-		})
-
-		log.Printf("[watch] completed passive scan for project %s (run %s)", project.ID, rid)
-	}()
-
-	return nil
-}

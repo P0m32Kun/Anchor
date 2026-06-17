@@ -1,5 +1,4 @@
-# Anchor Server Runtime Base Image
-# 包含运行时系统依赖，极少更新
+# Anchor Server Runtime Base Image — 【E2E】预装运行时依赖，极少更新
 # 构建: docker build -f Dockerfile.server-runtime-base -t anchor-server-base:latest .
 
 FROM debian:bookworm-slim

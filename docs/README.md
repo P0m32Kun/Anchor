@@ -1,9 +1,7 @@
 # Anchor 文档中心
 
-> 最后更新：2026-06-02
+> 最后更新：2026-06-17
 > 默认原则：任何 agent 在阅读历史材料前，先读本页和 `docs/current/`
->
-> **2026-06-02 同步**：`current/architecture.md` 新增「Docker 构建与部署」章节，记录镜像构建策略重构（移除 base 镜像层级，支持多平台构建）。
 
 ## 先读这些
 
@@ -23,6 +21,8 @@
 | [`current/agent-guide.md`](current/agent-guide.md) | Coding agent 迭代协议 | Yes |
 | [`current/plan.md`](current/plan.md) | 当前唯一仓库级计划 | Yes |
 | [`current/architecture.md`](current/architecture.md) | 当前唯一架构基线 | Yes |
+| [`current/deployment.md`](current/deployment.md) | **客户部署**（install.sh / ACR 镜像） | Yes |
+| [`current/e2e-testing.md`](current/e2e-testing.md) | **开发者 E2E**（fast 镜像 / Playwright） | Yes |
 | [`current/design/README.md`](current/design/README.md) | 当前候选设计索引 | Yes |
 | [`current/decisions/README.md`](current/decisions/README.md) | 当前决策索引 | Yes |
 | [`api-error-contract.md`](api-error-contract.md) | API 错误约定 | Supporting |
@@ -62,7 +62,7 @@
 
 ### 版本号规则
 
-项目采用三位版本号 `vMAJOR.MINOR.PATCH`（当前 `v0.2.1`），递增规则如下：
+项目采用三位版本号 `vMAJOR.MINOR.PATCH`（当前 `v0.4.0`），递增规则如下：
 
 | 位置 | 递增条件 | 示例 |
 |------|---------|------|

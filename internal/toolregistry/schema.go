@@ -12,6 +12,22 @@ type RenderParams map[string]interface{}
 // HighRiskPorts is the curated list of high-risk ports, matching
 // internal/worker/commands.go's HighRiskPorts constant. Defined here
 // in Go instead of inline YAML (per design §6.3: avoid 2KB YAML string).
+
+
+// highRiskPortsVar is the mutable version of HighRiskPorts for runtime override.
+var highRiskPortsVar = HighRiskPorts
+
+// HighRiskPortsFunc returns the current high-risk ports string.
+func HighRiskPortsFunc() string {
+	return highRiskPortsVar
+}
+
+// SetHighRiskPorts overrides the high-risk ports at runtime.
+func SetHighRiskPorts(ports string) {
+	if ports != "" {
+		highRiskPortsVar = ports
+	}
+}
 const HighRiskPorts = "21,22,23,25,53,80,81,88,110,135,139,143,389,443,445,465,587,636,873,993,995," +
 	"1080,1099,1433,1521,1723,2049,2082,2375,2376,2480,3000,3128,3306,3389," +
 	"4040,4194,4369,4444,4848,5000,5432,5601,5672,5900,5901,5984,6379,6443," +

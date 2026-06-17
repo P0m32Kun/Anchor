@@ -49,6 +49,15 @@ func TestIsUnreachableError(t *testing.T) {
 	}
 }
 
+func TestIsAtCapacityError(t *testing.T) {
+	if !isAtCapacityError(errors.New("worker at capacity: 503")) {
+		t.Fatal("expected capacity error")
+	}
+	if isAtCapacityError(errors.New("connection refused")) {
+		t.Fatal("connection refused is not capacity")
+	}
+}
+
 // --- limitedBuffer ---
 
 func TestLimitedBuffer_WriteUnderLimit(t *testing.T) {

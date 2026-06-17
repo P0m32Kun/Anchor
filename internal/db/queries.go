@@ -35,6 +35,13 @@ func sqlNullStringValue(s string) sql.NullString {
 	return sql.NullString{}
 }
 
+func sqlNullIntValue(v int) sql.NullInt64 {
+	if v == 0 {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: int64(v), Valid: true}
+}
+
 func nullableBool(nb sql.NullBool) *bool {
 	if nb.Valid {
 		v := nb.Bool

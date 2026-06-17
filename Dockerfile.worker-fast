@@ -1,4 +1,4 @@
-# Anchor Worker - 基于 base 镜像的快速构建版本
+# Anchor Worker - 【E2E】基于 runtime-base 的快速构建版本
 # 用法：先构建 base，再构建此镜像
 #   docker build -f Dockerfile.worker-runtime-base -t anchor-worker-base:latest .
 #   make build-linux TARGETARCH=arm64

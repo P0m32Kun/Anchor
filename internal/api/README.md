@@ -26,34 +26,28 @@
 | `dashboard_handlers.go` | `GET /dashboard/stats` | `queries` | 仪表盘聚合统计 |
 | `project_handlers.go` | `POST/GET/DELETE /projects[/{id}]` | `projectSvc` | 项目 CRUD;业务逻辑在 service 包 |
 | `target_handlers.go` | `POST/GET/DELETE /projects/{id}/targets[/{targetId}]`, `POST .../targets/import` | `targetSvc` | 目标管理 + 批量导入 |
-| `asset_handlers.go` | `GET /projects/{id}/assets`, `/web-endpoints`, `/service-ports`, `GET /assets/{id}/ports`, `/services` | `queries` | 资产/端点/服务端口查询(只读) |
-| `scope_handlers.go` | `POST/GET/DELETE /scope-rules`, `POST /scope-rules/parse`, `POST /projects/{id}/scope-rules/batch` | `queries`, `scopeEng` | 范围规则 CRUD；评估为 **exclusion-only**（include 废弃） |
-| `run_handlers.go` | `POST/GET /projects/{id}/runs`, `GET /runs/{id}`, `/runs/{id}/tasks`, `POST /runs/{id}/cancel` | `queries`, `scopeEng`, `worker`, `dataDir`, **`taskQueue`**, **`mu`** | 扫描运行生命周期;触碰任务分发四件套 |
-| `pipeline_handlers.go` | `POST /projects/{id}/scan`, `GET /pipeline/runs`, `/runs/{runId}/stages`, `POST /pipeline/runs/{runId}/cancel`, `GET/POST /pipeline/config` | `queries`, `scopeEng`, `worker`, `assetMerger`, `excludeMgr`, `dataDir` | 资产驱动 ScanEngine 启动；`ProfileFromConfig` |
-| `scan_work_handlers.go` | `GET /projects/{id}/pipeline/runs/{runId}/works`, `GET /assets/{id}/works` | `queries` | Work 列表；经 `scan_run_auth` 校验 run∈project |
-| `scan_metrics_handlers.go` | `GET /projects/{id}/pipeline/runs/{runId}/metrics` | `queries` | Run metrics；校验 run∈project |
-| `scan_run_auth.go` | — | `queries` | `requireRunInProject` 共享 helper（非路由） |
-| `workflow_handlers.go` | `POST /projects/{id}/workflows/asset-discovery`, `/web-screening`, `POST /projects/{id}/scan`, `GET /projects/{id}/scan/runs` | `queries`, `scopeEng`, `worker`, `dataDir` | 预定义工作流入口 + 统一扫描 |
+| `scope_handlers.go` | `POST/GET/DELETE /scope-rules`, `POST /scope-rules/parse`, `POST /projects/{id}/scope-rules/batch` | `queries`, `scopeEng` | 范围规则 CRUD |
 | `finding_handlers.go` | `GET /projects/{id}/findings`, `GET/PATCH /findings/{id}[...]`, `POST /findings/{id}/evidence`, `PATCH /findings/batch-status`, `GET /findings/{id}/curl` | `findingSvc` | 发现 CRUD + 状态变更 + 证据上传 |
+| `run_handlers.go` | `POST/GET /projects/{id}/runs`, `GET /runs/{id}`, `/runs/{id}/tasks`, `POST /runs/{id}/cancel` | `queries`, `scopeEng`, `worker`, `dataDir`, **`taskQueue`**, **`mu`** | 扫描运行生命周期;触碰任务分发四件套 |
+| `pipeline_handlers.go` | `POST /projects/{id}/scan`, `GET /pipeline/runs`, `/runs/{runId}/stages`, `/runs/{runId}/summary`, `POST /pipeline/runs/{runId}/cancel`, `GET/POST /pipeline/config` | `queries`, `scopeEng`, `worker`, `assetMerger`, `excludeMgr`, `dataDir` | 资产驱动 ScanEngine 启动；`ProfileFromConfig` |
+| `scan_work_handlers.go` | `GET /projects/{id}/pipeline/runs/{runId}/works?page&page_size`, `GET .../tool-calls?page&page_size`, `GET /assets/{id}/works` | `queries` | Work/ToolCall 分页列表；经 `scan_run_auth` 校验 run∈project |
+| `scan_metrics_handlers.go` | `GET /projects/{id}/pipeline/runs/{runId}/metrics` | `queries` | Run metrics；校验 run∈project |
+| `scan_handlers.go` | `GET /scan/defaults` | — | 部署侧 scan.config.yaml preset 默认值 |
+| `scan_run_auth.go` | — | `queries` | `requireRunInProject` 共享 helper（非路由） |
+| `asset_handlers.go` | `GET /projects/{id}/assets`, `/web-endpoints`, `/service-ports`, `GET /assets/{id}/ports`, `/services`, `/lineage` | `queries`, `excludeMgr` | 资产/端点/服务端口查询 + 血缘链 |
 | `finding_template_handlers.go` | `GET/POST/PATCH/DELETE /finding-templates[/{id}]`, `/finding-templates/export`, `/finding-templates/{id}/accept-upstream` | `queries` | 漏洞知识库模板 |
 | `retest_handlers.go` | `POST /findings/{id}/retest`, `GET /findings/{id}/retests` | `queries`, `rawDB` | 复测;唯一使用 `rawDB` 的 handler |
 | `report_handlers.go` | `GET /projects/{id}/reports/export.md` | `queries` | 同步报告导出(Markdown) |
 | `archive_handlers.go` | `POST /projects/{id}/archive`, `GET /projects/{id}/archive/download` | `queries`, `dataDir` | 项目归档打包导出 |
-| `task_handlers.go`, `task_output_handlers.go` | `POST /scan-plans`, `/scan-plans/{id}/approve`, `/scan-plans/dry-run`, `GET /scan-tasks/{id}`, `POST /scan-tasks/{id}/cancel`, `POST /tasks/run`, `GET /tasks/{id}/artifacts`, `GET /tasks/{id}/output`, `/artifacts/content` | `queries`, `worker` | 扫描计划 + 单任务执行；`/output` 为运行中任务的增量 stdout/stderr |
+| `task_handlers.go`, `task_output_handlers.go` | `GET /scan-tasks/{id}`, `POST /scan-tasks/{id}/cancel`, `GET /tasks/{id}/artifacts`, `GET /tasks/{id}/output`, `/artifacts/content` | `queries`, `worker` | 单任务查询/取消；`POST /tasks/run` 已移除 |
 | `worker_handlers.go` | `GET /workers`, `POST /workers/register`, `POST /workers/{id}/heartbeat`, `GET /workers/{id}/tasks/poll`, `POST /tasks/{id}/result`, `POST /workers/{id}/revoke`, `DELETE /workers/{id}` | `queries`, `dataDir`, **`taskQueue`**, **`taskResults`**, **`mu`** | 远程 worker 节点管理 + 任务长轮询 + 结果回报 |
 | `engine_handlers.go` | `GET/POST/DELETE /engines/credentials[/{engine}]`, `GET /engines/search`, `/engines/quota` | `queries` | FOFA/Hunter/Quake 等情报引擎统一接入 |
-| `credential_handlers.go` | `GET /credentials`, `GET /credentials/platforms`, `GET /credentials/{id}`, `GET /sources`, `GET /sources/type`, `GET /sources/{id}` | — | SRC 平台凭证发现与源注册表查询 |
-| `program_handlers.go` | `POST/GET/PUT/DELETE /projects/{id}/src-program`, `GET /src-programs` | `queries` | SRC 程序规则管理；每个项目一个程序配置 |
-| `bounty_handlers.go` | `GET /projects/{id}/bounty-candidates`, `POST .../refresh`, `GET/PATCH/DELETE /bounty-candidates/{id}` | `queries` | 赏金候选队列管理；评分排序与状态跟踪 |
-| `submission_handlers.go` | `POST /bounty-candidates/{id}/submission-pack`, `GET .../submission-packs`, `GET/PATCH/DELETE /submission-packs/{id}`, `POST /submission-packs/{id}/redact` | `queries` | 提交包生成与管理；支持多模板与脱敏 |
-| `nuclei_custom_handlers.go` | `GET/POST/PATCH/DELETE /nuclei/custom/sources[/{id}][/...]`, `PATCH /nuclei/custom/sources/{id}/enabled`, `/files`, `/validate`, `/publish`, `/manifest`, `/bundles/{version}` | `nucleiCustomMgr` | Nuclei 模板源；内置只读，见下表 |
+| `nuclei_custom_handlers.go` | `GET /nuclei/custom/sources`, `PATCH /nuclei/custom/sources/{id}/enabled` | `nucleiCustomMgr` | RBKD 内置模板源；仅启用开关 |
 | `dictionary_handlers.go` | `GET/POST/PATCH/DELETE /dictionaries[/{id}][/content]`, `PATCH /dictionaries/{id}/enabled` | `dictMgr` | 字典管理(ffuf 等)；内置只读，见下表 |
 | `httpx_fingerprint_handlers.go` | `GET/POST/PATCH/DELETE /httpx/fingerprints[/{id}][/content]`, `PATCH /httpx/fingerprints/{id}/enabled` | `httpxFpMgr` | HTTPX 指纹；内置只读，见下表 |
-| `slow_scan_handlers.go` | `GET /projects/{id}/slow-scans`, `GET/POST /slow-scans/{id}[/cancel]` | `queries`, `worker` | 长耗时扫描任务管理 |
 | `sse.go` | `GET /projects/{id}/events`(挂在 `handleProjectSSE`) | **`sseClients`**, **`mu`** | SSE 通道辅助;事件由 `report_handlers` / worker 推 |
 | `pagination.go` | — | — | 分页参数解析工具,无 handler |
 | `workdir_cleanup.go` | — | `queries`, `dataDir` | 后台 goroutine,定期清理过期工作目录;由 `Server.startWorkdirCleanup` 启动 |
-| `evaluation_handlers.go` | `GET /projects/{id}/runs/{runId}/evaluation`, `POST /projects/{id}/runs/{runId}/evaluation/retry`, `GET /projects/{id}/evaluations` | `queries`, `dataDir` | 评估报告查看与重试 |
 
 **加粗字段** = 任务分发与 SSE 子系统,改时四件套(`sseClients` / `taskQueue` / `taskResults` / `mu`)绑死,不要单改一个。
 
@@ -69,9 +63,9 @@
 |------|---------|------------|------------------|
 | `PATCH /dictionaries/{id}/enabled` | `handlePatchDictionaryEnabled` | ✓（403 非 builtin） | `PATCH /dictionaries/{id}` 改元数据；扫描仅列 `enabled=1` |
 | `PATCH /httpx/fingerprints/{id}/enabled` | `handlePatchHttpxFingerprintEnabled` | ✓（manager `ErrNotBuiltin`） | `PATCH /httpx/fingerprints/{id}` 含 `enabled` 字段 |
-| `PATCH /nuclei/custom/sources/{id}/enabled` | `handlePatchNucleiCustomSourceEnabled` | ✓（403 非 builtin） | `PATCH /nuclei/custom/sources/{id}` 含 `enabled` 字段 |
+| `PATCH /nuclei/custom/sources/{id}/enabled` | `handlePatchNucleiCustomSourceEnabled` | ✓（403 非 builtin） | —（自定义 nuclei 源已移除） |
 
-内置 nuclei 源禁用后 Worker 移除 `~/nuclei-templates/RBKD-templates` symlink，tags/workflow 均不加载 RBKD；自定义 nuclei 源仍走 bundle sync。
+内置 nuclei 源禁用后 Worker 移除 `~/nuclei-templates/RBKD-templates` symlink，tags/workflow 均不加载 RBKD。模板更新通过 `ANCHOR_BUILTIN_SYNC` + 目录挂载，不再走 git clone / publish / bundle。
 
 ---
 
@@ -81,8 +75,8 @@
 |---|---|---|
 | `queries` | 16 文件(几乎全包) | **巨大** |
 | `dataDir` | 8 文件 | **大** |
-| `scopeEng` | 4 文件:pipeline / run / scope / workflow | 中等 |
-| `worker` | 5 文件:pipeline / run / slow_scan / task / workflow | 中等 |
+| `scopeEng` | 3 文件:pipeline / run / scope | 中等 |
+| `worker` | 4 文件:pipeline / run / task / worker | 中等 |
 | `mu` | 3 文件:run / sse / worker(与下面三件套绑死) | 中等 |
 | `sseClients` | 1 文件:sse | 小 |
 | `taskQueue` | 2 文件:run / worker | 小 |

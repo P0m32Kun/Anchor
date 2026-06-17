@@ -13,16 +13,16 @@ import (
 
 // ExpandTargets converts project targets into engine seed values.
 // Company targets are expanded via FOFA when credentials are configured.
-func ExpandTargets(ctx context.Context, queries *db.Queries, targets []*models.Target) []string {
-	var vals []string
+func ExpandTargets(ctx context.Context, queries *db.Queries, cfg interface{}, targets []*models.Target) []SeedAsset {
+	var vals []SeedAsset
 	seen := make(map[string]bool)
-	add := func(v string) {
+	add := func(v, source, sourceRef string) {
 		v = strings.TrimSpace(v)
 		if v == "" || seen[v] {
 			return
 		}
 		seen[v] = true
-		vals = append(vals, v)
+		vals = append(vals, SeedAsset{Value: v, Source: source, SourceRef: sourceRef})
 	}
 
 	for _, t := range targets {
@@ -32,10 +32,10 @@ func ExpandTargets(ctx context.Context, queries *db.Queries, targets []*models.T
 		switch t.Type {
 		case models.TargetTypeCompany:
 			for _, s := range expandCompany(ctx, queries, t.Value) {
-				add(s)
+				add(s, "company_expand", t.ID)
 			}
 		default:
-			add(t.Value)
+			add(t.Value, "target", t.ID)
 		}
 	}
 	return vals

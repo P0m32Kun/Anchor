@@ -64,8 +64,8 @@ test.describe("External scan preset", () => {
 		// Select 外网扫描 mode
 		await page.locator("button", { hasText: "外网扫描" }).click();
 
-		// Go to step 2 — button says "配置参数"
-		await page.getByRole("button", { name: "配置参数" }).click();
+		// Go to step 2 — button says "高级配置"
+		await page.getByRole("button", { name: "高级配置" }).click();
 		await page.waitForTimeout(500);
 
 		// Verify nuclei scan strategy shows 精确扫描 (workflow default)

@@ -6,6 +6,15 @@ import (
 	"time"
 )
 
+// --- ScopeStatus ---
+type ScopeStatus string
+
+const (
+	ScopeInScope    ScopeStatus = "in_scope"
+	ScopeOutOfScope ScopeStatus = "out_of_scope"
+	ScopeUnknown    ScopeStatus = "unknown"
+)
+
 // --- ScopeRule ---
 
 type ScopeAction string
@@ -83,3 +92,11 @@ func (d *ScopeDecisionResult) Scan(value interface{}) error {
 		return fmt.Errorf("cannot scan %T into ScopeDecisionResult", value)
 	}
 }
+
+// --- ScopeBoundaryMode ---
+type ScopeBoundaryMode string
+
+const (
+	ScopeBoundaryOff    ScopeBoundaryMode = "off"
+	ScopeBoundaryStrict ScopeBoundaryMode = "strict"
+)

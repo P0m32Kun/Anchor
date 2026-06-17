@@ -91,3 +91,5 @@ func (m *Manager) disableConflictingCustomSources(installPath string) error {
 	}
 	return nil
 }
+
+func strPtr(s string) *string { return &s }

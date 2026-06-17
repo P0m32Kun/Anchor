@@ -4,6 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { E2E_API_TOKEN, E2E_SKIP_DOCKER } from "./fixtures/e2e-env";
 
+const E2E_MULTI_WORKER = process.env.ANCHOR_E2E_MULTI_WORKER === "1";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BACKEND_HEALTH_URL = "http://localhost:17421/health";
 const E2E_COMPOSE_FILE = "../../docker-compose.e2e.yml";
@@ -59,26 +61,6 @@ async function waitForBackend(): Promise<void> {
 	);
 }
 
-async function isWorkerRegistered(): Promise<boolean> {
-	try {
-		const res = await fetch("http://localhost:17421/workers", {
-			headers: { Authorization: `Bearer ${E2E_API_TOKEN}` },
-			signal: AbortSignal.timeout(3_000),
-		});
-		if (!res.ok) return false;
-		const workers = (await res.json()) as Array<{
-			status: string;
-		}>;
-		return (
-			Array.isArray(workers) &&
-			workers.length > 0 &&
-			workers.some((w) => w.status === "online" || w.status === "busy")
-		);
-	} catch {
-		return false;
-	}
-}
-
 async function isRangefieldHealthy(): Promise<boolean> {
 	try {
 		const res = await fetch("http://localhost:18080", {
@@ -90,17 +72,33 @@ async function isRangefieldHealthy(): Promise<boolean> {
 	}
 }
 
-async function waitForWorker(): Promise<void> {
+async function waitForWorkers(minCount: number): Promise<void> {
 	const start = Date.now();
 	while (Date.now() - start < MAX_WAIT_MS) {
-		if (await isWorkerRegistered()) {
-			console.log("[global-setup] Worker is registered and online.");
-			return;
+		try {
+			const res = await fetch("http://localhost:17421/workers", {
+				headers: { Authorization: `Bearer ${E2E_API_TOKEN}` },
+				signal: AbortSignal.timeout(3_000),
+			});
+			if (res.ok) {
+				const workers = (await res.json()) as Array<{ status: string }>;
+				const online = workers.filter(
+					(w) => w.status === "online" || w.status === "busy",
+				);
+				if (online.length >= minCount) {
+					console.log(
+						`[global-setup] ${online.length} worker(s) online (required ${minCount}).`,
+					);
+					return;
+				}
+			}
+		} catch {
+			// retry
 		}
 		await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
 	}
 	throw new Error(
-		`[global-setup] Worker did not register within ${MAX_WAIT_MS}ms.`,
+		`[global-setup] Fewer than ${minCount} workers registered within ${MAX_WAIT_MS}ms.`,
 	);
 }
 
@@ -161,15 +159,23 @@ export default async function globalSetup(): Promise<void> {
 		}
 
 		console.log("[global-setup] Starting E2E environment (Docker)...");
+		const composeFiles = E2E_MULTI_WORKER
+			? [
+					"-f",
+					E2E_COMPOSE_FILE,
+					"-f",
+					"../../docker-compose.e2e-multi-worker.override.yml",
+				]
+			: ["-f", E2E_COMPOSE_FILE];
 		await runDockerCompose(
-			["-f", E2E_COMPOSE_FILE, "up", "-d", "--build", "--force-recreate"],
+			[...composeFiles, "up", "-d", "--build", "--force-recreate"],
 			path.join(__dirname),
 		);
 	}
 
 	await waitForBackend();
 	await waitForRangefield();
-	await waitForWorker();
+	await waitForWorkers(E2E_MULTI_WORKER ? 2 : 1);
 
 	writeStorageState();
 

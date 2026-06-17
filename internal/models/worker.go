@@ -36,6 +36,11 @@ type WorkerNode struct {
 	TemplateVersions string       `json:"template_versions" db:"template_versions"`
 	MaxConcurrency   int          `json:"max_concurrency" db:"max_concurrency"`
 	LastSeen         *time.Time   `json:"last_seen" db:"last_seen"`
+	// System resource metrics (updated via heartbeat)
+	CPUPercent       *float64     `json:"cpu_percent" db:"cpu_percent"`
+	MemPercent       *float64     `json:"mem_percent" db:"mem_percent"`
+	DiskPercent      *float64     `json:"disk_percent" db:"disk_percent"`
+	MetricsUpdatedAt *time.Time   `json:"metrics_updated_at" db:"metrics_updated_at"`
 	CreatedAt        time.Time    `json:"created_at" db:"created_at"`
 	RevokedAt        *time.Time   `json:"revoked_at" db:"revoked_at"`
 }

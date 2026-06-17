@@ -7,62 +7,44 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/models"
 )
 
+const scanWorkItemColumns = `id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error,
+	input_file, member_asset_ids, bucket_key, generation, batch_mode, started_at, completed_at, created_at`
+
 // --- ScanWorkItem ---
 
 func (q *Queries) CreateScanWorkItem(w *models.ScanWorkItem) error {
+	batchMode := 0
+	if w.BatchMode {
+		batchMode = 1
+	}
 	_, err := q.db.Exec(`
-		INSERT INTO scan_work_items (id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO scan_work_items (id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error,
+			input_file, member_asset_ids, bucket_key, generation, batch_mode, started_at, completed_at, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.RunID, w.ProjectID, w.AssetID, w.Action, w.TaskID, w.Status,
 		sqlNullStringValue(w.SkipReason), sqlNullStringValue(w.Stage), sqlNullStringValue(w.Error),
+		sqlNullStringValue(w.InputFile), sqlNullStringValue(w.MemberAssetIDs), sqlNullStringValue(w.BucketKey),
+		sqlNullIntValue(w.Generation), batchMode,
 		w.StartedAt, w.CompletedAt, w.CreatedAt)
 	return err
 }
 
 func (q *Queries) GetScanWorkItem(id string) (*models.ScanWorkItem, error) {
-	row := q.db.QueryRow(`
-		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
-		FROM scan_work_items WHERE id = ?`, id)
-	w := &models.ScanWorkItem{}
-	var skipReason, stage, errMsg sql.NullString
-	var taskID sql.NullString
-	var startedAt, completedAt sql.NullTime
-	err := row.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &taskID, &w.Status,
-		&skipReason, &stage, &errMsg, &startedAt, &completedAt, &w.CreatedAt)
+	row := q.db.QueryRow(`SELECT `+scanWorkItemColumns+` FROM scan_work_items WHERE id = ?`, id)
+	w, err := scanWorkItemRow(row)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	if skipReason.Valid {
-		w.SkipReason = skipReason.String
-	}
-	if stage.Valid {
-		w.Stage = stage.String
-	}
-	applyScanWorkItemNullables(w, skipReason, stage, errMsg, taskID, startedAt, completedAt)
-	return w, nil
+	return w, err
 }
 
 func (q *Queries) GetScanWorkItemByRunAssetAction(runID, assetID, action string) (*models.ScanWorkItem, error) {
-	row := q.db.QueryRow(`
-		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
-		FROM scan_work_items WHERE run_id = ? AND asset_id = ? AND action = ?`, runID, assetID, action)
-	w := &models.ScanWorkItem{}
-	var skipReason, stage, errMsg sql.NullString
-	var taskID sql.NullString
-	var startedAt, completedAt sql.NullTime
-	err := row.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &taskID, &w.Status,
-		&skipReason, &stage, &errMsg, &startedAt, &completedAt, &w.CreatedAt)
+	row := q.db.QueryRow(`SELECT `+scanWorkItemColumns+` FROM scan_work_items WHERE run_id = ? AND asset_id = ? AND action = ?`, runID, assetID, action)
+	w, err := scanWorkItemRow(row)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	applyScanWorkItemNullables(w, skipReason, stage, errMsg, taskID, startedAt, completedAt)
-	return w, nil
+	return w, err
 }
 
 // ClaimScanWorkItem atomically transitions pending → running.
@@ -112,9 +94,25 @@ func (q *Queries) UpdateScanWorkItemError(id string, status models.WorkStatus, e
 }
 
 func (q *Queries) ListScanWorkItemsByRun(runID string) ([]*models.ScanWorkItem, error) {
-	rows, err := q.db.Query(`
-		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
-		FROM scan_work_items WHERE run_id = ? ORDER BY created_at`, runID)
+	return q.ListScanWorkItemsByRunPaginated(runID, 0, 0)
+}
+
+func (q *Queries) CountScanWorkItemsByRun(runID string) (int, error) {
+	var count int
+	err := q.db.QueryRow(`SELECT COUNT(*) FROM scan_work_items WHERE run_id = ?`, runID).Scan(&count)
+	return count, err
+}
+
+func (q *Queries) ListScanWorkItemsByRunPaginated(runID string, limit, offset int) ([]*models.ScanWorkItem, error) {
+	query := `SELECT ` + scanWorkItemColumns + ` FROM scan_work_items WHERE run_id = ? ORDER BY created_at`
+	var rows *sql.Rows
+	var err error
+	if limit > 0 {
+		query += ` LIMIT ? OFFSET ?`
+		rows, err = q.db.Query(query, runID, limit, offset)
+	} else {
+		rows, err = q.db.Query(query, runID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -123,9 +121,7 @@ func (q *Queries) ListScanWorkItemsByRun(runID string) ([]*models.ScanWorkItem, 
 }
 
 func (q *Queries) ListScanWorkItemsByRunAndStatus(runID string, status models.WorkStatus) ([]*models.ScanWorkItem, error) {
-	rows, err := q.db.Query(`
-		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
-		FROM scan_work_items WHERE run_id = ? AND status = ? ORDER BY created_at`, runID, status)
+	rows, err := q.db.Query(`SELECT `+scanWorkItemColumns+` FROM scan_work_items WHERE run_id = ? AND status = ? ORDER BY created_at`, runID, status)
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +130,7 @@ func (q *Queries) ListScanWorkItemsByRunAndStatus(runID string, status models.Wo
 }
 
 func (q *Queries) ListScanWorkItemsByAsset(runID, assetID string) ([]*models.ScanWorkItem, error) {
-	rows, err := q.db.Query(`
-		SELECT id, run_id, project_id, asset_id, action, task_id, status, skip_reason, stage, error, started_at, completed_at, created_at
-		FROM scan_work_items WHERE run_id = ? AND asset_id = ? ORDER BY started_at`, runID, assetID)
+	rows, err := q.db.Query(`SELECT `+scanWorkItemColumns+` FROM scan_work_items WHERE run_id = ? AND asset_id = ? ORDER BY started_at`, runID, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -247,18 +241,42 @@ func (q *Queries) UpdatePipelineRunStageWorkCounts(runID, stage string, workTota
 func scanWorkItemRows(rows *sql.Rows) ([]*models.ScanWorkItem, error) {
 	var list []*models.ScanWorkItem
 	for rows.Next() {
-		w := &models.ScanWorkItem{}
-		var skipReason, stage, errMsg sql.NullString
-		var taskID sql.NullString
-		var startedAt, completedAt sql.NullTime
-		if err := rows.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &taskID, &w.Status,
-			&skipReason, &stage, &errMsg, &startedAt, &completedAt, &w.CreatedAt); err != nil {
+		w, err := scanWorkItemRow(rows)
+		if err != nil {
 			return nil, err
 		}
-		applyScanWorkItemNullables(w, skipReason, stage, errMsg, taskID, startedAt, completedAt)
 		list = append(list, w)
 	}
 	return list, rows.Err()
+}
+
+func scanWorkItemRow(scanner interface{ Scan(dest ...any) error }) (*models.ScanWorkItem, error) {
+	w := &models.ScanWorkItem{}
+	var skipReason, stage, errMsg sql.NullString
+	var taskID, inputFile, memberAssetIDs, bucketKey sql.NullString
+	var generation sql.NullInt64
+	var batchMode int
+	var startedAt, completedAt sql.NullTime
+	if err := scanner.Scan(&w.ID, &w.RunID, &w.ProjectID, &w.AssetID, &w.Action, &taskID, &w.Status,
+		&skipReason, &stage, &errMsg, &inputFile, &memberAssetIDs, &bucketKey, &generation, &batchMode,
+		&startedAt, &completedAt, &w.CreatedAt); err != nil {
+		return nil, err
+	}
+	if inputFile.Valid {
+		w.InputFile = inputFile.String
+	}
+	if memberAssetIDs.Valid {
+		w.MemberAssetIDs = memberAssetIDs.String
+	}
+	if bucketKey.Valid {
+		w.BucketKey = bucketKey.String
+	}
+	if generation.Valid {
+		w.Generation = int(generation.Int64)
+	}
+	w.BatchMode = batchMode != 0
+	applyScanWorkItemNullables(w, skipReason, stage, errMsg, taskID, startedAt, completedAt)
+	return w, nil
 }
 
 func applyScanWorkItemNullables(w *models.ScanWorkItem, skipReason, stage, errMsg, taskID sql.NullString, startedAt, completedAt sql.NullTime) {
