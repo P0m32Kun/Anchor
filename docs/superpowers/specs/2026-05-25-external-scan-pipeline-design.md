@@ -1,9 +1,10 @@
 ---
-status: in_review
+status: superseded
 source_of_truth: false
 owner: kun
-last_updated: 2026-05-29
+last_updated: 2026-06-17
 scope: external-scan-pipeline
+reason: "执行模型已被 asset-driven-scan-engine-design 取代"
 verification: pending_implementation
 supersedes: informal chat design 2026-05-25
 execution_model_superseded_by: docs/superpowers/specs/2026-05-29-asset-driven-scan-engine-design.md

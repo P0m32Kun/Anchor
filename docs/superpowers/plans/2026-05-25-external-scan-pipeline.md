@@ -1,3 +1,12 @@
+---
+status: superseded
+source_of_truth: false
+owner: kun
+last_updated: 2026-06-17
+scope: external-scan-pipeline
+reason: "执行模型已被 asset-driven-scan-engine-design 取代"
+---
+
 # 外网扫描管线 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

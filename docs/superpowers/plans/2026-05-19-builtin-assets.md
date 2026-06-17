@@ -1,3 +1,12 @@
+---
+status: accepted
+source_of_truth: false
+owner: kun
+last_updated: 2026-06-17
+scope: builtin-dict-templates-fingerprints
+reason: "设计已批准，实现计划已执行"
+---
+
 # 团队内置资源 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

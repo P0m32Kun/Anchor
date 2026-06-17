@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: cancelled
 source_of_truth: false
 owner: kun
 created: 2026-06-13

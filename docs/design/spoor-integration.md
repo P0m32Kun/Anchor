@@ -1,9 +1,10 @@
 ---
-status: active
-source_of_truth: true
+status: in_review
+source_of_truth: false
 owner: kun
-last_updated: 2026-06-01
+last_updated: 2026-06-17
 scope: scanengine
+reason: "位于 design/（候选方案区），不应标记为 active+sot；待迁移到 current/ 或确认实现后再提升"
 ---
 
 # Spoor 工具集成设计
