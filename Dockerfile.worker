@@ -38,13 +38,14 @@ ARG SPOOR_VERSION=0.2.0
 # - postgresql-client: PostgreSQL 弱口令验证
 # - python3: Python code 模板
 # - jq: JSON 处理
+# - chromium: headless 浏览器，截图归档功能需要
 RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
     && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
     ca-certificates libpcap0.8 nmap wget curl unzip \
     telnet netcat-openbsd openssh-client \
     redis-tools default-mysql-client postgresql-client \
-    python3 jq \
+    python3 jq chromium \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 

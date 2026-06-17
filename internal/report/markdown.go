@@ -249,6 +249,9 @@ func writeSectionCN(sb *strings.Builder, num int, section *ReportSection) {
 		}
 	}
 
+	// 证据
+	writeEvidenceSection(sb, section)
+
 	// 底部元数据
 	var meta []string
 	if section.Template != nil {
@@ -304,6 +307,57 @@ func writeAffectedAssetsTable(sb *strings.Builder, section *ReportSection) {
 
 		fmt.Fprintf(sb, "| %s | %s | %s | %s |\n", assetVal, portVal, urlVal, ruleVal)
 	}
+	sb.WriteString("\n")
+}
+
+// writeEvidenceSection renders evidence (screenshots, notes, files) for the section.
+// Raw HTTP request/response evidence is excluded from the human-friendly report.
+func writeEvidenceSection(sb *strings.Builder, section *ReportSection) {
+	var screenshots, notes, files []*models.Evidence
+	for _, rf := range section.Findings {
+		for _, ev := range rf.EvidenceList {
+			switch ev.Type {
+			case models.EvidenceScreenshot:
+				screenshots = append(screenshots, ev)
+			case models.EvidenceNote:
+				notes = append(notes, ev)
+			case models.EvidenceFile:
+				files = append(files, ev)
+			}
+		}
+	}
+	if len(screenshots) == 0 && len(notes) == 0 && len(files) == 0 {
+		return
+	}
+
+	sb.WriteString("**证据**\n\n")
+
+	// Screenshot evidence — show URL and dimensions from excerpt
+	for _, ev := range screenshots {
+		excerpt := strings.TrimSpace(ev.Excerpt)
+		if excerpt == "" {
+			excerpt = "截图证据"
+		}
+		fmt.Fprintf(sb, "- 📷 %s\n", escapeMDTable(excerpt))
+	}
+
+	// Note evidence
+	for _, ev := range notes {
+		excerpt := strings.TrimSpace(ev.Excerpt)
+		if excerpt != "" {
+			fmt.Fprintf(sb, "- 📝 %s\n", escapeMDTable(excerpt))
+		}
+	}
+
+	// File evidence
+	for _, ev := range files {
+		excerpt := strings.TrimSpace(ev.Excerpt)
+		if excerpt == "" {
+			excerpt = "附件文件"
+		}
+		fmt.Fprintf(sb, "- 📎 %s\n", escapeMDTable(excerpt))
+	}
+
 	sb.WriteString("\n")
 }
 

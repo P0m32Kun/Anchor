@@ -113,6 +113,11 @@ func (q *Queries) UpdateFindingEvidence(id string, severity models.FindingSeveri
 	return err
 }
 
+func (q *Queries) UpdateFindingWebEndpointID(findingID, webEndpointID string) error {
+	_, err := q.db.Exec(`UPDATE findings SET web_endpoint_id = ? WHERE id = ?`, webEndpointID, findingID)
+	return err
+}
+
 func (q *Queries) ListFindingsByProject(projectID string) ([]*models.Finding, error) {
 	rows, err := q.db.Query(
 		"SELECT "+findingColumns+" FROM findings WHERE project_id = ? ORDER BY priority DESC, created_at DESC", projectID)

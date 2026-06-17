@@ -222,6 +222,49 @@ type Screenshot struct {
 	TakenAt       time.Time `json:"taken_at" db:"taken_at"`
 }
 
+// --- ScanDiffResult ---
+
+type ScanAssetDiffItem struct {
+	Asset       Asset  `json:"asset"`
+	RunID       string `json:"run_id"`
+	DiscoveredAt string `json:"discovered_at"`
+}
+
+type ScanFindingDiffItem struct {
+	Finding Finding `json:"finding"`
+}
+
+type ScanDiffAssets struct {
+	Added     []ScanAssetDiffItem    `json:"added"`
+	Removed   []ScanAssetDiffItem    `json:"removed"`
+	Unchanged []ScanAssetDiffItem    `json:"unchanged"`
+}
+
+type ScanDiffFindings struct {
+	Added     []ScanFindingDiffItem `json:"added"`
+	Removed   []ScanFindingDiffItem `json:"removed"`
+	Unchanged []ScanFindingDiffItem `json:"unchanged"`
+}
+
+type ScanDiffSummary struct {
+	AssetsAdded      int `json:"assets_added"`
+	AssetsRemoved    int `json:"assets_removed"`
+	AssetsUnchanged  int `json:"assets_unchanged"`
+	FindingsAdded    int `json:"findings_added"`
+	FindingsRemoved  int `json:"findings_removed"`
+	FindingsUnchanged int `json:"findings_unchanged"`
+}
+
+type ScanDiffResult struct {
+	BaseRunID   string            `json:"base_run_id"`
+	TargetRunID string            `json:"target_run_id"`
+	BaseRun     *PipelineRun      `json:"base_run"`
+	TargetRun   *PipelineRun      `json:"target_run"`
+	Assets      ScanDiffAssets    `json:"assets"`
+	Findings    ScanDiffFindings  `json:"findings"`
+	Summary     ScanDiffSummary   `json:"summary"`
+}
+
 // --- AuditLog ---
 
 type AuditLog struct {

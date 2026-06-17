@@ -8,6 +8,7 @@ import {
   ConfirmDialog,
   Button,
   ScanModal,
+  ScanDiffView,
   Card,
   CardHeader,
   CardTitle,
@@ -44,6 +45,7 @@ import {
   Download,
   Copy,
   Eye,
+  GitBranch,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -88,6 +90,9 @@ export default function RunsPage() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTargetRun, setCancelTargetRun] = useState<PipelineRun | null>(null);
+
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
 
   const [inspectingTask, setInspectingTask] = useState<ScanTask | null>(null);
   const [inspectingLogs, setInspectingLogs] = useState<string>("");
@@ -514,6 +519,39 @@ export default function RunsPage() {
                 <History className="h-5 w-5 text-muted-foreground" />
                 执行历史
             </h2>
+            <div className="flex items-center gap-2">
+              {compareMode && selectedForCompare.length === 2 && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setSelectedForCompare([]);
+                    setCompareMode(false);
+                  }}
+                >
+                  <XCircle className="mr-1 h-3 w-3" />
+                  关闭对比
+                </Button>
+              )}
+              <Button
+                variant={compareMode ? "secondary" : "outline"}
+                size="sm"
+                className={cn("h-7 text-xs", compareMode && "ring-1 ring-primary")}
+                onClick={() => {
+                  setCompareMode(!compareMode);
+                  if (!compareMode) {
+                    setSelectedRun(null);
+                    setSelectedForCompare([]);
+                  } else {
+                    setSelectedForCompare([]);
+                  }
+                }}
+              >
+                <GitBranch className="mr-1 h-3 w-3" />
+                对比
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -527,16 +565,42 @@ export default function RunsPage() {
                     />
                 </Card>
             ) : (
-                runs.map((run) => (
+                runs.map((run) => {
+                    const isSelectedForCompare = selectedForCompare.includes(run.id);
+                    return (
                     <Card 
                         key={run.id} 
                         className={cn(
-                            "group cursor-pointer transition-all hover:border-primary/50",
-                            selectedRun === run.id && "ring-1 ring-primary border-primary shadow-sm bg-primary/[0.02]"
+                            "group transition-all hover:border-primary/50",
+                            compareMode ? "cursor-pointer" : "cursor-pointer",
+                            compareMode && isSelectedForCompare && "ring-2 ring-primary border-primary bg-primary/[0.04]",
+                            !compareMode && selectedRun === run.id && "ring-1 ring-primary border-primary shadow-sm bg-primary/[0.02]"
                         )}
-                        onClick={() => loadRunDetails(run.id)}
+                        onClick={() => {
+                            if (compareMode) {
+                                if (isSelectedForCompare) {
+                                    setSelectedForCompare(selectedForCompare.filter(id => id !== run.id));
+                                } else if (selectedForCompare.length < 2) {
+                                    setSelectedForCompare([...selectedForCompare, run.id]);
+                                }
+                            } else {
+                                loadRunDetails(run.id);
+                            }
+                        }}
                     >
                         <CardContent className="p-4 flex items-center justify-between gap-4">
+                            {compareMode && (
+                                <div className={cn(
+                                    "h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
+                                    isSelectedForCompare
+                                        ? "bg-primary border-primary"
+                                        : "border-muted-foreground/30"
+                                )}>
+                                    {isSelectedForCompare && (
+                                        <CheckCircle2 className="h-4 w-4 text-white" />
+                                    )}
+                                </div>
+                            )}
                             <div className="flex items-center gap-4 flex-1">
                                 <div className={cn(
                                     "h-10 w-10 rounded-full flex items-center justify-center shrink-0 border",
@@ -625,11 +689,32 @@ export default function RunsPage() {
                             </div>
                         </CardContent>
                     </Card>
-                ))
+                    );
+                })
             )}
           </div>
         </section>
 
+        {compareMode && selectedForCompare.length === 2 ? (
+          <aside className="space-y-6">
+            {(() => {
+              const baseRun = runs.find(r => r.id === selectedForCompare[0]);
+              const targetRun = runs.find(r => r.id === selectedForCompare[1]);
+              if (!baseRun || !targetRun) return null;
+              return (
+                <ScanDiffView
+                  projectId={projectId!}
+                  baseRun={baseRun}
+                  targetRun={targetRun}
+                  onClose={() => {
+                    setSelectedForCompare([]);
+                    setCompareMode(false);
+                  }}
+                />
+              );
+            })()}
+          </aside>
+        ) : (
         <aside className="space-y-6">
             <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
                 <Terminal className="h-5 w-5 text-muted-foreground" />
@@ -973,6 +1058,7 @@ export default function RunsPage() {
                 </div>
             )}
         </aside>
+        )}
       </div>
 
       <ScanModal

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -310,11 +312,20 @@ func (e *ScanEngine) processHTTPXOutput(ctx context.Context, parentForInput func
 			continue
 		}
 		ep.AssetID = hostAsset.ID
-		if _, _, err := e.merger.CreateWebEndpointIfNotExists(
+		if _, created, err := e.merger.CreateWebEndpointIfNotExists(
 			e.projectID, hostAsset.ID, ep.URL, ep.Scheme, ep.Host,
 			ep.Port, ep.Path, ep.Title, ep.StatusCode, ep.Technologies, "httpx",
 		); err != nil {
 			log.Printf("[scanengine] save web endpoint %s: %v", ep.URL, err)
+		} else if created && e.screenshotMgr != nil && !e.skipScreenshots() {
+			endpoint := ep
+			go func() {
+				bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				if _, err := e.screenshotMgr.CaptureForEndpoint(bgCtx, endpoint, 30*time.Second); err != nil {
+					log.Printf("[scanengine] screenshot %s: %v", endpoint.URL, err)
+				}
+			}()
 		}
 
 		attrs := core.AssetAttrs{Fingerprinted: true}
@@ -418,7 +429,7 @@ func (e *ScanEngine) onBatchNucleiComplete(ctx context.Context, w *models.ScanWo
 				}
 			}
 		}
-		created, updated, err := e.nucleiPersist.Persist(e.projectID, e.runID, taskID, assetID, []byte(nr.RawLine+"\n"))
+		created, updated, findingURLs, err := e.nucleiPersist.Persist(e.projectID, e.runID, taskID, assetID, []byte(nr.RawLine+"\n"))
 		if err != nil {
 			log.Printf("[scanengine] persist nuclei finding: %v", err)
 			continue
@@ -426,6 +437,89 @@ func (e *ScanEngine) onBatchNucleiComplete(ctx context.Context, w *models.ScanWo
 		if created+updated > 0 {
 			log.Printf("[scanengine] nuclei batch finding asset=%s created=%d updated=%d", assetID, created, updated)
 		}
+		for _, fu := range findingURLs {
+			e.linkFindingToScreenshot(fu.FindingID, fu.URL)
+		}
 	}
 	_ = ctx
+}
+
+// linkFindingToScreenshot tries to match a finding to its web endpoint and
+// link any existing screenshot as evidence.
+func (e *ScanEngine) linkFindingToScreenshot(findingID, matchedURL string) {
+	if e.screenshotMgr == nil || e.skipScreenshots() {
+		return
+	}
+
+	// Try exact URL match first, then strip query string, then try host-based variants.
+	candidates := candidateURLs(matchedURL)
+	for _, u := range candidates {
+		ep, err := e.queries.GetWebEndpointByURL(e.projectID, u)
+		if err != nil {
+			continue
+		}
+		if ep == nil {
+			continue
+		}
+
+		// Link finding to web endpoint.
+		if err := e.queries.UpdateFindingWebEndpointID(findingID, ep.ID); err != nil {
+			log.Printf("[scanengine] link finding %s to web endpoint %s: %v", findingID, ep.ID, err)
+		}
+
+		// If the web endpoint has a screenshot, add it as evidence.
+		ss, err := e.queries.GetScreenshotByURL(e.projectID, u)
+		if err != nil || ss == nil {
+			return
+		}
+		if _, err := e.screenshotMgr.AddScreenshotEvidence(context.Background(), findingID, ss); err != nil {
+			log.Printf("[scanengine] add screenshot evidence %s: %v", findingID, err)
+		}
+		return
+	}
+}
+
+// candidateURLs generates URL variants for matching against web_endpoints.
+func candidateURLs(matchedAt string) []string {
+	var out []string
+	out = append(out, matchedAt)
+
+	// Strip query string and fragment.
+	if u, err := url.Parse(matchedAt); err == nil {
+		if u.Scheme != "" && u.Host != "" {
+			qs := ""
+			if u.RawQuery != "" {
+				qs = "?" + u.RawQuery
+			}
+			fr := ""
+			if u.Fragment != "" {
+				fr = "#" + u.Fragment
+			}
+			if qs != "" || fr != "" {
+				base := fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, u.Path)
+				out = append(out, base)
+			}
+			// Also try just scheme + host.
+			schemeHost := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+			if schemeHost != matchedAt {
+				out = append(out, schemeHost)
+			}
+			// Also try the alternate scheme.
+			altScheme := "https"
+			if u.Scheme == "https" {
+				altScheme = "http"
+			}
+			altHost := fmt.Sprintf("%s://%s", altScheme, u.Host)
+			if altHost != matchedAt {
+				out = append(out, altHost)
+			}
+		}
+	}
+	return out
+}
+
+// skipScreenshots returns true if auto-screenshot capture is disabled.
+// Controlled by ANCHOR_SKIP_SCREENSHOTS=1 or ANCHOR_NO_BROWSER=1 env vars.
+func (e *ScanEngine) skipScreenshots() bool {
+	return os.Getenv("ANCHOR_SKIP_SCREENSHOTS") == "1" || os.Getenv("ANCHOR_NO_BROWSER") == "1"
 }

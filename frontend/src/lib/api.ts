@@ -616,6 +616,10 @@ export const api = {
   getScanRun: (projectId: string, runId: string, signal?: AbortSignal) =>
     fetchAPI<PipelineRun>(`/projects/${projectId}/pipeline/runs/${runId}`, { signal }),
 
+  // --- Scan Diff ---
+  getScanDiff: (projectId: string, baseRunId: string, targetRunId: string, signal?: AbortSignal) =>
+    fetchAPI<ScanDiffResult>(`/projects/${projectId}/scan/diff?base=${baseRunId}&target=${targetRunId}`, { signal }),
+
   // --- Retest ---
   retestFinding: (id: string, signal?: AbortSignal) =>
     fetchAPI<any>(`/findings/${id}/retest`, { method: "POST", signal }),
@@ -846,6 +850,41 @@ export interface PhaseCoverage {
   total: number;
   done: number;
   pct: number;
+}
+
+export interface ScanDiffAssetItem {
+  asset: Asset;
+  run_id: string;
+  discovered_at?: string;
+}
+
+export interface ScanDiffFindingItem {
+  finding: Finding;
+}
+
+export interface ScanDiffResult {
+  base_run_id: string;
+  target_run_id: string;
+  base_run: PipelineRun;
+  target_run: PipelineRun;
+  assets: {
+    added: ScanDiffAssetItem[];
+    removed: ScanDiffAssetItem[];
+    unchanged: ScanDiffAssetItem[];
+  };
+  findings: {
+    added: ScanDiffFindingItem[];
+    removed: ScanDiffFindingItem[];
+    unchanged: ScanDiffFindingItem[];
+  };
+  summary: {
+    assets_added: number;
+    assets_removed: number;
+    assets_unchanged: number;
+    findings_added: number;
+    findings_removed: number;
+    findings_unchanged: number;
+  };
 }
 
 export interface RunSummaryResponse {

@@ -24,6 +24,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/scope"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/recovery"
 	"github.com/P0m32Kun/Anchor/internal/service"
+	"github.com/P0m32Kun/Anchor/internal/watch"
 	"github.com/P0m32Kun/Anchor/internal/worker"
 )
 
@@ -117,6 +118,10 @@ type Server struct {
 	httpxFpMgr *httpxfp.Manager
 	// excludeMgr 消费者: exclude_handlers.go
 	excludeMgr *exclude.Manager
+
+	// watcher: 定时扫描调度器
+	// 消费者: (后台 goroutine，由 NewServer 启动)
+	watcher *watch.Watcher
 }
 
 func generateAPIToken() string {
@@ -198,6 +203,25 @@ func NewServer(queries *db.Queries, rawDB *sql.DB, dataDir string) *Server {
 	}
 	go s.cleanupStaleWorkers()
 	go s.startWorkdirCleanup()
+
+	// Start watch scheduler for periodic asset monitoring.
+	s.watcher = watch.NewWatcher(queries, s.worker, s.assetMerger, s.excludeMgr, s.scopeEng, dataDir)
+	s.watcher.SetOnScanStarted(func(projectID, runID, mode string) {
+		s.broadcastProjectSSE(projectID, map[string]interface{}{
+			"event":  "watch_scan_started",
+			"run_id": runID,
+			"mode":   mode,
+			"time":   time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+	s.watcher.SetOnScanCompleted(func(projectID, runID string) {
+		s.broadcastProjectSSE(projectID, map[string]interface{}{
+			"event":  "watch_scan_completed",
+			"run_id": runID,
+			"time":   time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+	go s.watcher.Start(context.Background())
 	return s
 }
 
@@ -288,6 +312,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /projects", auth(http.HandlerFunc(s.handleListProjects)))
 	mux.Handle("GET /projects/{id}", auth(http.HandlerFunc(s.handleGetProject)))
 	mux.Handle("DELETE /projects/{id}", auth(http.HandlerFunc(s.handleDeleteProject)))
+	mux.Handle("GET /projects/{id}/watch-config", auth(http.HandlerFunc(s.handleGetWatchConfig)))
+	mux.Handle("PATCH /projects/{id}/watch-config", auth(http.HandlerFunc(s.handleUpdateWatchConfig)))
 	mux.Handle("POST /projects/{id}/targets", auth(http.HandlerFunc(s.handleCreateTarget)))
 	mux.Handle("POST /projects/{id}/targets/import", auth(http.HandlerFunc(s.handleImportTargets)))
 	mux.Handle("GET /projects/{id}/targets", auth(http.HandlerFunc(s.handleListTargets)))
@@ -310,6 +336,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/summary", auth(http.HandlerFunc(s.handleGetRunSummary)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/works", auth(http.HandlerFunc(s.handleListScanRunWorks)))
 	mux.Handle("GET /projects/{id}/pipeline/runs/{runId}/tool-calls", auth(http.HandlerFunc(s.handleListToolCallLogs)))
+	mux.Handle("GET /projects/{id}/scan/diff", auth(http.HandlerFunc(s.handleScanDiff)))
 	mux.Handle("GET /assets/{id}/works", auth(http.HandlerFunc(s.handleListAssetWorks)))
 	mux.Handle("POST /projects/{id}/pipeline/runs/{runId}/cancel", auth(http.HandlerFunc(s.handleCancelPipelineRun)))
 	mux.Handle("GET /projects/{id}/pipeline/config", auth(http.HandlerFunc(s.handleGetPipelineConfig)))
@@ -347,6 +374,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	// SSE token issuance (requires standard auth)
 	mux.Handle("POST /projects/{id}/sse-token", auth(http.HandlerFunc(s.handleIssueSSEToken)))
 	mux.Handle("GET /projects/{id}/reports/export.md", auth(http.HandlerFunc(s.handleExportReportMD)))
+	mux.Handle("POST /projects/{id}/screenshots/capture", auth(http.HandlerFunc(s.handleScreenshotCapture)))
+	mux.Handle("GET /projects/{id}/screenshots", auth(http.HandlerFunc(s.handleListScreenshots)))
+	mux.Handle("GET /screenshots/{id}/{kind}", auth(http.HandlerFunc(s.handleScreenshotFile)))
+	mux.Handle("GET /screenshots/content", auth(http.HandlerFunc(s.handleScreenshotContent)))
 	mux.Handle("POST /projects/{id}/archive", auth(http.HandlerFunc(s.handleCreateArchive)))
 	mux.Handle("GET /projects/{id}/archive/download", auth(http.HandlerFunc(s.handleDownloadArchive)))
 	mux.Handle("GET /tool-templates", auth(http.HandlerFunc(s.handleListToolTemplates)))

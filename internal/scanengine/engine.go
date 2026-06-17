@@ -17,8 +17,9 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/exclude"
 	"github.com/P0m32Kun/Anchor/internal/finding"
 	"github.com/P0m32Kun/Anchor/internal/models"
-	"github.com/P0m32Kun/Anchor/internal/scope"
 	"github.com/P0m32Kun/Anchor/internal/parser"
+	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/screenshot"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/dedup"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/domainpool"
@@ -72,6 +73,7 @@ type ScanEngine struct {
 	excludeMgr     *exclude.Manager
 	scopeEng       *scope.Engine
 	nucleiPersist  *finding.NucleiPersister
+	screenshotMgr  *screenshot.Manager
 	dataDir        string
 	runID          string
 	projectID      string
@@ -159,6 +161,7 @@ func NewWithExecutor(
 		excludeMgr:      excludeMgr,
 		scopeEng:        scopeEng,
 		nucleiPersist:   finding.NewNucleiPersister(queries, dataDir),
+		screenshotMgr:   screenshot.NewManager(queries, dataDir),
 		dataDir:         dataDir,
 		runID:           runID,
 		projectID:       projectID,
@@ -659,11 +662,14 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 		if w.TaskID != nil {
 			taskID = *w.TaskID
 		}
-		created, updated, err := e.nucleiPersist.Persist(e.projectID, e.runID, taskID, w.AssetID, stdout)
+		created, updated, findingURLs, err := e.nucleiPersist.Persist(e.projectID, e.runID, taskID, w.AssetID, stdout)
 		if err != nil {
 			log.Printf("[scanengine] persist nuclei: %v", err)
 		} else if created+updated > 0 {
 			log.Printf("[scanengine] nuclei findings created=%d updated=%d", created, updated)
+		}
+		for _, fu := range findingURLs {
+			e.linkFindingToScreenshot(fu.FindingID, fu.URL)
 		}
 
 	case core.ActionSpoorScan:

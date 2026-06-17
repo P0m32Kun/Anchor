@@ -395,6 +395,51 @@ func (q *Queries) ListScreenshotsByProject(projectID string) ([]*models.Screensh
 	return list, rows.Err()
 }
 
+func (q *Queries) GetScreenshot(id string) (*models.Screenshot, error) {
+	s := &models.Screenshot{}
+	var assetID, taskID sql.NullString
+	err := q.db.QueryRow(`
+		SELECT id, project_id, asset_id, task_id, url, original_path, thumbnail_path, width, height, taken_at
+		FROM screenshots WHERE id = ?`, id).Scan(
+		&s.ID, &s.ProjectID, &assetID, &taskID, &s.URL, &s.OriginalPath, &s.ThumbnailPath, &s.Width, &s.Height, &s.TakenAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if assetID.Valid {
+		s.AssetID = &assetID.String
+	}
+	if taskID.Valid {
+		s.TaskID = &taskID.String
+	}
+	return s, nil
+}
+
+func (q *Queries) GetScreenshotByURL(projectID, url string) (*models.Screenshot, error) {
+	s := &models.Screenshot{}
+	var assetID, taskID sql.NullString
+	err := q.db.QueryRow(`
+		SELECT id, project_id, asset_id, task_id, url, original_path, thumbnail_path, width, height, taken_at
+		FROM screenshots WHERE project_id = ? AND url = ?
+		ORDER BY taken_at DESC LIMIT 1`, projectID, url).Scan(
+		&s.ID, &s.ProjectID, &assetID, &taskID, &s.URL, &s.OriginalPath, &s.ThumbnailPath, &s.Width, &s.Height, &s.TakenAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if assetID.Valid {
+		s.AssetID = &assetID.String
+	}
+	if taskID.Valid {
+		s.TaskID = &taskID.String
+	}
+	return s, nil
+}
+
 // --- v0.4 Pipeline tables ---
 
 func (q *Queries) SaveDNSRecord(r *models.DNSRecord) error {

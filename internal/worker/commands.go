@@ -297,6 +297,27 @@ func BuildKatanaCommand(listFile string, depth, rateLimit, timeoutSec int) []str
 	return args
 }
 
+// BuildScreenshotCommand builds a headless Chromium screenshot command.
+// url is the target URL; outputFile is the absolute path for the output PNG.
+func BuildScreenshotCommand(url, outputFile string, width, height int) []string {
+	if width <= 0 {
+		width = 1920
+	}
+	if height <= 0 {
+		height = 1080
+	}
+	return []string{
+		"chromium",
+		"--headless",
+		"--disable-gpu",
+		"--no-sandbox",
+		fmt.Sprintf("--screenshot=%s", outputFile),
+		fmt.Sprintf("--window-size=%d,%d", width, height),
+		"--hide-scrollbars",
+		url,
+	}
+}
+
 // appendRateLimitArgs appends tool-specific rate limit flags to the argument list.
 // Only adds flags when rate > 0 and the tool supports it.
 func appendRateLimitArgs(args []string, tool string, rate int) []string {

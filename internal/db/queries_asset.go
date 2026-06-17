@@ -165,6 +165,18 @@ func scanPorts(rows *sql.Rows) ([]*models.Port, error) {
 	return list, rows.Err()
 }
 
+func (q *Queries) CountPortsByProject(projectID string) (int, error) {
+	var count int
+	row := q.db.QueryRow(`
+		SELECT COUNT(*) FROM ports p
+		JOIN assets a ON p.asset_id = a.id
+		WHERE a.project_id = ?`, projectID)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (q *Queries) PortExists(assetID string, port int) (bool, error) {
 	row := q.db.QueryRow(`SELECT COUNT(1) FROM ports WHERE asset_id = ? AND port = ?`, assetID, port)
 	var count int
@@ -175,6 +187,18 @@ func (q *Queries) PortExists(assetID string, port int) (bool, error) {
 }
 
 // --- Services ---
+
+func (q *Queries) CountServicesByProject(projectID string) (int, error) {
+	var count int
+	row := q.db.QueryRow(`
+		SELECT COUNT(*) FROM services s
+		JOIN assets a ON s.asset_id = a.id
+		WHERE a.project_id = ?`, projectID)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
 
 func (q *Queries) CreateService(s *models.Service) error {
 	_, err := q.db.Exec(`INSERT INTO services (id, asset_id, port_id, name, product, version, banner, confidence, source_tool, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -268,6 +292,11 @@ func (q *Queries) ListWebEndpointsByProjectPaginated(projectID string, limit, of
 	return scanWebEndpoints(rows)
 }
 
+func (q *Queries) UpdateWebEndpointScreenshotArtifactID(weID, artifactID string) error {
+	_, err := q.db.Exec(`UPDATE web_endpoints SET screenshot_artifact_id = ? WHERE id = ?`, artifactID, weID)
+	return err
+}
+
 func (q *Queries) WebEndpointExists(projectID, url string) (bool, error) {
 	row := q.db.QueryRow(`SELECT COUNT(1) FROM web_endpoints WHERE project_id = ? AND url = ?`, projectID, url)
 	var count int
@@ -275,6 +304,37 @@ func (q *Queries) WebEndpointExists(projectID, url string) (bool, error) {
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func (q *Queries) GetWebEndpointByURL(projectID, url string) (*models.WebEndpoint, error) {
+	row := q.db.QueryRow(`
+		SELECT id, project_id, asset_id, url, scheme, host, port, path, status_code, title, technologies, screenshot_artifact_id, source_tool, created_at
+		FROM web_endpoints WHERE project_id = ? AND url = ?`, projectID, url)
+	var we models.WebEndpoint
+	var port sql.NullInt64
+	var statusCode sql.NullInt64
+	var screenshotID sql.NullString
+	var techJSON string
+	err := row.Scan(&we.ID, &we.ProjectID, &we.AssetID, &we.URL, &we.Scheme, &we.Host, &port, &we.Path, &statusCode, &we.Title, &techJSON, &screenshotID, &we.SourceTool, &we.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if port.Valid {
+		p := int(port.Int64)
+		we.Port = &p
+	}
+	if statusCode.Valid {
+		sc := int(statusCode.Int64)
+		we.StatusCode = &sc
+	}
+	we.ScreenshotArtifactID = nullableString(screenshotID)
+	if techJSON != "" && techJSON != "null" {
+		_ = json.Unmarshal([]byte(techJSON), &we.Technologies)
+	}
+	return &we, nil
 }
 
 func scanWebEndpoints(rows *sql.Rows) ([]*models.WebEndpoint, error) {

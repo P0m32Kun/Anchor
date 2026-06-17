@@ -41,6 +41,46 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, project)
 }
 
+// GET /projects/{id}/watch-config
+func (s *Server) handleGetWatchConfig(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	// ListWatchEnabledProjects only returns enabled ones; we need to handle both cases.
+	// For a specific project, read watch fields via raw query.
+	proj, err := s.queries.GetWatchProject(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "get watch config: %v", err))
+		return
+	}
+	if proj == nil {
+		writeError(w, http.StatusNotFound, errors.New(errors.ErrNotFound, "Project not found"))
+		return
+	}
+	writeJSON(w, http.StatusOK, proj)
+}
+
+// PATCH /projects/{id}/watch-config
+func (s *Server) handleUpdateWatchConfig(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var req struct {
+		WatchEnabled        bool `json:"watch_enabled"`
+		WatchIntervalHours  int  `json:"watch_interval_hours"`
+		WatchPassiveOnly    bool `json:"watch_passive_only"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.New(errors.ErrBadRequest, "invalid body"))
+		return
+	}
+	if req.WatchIntervalHours <= 0 {
+		req.WatchIntervalHours = 24
+	}
+	if err := s.queries.UpdateProjectWatchConfig(id, req.WatchEnabled, req.WatchIntervalHours, req.WatchPassiveOnly); err != nil {
+		writeError(w, http.StatusInternalServerError, errors.Newf(errors.ErrInternal, "update watch config: %v", err))
+		return
+	}
+	proj, _ := s.queries.GetWatchProject(id)
+	writeJSON(w, http.StatusOK, proj)
+}
+
 func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := s.projectSvc.Delete(r.Context(), id); err != nil {

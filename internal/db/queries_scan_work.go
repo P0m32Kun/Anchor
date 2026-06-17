@@ -2,6 +2,8 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/models"
@@ -298,6 +300,52 @@ func applyScanWorkItemNullables(w *models.ScanWorkItem, skipReason, stage, errMs
 	if completedAt.Valid {
 		w.CompletedAt = &completedAt.Time
 	}
+}
+
+// ListAssetsByRun returns assets discovered during a specific pipeline run,
+// joined through scan_work_items.
+func (q *Queries) ListAssetsByRun(projectID, runID string) ([]*models.Asset, error) {
+	rows, err := q.db.Query(`
+		SELECT DISTINCT a.id, a.project_id, a.type, a.value, a.normalized_value,
+			a.source_tools, a.first_seen, a.last_seen, a.tags
+		FROM assets a
+		INNER JOIN scan_work_items swi ON swi.asset_id = a.id
+		WHERE swi.run_id = ? AND a.project_id = ?
+		ORDER BY a.last_seen DESC`, runID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*models.Asset, 0)
+	for rows.Next() {
+		a, err := scanAssetRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, a)
+	}
+	return list, rows.Err()
+}
+
+// scanAssetRow scans an Asset from a row interface.
+func scanAssetRow(scanner interface{ Scan(dest ...any) error }) (*models.Asset, error) {
+	a := &models.Asset{}
+	var sourceToolsJSON, tagsJSON string
+	if err := scanner.Scan(&a.ID, &a.ProjectID, &a.Type, &a.Value, &a.NormalizedValue,
+		&sourceToolsJSON, &a.FirstSeen, &a.LastSeen, &tagsJSON); err != nil {
+		return nil, err
+	}
+	if sourceToolsJSON != "" {
+		if err := json.Unmarshal([]byte(sourceToolsJSON), &a.SourceTools); err != nil {
+			return nil, fmt.Errorf("unmarshal source_tools: %w", err)
+		}
+	}
+	if tagsJSON != "" {
+		if err := json.Unmarshal([]byte(tagsJSON), &a.Tags); err != nil {
+			return nil, fmt.Errorf("unmarshal tags: %w", err)
+		}
+	}
+	return a, nil
 }
 
 // ToolStats holds aggregated statistics for a single tool.

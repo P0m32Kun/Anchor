@@ -19,6 +19,143 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/toolregistry"
 )
 
+// handleScanDiff compares two pipeline runs: base vs target.
+// GET /projects/{id}/scan/diff?base={runId1}&target={runId2}
+func (s *Server) handleScanDiff(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	baseRunID := r.URL.Query().Get("base")
+	targetRunID := r.URL.Query().Get("target")
+	if projectID == "" || baseRunID == "" || targetRunID == "" {
+		writeError(w, http.StatusBadRequest, errors.New("MISSING_PARAMS", "Project ID, base and target run IDs are required"))
+		return
+	}
+	if baseRunID == targetRunID {
+		writeError(w, http.StatusBadRequest, errors.New("SAME_RUN", "base and target must be different runs"))
+		return
+	}
+
+	// Fetch both runs
+	baseRun, err := s.queries.GetPipelineRun(baseRunID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
+		return
+	}
+	if baseRun == nil || baseRun.ProjectID != projectID {
+		writeError(w, http.StatusNotFound, errors.New("NOT_FOUND", "base run not found"))
+		return
+	}
+
+	targetRun, err := s.queries.GetPipelineRun(targetRunID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
+		return
+	}
+	if targetRun == nil || targetRun.ProjectID != projectID {
+		writeError(w, http.StatusNotFound, errors.New("NOT_FOUND", "target run not found"))
+		return
+	}
+
+	// Fetch assets for both runs
+	baseAssets, err := s.queries.ListAssetsByRun(projectID, baseRunID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
+		return
+	}
+	targetAssets, err := s.queries.ListAssetsByRun(projectID, targetRunID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
+		return
+	}
+
+	// Fetch findings for both runs
+	baseFindings, err := s.queries.ListFindingsByRun(projectID, baseRunID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
+		return
+	}
+	targetFindings, err := s.queries.ListFindingsByRun(projectID, targetRunID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
+		return
+	}
+
+	// Build lookup maps for diff
+	baseAssetMap := make(map[string]*models.Asset)
+	for _, a := range baseAssets {
+		baseAssetMap[a.NormalizedValue] = a
+	}
+	targetAssetMap := make(map[string]*models.Asset)
+	for _, a := range targetAssets {
+		targetAssetMap[a.NormalizedValue] = a
+	}
+
+	baseFindingMap := make(map[string]*models.Finding)
+	for _, f := range baseFindings {
+		baseFindingMap[f.DedupKey] = f
+	}
+	targetFindingMap := make(map[string]*models.Finding)
+	for _, f := range targetFindings {
+		targetFindingMap[f.DedupKey] = f
+	}
+
+	// Compute asset diff
+	var assetsAdded, assetsRemoved, assetsUnchanged []models.ScanAssetDiffItem
+	for nv, a := range targetAssetMap {
+		if _, exists := baseAssetMap[nv]; exists {
+			assetsUnchanged = append(assetsUnchanged, models.ScanAssetDiffItem{Asset: *a, RunID: targetRunID})
+		} else {
+			assetsAdded = append(assetsAdded, models.ScanAssetDiffItem{Asset: *a, RunID: targetRunID})
+		}
+	}
+	for nv, a := range baseAssetMap {
+		if _, exists := targetAssetMap[nv]; !exists {
+			assetsRemoved = append(assetsRemoved, models.ScanAssetDiffItem{Asset: *a, RunID: baseRunID})
+		}
+	}
+
+	// Compute finding diff
+	var findingsAdded, findingsRemoved, findingsUnchanged []models.ScanFindingDiffItem
+	for dk, f := range targetFindingMap {
+		if _, exists := baseFindingMap[dk]; exists {
+			findingsUnchanged = append(findingsUnchanged, models.ScanFindingDiffItem{Finding: *f})
+		} else {
+			findingsAdded = append(findingsAdded, models.ScanFindingDiffItem{Finding: *f})
+		}
+	}
+	for dk, f := range baseFindingMap {
+		if _, exists := targetFindingMap[dk]; !exists {
+			findingsRemoved = append(findingsRemoved, models.ScanFindingDiffItem{Finding: *f})
+		}
+	}
+
+	result := models.ScanDiffResult{
+		BaseRunID:   baseRunID,
+		TargetRunID: targetRunID,
+		BaseRun:     baseRun,
+		TargetRun:   targetRun,
+		Assets: models.ScanDiffAssets{
+			Added:     assetsAdded,
+			Removed:   assetsRemoved,
+			Unchanged: assetsUnchanged,
+		},
+		Findings: models.ScanDiffFindings{
+			Added:     findingsAdded,
+			Removed:   findingsRemoved,
+			Unchanged: findingsUnchanged,
+		},
+		Summary: models.ScanDiffSummary{
+			AssetsAdded:       len(assetsAdded),
+			AssetsRemoved:     len(assetsRemoved),
+			AssetsUnchanged:   len(assetsUnchanged),
+			FindingsAdded:     len(findingsAdded),
+			FindingsRemoved:   len(findingsRemoved),
+			FindingsUnchanged: len(findingsUnchanged),
+		},
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
 // finalizePipelineRun sets the terminal pipeline run status after the scan engine exits.
 // It never marks a run completed while work items are still pending.
 func (s *Server) finalizePipelineRun(runID string, runErr error) {

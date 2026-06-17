@@ -17,6 +17,12 @@ import (
 
 const maxEvidenceSize = 10 * 1024 * 1024
 
+// FindingURL holds the finding ID and its matched URL for post-persist linking.
+type FindingURL struct {
+	FindingID string
+	URL       string // MatchedAt value from the nuclei result
+}
+
 // NucleiPersister saves Nuclei JSONL results as Findings and Evidence artifacts.
 type NucleiPersister struct {
 	queries *db.Queries
@@ -33,7 +39,9 @@ func NewNucleiPersister(queries *db.Queries, dataDir string) *NucleiPersister {
 }
 
 // Persist parses stdout and upserts findings for the given run/task.
-func (p *NucleiPersister) Persist(projectID, runID, taskID, assetID string, stdout []byte) (created, updated int, err error) {
+// Returns created/updated counts, a list of finding URLs for post-persist
+// web-endpoint/screenshot linking, and any error.
+func (p *NucleiPersister) Persist(projectID, runID, taskID, assetID string, stdout []byte) (created, updated int, findings []FindingURL, err error) {
 	results, parseErrs := parser.ParseNuclei(strings.NewReader(string(stdout)))
 	for _, pe := range parseErrs {
 		_ = pe
@@ -105,8 +113,11 @@ func (p *NucleiPersister) Persist(projectID, runID, taskID, assetID string, stdo
 				_ = p.saveEvidence(workdir, projectID, taskID, findingID, models.EvidenceResponse, nr.Response)
 			}
 		}
+		if nr.MatchedAt != "" {
+			findings = append(findings, FindingURL{FindingID: findingID, URL: nr.MatchedAt})
+		}
 	}
-	return created, updated, nil
+	return created, updated, findings, nil
 }
 
 func (p *NucleiPersister) saveEvidence(workdir, projectID, taskID, findingID string, evType models.EvidenceType, data string) error {

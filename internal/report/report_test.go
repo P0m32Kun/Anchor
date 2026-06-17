@@ -206,16 +206,44 @@ func TestGenerateMarkdown_NilAssetAndEndpoint(t *testing.T) {
 }
 
 func TestGenerateMarkdown_NoEvidenceSection(t *testing.T) {
-	// New human-friendly format removes raw evidence (request/response) entirely.
-	// Verify the section header and any evidence excerpt content are absent.
+	// Human-friendly format renders only useful evidence (screenshots, notes, files).
+	// Raw HTTP request/response evidence is excluded.
+	// The test data contains only request/response evidence — so no evidence section appears.
 	data := testReportData()
 	md := GenerateMarkdown(data)
 
-	if strings.Contains(md, "**证据链**") || strings.Contains(md, "证据链") {
-		t.Error("evidence section should be removed from the human-friendly report")
-	}
 	if strings.Contains(md, "GET / HTTP/1.1") || strings.Contains(md, "X-Powered-By: Express") {
 		t.Error("raw evidence excerpts should not appear in the human-friendly report")
+	}
+}
+
+func TestGenerateMarkdown_WithScreenshotEvidence(t *testing.T) {
+	data := testReportData()
+	now := time.Now()
+	screenshotEv := &models.Evidence{
+		ID:        "ev-003",
+		FindingID: "finding-001",
+		Type:      models.EvidenceScreenshot,
+		Excerpt:   "截图: https://example.com/login (1920x1080)",
+		CreatedBy: "screenshot_bot",
+		CreatedAt: now,
+	}
+	data.Findings[0].EvidenceList = append(data.Findings[0].EvidenceList, screenshotEv)
+	data.Sections[0].Findings[0].EvidenceList = append(data.Sections[0].Findings[0].EvidenceList, screenshotEv)
+	md := GenerateMarkdown(data)
+
+	if !strings.Contains(md, "**证据**") {
+		t.Error("expected evidence section header when screenshot evidence exists")
+	}
+	if !strings.Contains(md, "截图: https://example.com/login (1920x1080)") {
+		t.Error("expected screenshot evidence excerpt in markdown")
+	}
+	if !strings.Contains(md, "📷") {
+		t.Error("expected screenshot emoji marker")
+	}
+	// Raw request/response evidence should still be absent.
+	if strings.Contains(md, "GET / HTTP/1.1") {
+		t.Error("raw request evidence should not appear")
 	}
 }
 
