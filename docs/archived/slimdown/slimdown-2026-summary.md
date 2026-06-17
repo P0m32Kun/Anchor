@@ -1,10 +1,12 @@
 ---
-status: active
-source_of_truth: true
+status: archived
+source_of_truth: false
 owner: kun
 audit_date: 2026-05-26
 audit_baseline_commit: "main @ 27938da"
 scope: slimdown-summary
+archived_date: "2026-06-17"
+archive_reason: "slimdown series completed, moved from active/review/"
 ---
 
 # Slimdown 2026 — 全量瘦身审计总览

@@ -4,6 +4,8 @@ source_of_truth: false
 owner: kun
 created: 2026-06-13
 scope: bounty-watch
+cancelled_date: "2026-06-17"
+cancelled_reason: "cancelled with SRC convergence"
 ---
 
 # Bounty Watch — Spec

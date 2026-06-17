@@ -1,11 +1,13 @@
 ---
-status: active
+status: archived
 source_of_truth: false
 owner: kun
 last_updated: 2026-05-26
 scope: repository-slimdown-audit-handoff
 audience: external-implementer (e.g. DeepSeek)
 audit_baseline_commit: "main @ b6d818f (2026-05-26)"
+archived_date: "2026-06-17"
+archive_reason: "slimdown series completed, moved from active/review/"
 ---
 
 # Anchor 全量瘦身 — 实现者交接说明

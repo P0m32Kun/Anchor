@@ -4,6 +4,8 @@ source_of_truth: false
 owner: kun
 last_updated: 2026-06-04
 scope: src-bounty-workstation
+superseded_date: "2026-06-17"
+superseded_reason: "SRC capability removed from codebase, see docs/superpowers/specs/2026-06-17-anchor-core-slimdown-design.md"
 ---
 
 # SRC Bounty Workstation Design

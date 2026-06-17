@@ -1,10 +1,12 @@
 ---
-status: in_review
+status: stale
 source_of_truth: false
 owner: kun
 last_updated: 2026-05-05
 scope: custom-nuclei-template-management
 verification: pending_implementation
+stale_date: "2026-06-17"
+note: "40+ days without update, needs decision"
 ---
 
 # Custom Nuclei Template Management Plan

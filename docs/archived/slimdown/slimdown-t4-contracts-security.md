@@ -1,10 +1,12 @@
 ---
-status: active
-source_of_truth: true
+status: archived
+source_of_truth: false
 owner: kun
 audit_date: 2026-05-26
 audit_baseline_commit: "main @ 7399a5f"
 scope: contracts-security-regression
+archived_date: "2026-06-17"
+archive_reason: "slimdown series completed, moved from active/review/"
 ---
 
 # T4 报告：契约、安全、Pitfall 回归

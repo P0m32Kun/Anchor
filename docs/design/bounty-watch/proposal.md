@@ -5,6 +5,8 @@ owner: kun
 created: 2026-06-13
 scope: bounty-watch
 related_plan: docs/current/plan.md
+cancelled_date: "2026-06-17"
+cancelled_reason: "cancelled with SRC convergence"
 ---
 
 # Bounty Watch — Proposal

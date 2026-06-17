@@ -1,3 +1,9 @@
+---
+status: archived
+archived_date: "2026-06-17"
+archive_reason: "plan outdated, vuln-template-redesign design still in_review in docs/design/"
+---
+
 # 漏洞辞典(Vulnerability Dictionary)实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

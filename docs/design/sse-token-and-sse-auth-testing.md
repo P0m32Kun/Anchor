@@ -1,3 +1,8 @@
+---
+status: stale
+stale_date: "2026-06-17"
+---
+
 # SSE Token & SSE Auth — Proposal / Spec / Tasks
 
 > 目的：用可观测的行为约束「SSE 实时更新链路」是否真的跑通，避免仅写了代码但 SSE 认证或前端订阅链路不可用。
