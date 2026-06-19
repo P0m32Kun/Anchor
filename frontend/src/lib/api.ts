@@ -429,6 +429,124 @@ export interface WorkerNode {
   metrics_updated_at?: string;
 }
 
+// --- Signal / Notification / Asset Change / Watch / Alert Webhook ---
+
+export interface Signal {
+  id: string;
+  project_id: string;
+  source_kind: string;
+  source_id: string;
+  title: string;
+  severity: string;
+  score: number;
+  scope_status: string;
+  status: string;
+  metadata: string;
+  first_seen: string;
+  last_seen: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SignalStats {
+  total: number;
+  new: number;
+  acknowledged: number;
+  resolved: number;
+  by_severity: Record<string, number>;
+  by_status: Record<string, number>;
+  by_source: Record<string, number>;
+}
+
+export interface NotificationChannel {
+  id: string;
+  project_id: string;
+  name: string;
+  channel_type: string;
+  url: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssetChange {
+  id: string;
+  project_id: string;
+  run_id: string;
+  asset_id: string;
+  asset_value: string;
+  asset_type: string;
+  change_type: string;
+  change_summary: string;
+  detail_json: string;
+  severity: string;
+  created_at: string;
+}
+
+export interface AlertWebhook {
+  id: string;
+  project_id: string;
+  enabled: boolean;
+  url: string;
+  secret?: string;
+  min_severity: string;
+  on_new_asset: boolean;
+  on_asset_gone: boolean;
+  on_port_change: boolean;
+  on_service_change: boolean;
+  on_cert_expiry: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WatchConfig {
+  id: string;
+  name: string;
+  watch_enabled: boolean;
+  watch_interval_hours: number;
+  watch_passive_only: boolean;
+  watch_last_tick_at?: string;
+}
+
+export const SIGNAL_SEVERITY_COLORS: Record<string, string> = {
+  critical: "bg-red-600 text-white",
+  high: "bg-orange-500 text-white",
+  medium: "bg-yellow-400 text-black",
+  low: "bg-blue-400 text-white",
+  info: "bg-gray-400 text-white",
+};
+
+export const SIGNAL_SOURCE_LABELS: Record<string, string> = {
+  finding: "Finding",
+  new_asset: "New Asset",
+  disappeared_asset: "Disappeared Asset",
+  asset_change: "Asset Change",
+  new_endpoint: "New Endpoint",
+  new_port: "New Port",
+  new_service: "New Service",
+};
+
+export const SIGNAL_STATUS_LABELS: Record<string, string> = {
+  new: "New",
+  acknowledged: "Acknowledged",
+  resolved: "Resolved",
+};
+
+export const CHANGE_TYPE_LABELS: Record<string, string> = {
+  port_new: "New Port",
+  port_gone: "Port Gone",
+  service_new: "New Service",
+  service_gone: "Service Gone",
+  service_version_change: "Service Version Change",
+  endpoint_new: "New Endpoint",
+  endpoint_gone: "Endpoint Gone",
+  endpoint_changed: "Endpoint Changed",
+  cert_expiring: "Cert Expiring",
+  cert_changed: "Cert Changed",
+  asset_new: "New Asset",
+  asset_gone: "Asset Gone",
+};
+
 export const api = {
   // ... rest of api object
   listWorkers: (signal?: AbortSignal) =>
@@ -764,6 +882,53 @@ export const api = {
       `/excluded-domains/check?domain=${encodeURIComponent(domain)}`,
       { signal }
     ),
+
+  // --- Signals ---
+  listSignals: (projectId: string, params?: { status?: string; severity?: string; source_kind?: string }, signal?: AbortSignal) =>
+    fetchAPI<Signal[]>(`/projects/${projectId}/signals?${new URLSearchParams(params as Record<string, string>).toString()}`, { signal }),
+
+  getSignalStats: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<SignalStats>(`/projects/${projectId}/signals/stats`, { signal }),
+
+  updateSignalStatus: (signalId: string, status: string, signal?: AbortSignal) =>
+    fetchAPI<Signal>(`/signals/${signalId}/status`, { method: "PATCH", body: JSON.stringify({ status }), signal }),
+
+  batchUpdateSignalStatus: (signalIds: string[], status: string, signal?: AbortSignal) =>
+    fetchAPI<{ updated: number }>(`/signals/batch-status`, { method: "PATCH", body: JSON.stringify({ signal_ids: signalIds, status }), signal }),
+
+  // --- Notification Channels ---
+  listNotificationChannels: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<NotificationChannel[]>(`/projects/${projectId}/notification-channels`, { signal }),
+
+  createNotificationChannel: (projectId: string, data: Partial<NotificationChannel>, signal?: AbortSignal) =>
+    fetchAPI<NotificationChannel>(`/projects/${projectId}/notification-channels`, { method: "POST", body: JSON.stringify(data), signal }),
+
+  updateNotificationChannel: (projectId: string, channelId: string, data: Partial<NotificationChannel>, signal?: AbortSignal) =>
+    fetchAPI<NotificationChannel>(`/projects/${projectId}/notification-channels/${channelId}`, { method: "PATCH", body: JSON.stringify(data), signal }),
+
+  deleteNotificationChannel: (projectId: string, channelId: string, signal?: AbortSignal) =>
+    fetchAPI<void>(`/projects/${projectId}/notification-channels/${channelId}`, { method: "DELETE", signal }),
+
+  // --- Alert Webhooks ---
+  getAlertWebhook: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<AlertWebhook | null>(`/projects/${projectId}/alert-webhook`, { signal }),
+
+  upsertAlertWebhook: (projectId: string, data: Partial<AlertWebhook>, signal?: AbortSignal) =>
+    fetchAPI<AlertWebhook>(`/projects/${projectId}/alert-webhook`, { method: "PUT", body: JSON.stringify(data), signal }),
+
+  deleteAlertWebhook: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<void>(`/projects/${projectId}/alert-webhook`, { method: "DELETE", signal }),
+
+  // --- Asset Changes ---
+  listAssetChanges: (projectId: string, params?: { limit?: number }, signal?: AbortSignal) =>
+    fetchAPI<AssetChange[]>(`/projects/${projectId}/asset-changes?${new URLSearchParams(params as Record<string, string>).toString()}`, { signal }),
+
+  // --- Watch Config ---
+  getWatchConfig: (projectId: string, signal?: AbortSignal) =>
+    fetchAPI<WatchConfig>(`/projects/${projectId}/watch-config`, { signal }),
+
+  updateWatchConfig: (projectId: string, data: Partial<WatchConfig>, signal?: AbortSignal) =>
+    fetchAPI<WatchConfig>(`/projects/${projectId}/watch-config`, { method: "PATCH", body: JSON.stringify(data), signal }),
 };
 
 export interface Run {
