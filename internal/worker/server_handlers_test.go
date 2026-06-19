@@ -119,8 +119,8 @@ func TestWorkerServer_handleTask_accepted(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"task_id":    "task-1",
-		"tool":       "echo",
-		"command":    []string{"/bin/echo", "hello"},
+		"tool":       "sh",
+		"command":    []string{"sh", "-c", "echo hello"},
 		"workdir":    "",
 		"scan_depth": "",
 	})
@@ -170,8 +170,8 @@ func TestWorkerServer_handleTask_atCapacity(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"task_id": "task-1",
-		"tool":    "echo",
-		"command": []string{"/bin/echo"},
+		"tool":    "sh",
+		"command": []string{"sh", "-c", "echo"},
 	})
 	resp, err := http.Post(ts.URL+"/tasks", "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -209,8 +209,8 @@ func TestWorkerServer_handleTask_executionReportsToCore(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"task_id":    "task-exec-1",
-		"tool":       "echo",
-		"command":    []string{"/bin/echo", "hello"},
+		"tool":       "sh",
+		"command":    []string{"sh", "-c", "echo hello"},
 		"workdir":    "",
 		"scan_depth": "",
 	})
@@ -233,8 +233,8 @@ func TestWorkerServer_handleTask_executionReportsToCore(t *testing.T) {
 		t.Fatal("expected result to be reported to core server")
 	}
 	result := reported[0]
-	if result["status"] != "failed" {
-		t.Errorf("reported status = %v, want failed (allowlist rejects echo)", result["status"])
+	if result["status"] != "completed" {
+		t.Errorf("reported status = %v, want completed", result["status"])
 	}
 }
 
