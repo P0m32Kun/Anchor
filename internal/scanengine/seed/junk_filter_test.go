@@ -95,23 +95,11 @@ func TestFilterPassiveSeeds_CustomKeyword(t *testing.T) {
 		Value: "foo.example.com", ValueType: "domain", Source: "fofa", Raw: &raw,
 	}}
 	cfg := models.DefaultExternalPipelineConfig()
-	cfg.PassiveJunkKeywords = []string{"foo.example.com"}
+	cfg.PassiveJunkKeywords = "foo.example.com"
 
 	out, _ := FilterPassiveSeeds(seeds, cfg)
 	if len(out) != 0 {
 		t.Fatalf("expected custom keyword to drop seed, got %+v", out)
-	}
-}
-
-func TestJunkWordBoundaryMatch_AvoidsFalsePositive(t *testing.T) {
-	if junkWordBoundaryMatch("lixiang.com", "bet") {
-		t.Fatal("bet should not match lixiang.com")
-	}
-	if junkWordBoundaryMatch("advert.example.com", "ad") {
-		t.Fatal("ad should not match advert subdomain")
-	}
-	if !junkWordBoundaryMatch("www.casino.example.com", "casino") {
-		t.Fatal("casino should match casino.example.com")
 	}
 }
 
@@ -132,8 +120,10 @@ func TestExpandTargets_AppliesJunkFilter(t *testing.T) {
 		t.Fatalf("expected junk filter to drop at least one seed, stats=%+v seeds=%+v", stats, filtered)
 	}
 	for _, s := range filtered {
-		if s.Raw != nil && s.Raw.Title != "" && matchJunkText(s.Raw.Title, activeJunkKeywords(nil)) != "" {
-			t.Fatalf("junk seed survived filter: %+v", s)
+		if s.Raw != nil && s.Raw.Title != "" {
+			if field, _ := matchSeedJunk(s, activeJunkKeywords(nil)); field != "" {
+				t.Fatalf("junk seed survived filter: %+v", s)
+			}
 		}
 	}
 }

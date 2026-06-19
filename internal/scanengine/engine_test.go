@@ -91,6 +91,9 @@ func setupTestEngine(t *testing.T, fakeExec *fakeExecutor, config EngineConfig) 
 	merger := asset.NewMerger(queries)
 	profile := core.DefaultInternalProfile()
 	engine := NewWithExecutor(queries, merger, profile, nil, nil, t.TempDir(), "run1", "proj1", config, nil, fakeExec)
+	// Initialize tier pools maps so processNewAsset → claimTier1/Tier2 doesn't nil-map panic
+	engine.tier1Scheduled = make(map[string]struct{})
+	engine.tier2Scheduled = make(map[string]struct{})
 	return engine, queries
 }
 
@@ -391,6 +394,57 @@ func TestEngine_WorkItemLifecycle(t *testing.T) {
 			t.Errorf("work %s has non-terminal status: %s", w.ID, w.Status)
 		}
 	}
+}
+
+func TestEngine_WorkStatusLifecycle(t *testing.T) {
+	var mu sync.Mutex
+	var observedStatuses []models.WorkStatus
+
+	fake := &fakeExecutor{
+		behavior: func(ctx context.Context, w *models.ScanWorkItem) (*toolrun.InvokeResult, error) {
+			// When Execute is called, the work item has been claimed (status = running).
+			mu.Lock()
+			observedStatuses = append(observedStatuses, w.Status)
+			mu.Unlock()
+			return &toolrun.InvokeResult{Task: &models.ScanTask{ID: "t"}, Stdout: nil}, nil
+		},
+	}
+
+	cfg := DefaultEngineConfig()
+	cfg.SchedulerTick = 20 * time.Millisecond
+	cfg.IdleTimeout = 200 * time.Millisecond
+	engine, queries := setupTestEngine(t, fake, cfg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	engine.Run(ctx, []string{"10.0.0.1"})
+
+	// Verify executor processed at least one item
+	if fake.callCount() == 0 {
+		t.Fatal("expected executor to process at least one work item")
+	}
+
+	// All observed statuses at execution time should be "running"
+	mu.Lock()
+	defer mu.Unlock()
+	for i, s := range observedStatuses {
+		if s != models.WorkStatusRunning {
+			t.Errorf("work item %d at execution time had status %q, want %q", i, s, models.WorkStatusRunning)
+		}
+	}
+
+	// After Run completes, all works should be in terminal state
+	works, _ := queries.ListScanWorkItemsByRun("run1")
+	for _, w := range works {
+		switch w.Status {
+		case models.WorkStatusDone, models.WorkStatusSkipped, models.WorkStatusFailed:
+			// OK — terminal state
+		default:
+			t.Errorf("work %s has non-terminal status after Run: %s", w.ID, w.Status)
+		}
+	}
+	t.Logf("executor called %d times, total works: %d", fake.callCount(), len(works))
 }
 
 func TestEngine_SeedCreatesWorkItems(t *testing.T) {

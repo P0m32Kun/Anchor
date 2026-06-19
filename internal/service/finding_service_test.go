@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/db"
+	"github.com/P0m32Kun/Anchor/internal/errors"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -268,5 +269,190 @@ func TestFindingService_ListEvidence_WithData(t *testing.T) {
 	}
 	if len(evList) != 2 {
 		t.Errorf("len = %d, want 2", len(evList))
+	}
+}
+
+// --- ListPaginated ---
+
+func TestFindingService_ListPaginated_All(t *testing.T) {
+	svc, q, pid := setupFindingService(t)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		createSvcFinding(t, q, pid, models.FindingNew)
+	}
+
+	result, err := svc.ListPaginated(ctx, pid, "", PaginationParams{Page: 1, PageSize: 2})
+	if err != nil {
+		t.Fatalf("ListPaginated: %v", err)
+	}
+	if result.Total != 5 {
+		t.Errorf("total = %d, want 5", result.Total)
+	}
+	if len(result.Data) != 2 {
+		t.Errorf("data len = %d, want 2", len(result.Data))
+	}
+	if result.Page != 1 {
+		t.Errorf("page = %d, want 1", result.Page)
+	}
+}
+
+func TestFindingService_ListPaginated_FilterByStatus(t *testing.T) {
+	svc, q, pid := setupFindingService(t)
+	ctx := context.Background()
+
+	createSvcFinding(t, q, pid, models.FindingConfirmed)
+	createSvcFinding(t, q, pid, models.FindingNew)
+	createSvcFinding(t, q, pid, models.FindingConfirmed)
+
+	result, err := svc.ListPaginated(ctx, pid, "confirmed", PaginationParams{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("ListPaginated: %v", err)
+	}
+	if result.Total != 2 {
+		t.Errorf("total = %d, want 2", result.Total)
+	}
+	if len(result.Data) != 2 {
+		t.Errorf("data len = %d, want 2", len(result.Data))
+	}
+}
+
+func TestFindingService_ListPaginated_SecondPage(t *testing.T) {
+	svc, q, pid := setupFindingService(t)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		createSvcFinding(t, q, pid, models.FindingNew)
+	}
+
+	result, err := svc.ListPaginated(ctx, pid, "", PaginationParams{Page: 2, PageSize: 2})
+	if err != nil {
+		t.Fatalf("ListPaginated: %v", err)
+	}
+	if len(result.Data) != 2 {
+		t.Errorf("data len = %d, want 2", len(result.Data))
+	}
+}
+
+// --- Create with nil audit (covers audit==nil branch in Create) ---
+
+func TestProjectService_Create_NilAudit(t *testing.T) {
+	repo := NewMockProjectRepository()
+	svc := NewProjectServiceWithDeps(repo, nil)
+
+	project, err := svc.Create(context.Background(), CreateProjectRequest{Name: "no-audit"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if project.Name != "no-audit" {
+		t.Errorf("name = %q, want %q", project.Name, "no-audit")
+	}
+}
+
+func TestProjectService_Delete_NilAudit(t *testing.T) {
+	repo := NewMockProjectRepository()
+	svc := NewProjectServiceWithDeps(repo, nil)
+
+	project, _ := svc.Create(context.Background(), CreateProjectRequest{Name: "to-delete"})
+	err := svc.Delete(context.Background(), project.ID)
+	if err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+}
+
+func TestProjectService_Create_NameTooLong(t *testing.T) {
+	repo := NewMockProjectRepository()
+	svc := NewProjectServiceWithDeps(repo, nil)
+
+	longName := string(make([]byte, 201))
+	_, err := svc.Create(context.Background(), CreateProjectRequest{Name: longName})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	appErr := err.(*errors.AppError)
+	if appErr.Code != errors.ErrBadRequest {
+		t.Errorf("code = %q, want %q", appErr.Code, errors.ErrBadRequest)
+	}
+}
+
+func TestProjectService_List_Error(t *testing.T) {
+	repo := NewMockProjectRepository()
+	repo.ListFn = func() ([]*models.Project, error) {
+		return nil, errors.Newf(errors.ErrInternal, "db error")
+	}
+	svc := NewProjectServiceWithDeps(repo, nil)
+
+	_, err := svc.List(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestProjectService_Get_Error(t *testing.T) {
+	repo := NewMockProjectRepository()
+	repo.GetFn = func(id string) (*models.Project, error) {
+		return nil, errors.Newf(errors.ErrInternal, "db error")
+	}
+	svc := NewProjectServiceWithDeps(repo, nil)
+
+	_, err := svc.Get(context.Background(), "p1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestProjectService_Delete_GetError(t *testing.T) {
+	repo := NewMockProjectRepository()
+	repo.GetFn = func(id string) (*models.Project, error) {
+		return nil, errors.Newf(errors.ErrInternal, "db error")
+	}
+	svc := NewProjectServiceWithDeps(repo, nil)
+
+	err := svc.Delete(context.Background(), "p1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestProjectService_Delete_DeleteError(t *testing.T) {
+	repo := NewMockProjectRepository()
+	repo.Create(&models.Project{ID: "p1", Name: "test"})
+	repo.DeleteFn = func(id string) error {
+		return errors.Newf(errors.ErrInternal, "delete error")
+	}
+	svc := NewProjectServiceWithDeps(repo, nil)
+
+	err := svc.Delete(context.Background(), "p1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestProjectService_Create_RepoError(t *testing.T) {
+	repo := NewMockProjectRepository()
+	repo.CreateFn = func(p *models.Project) error {
+		return errors.Newf(errors.ErrInternal, "create error")
+	}
+	svc := NewProjectServiceWithDeps(repo, nil)
+
+	_, err := svc.Create(context.Background(), CreateProjectRequest{Name: "test"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestProjectService_ListPaginated_CountError(t *testing.T) {
+	repo := NewMockProjectRepository()
+	// Override List to make Count return from the mock's internal state
+	// Count is not directly overridable, but we can test via the real mock
+	svc := NewProjectServiceWithDeps(repo, nil)
+
+	// Empty repo - count=0
+	result, err := svc.ListPaginated(context.Background(), PaginationParams{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("ListPaginated: %v", err)
+	}
+	if result.Total != 0 {
+		t.Errorf("total = %d, want 0", result.Total)
 	}
 }

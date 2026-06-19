@@ -209,3 +209,51 @@ func TestProjectService_Delete(t *testing.T) {
 		}
 	})
 }
+
+func TestProjectService_ListPaginated(t *testing.T) {
+	repo := NewMockProjectRepository()
+	audit := NewMockAuditLogger()
+	svc := NewProjectServiceWithDeps(repo, audit)
+
+	for i := 0; i < 5; i++ {
+		svc.Create(context.Background(), CreateProjectRequest{
+			Name: "Project " + string(rune('A'+i)),
+		})
+	}
+
+	t.Run("first page", func(t *testing.T) {
+		result, err := svc.ListPaginated(context.Background(), PaginationParams{Page: 1, PageSize: 2})
+		if err != nil {
+			t.Fatalf("ListPaginated: %v", err)
+		}
+		if result.Total != 5 {
+			t.Errorf("total = %d, want 5", result.Total)
+		}
+		if len(result.Data) != 2 {
+			t.Errorf("data len = %d, want 2", len(result.Data))
+		}
+		if result.Page != 1 {
+			t.Errorf("page = %d, want 1", result.Page)
+		}
+	})
+
+	t.Run("last page", func(t *testing.T) {
+		result, err := svc.ListPaginated(context.Background(), PaginationParams{Page: 3, PageSize: 2})
+		if err != nil {
+			t.Fatalf("ListPaginated: %v", err)
+		}
+		if len(result.Data) != 1 {
+			t.Errorf("data len = %d, want 1", len(result.Data))
+		}
+	})
+
+	t.Run("empty page", func(t *testing.T) {
+		result, err := svc.ListPaginated(context.Background(), PaginationParams{Page: 10, PageSize: 2})
+		if err != nil {
+			t.Fatalf("ListPaginated: %v", err)
+		}
+		if len(result.Data) != 0 {
+			t.Errorf("data len = %d, want 0", len(result.Data))
+		}
+	})
+}

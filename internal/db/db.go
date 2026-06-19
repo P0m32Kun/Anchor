@@ -424,6 +424,46 @@ func migrate(db *sql.DB) error {
 		version = 40
 	}
 
+	if version < 41 {
+		if err := migrateV41(db); err != nil {
+			return fmt.Errorf("migrate v41 (asset_changes + alert_webhooks): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 41"); err != nil {
+			return fmt.Errorf("set user_version 41: %w", err)
+		}
+		version = 41
+	}
+
+	if version < 42 {
+		if err := migrateV42(db); err != nil {
+			return fmt.Errorf("migrate v42 (notification_channels): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 42"); err != nil {
+			return fmt.Errorf("set user_version 42: %w", err)
+		}
+		version = 42
+	}
+
+	if version < 43 {
+		if err := migrateV43(db); err != nil {
+			return fmt.Errorf("migrate v43 (web_endpoints TLS columns): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 43"); err != nil {
+			return fmt.Errorf("set user_version 43: %w", err)
+		}
+		version = 43
+	}
+
+	if version < 44 {
+		if err := migrateV44(db); err != nil {
+			return fmt.Errorf("migrate v44 (retest_runs): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 44"); err != nil {
+			return fmt.Errorf("set user_version 44: %w", err)
+		}
+		version = 44
+	}
+
 	if err := ensureProjectsColumns(db); err != nil {
 		return fmt.Errorf("ensure projects columns: %w", err)
 	}

@@ -2,6 +2,7 @@ package executor
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
@@ -32,9 +33,13 @@ func ParseKatanaOutput(stdout []byte) ([]*core.DiscoveryAsset, error) {
 		}
 		seen[entry.URL] = true
 
+		assetType := core.AssetHTTPPath
+		if isJSURL(entry.URL) {
+			assetType = core.AssetJSURL
+		}
 		assets = append(assets, &core.DiscoveryAsset{
 			ID:              util.GenerateID(),
-			Type:            core.AssetHTTPPath,
+			Type:            assetType,
 			Value:           entry.URL,
 			NormalizedValue: entry.URL,
 			SourceTool:      "katana",
@@ -45,4 +50,13 @@ func ParseKatanaOutput(stdout []byte) ([]*core.DiscoveryAsset, error) {
 
 type katanaEntry struct {
 	URL string `json:"url"`
+}
+
+// isJSURL returns true if the URL path ends with .js (ignoring query params and fragments).
+func isJSURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	return strings.HasSuffix(strings.ToLower(u.Path), ".js")
 }

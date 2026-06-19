@@ -24,6 +24,7 @@ func setupTestServer(t *testing.T) (*Server, *sql.DB, func()) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
+	rawDB.SetMaxOpenConns(1) // :memory: per-connection; pool would create separate DBs
 
 	if err := db.Migrate(rawDB); err != nil {
 		t.Fatalf("migrate: %v", err)

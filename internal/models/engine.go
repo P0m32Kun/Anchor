@@ -124,10 +124,10 @@ func DefaultPipelineConfig() PipelineConfig {
 func DefaultExternalPipelineConfig() PipelineConfig {
 	cfg := DefaultPipelineConfig()
 	cfg.PortRange = "top100"
-	cfg.NaabuRate = 300
-	cfg.NaabuThreads = 50
+	cfg.NaabuRate = 150
+	cfg.NaabuThreads = 30
 	cfg.NucleiScanDepth = "workflow"
-	cfg.NucleiRateLimit = 20
+	cfg.NucleiRateLimit = 10
 	cfg.NucleiConcurrency = 5
 	cfg.NucleiRateLimitPerMinute = 30
 	cfg.FfufRateLimit = 4
@@ -144,6 +144,7 @@ func DefaultExternalPipelineConfig() PipelineConfig {
 	cfg.NucleiRequireFingerprint = true
 	cfg.PassiveSearchResultLimit = 500
 	cfg.PassiveSearchConcurrency = 3
+	cfg.EnablePassiveJunkFilter = true
 	return cfg
 }
 
@@ -153,14 +154,14 @@ func DefaultExternalLowNoisePipelineConfig() PipelineConfig {
 	cfg.ScanMode = "external"
 	cfg.NoiseLevel = "low"
 	cfg.PortRange = "top100"
-	cfg.NaabuRate = 200
-	cfg.NaabuThreads = 30
+	cfg.NaabuRate = 100
+	cfg.NaabuThreads = 20
 	cfg.NucleiScanDepth = "tags"
 	cfg.NucleiRateLimit = 5
 	cfg.NucleiConcurrency = 3
 	cfg.NucleiRateLimitPerMinute = 20
 	cfg.NucleiRequireFingerprint = true
-	cfg.EnableFfuf = true
+	cfg.EnableFfuf = false
 	cfg.FfufTier = "small"
 	cfg.FfufRateLimit = 3
 	cfg.FfufTimeout = 20

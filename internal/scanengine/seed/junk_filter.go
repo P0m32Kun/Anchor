@@ -62,10 +62,20 @@ func FilterPassiveSeeds(seeds []SeedAsset, cfg models.PipelineConfig) ([]SeedAss
 }
 
 // matchSeedJunk checks if a seed matches any junk keyword rule.
+// It checks s.Value, s.Raw.Title, and s.Raw.Domain (when s.Raw is non-nil).
 func matchSeedJunk(s SeedAsset, rules []junkKeywordRule) (string, string) {
 	for _, rule := range rules {
-		if strings.Contains(strings.ToLower(s.Value), strings.ToLower(rule.Keyword)) {
+		kw := strings.ToLower(rule.Keyword)
+		if strings.Contains(strings.ToLower(s.Value), kw) {
 			return "value", rule.Keyword
+		}
+		if s.Raw != nil {
+			if strings.Contains(strings.ToLower(s.Raw.Title), kw) {
+				return "title", rule.Keyword
+			}
+			if strings.Contains(strings.ToLower(s.Raw.Domain), kw) {
+				return "domain", rule.Keyword
+			}
 		}
 	}
 	return "", ""

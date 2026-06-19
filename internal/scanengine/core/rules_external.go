@@ -40,7 +40,7 @@ func (p *ExternalProfile) Rules() []ActionRule {
 		}},
 		{Action: ActionServiceFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPPort},
 		{Action: ActionHTTPXFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isWebEntryOrHTTPXCandidate},
-		{Action: ActionKatanaCrawl, Enabled: true, MaxDepth: 1, Precondition: isHTTPServiceOrPath},
+		{Action: ActionKatanaCrawl, Enabled: true, MaxDepth: 1, Precondition: isHTTPServiceOrPathHighValue},
 		{Action: ActionFFUFBrute, Enabled: false, MaxDepth: 1, Precondition: isHTTPService}, // disabled by default for external
 		{Action: ActionNucleiScan, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isHTTPAndFingerprinted},
 	}

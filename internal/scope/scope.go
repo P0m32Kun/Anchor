@@ -440,26 +440,57 @@ func matchRule(target, rule string) bool {
 
 // EvaluateBoundary checks if a target is in scope for boundary filtering.
 // Returns (allow, decision, reason).
+//
+// Semantics (strict mode):
+//  1. Exclude rules checked first — any match → deny.
+//  2. Include rules checked next — any match → allow.
+//  3. If include rules existed but none matched → deny.
+//  4. If no include rules existed at all → allow (default-allow with excludes).
 func (e *Engine) EvaluateBoundary(target *models.Target, rules []*models.ScopeRule, mode string) (bool, string, string) {
 	if mode == "" || mode == string(models.ScopeBoundaryOff) {
 		return true, string(models.ScopeAllow), "boundary off"
 	}
+
+	// Pass 1: check exclude rules first — exclude takes priority.
 	for _, rule := range rules {
-		if rule.Type != target.Type {
+		if rule.Action != models.ScopeActionExclude {
 			continue
 		}
-		if matchRule(target.Value, rule.Value) {
-			switch rule.Action {
-			case models.ScopeActionInclude:
-				return true, string(models.ScopeAllow), "matched include rule"
-			case models.ScopeActionExclude:
-				return false, string(models.ScopeDeny), "matched exclude rule"
-			}
+		if e.boundaryMatch(target, rule) {
+			return false, string(models.ScopeDeny), "matched exclude rule"
 		}
 	}
-	// Default: allow in off mode, deny in strict mode
-	if mode == string(models.ScopeBoundaryStrict) {
-		return false, string(models.ScopeDeny), "no matching rule in strict mode"
+
+	// Pass 2: check include rules.
+	hasInclude := false
+	for _, rule := range rules {
+		if rule.Action != models.ScopeActionInclude {
+			continue
+		}
+		hasInclude = true
+		if e.boundaryMatch(target, rule) {
+			return true, string(models.ScopeAllow), "matched include rule"
+		}
 	}
-	return true, string(models.ScopeAllow), "default allow"
+
+	// If include rules existed but none matched → deny.
+	if hasInclude {
+		return false, string(models.ScopeDeny), "no matching include rule in strict mode"
+	}
+
+	// No include rules at all → allow (only excludes were configured, target wasn't excluded).
+	return true, string(models.ScopeAllow), "default allow (no include rules)"
+}
+
+// boundaryMatch checks if a target matches a scope rule for boundary filtering.
+// It handles cross-type matching for CIDR rules (IP targets can match CIDR rules).
+func (e *Engine) boundaryMatch(target *models.Target, rule *models.ScopeRule) bool {
+	// CIDR rules can match IP targets (check if IP is within the CIDR range).
+	if rule.Type == models.TargetTypeCIDR && target.Type == models.TargetTypeIP {
+		return e.matchIP(target.Value, rule)
+	}
+	if rule.Type != target.Type {
+		return false
+	}
+	return matchRule(target.Value, rule.Value)
 }

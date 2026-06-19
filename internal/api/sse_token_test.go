@@ -79,3 +79,66 @@ func TestSSEAuthMiddleware_ProjectMismatch(t *testing.T) {
 		}
 	})
 }
+
+// --- SSEAuthMiddleware additional ---
+
+func TestSSEAuthMiddleware_NoAuth(t *testing.T) {
+	server, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := server.SSEAuthMiddleware(next)
+
+	req := httptest.NewRequest(http.MethodGet, "/projects/proj-1/events", nil)
+	req.SetPathValue("id", "proj-1")
+	w := httptest.NewRecorder()
+
+	mw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestSSEAuthMiddleware_OptionsPassthrough(t *testing.T) {
+	server, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	})
+	mw := server.SSEAuthMiddleware(next)
+
+	req := httptest.NewRequest(http.MethodOptions, "/projects/proj-1/events", nil)
+	w := httptest.NewRecorder()
+
+	mw.ServeHTTP(w, req)
+
+	if !called {
+		t.Error("inner handler should be called for OPTIONS")
+	}
+}
+
+func TestSSEAuthMiddleware_ValidBearerToken(t *testing.T) {
+	server, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := server.SSEAuthMiddleware(next)
+
+	req := httptest.NewRequest(http.MethodGet, "/projects/proj-1/events", nil)
+	req.Header.Set("Authorization", "Bearer "+server.apiToken)
+	req.SetPathValue("id", "proj-1")
+	w := httptest.NewRecorder()
+
+	mw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+}

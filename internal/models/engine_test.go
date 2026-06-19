@@ -10,8 +10,8 @@ func TestDefaultExternalPipelineConfig(t *testing.T) {
 	if cfg.NucleiScanDepth != "workflow" {
 		t.Errorf("NucleiScanDepth = %q, want workflow", cfg.NucleiScanDepth)
 	}
-	if cfg.NaabuRate != 300 {
-		t.Errorf("NaabuRate = %d, want 300", cfg.NaabuRate)
+	if cfg.NaabuRate != 150 {
+		t.Errorf("NaabuRate = %d, want 150", cfg.NaabuRate)
 	}
 	if !cfg.EnablePassiveSearch {
 		t.Error("EnablePassiveSearch should be true")

@@ -124,3 +124,49 @@ func TestParseHTTPXCPEMerge(t *testing.T) {
 		t.Errorf("expected tech [grafana] without duplication, got %v", res.Tech)
 	}
 }
+
+func TestParseHTTPX_EmptyTechArray(t *testing.T) {
+	input := `{"url":"https://example.com","tech":[],"status-code":200}`
+	results, errs := ParseHTTPX(strings.NewReader(input))
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if len(results[0].Tech) != 0 {
+		t.Errorf("expected empty tech, got %v", results[0].Tech)
+	}
+}
+
+func TestParseHTTPX_CPEProductDedup(t *testing.T) {
+	// CPE product matches tech entry case-insensitively → no duplicate
+	input := `{"url":"https://a.com","tech":["Nginx"],"cpe":[{"product":"nginx","vendor":"nginx"}]}`
+	results, errs := ParseHTTPX(strings.NewReader(input))
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if len(results[0].Tech) != 1 {
+		t.Errorf("expected 1 tech entry (deduped), got %d: %v", len(results[0].Tech), results[0].Tech)
+	}
+}
+
+func TestParseHTTPX_TechAndCPENoDup(t *testing.T) {
+	// tech has "Vue", CPE has "Vue" product → should not duplicate
+	input := `{"url":"https://b.com","tech":["Vue","Nginx"],"cpe":[{"product":"Vue","vendor":"vuejs"},{"product":"Apache","vendor":"apache"}]}`
+	results, errs := ParseHTTPX(strings.NewReader(input))
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	// Should have Vue, Nginx, Apache (Vue deduped, Apache new from CPE)
+	res := results[0]
+	if len(res.Tech) != 3 {
+		t.Errorf("expected 3 tech entries [Vue Nginx Apache], got %d: %v", len(res.Tech), res.Tech)
+	}
+}

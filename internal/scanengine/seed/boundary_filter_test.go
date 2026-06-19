@@ -18,7 +18,7 @@ func TestFilterSeedsByBoundary(t *testing.T) {
 		rules := []*models.ScopeRule{
 			{Action: models.ScopeActionInclude, Type: models.TargetTypeDomain, Value: "*.example.com"},
 		}
-		got := FilterSeedsByBoundary(seeds, eng, rules, models.ScopeBoundaryOff)
+		got := FilterSeedsByBoundary(seeds, eng, rules, string(models.ScopeBoundaryOff))
 		if len(got) != 2 {
 			t.Errorf("off mode should pass all seeds, got %d", len(got))
 		}
@@ -32,7 +32,7 @@ func TestFilterSeedsByBoundary(t *testing.T) {
 		rules := []*models.ScopeRule{
 			{Action: models.ScopeActionInclude, Type: models.TargetTypeDomain, Value: "*.example.com"},
 		}
-		got := FilterSeedsByBoundary(seeds, eng, rules, models.ScopeBoundaryStrict)
+		got := FilterSeedsByBoundary(seeds, eng, rules, string(models.ScopeBoundaryStrict))
 		if len(got) != 1 {
 			t.Fatalf("expected 1 seed, got %d", len(got))
 		}
@@ -50,7 +50,7 @@ func TestFilterSeedsByBoundary(t *testing.T) {
 			{Action: models.ScopeActionInclude, Type: models.TargetTypeDomain, Value: "*.example.com"},
 			{Action: models.ScopeActionExclude, Type: models.TargetTypeDomain, Value: "staging.example.com"},
 		}
-		got := FilterSeedsByBoundary(seeds, eng, rules, models.ScopeBoundaryStrict)
+		got := FilterSeedsByBoundary(seeds, eng, rules, string(models.ScopeBoundaryStrict))
 		if len(got) != 1 {
 			t.Fatalf("expected 1 seed, got %d", len(got))
 		}
@@ -67,7 +67,7 @@ func TestFilterSeedsByBoundary(t *testing.T) {
 		rules := []*models.ScopeRule{
 			{Action: models.ScopeActionInclude, Type: models.TargetTypeCIDR, Value: "10.0.0.0/24"},
 		}
-		got := FilterSeedsByBoundary(seeds, eng, rules, models.ScopeBoundaryStrict)
+		got := FilterSeedsByBoundary(seeds, eng, rules, string(models.ScopeBoundaryStrict))
 		if len(got) != 1 {
 			t.Fatalf("expected 1 seed, got %d", len(got))
 		}
@@ -83,7 +83,7 @@ func TestFilterSeedsByBoundary(t *testing.T) {
 		rules := []*models.ScopeRule{
 			{Action: models.ScopeActionExclude, Type: models.TargetTypeDomain, Value: "blocked.com"},
 		}
-		got := FilterSeedsByBoundary(seeds, eng, rules, models.ScopeBoundaryStrict)
+		got := FilterSeedsByBoundary(seeds, eng, rules, string(models.ScopeBoundaryStrict))
 		if len(got) != 1 {
 			t.Errorf("no include rules + no exclude match should pass, got %d", len(got))
 		}

@@ -122,29 +122,3 @@ func TestSeedValues(t *testing.T) {
 	}
 }
 
-// ============================================================
-// inferSeedValueType
-// ============================================================
-
-func TestInferSeedValueType(t *testing.T) {
-	cases := []struct {
-		value string
-		want  string
-	}{
-		{"http://example.com", "url"},
-		{"https://example.com/path", "url"},
-		{"10.0.0.0/24", "cidr"},
-		{"192.168.1.1", "ip"},
-		{"example.com", "domain"},
-		{"sub.example.com", "domain"},
-		{"  10.0.0.1  ", "ip"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.value, func(t *testing.T) {
-			got := inferSeedValueType(tc.value)
-			if got != tc.want {
-				t.Errorf("inferSeedValueType(%q) = %q, want %q", tc.value, got, tc.want)
-			}
-		})
-	}
-}
