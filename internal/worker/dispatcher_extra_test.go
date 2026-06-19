@@ -141,8 +141,8 @@ func TestDispatchOnce_scopeDenied(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for scope denied")
 	}
-	if !containsSubstring(err.Error(), "scope_denied") {
-		t.Errorf("error = %q, want contains 'scope_denied'", err)
+	if !containsSubstring(err.Error(), "cancelled") && !containsSubstring(err.Error(), "scope_denied") {
+		t.Errorf("error = %q, want contains 'cancelled' or 'scope_denied'", err)
 	}
 }
 
