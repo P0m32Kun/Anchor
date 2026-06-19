@@ -97,3 +97,21 @@ docs/superpowers/
 # Local scratch
 .gitnexus
 内网渗透测试手册_v2.md
+
+# Root-level node_modules (not just frontend/)
+/node_modules/
+
+# E2E logs
+.e2e-logs/
+
+# Agent workspace outputs
+dev_team.tar.gz
+dev_team_inspect/
+inbox/
+
+# Python test cache
+.pytest_cache/
+
+# Reasonix agent config
+reasonix.toml
+.reasonix/
