@@ -18,7 +18,7 @@ import (
 func TestExecuteTask_emptyCommand(t *testing.T) {
 	ws, _ := newTestWorkerServer(t)
 
-	ws.executeTask(context.Background(), "task-empty", "echo", nil, "", 0, "")
+	ws.executeTask(context.Background(), "task-empty", "sh", nil, "", 0, "")
 
 	resultPath := filepath.Join(ws.dataDir, "workdirs", "task-empty", "_result.json")
 	data, err := os.ReadFile(resultPath)
@@ -127,7 +127,7 @@ func TestExecuteTask_withWorkdir(t *testing.T) {
 	workdir := filepath.Join(dataDir, "custom-workdir")
 	os.MkdirAll(workdir, 0750)
 
-	ws.executeTask(context.Background(), "task-workdir", "echo", []string{"/bin/echo", "test"}, workdir, 0, "")
+	ws.executeTask(context.Background(), "task-workdir", "sh", []string{"sh", "-c", "echo test"}, workdir, 0, "")
 
 	resultPath := filepath.Join(dataDir, "workdirs", "task-workdir", "_result.json")
 	if _, err := os.ReadFile(resultPath); err != nil {
@@ -169,7 +169,7 @@ func TestExecuteTask_reportResultToCoreError(t *testing.T) {
 	ws.coreURL = "http://127.0.0.1:1"
 	ws.token = "tok"
 
-	ws.executeTask(context.Background(), "task-err", "echo", []string{"/bin/echo", "hi"}, "", 0, "")
+	ws.executeTask(context.Background(), "task-err", "sh", []string{"sh", "-c", "echo hi"}, "", 0, "")
 
 	// Should not panic. Result written to local file.
 	resultPath := filepath.Join(ws.dataDir, "workdirs", "task-err", "_result.json")
@@ -190,8 +190,8 @@ func TestHandleTask_withInputFiles(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"task_id": "task-input",
-		"tool":    "echo",
-		"command": []string{"/bin/echo", "hello"},
+		"tool":    "sh",
+		"command": []string{"sh", "-c", "echo hello"},
 		"input_files": map[string]string{
 			inputPath: "aGVsbG8=", // base64("hello")
 		},

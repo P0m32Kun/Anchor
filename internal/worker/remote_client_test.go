@@ -379,7 +379,7 @@ func TestRemoteClient_StartPolling_withTask(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"task_id": "task-from-poll",
-			"tool":    "echo",
+			"tool":    "sh",
 			"payload": map[string]interface{}{},
 		})
 	})
