@@ -24,8 +24,6 @@ presets:
   external:
     port_range: top100
     enable_passive_search: true
-    enable_passive_cert: true
-    enable_passive_url: true
     enable_passive_junk_filter: true
     subfinder_mode: passive
     httpx_rate_limit: 40
@@ -49,8 +47,6 @@ presets:
   internal:
     port_range: high-risk
     enable_passive_search: false
-    enable_passive_cert: false
-    enable_passive_url: false
     enable_passive_junk_filter: false
     subfinder_mode: active
     enable_ffuf: true

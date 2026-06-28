@@ -16,9 +16,6 @@ type EngineCredential struct {
 // --- Pipeline Config ---
 
 type PipelineConfig struct {
-	EnableFOFA               bool   `json:"enable_fofa"`
-	FofaResultLimit          int    `json:"fofa_result_limit"`
-	FofaConcurrency          int    `json:"fofa_concurrency"`
 	EnableSubfinder          bool   `json:"enable_subfinder"`
 	EnableDNSx               bool   `json:"enable_dnsx"`
 	EnableCDNFilter          bool   `json:"enable_cdn_filter"`
@@ -43,8 +40,6 @@ type PipelineConfig struct {
 	FfufDictionaryID string `json:"ffuf_dictionary_id"`     // optional
 	// External-scan-only fields
 	EnablePassiveSearch      bool   `json:"enable_passive_search"`
-	EnablePassiveCert        bool   `json:"enable_passive_cert"`
-	EnablePassiveURL         bool   `json:"enable_passive_url"`
 	SubfinderMode            string `json:"subfinder_mode"`             // passive | active | off
 	EnableKatana             bool   `json:"enable_katana"`
 	KatanaMaxDepth           int    `json:"katana_max_depth"`
@@ -71,9 +66,6 @@ type PipelineConfig struct {
 const DefaultFfufDictionaryID = "builtin:path/top100.txt"
 func DefaultPipelineConfig() PipelineConfig {
 	return PipelineConfig{
-		EnableFOFA:               true,
-		FofaResultLimit:          500,
-		FofaConcurrency:          5,
 		EnableSubfinder:          true,
 		EnableDNSx:               true,
 		EnableCDNFilter:          true,
@@ -117,8 +109,6 @@ func DefaultExternalPipelineConfig() PipelineConfig {
 	cfg.NucleiRateLimitPerMinute = 30
 	cfg.FfufRateLimit = 4
 	cfg.EnablePassiveSearch = true
-	cfg.EnablePassiveCert = true
-	cfg.EnablePassiveURL = true
 	cfg.SubfinderMode = "passive"
 	cfg.EnableKatana = true
 	cfg.KatanaMaxDepth = 2
@@ -150,8 +140,6 @@ func DefaultExternalLowNoisePipelineConfig() PipelineConfig {
 	cfg.FfufTimeout = 20
 	cfg.EnableKatana = false
 	cfg.EnablePassiveSearch = true
-	cfg.EnablePassiveCert = true
-	cfg.EnablePassiveURL = true
 	cfg.SubfinderMode = "passive"
 	cfg.PassiveSearchResultLimit = 300
 	cfg.PassiveSearchConcurrency = 2

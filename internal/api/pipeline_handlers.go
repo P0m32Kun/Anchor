@@ -467,16 +467,9 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 	if cfg.NucleiScanDepth == "" {
 		cfg.NucleiScanDepth = defaults.NucleiScanDepth
 	}
-	if cfg.FofaResultLimit == 0 {
-		cfg.FofaResultLimit = defaults.FofaResultLimit
-	}
-	if cfg.FofaConcurrency == 0 {
-		cfg.FofaConcurrency = defaults.FofaConcurrency
-	}
 
 	switch mode {
 	case "external":
-		cfg.EnableFOFA = true
 		cfg.EnableSubfinder = true
 		cfg.EnableDNSx = true
 		cfg.EnableCDNFilter = true
@@ -484,8 +477,6 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 		cfg.EnableHttpx = true
 		cfg.EnableNuclei = true
 		cfg.EnablePassiveSearch = defaults.EnablePassiveSearch
-		cfg.EnablePassiveCert = defaults.EnablePassiveCert
-		cfg.EnablePassiveURL = defaults.EnablePassiveURL
 		if cfg.SubfinderMode == "" {
 			cfg.SubfinderMode = defaults.SubfinderMode
 		}
@@ -499,7 +490,6 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 		cfg.SkipPortscanOnCDNHost = defaults.SkipPortscanOnCDNHost
 		cfg.NucleiRequireFingerprint = defaults.NucleiRequireFingerprint
 	case "internal":
-		cfg.EnableFOFA = false
 		cfg.EnableSubfinder = false
 		cfg.EnableDNSx = false
 		cfg.EnableCDNFilter = false

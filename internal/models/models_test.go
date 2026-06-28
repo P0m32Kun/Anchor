@@ -18,9 +18,6 @@ func TestDefaultPipelineConfig(t *testing.T) {
 		got  interface{}
 		want interface{}
 	}{
-		{"EnableFOFA", cfg.EnableFOFA, true},
-		{"FofaResultLimit", cfg.FofaResultLimit, 500},
-		{"FofaConcurrency", cfg.FofaConcurrency, 5},
 		{"EnableSubfinder", cfg.EnableSubfinder, true},
 		{"EnableDNSx", cfg.EnableDNSx, true},
 		{"EnableCDNFilter", cfg.EnableCDNFilter, true},
@@ -61,9 +58,6 @@ func TestDefaultExternalPipelineConfigFull(t *testing.T) {
 	cfg := DefaultExternalPipelineConfig()
 
 	// Inherits from DefaultPipelineConfig
-	if !cfg.EnableFOFA {
-		t.Error("EnableFOFA should be inherited as true")
-	}
 	if !cfg.EnableSubfinder {
 		t.Error("EnableSubfinder should be inherited as true")
 	}
@@ -83,8 +77,6 @@ func TestDefaultExternalPipelineConfigFull(t *testing.T) {
 		{"NucleiRateLimitPerMinute", cfg.NucleiRateLimitPerMinute, 30},
 		{"FfufRateLimit", cfg.FfufRateLimit, 4},
 		{"EnablePassiveSearch", cfg.EnablePassiveSearch, true},
-		{"EnablePassiveCert", cfg.EnablePassiveCert, true},
-		{"EnablePassiveURL", cfg.EnablePassiveURL, true},
 		{"SubfinderMode", cfg.SubfinderMode, "passive"},
 		{"EnableKatana", cfg.EnableKatana, true},
 		{"KatanaMaxDepth", cfg.KatanaMaxDepth, 2},
@@ -130,8 +122,6 @@ func TestDefaultExternalLowNoisePipelineConfig(t *testing.T) {
 		{"FfufTimeout", cfg.FfufTimeout, 20},
 		{"EnableKatana", cfg.EnableKatana, false},
 		{"EnablePassiveSearch", cfg.EnablePassiveSearch, true},
-		{"EnablePassiveCert", cfg.EnablePassiveCert, true},
-		{"EnablePassiveURL", cfg.EnablePassiveURL, true},
 		{"SubfinderMode", cfg.SubfinderMode, "passive"},
 		{"PassiveSearchResultLimit", cfg.PassiveSearchResultLimit, 300},
 		{"PassiveSearchConcurrency", cfg.PassiveSearchConcurrency, 2},
