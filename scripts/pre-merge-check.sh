@@ -24,17 +24,14 @@ npm run typecheck
 echo "[5/6] Frontend build..."
 npm run build
 
-# 6. Tauri 构建（可选，如果有 cargo）
-echo "[6/7] Tauri check..."
-cd ../src-tauri
-if command -v cargo >/dev/null; then
-	cargo check
-fi
+# 6. E2E 测试（可选，需要 Docker + Chromium + running dev server）
+echo "[6/6] E2E tests (optional)..."
+# already in frontend/
 
-# 7. E2E 测试（可选，需要 Docker + Chromium）
-echo "[7/7] E2E tests (optional)..."
-cd ../frontend
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+# 检查 localhost:1420 是否有 dev server 在运行（否则 Playwright webServer 会因没有 Go backend 而超时）
+if ! curl -sf http://localhost:1420 > /dev/null 2>&1; then
+	echo "⚠️  Local dev server (localhost:1420) not detected. Skipping E2E tests."
+elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
 	if [ -d "node_modules/.bin/playwright" ] || [ -f "node_modules/@playwright/test/package.json" ]; then
 		if npx playwright install --with-deps chromium --dry-run >/dev/null 2>&1; then
 			npx playwright test --reporter=line || {

@@ -440,24 +440,6 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 	if cfg.PortRange == "" {
 		cfg.PortRange = defaults.PortRange
 	}
-	if cfg.SubfinderRateLimit == 0 {
-		cfg.SubfinderRateLimit = defaults.SubfinderRateLimit
-	}
-	if cfg.SubfinderThreads == 0 {
-		cfg.SubfinderThreads = defaults.SubfinderThreads
-	}
-	if cfg.SubfinderTimeout == 0 {
-		cfg.SubfinderTimeout = defaults.SubfinderTimeout
-	}
-	if cfg.DNSxRateLimit == 0 {
-		cfg.DNSxRateLimit = defaults.DNSxRateLimit
-	}
-	if cfg.DNSxThreads == 0 {
-		cfg.DNSxThreads = defaults.DNSxThreads
-	}
-	if cfg.DNSxTimeout == 0 {
-		cfg.DNSxTimeout = defaults.DNSxTimeout
-	}
 	if cfg.NaabuRate == 0 {
 		cfg.NaabuRate = defaults.NaabuRate
 	}

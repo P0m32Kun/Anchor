@@ -22,7 +22,7 @@ func (p *ExternalProfile) Rules() []ActionRule {
 		{Action: ActionPassiveURL, Enabled: false, MaxDepth: 0, Precondition: isSubdomain},
 
 		// Active actions
-		{Action: ActionSubdomainEnum, Enabled: true, MaxDepth: 1, Precondition: isSubdomain},
+		{Action: ActionSubdomainEnum, Enabled: true, MaxDepth: 0, Precondition: isSubdomain},
 		{Action: ActionDNSResolve, Enabled: true, MaxDepth: 1, Precondition: isSubdomainOrIP},
 		{Action: ActionCDNCheck, Enabled: true, MaxDepth: -1, Precondition: isIP},
 		{Action: ActionPortScan, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: func(a *DiscoveryAsset, _ Profile) bool {

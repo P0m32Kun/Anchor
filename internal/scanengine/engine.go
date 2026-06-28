@@ -430,13 +430,6 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 		return nil
 	}
 
-	// Check idle timeout → wind_down
-	if state == "running" && time.Since(lastAsset) > e.config.IdleTimeout {
-		log.Printf("[scanengine] idle timeout reached (%v), entering wind_down", e.config.IdleTimeout)
-		e.setEngineState("wind_down")
-		state = "wind_down"
-	}
-
 	allTerminal, err := e.store.AllTerminal(e.runID)
 	if err != nil {
 		return err
@@ -448,6 +441,13 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 	if state == "running" && allTerminal && queueEmpty && inFlight == 0 {
 		e.setEngineState("stopped")
 		return nil
+	}
+
+	// Check idle timeout → wind_down (only when no pending/running work remains)
+	if state == "running" && allTerminal && time.Since(lastAsset) > e.config.IdleTimeout {
+		log.Printf("[scanengine] idle timeout reached (%v), entering wind_down", e.config.IdleTimeout)
+		e.setEngineState("wind_down")
+		state = "wind_down"
 	}
 
 	// wind_down → stopped when drained

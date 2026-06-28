@@ -141,6 +141,7 @@ func TestWorkerServer_handleTask_accepted(t *testing.T) {
 	if result["status"] != "accepted" {
 		t.Errorf("response status = %q, want accepted", result["status"])
 	}
+	ws.WaitForTasks()
 }
 
 func TestWorkerServer_handleTask_badRequest(t *testing.T) {

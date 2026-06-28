@@ -493,3 +493,11 @@ func (ws *WorkerServer) handleFile(w http.ResponseWriter, r *http.Request) {
 
 
 
+
+// WaitForTasks waits for all running tasks to complete.
+// Used in tests to ensure cleanup happens after goroutines finish.
+func (ws *WorkerServer) WaitForTasks() {
+	for ws.runningTasks.Load() > 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+}

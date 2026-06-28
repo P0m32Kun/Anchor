@@ -30,7 +30,7 @@ func (p *internalProfile) RequireFingerprint() bool { return true }
 
 func (p *internalProfile) Rules() []ActionRule {
 	return []ActionRule{
-		{Action: ActionSubdomainEnum, Enabled: true, MaxDepth: 1, Precondition: isSubdomain},
+		{Action: ActionSubdomainEnum, Enabled: true, MaxDepth: 0, Precondition: isSubdomain},
 		{Action: ActionDNSResolve, Enabled: true, MaxDepth: -1, Precondition: isSubdomainOrIP},
 		// 内网模式不做 CDN 过滤（Fix 1: internal 不上报 cdn_filter stage）
 		{Action: ActionPortScan, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPAndAlive},

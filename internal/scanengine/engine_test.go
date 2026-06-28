@@ -142,6 +142,75 @@ func TestEngine_IdleTimeout_WindDown(t *testing.T) {
 	}
 }
 
+func TestEngine_IdleTimeout_DoesNotWindDownWithPendingWork(t *testing.T) {
+	// Track whether the executor was called for the pending work item
+	var pendingExecuted int64
+
+	fake := &fakeExecutor{
+		behavior: func(ctx context.Context, w *models.ScanWorkItem) (*toolrun.InvokeResult, error) {
+			if w.ID == "w-pending-batch" {
+				atomic.AddInt64(&pendingExecuted, 1)
+			}
+			return &toolrun.InvokeResult{Task: &models.ScanTask{ID: "t"}, Stdout: nil}, nil
+		},
+	}
+	cfg := DefaultEngineConfig()
+	cfg.SchedulerTick = 20 * time.Millisecond
+	cfg.IdleTimeout = 100 * time.Millisecond // very short idle timeout
+	cfg.AbsoluteTimeout = 5 * time.Second
+	engine, queries := setupTestEngine(t, fake, cfg)
+
+	// Create a valid asset so buildParams can resolve the host value
+	if err := queries.CreateAsset(&models.Asset{
+		ID:              "a-batch-host",
+		ProjectID:       "proj1",
+		Type:            models.AssetTypeIP,
+		Value:           "10.0.0.99",
+		NormalizedValue: "10.0.0.99",
+		FirstSeen:       time.Now(),
+		LastSeen:        time.Now(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a pending work item that references the valid asset
+	if err := queries.CreateScanWorkItem(&models.ScanWorkItem{
+		ID:        "w-pending-batch",
+		RunID:     "run1",
+		ProjectID: "proj1",
+		AssetID:   "a-batch-host",
+		Action:    string(core.ActionHTTPXFingerprint),
+		Status:    models.WorkStatusPending,
+		Stage:     "web",
+		BucketKey: "tier1:HTTPX_FINGERPRINT",
+		CreatedAt: time.Now(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := engine.Run(ctx, []string{"10.0.0.1"})
+	if err != nil && err != context.DeadlineExceeded && err != context.Canceled {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The pending work item should have been executed (not skipped)
+	if atomic.LoadInt64(&pendingExecuted) == 0 {
+		t.Error("pending work item was never executed — idle timeout triggered too early")
+	}
+
+	// Verify the work item was processed (done, not skipped)
+	w, _ := queries.GetScanWorkItem("w-pending-batch")
+	if w != nil && w.Status == models.WorkStatusPending {
+		t.Error("work item still pending after engine stopped")
+	}
+	if w != nil && w.Status == models.WorkStatusSkipped {
+		t.Errorf("work item was skipped (reason: %s) — should have been executed", w.SkipReason)
+	}
+}
+
 func TestEngine_ConcurrencyBound(t *testing.T) {
 	var maxConcurrent int64
 	var currentConcurrent int64

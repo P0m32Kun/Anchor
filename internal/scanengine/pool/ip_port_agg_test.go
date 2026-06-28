@@ -6,11 +6,9 @@ import (
 
 func TestIPPortAggregator_MergesPortsPerIP(t *testing.T) {
 	dir := t.TempDir()
-	var flushes int
-	var last FlushEvent
+	var events []FlushEvent
 	agg := NewIPPortAggregator(dir, func(_ string, ev FlushEvent) {
-		flushes++
-		last = ev
+		events = append(events, ev)
 	})
 
 	agg.Add("1.2.3.4", 80, "a1", "b1")
@@ -22,13 +20,28 @@ func TestIPPortAggregator_MergesPortsPerIP(t *testing.T) {
 	}
 
 	agg.FlushAll()
-	if flushes != 2 {
-		t.Fatalf("flushes = %d, want 2", flushes)
+	if len(events) != 2 {
+		t.Fatalf("flushes = %d, want 2", len(events))
 	}
-	if len(last.Members) != 1 {
-		t.Fatalf("last batch members = %d", len(last.Members))
+
+	// FlushAll iterates a map so order is non-deterministic.
+	// Find the event for 5.6.7.8 and the event for 1.2.3.4 by members count.
+	var singleIP, multiIP *FlushEvent
+	for _, ev := range events {
+		if len(ev.Members) == 1 {
+			singleIP = &ev
+		} else if len(ev.Members) == 2 {
+			multiIP = &ev
+		}
 	}
-	ports := SortedPortsFromMembers(last.Members)
+	if singleIP == nil {
+		t.Fatal("expected an event with 1 member for 5.6.7.8")
+	}
+	if multiIP == nil {
+		t.Fatal("expected an event with 2 members for 1.2.3.4")
+	}
+
+	ports := SortedPortsFromMembers(singleIP.Members)
 	if len(ports) != 1 || ports[0] != 22 {
 		t.Fatalf("ports = %v", ports)
 	}

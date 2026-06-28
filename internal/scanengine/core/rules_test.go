@@ -131,7 +131,7 @@ func TestDeriveEligibleWorks_SubdomainOnlyAtDepth01(t *testing.T) {
 		t.Fatal("subdomain enum should be eligible at depth 0")
 	}
 
-	// Depth 1: still eligible
+	// Depth 1: NOT eligible (subdomain enum only runs on seed targets)
 	a.DiscoveryDepth = 1
 	works = DeriveEligibleWorks(a, profile)
 	hasSubdomain = false
@@ -140,8 +140,8 @@ func TestDeriveEligibleWorks_SubdomainOnlyAtDepth01(t *testing.T) {
 			hasSubdomain = true
 		}
 	}
-	if !hasSubdomain {
-		t.Fatal("subdomain enum should be eligible at depth 1")
+	if hasSubdomain {
+		t.Fatal("subdomain enum should NOT be eligible at depth 1")
 	}
 
 	// Depth 2: not eligible

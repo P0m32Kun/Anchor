@@ -20,13 +20,7 @@ type PipelineConfig struct {
 	FofaResultLimit          int    `json:"fofa_result_limit"`
 	FofaConcurrency          int    `json:"fofa_concurrency"`
 	EnableSubfinder          bool   `json:"enable_subfinder"`
-	SubfinderRateLimit       int    `json:"subfinder_rate_limit"`
-	SubfinderThreads         int    `json:"subfinder_threads"`
-	SubfinderTimeout         int    `json:"subfinder_timeout"`
 	EnableDNSx               bool   `json:"enable_dnsx"`
-	DNSxRateLimit            int    `json:"dnsx_rate_limit"`
-	DNSxThreads              int    `json:"dnsx_threads"`
-	DNSxTimeout              int    `json:"dnsx_timeout"`
 	EnableCDNFilter          bool   `json:"enable_cdn_filter"`
 	PortRange                string `json:"port_range"`
 	NaabuRate                int    `json:"naabu_rate"`
@@ -81,13 +75,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		FofaResultLimit:          500,
 		FofaConcurrency:          5,
 		EnableSubfinder:          true,
-		SubfinderRateLimit:       50,
-		SubfinderThreads:         10,
-		SubfinderTimeout:         30, // seconds; aligns with subfinder CLI default
 		EnableDNSx:               true,
-		DNSxRateLimit:            100,
-		DNSxThreads:              50,
-		DNSxTimeout:              5,
 		EnableCDNFilter:          true,
 		PortRange:                "high-risk",
 		NaabuRate:                1000,
