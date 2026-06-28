@@ -196,7 +196,7 @@ export default function RunsPage() {
   const refreshRunDetails = useCallback(
     async (runId: string, signal?: AbortSignal) => {
       try {
-        const [taskData, stageData, metricsData, summaryData] = await Promise.all([
+        const [taskData, stageData, metricsData, summaryData, workData, toolCallsData] = await Promise.all([
           api.getRunTasks(runId, signal).catch(() => null),
           projectId
             ? api.listPipelineRunStages(projectId, runId, signal).catch(() => null)
@@ -207,11 +207,25 @@ export default function RunsPage() {
           projectId
             ? api.getRunSummary(projectId, runId, signal).catch(() => null)
             : Promise.resolve(null),
+          projectId
+            ? api.listScanRunWorks(projectId, runId, { page: 1, page_size: RUN_DETAIL_PAGE_SIZE }, signal).catch(() => null)
+            : Promise.resolve(null),
+          projectId
+            ? api.listToolCallLogs(projectId, runId, { page: 1, page_size: RUN_DETAIL_PAGE_SIZE }, signal).catch(() => null)
+            : Promise.resolve(null),
         ]);
         if (taskData) setTasks(taskData);
         if (stageData) setStages(stageData.stages ?? []);
         if (metricsData) setMetrics(metricsData);
         if (summaryData) setRunSummary(summaryData);
+        if (workData) {
+          setWorks(workData.items ?? []);
+          setWorksTotal(workData.total ?? 0);
+        }
+        if (toolCallsData) {
+          setToolCallLogs(toolCallsData.items ?? []);
+          setToolCallsTotal(toolCallsData.total ?? 0);
+        }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
       }

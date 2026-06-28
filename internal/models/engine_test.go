@@ -16,9 +16,6 @@ func TestDefaultExternalPipelineConfig(t *testing.T) {
 	if !cfg.EnablePassiveSearch {
 		t.Error("EnablePassiveSearch should be true")
 	}
-	if cfg.SubfinderMode != "passive" {
-		t.Errorf("SubfinderMode = %q, want passive", cfg.SubfinderMode)
-	}
 	if cfg.NucleiRequireFingerprint != true {
 		t.Error("NucleiRequireFingerprint should be true")
 	}

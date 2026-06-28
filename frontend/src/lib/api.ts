@@ -1062,17 +1062,6 @@ export interface RunSummaryResponse {
 }
 
 export interface PipelineConfig {
-  enable_fofa: boolean;
-  fofa_result_limit: number;
-  fofa_concurrency: number;
-  enable_subfinder: boolean;
-  subfinder_rate_limit: number;
-  subfinder_threads: number;
-  subfinder_timeout: number;
-  enable_dnsx: boolean;
-  dnsx_rate_limit: number;
-  dnsx_threads: number;
-  dnsx_timeout: number;
   enable_cdn_filter: boolean;
   port_range: string;
   naabu_rate: number;
@@ -1091,26 +1080,16 @@ export interface PipelineConfig {
   enable_ffuf: boolean;
   ffuf_rate_limit: number;
   ffuf_timeout: number;
-  ffuf_dictionary_id: string;
   katana_timeout: number;
-  // External-scan-only fields
-  enable_passive_search: boolean;
-  enable_passive_cert: boolean;
-  enable_passive_url: boolean;
-  subfinder_mode: string; // passive | active | off
   enable_katana: boolean;
   katana_max_depth: number;
   katana_rate_limit: number;
-  ffuf_tier: string; // small | medium | off
   skip_portscan_on_cdn_host: boolean;
   nuclei_require_fingerprint: boolean;
   passive_search_result_limit: number;
   passive_search_concurrency: number;
   enable_passive_junk_filter: boolean;
   passive_junk_keywords?: string[];
-  subfinder_provider_config: string;
-  scan_mode?: string; // "internal" | "external" (legacy: external_low → external + noise_level=low)
-  noise_level?: string; // "low" | "standard" — only for external mode
   enable_spoor: boolean;
 }
 
@@ -1187,17 +1166,6 @@ export interface DashboardStats {
 export const DEFAULT_FFUF_DICTIONARY_ID = "builtin:path/top100.txt";
 
 export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
-  enable_fofa: true,
-  fofa_result_limit: 500,
-  fofa_concurrency: 5,
-  enable_subfinder: true,
-  subfinder_rate_limit: 50,
-  subfinder_threads: 10,
-  subfinder_timeout: 30,
-  enable_dnsx: true,
-  dnsx_rate_limit: 100,
-  dnsx_threads: 50,
-  dnsx_timeout: 5,
   enable_cdn_filter: true,
   port_range: "top1000",
   naabu_rate: 1000,
@@ -1216,22 +1184,15 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   enable_ffuf: true,
   ffuf_rate_limit: 6,
   ffuf_timeout: 30,
-  ffuf_dictionary_id: DEFAULT_FFUF_DICTIONARY_ID,
   enable_katana: true,
   katana_max_depth: 2,
   katana_rate_limit: 10,
   katana_timeout: 10,
-  enable_passive_search: false,
-  enable_passive_cert: false,
-  enable_passive_url: false,
-  subfinder_mode: "active",
-  ffuf_tier: "off",
   skip_portscan_on_cdn_host: false,
   nuclei_require_fingerprint: false,
   passive_search_result_limit: 500,
   passive_search_concurrency: 3,
   enable_passive_junk_filter: false,
-  subfinder_provider_config: "",
   enable_spoor: false,
 };
 
@@ -1245,46 +1206,14 @@ export const DEFAULT_EXTERNAL_PIPELINE_CONFIG: PipelineConfig = {
   nuclei_concurrency: 5,
   nuclei_rate_limit_per_min: 30,
   ffuf_rate_limit: 4,
-  enable_passive_search: true,
-  enable_passive_cert: true,
-  enable_passive_url: true,
-  subfinder_mode: "passive",
-  katana_timeout: 10,
-  ffuf_tier: "small",
-  skip_portscan_on_cdn_host: true,
-  nuclei_require_fingerprint: true,
-  passive_search_result_limit: 500,
-  passive_search_concurrency: 3,
-  enable_passive_junk_filter: true,
-  passive_junk_keywords: [],
-  enable_ffuf: false,
   enable_katana: false,
 };
 
 export const DEFAULT_EXTERNAL_STANDARD_PIPELINE_CONFIG: PipelineConfig = {
   ...DEFAULT_EXTERNAL_PIPELINE_CONFIG,
-  scan_mode: "external",
-  noise_level: "standard",
-  port_range: "top100",
-  naabu_rate: 300,
-  naabu_threads: 50,
-  nuclei_scan_depth: "workflow",
   nuclei_rate_limit: 10,
-  nuclei_concurrency: 5,
-  nuclei_rate_limit_per_min: 30,
   nuclei_require_fingerprint: true,
-  enable_ffuf: true,
-  ffuf_tier: "small",
-  ffuf_rate_limit: 4,
-  enable_katana: false,
   enable_spoor: true,
-  enable_passive_search: true,
-  enable_passive_cert: true,
-  enable_passive_url: true,
-  subfinder_mode: "passive",
-  passive_search_result_limit: 500,
-  passive_search_concurrency: 3,
-  enable_passive_junk_filter: true,
 };
 
 // Mirrors internal/worker/commands.go:HighRiskPorts — curated list of high-value
@@ -1304,7 +1233,7 @@ export const DEFAULT_HIGH_RISK_PORTS =
 export interface ScanDefaultsResponse {
   high_risk_ports: string;
   ffuf_dictionary_default: string;
-  presets: Partial<Record<"external" | "internal" | "external_low" | "external_standard", PipelineConfig>>;
+  presets: Partial<Record<"external" | "internal", PipelineConfig>>;
   junk_keyword_count: number;
   exclude_domain_count: number;
   config_path?: string;

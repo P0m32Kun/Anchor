@@ -3,7 +3,7 @@ import { E2E_API_BASE, E2E_API_TOKEN } from "./e2e-env";
 const API_BASE = E2E_API_BASE;
 const API_TOKEN = E2E_API_TOKEN;
 
-async function apiFetch(
+export async function apiFetch(
 	path: string,
 	options?: RequestInit,
 ): Promise<Response> {
@@ -148,6 +148,13 @@ export async function updateProject(
 		body: JSON.stringify(data),
 	});
 	return res.json();
+}
+
+export async function updateProjectScopeBoundaryMode(
+	id: string,
+	mode: string,
+): Promise<Project> {
+	return updateProject(id, { scope_boundary_mode: mode } as Record<string, unknown>);
 }
 
 export async function deleteProject(id: string): Promise<void> {
@@ -505,4 +512,14 @@ export async function waitForPipelineRun(
 		status = run.status;
 	}
 	return { status };
+}
+export async function createScanRun(
+	projectId: string,
+	data: Record<string, unknown>,
+): Promise<Run> {
+	const res = await apiFetch(`/projects/${projectId}/runs`, {
+		method: "POST",
+		body: JSON.stringify(data),
+	});
+	return res.json();
 }

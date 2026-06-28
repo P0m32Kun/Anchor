@@ -10,11 +10,10 @@ import {
   TP_PRESET_VALUES,
   TP_PRESET_LABELS,
   TpPresetValue,
-  Dictionary,
   api,
 } from "../lib/api";
 import { cn } from "../lib/utils";
-import { Zap, Globe, Shield, Gauge, Cpu, CheckCircle2, RotateCcw, ChevronRight, ChevronDown, Search } from "lucide-react";
+import { Zap, Globe, Shield, Gauge, Cpu, CheckCircle2, RotateCcw, ChevronRight, ChevronDown } from "lucide-react";
 
 export type ScanMode = "external" | "internal";
 
@@ -37,8 +36,6 @@ function loadStoredConfig(mode: ScanMode): PipelineConfig {
 function loadStoredMode(): ScanMode {
   const raw = localStorage.getItem(SCAN_MODE_STORAGE_KEY);
   if (raw === "internal") return "internal";
-  // legacy: external_low / src_low_noise merged into external
-  if (raw === "external_low" || raw === "src_low_noise") return "external";
   return "external";
 }
 
@@ -68,7 +65,7 @@ const MODE_OPTIONS: {
     mode: "external",
     label: "外网扫描",
     description: "面向互联网的资产发现与漏洞检测",
-    tools: ["FOFA", "Subfinder", "DNSx", "CDNCheck", "nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Katana", "Ffuf"],
+    tools: ["FOFA", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Katana", "Ffuf"],
     icon: Globe,
     color: "text-blue-400",
   },
@@ -127,28 +124,7 @@ const BASE_TOOL_FIELDS: { group: string; fields: ToolField[]; icon: any }[] = [
   },
 ];
 
-const EXTERNAL_TOOL_FIELDS: { group: string; fields: ToolField[]; icon: any }[] = [
-  {
-    group: "Subfinder",
-    icon: Search,
-    fields: [
-      { key: "subfinder_rate_limit", label: "速率限制", unit: "rps", min: 10, max: 500, recommended: 50 },
-      { key: "subfinder_threads", label: "并发线程", unit: "", min: 5, max: 100, recommended: 10 },
-      { key: "subfinder_timeout", label: "超时", unit: "秒", min: 10, max: 600, recommended: 30 },
-    ],
-  },
-  {
-    group: "DNSx",
-    icon: Globe,
-    fields: [
-      { key: "dnsx_rate_limit", label: "速率限制", unit: "rps", min: 50, max: 1000, recommended: 100 },
-      { key: "dnsx_threads", label: "并发线程", unit: "", min: 10, max: 200, recommended: 50 },
-      { key: "dnsx_timeout", label: "超时", unit: "秒", min: 1, max: 30, recommended: 5 },
-    ],
-  },
-  ...BASE_TOOL_FIELDS,
-];
-
+const EXTERNAL_TOOL_FIELDS = BASE_TOOL_FIELDS;
 const INTERNAL_TOOL_FIELDS = BASE_TOOL_FIELDS;
 
 const SCAN_DEPTH_OPTIONS: {
@@ -175,10 +151,6 @@ const SCAN_DEPTH_OPTIONS: {
 
 type PortMode = "tp" | "p";
 
-// Derive UI state from the persisted port_range string. The backend (see
-// internal/worker/commands.go:BuildNaabuCommand) accepts top-N presets, the
-// magic "high-risk" alias, or a raw comma-separated port list — we normalize
-// those into the two-mode UI here.
 function decodePortRange(raw: string): {
   mode: PortMode;
   tpValue: TpPresetValue;
@@ -215,8 +187,6 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   const [config, setConfig] = useState<PipelineConfig>(() => loadStoredConfig(loadStoredMode()));
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  // Merge project pipeline config on mount so saved settings (e.g.
-  // nuclei_scan_depth) are honoured even when localStorage is stale.
   useEffect(() => {
     if (!projectId || !open) return;
     let cancelled = false;
@@ -309,18 +279,6 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   };
 
   const toolFields = mode === "external" ? EXTERNAL_TOOL_FIELDS : INTERNAL_TOOL_FIELDS;
-
-  const [dictionaries, setDictionaries] = useState<Dictionary[]>([]);
-  useEffect(() => {
-    if (config.enable_ffuf && dictionaries.length === 0) {
-      api.listDictionaries("dirscan").then(setDictionaries).catch(() => {});
-    }
-  }, [config.enable_ffuf]);
-
-  // Fix 3 frontend guard: ffuf without a dictionary would silently skip
-  // server-side. Disable the start button and flag the dictionary select so
-  // the user fixes it instead of losing ffuf coverage to a misconfiguration.
-  const ffufMisconfigured = config.enable_ffuf && !config.ffuf_dictionary_id;
 
   return (
     <Modal open={open} onClose={handleClose} title="新建扫描流水线" size="lg">
@@ -529,8 +487,8 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
           {/* 后台慢速扫描 */}
           <div className="space-y-4">
             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
-              <Search className="h-3 w-3" />
-              后台慢速扫描
+              <Gauge className="h-3 w-3" />
+              性能调优
             </label>
 
             {/* Toggle buttons */}
@@ -586,34 +544,6 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
                         <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">秒</span>
                       </div>
                     </div>
-                    {/* Dictionary selector */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-medium text-muted-foreground">字典</label>
-                      {dictionaries.length > 0 ? (
-                        <select
-                          value={config.ffuf_dictionary_id}
-                          onChange={(e) => setConfig((prev) => ({ ...prev, ffuf_dictionary_id: e.target.value }))}
-                          aria-label="Ffuf 字典"
-                          aria-invalid={ffufMisconfigured || undefined}
-                          className={cn(
-                            "w-full h-8 px-2 rounded-md bg-white/5 border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30",
-                            ffufMisconfigured ? "border-destructive/60 ring-1 ring-destructive/30" : "border-white/5"
-                          )}
-                        >
-                          <option value="" className="bg-slate-900">请选择字典</option>
-                          {dictionaries.map((d) => (
-                            <option key={d.id} value={d.id} className="bg-slate-900">
-                              {d.name} ({d.line_count} 行)
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="text-[10px] text-muted-foreground/50 py-1.5">请先上传字典</div>
-                      )}
-                      {ffufMisconfigured && (
-                        <div className="text-[10px] text-destructive">请选择 Ffuf 字典,或关闭 Ffuf</div>
-                      )}
-                    </div>
                   </div>
                 )}
               </div>
@@ -640,35 +570,20 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
                         <label className="text-[10px] font-medium text-muted-foreground">爬取深度</label>
                         <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 2</span>
                       </div>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={5}
-                        value={config.katana_max_depth}
-                        onChange={(e) => updateConfig("katana_max_depth", e.target.value)}
-                        className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-medium text-muted-foreground">速率限制</label>
-                        <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 10 req/s</span>
-                      </div>
                       <div className="relative">
                         <Input
                           type="number"
                           min={1}
-                          max={200}
-                          value={config.katana_rate_limit}
-                          onChange={(e) => updateConfig("katana_rate_limit", e.target.value)}
+                          max={10}
+                          value={config.katana_max_depth}
+                          onChange={(e) => updateConfig("katana_max_depth", e.target.value)}
                           className="h-8 bg-white/5 border-white/5 text-xs focus-visible:ring-primary/30"
                         />
-                        <span className="absolute right-2 top-1.5 text-[9px] font-bold text-muted-foreground/30">req/s</span>
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-medium text-muted-foreground">请求超时</label>
+                        <label className="text-[10px] font-medium text-muted-foreground">超时</label>
                         <span className="text-[9px] text-muted-foreground/40 font-mono italic">REC: 10秒</span>
                       </div>
                       <div className="relative">
@@ -731,39 +646,6 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
                 ))}
              </div>
 
-             {/* Subfinder Provider Config (external mode only) */}
-             {mode === "external" && (
-               <div className="space-y-2">
-                 <button
-                   type="button"
-                   onClick={() => setConfig((prev) => ({ ...prev, subfinder_provider_config: prev.subfinder_provider_config ? "" : "# 展开以编辑" }))}
-                   className="w-full text-left flex items-center gap-2 text-[10px] font-bold text-muted-foreground hover:text-primary transition-colors"
-                 >
-                   {config.subfinder_provider_config ? (
-                     <ChevronDown className="h-3 w-3" />
-                   ) : (
-                     <ChevronRight className="h-3 w-3" />
-                   )}
-                   Subfinder Provider Config (可选)
-                 </button>
-                 {config.subfinder_provider_config && (
-                   <div className="animate-in fade-in slide-in-from-top-1 duration-150 space-y-1.5">
-                     <textarea
-                       aria-label="Subfinder Provider Config YAML"
-                       value={config.subfinder_provider_config === "# 展开以编辑" ? "" : config.subfinder_provider_config}
-                       onChange={(e) => setConfig((prev) => ({ ...prev, subfinder_provider_config: e.target.value }))}
-                       rows={8}
-                       spellCheck={false}
-                       placeholder={`# 粘贴 subfinder provider-config.yaml 内容\n# 例如:\n# securitytrails:\n#   - YOUR_API_KEY\n# 留空则使用 worker 默认配置\n# (~/.config/subfinder/provider-config.yaml)`}
-                       className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/5 text-[11px] font-mono text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/30 resize-y leading-relaxed"
-                     />
-                     <p className="text-[10px] text-muted-foreground/60">
-                       粘贴 provider-config.yaml 内容，留空则使用 worker 默认配置 (~/.config/subfinder/provider-config.yaml)
-                     </p>
-                   </div>
-                 )}
-               </div>
-             )}
           </div>
               </div>
             )}
@@ -785,8 +667,6 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
               <Button
                 onClick={handleStart}
                 loading={loading}
-                disabled={loading || ffufMisconfigured}
-                title={ffufMisconfigured ? "请选择 Ffuf 字典或关闭 Ffuf" : undefined}
                 className="rounded-xl px-8 font-black shadow-lg shadow-primary/20"
               >
                 立即启动扫描
