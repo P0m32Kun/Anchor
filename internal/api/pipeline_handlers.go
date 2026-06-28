@@ -477,9 +477,6 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 		cfg.EnableHttpx = true
 		cfg.EnableNuclei = true
 		cfg.EnablePassiveSearch = defaults.EnablePassiveSearch
-		if cfg.SubfinderMode == "" {
-			cfg.SubfinderMode = defaults.SubfinderMode
-		}
 		if cfg.PassiveSearchResultLimit == 0 {
 			cfg.PassiveSearchResultLimit = defaults.PassiveSearchResultLimit
 		}

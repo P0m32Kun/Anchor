@@ -37,32 +37,22 @@ type PipelineConfig struct {
 	EnableFfuf       bool   `json:"enable_ffuf"`
 	FfufRateLimit    int    `json:"ffuf_rate_limit"`        // rps
 	FfufTimeout      int    `json:"ffuf_timeout"`           // seconds
-	FfufDictionaryID string `json:"ffuf_dictionary_id"`     // optional
 	// External-scan-only fields
 	EnablePassiveSearch      bool   `json:"enable_passive_search"`
-	SubfinderMode            string `json:"subfinder_mode"`             // passive | active | off
 	EnableKatana             bool   `json:"enable_katana"`
 	KatanaMaxDepth           int    `json:"katana_max_depth"`
 	KatanaRateLimit          int    `json:"katana_rate_limit"`
 	KatanaTimeout            int    `json:"katana_timeout"` // per-request seconds
-	FfufTier                 string `json:"ffuf_tier"`                  // small | medium | off
 	SkipPortscanOnCDNHost    bool   `json:"skip_portscan_on_cdn_host"`
 	NucleiRequireFingerprint bool   `json:"nuclei_require_fingerprint"`
 	PassiveSearchResultLimit int    `json:"passive_search_result_limit"`
 	PassiveSearchConcurrency int    `json:"passive_search_concurrency"`
 	EnablePassiveJunkFilter  bool   `json:"enable_passive_junk_filter"`
 	PassiveJunkKeywords      string `json:"passive_junk_keywords"`
-	// SubfinderProviderConfig is an optional YAML string for subfinder's
-	// provider-config.yaml. When non-empty, the pipeline writes it to a temp
-	// file and passes -pc <path> to subfinder. The file is automatically
-	// synced to remote workers via the dispatcher's input_files mechanism.
-	// Leave empty to use the worker's default (~/.config/subfinder/provider-config.yaml).
-	SubfinderProviderConfig string `json:"subfinder_provider_config,omitempty"`
 }
 
 
 
-// DefaultFfufDictionaryID is the default dictionary ID for ffuf.
 const DefaultFfufDictionaryID = "builtin:path/top100.txt"
 func DefaultPipelineConfig() PipelineConfig {
 	return PipelineConfig{
@@ -87,7 +77,6 @@ func DefaultPipelineConfig() PipelineConfig {
 		EnableFfuf:       true,
 		FfufRateLimit:    6, // rps
 		FfufTimeout:      30,
-		FfufDictionaryID: "",
 		EnableKatana:    true,
 		KatanaMaxDepth:  2,
 		KatanaRateLimit: 10,
@@ -109,12 +98,10 @@ func DefaultExternalPipelineConfig() PipelineConfig {
 	cfg.NucleiRateLimitPerMinute = 30
 	cfg.FfufRateLimit = 4
 	cfg.EnablePassiveSearch = true
-	cfg.SubfinderMode = "passive"
 	cfg.EnableKatana = true
 	cfg.KatanaMaxDepth = 2
 	cfg.KatanaRateLimit = 10
 	cfg.KatanaTimeout = 10
-	cfg.FfufTier = "small"
 	cfg.SkipPortscanOnCDNHost = true
 	cfg.NucleiRequireFingerprint = true
 	cfg.PassiveSearchResultLimit = 500
@@ -135,12 +122,10 @@ func DefaultExternalLowNoisePipelineConfig() PipelineConfig {
 	cfg.NucleiRateLimitPerMinute = 20
 	cfg.NucleiRequireFingerprint = true
 	cfg.EnableFfuf = false
-	cfg.FfufTier = "small"
 	cfg.FfufRateLimit = 3
 	cfg.FfufTimeout = 20
 	cfg.EnableKatana = false
 	cfg.EnablePassiveSearch = true
-	cfg.SubfinderMode = "passive"
 	cfg.PassiveSearchResultLimit = 300
 	cfg.PassiveSearchConcurrency = 2
 	return cfg

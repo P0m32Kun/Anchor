@@ -25,7 +25,6 @@ presets:
     port_range: top100
     enable_passive_search: true
     enable_passive_junk_filter: true
-    subfinder_mode: passive
     httpx_rate_limit: 40
     httpx_threads: 15
     enable_ffuf: false
@@ -40,7 +39,6 @@ presets:
     nuclei_rate_limit_per_min: 30
     ffuf_rate_limit: 4
     ffuf_timeout: 20
-    ffuf_tier: small
     passive_search_result_limit: 500
     passive_search_concurrency: 3
 
@@ -48,7 +46,6 @@ presets:
     port_range: high-risk
     enable_passive_search: false
     enable_passive_junk_filter: false
-    subfinder_mode: active
     enable_ffuf: true
     enable_katana: true
     skip_portscan_on_cdn_host: false
@@ -62,7 +59,7 @@ presets:
     nuclei_concurrency: 25
     katana_rate_limit: 10
     ffuf_rate_limit: 6
-    ffuf_tier: "off"
+    ffuf_timeout: 30
 
 nuclei_tech_routing:
   jenkins:
