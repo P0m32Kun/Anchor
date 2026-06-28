@@ -115,54 +115,24 @@ func TestPresetValuesMatchDesignDoc(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 
-	// external_low: naabu 100/20, nuclei 5/3/20rpm
-	low := cfg.Preset("external_low")
-	if low.NaabuRate != 100 {
-		t.Errorf("external_low.NaabuRate = %d, want 100", low.NaabuRate)
+	// external: naabu 150/30, nuclei 10/5/30rpm, ffuf true by compiled default
+	ext := cfg.Preset("external")
+	if ext.NaabuRate != 150 {
+		t.Errorf("external.NaabuRate = %d, want 150", ext.NaabuRate)
 	}
-	if low.NaabuThreads != 20 {
-		t.Errorf("external_low.NaabuThreads = %d, want 20", low.NaabuThreads)
+	if ext.NaabuThreads != 30 {
+		t.Errorf("external.NaabuThreads = %d, want 30", ext.NaabuThreads)
 	}
-	if low.NucleiRateLimit != 5 {
-		t.Errorf("external_low.NucleiRateLimit = %d, want 5", low.NucleiRateLimit)
+	if ext.NucleiRateLimit != 10 {
+		t.Errorf("external.NucleiRateLimit = %d, want 10", ext.NucleiRateLimit)
 	}
-	if low.NucleiConcurrency != 3 {
-		t.Errorf("external_low.NucleiConcurrency = %d, want 3", low.NucleiConcurrency)
+	if ext.NucleiConcurrency != 5 {
+		t.Errorf("external.NucleiConcurrency = %d, want 5", ext.NucleiConcurrency)
 	}
-	if low.NucleiRateLimitPerMinute != 20 {
-		t.Errorf("external_low.NucleiRateLimitPerMinute = %d, want 20", low.NucleiRateLimitPerMinute)
+	if ext.NucleiRateLimitPerMinute != 30 {
+		t.Errorf("external.NucleiRateLimitPerMinute = %d, want 30", ext.NucleiRateLimitPerMinute)
 	}
-	if low.EnableFfuf {
-		t.Error("external_low.EnableFfuf should be false (design: off)")
-	}
-
-	// external_standard: naabu 150/30, nuclei 10/5/30rpm
-	std := cfg.Preset("external_standard")
-	if std.NaabuRate != 150 {
-		t.Errorf("external_standard.NaabuRate = %d, want 150", std.NaabuRate)
-	}
-	if std.NaabuThreads != 30 {
-		t.Errorf("external_standard.NaabuThreads = %d, want 30", std.NaabuThreads)
-	}
-	if std.NucleiRateLimit != 10 {
-		t.Errorf("external_standard.NucleiRateLimit = %d, want 10", std.NucleiRateLimit)
-	}
-	if std.NucleiConcurrency != 5 {
-		t.Errorf("external_standard.NucleiConcurrency = %d, want 5", std.NucleiConcurrency)
-	}
-	if std.NucleiRateLimitPerMinute != 30 {
-		t.Errorf("external_standard.NucleiRateLimitPerMinute = %d, want 30", std.NucleiRateLimitPerMinute)
-	}
-
-	// watch: naabu 150/30, nuclei 10/5/30rpm
-	watch := cfg.Preset("watch")
-	if watch.NaabuRate != 150 {
-		t.Errorf("watch.NaabuRate = %d, want 150", watch.NaabuRate)
-	}
-	if watch.NaabuThreads != 30 {
-		t.Errorf("watch.NaabuThreads = %d, want 30", watch.NaabuThreads)
-	}
-	if watch.NucleiRateLimit != 10 {
-		t.Errorf("watch.NucleiRateLimit = %d, want 10", watch.NucleiRateLimit)
+	if !ext.EnableFfuf {
+		t.Error("external.EnableFfuf should be true in compiled defaults")
 	}
 }

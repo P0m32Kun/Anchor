@@ -537,23 +537,15 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 	return cfg
 }
 
-// presetDefaults returns the default PipelineConfig for the given mode and noise level.
+// presetDefaults returns the default PipelineConfig for the given mode.
 // It normalizes legacy mode values before lookup.
 func presetDefaults(mode, noiseLevel string) models.PipelineConfig {
 	if sc := scanconfig.Get(); sc != nil {
-		// Construct the full preset name: "external_low", "external_standard", "internal"
-		presetName := mode
-		if mode == "external" && noiseLevel != "" {
-			presetName = "external_" + noiseLevel
-		}
-		return sc.Preset(presetName)
+		return sc.Preset(mode)
 	}
 	switch mode {
 	case "external":
-		if noiseLevel == "low" {
-			return models.DefaultExternalLowNoisePipelineConfig()
-		}
-		return models.DefaultExternalStandardPipelineConfig()
+		return models.DefaultExternalPipelineConfig()
 	default:
 		return models.DefaultPipelineConfig()
 	}

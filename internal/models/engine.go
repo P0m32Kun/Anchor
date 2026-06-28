@@ -176,6 +176,8 @@ func DefaultExternalLowNoisePipelineConfig() PipelineConfig {
 }
 
 // NormalizeScanMode normalizes the scan mode and noise level.
+// Legacy mode values "external_low", "external_standard", "src_low_noise", and "watch"
+// are mapped to "external" with the appropriate noise level.
 func NormalizeScanMode(mode, noise string) (string, string) {
 	switch mode {
 	case "external", "standard", "external_low", "src_low_noise":

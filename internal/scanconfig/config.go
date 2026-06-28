@@ -237,8 +237,7 @@ func (c *Config) DefaultsAPI() DefaultsResponse {
 		ExcludeDomainCount:    len(c.ExcludeDomains),
 		ConfigPath:            LoadPath(),
 	}
-	// Always include the canonical presets
-	names := map[string]bool{"external": true, "external_low": true, "external_standard": true, "internal": true}
+	names := map[string]bool{"external": true, "internal": true}
 	// Add any extra presets from YAML
 	for name := range c.PresetOverrides {
 		names[name] = true

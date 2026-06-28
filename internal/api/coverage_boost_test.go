@@ -391,9 +391,8 @@ func TestPresetDefaults_AllModes(t *testing.T) {
 		noiseLevel  string
 		expectTools bool
 	}{
-		{"external_standard", "external", "standard", true},
-		{"external_low", "external", "low", true},
-		{"external_empty_noise", "external", "", true},
+		{"external", "external", "", true},
+		{"external with low noise", "external", "low", true},
 		{"internal", "internal", "", false},
 		{"default", "", "", false},
 		{"unknown", "unknown", "", false},
