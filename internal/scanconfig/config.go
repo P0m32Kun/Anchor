@@ -188,18 +188,12 @@ func (c *Config) resolveFiles(dataDir string) error {
 	return nil
 }
 
-// Preset returns a PipelineConfig for the named scan mode preset merged onto models defaults.
-// Legacy mode value "src_low_noise" is normalized before lookup.
+// Preset returns a PipelineConfig for the named preset merged onto models defaults.
 func (c *Config) Preset(name string) models.PipelineConfig {
-	nMode, nNoise := models.NormalizeScanMode(name, "")
 	base := models.DefaultPipelineConfig()
-	switch nMode {
+	switch name {
 	case "external":
-		if nNoise == "low" {
-			base = models.DefaultExternalLowNoisePipelineConfig()
-		} else {
-			base = models.DefaultExternalStandardPipelineConfig()
-		}
+		base = models.DefaultExternalPipelineConfig()
 	case "internal":
 		// base already internal default
 	}

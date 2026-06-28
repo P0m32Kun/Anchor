@@ -57,7 +57,6 @@ type PipelineConfig struct {
 	KatanaRateLimit          int    `json:"katana_rate_limit"`
 	KatanaTimeout            int    `json:"katana_timeout"` // per-request seconds
 	FfufTier                 string `json:"ffuf_tier"`                  // small | medium | off
-	NoiseLevel               string `json:"noise_level"`
 	SkipPortscanOnCDNHost    bool   `json:"skip_portscan_on_cdn_host"`
 	NucleiRequireFingerprint bool   `json:"nuclei_require_fingerprint"`
 	PassiveSearchResultLimit int    `json:"passive_search_result_limit"`
@@ -70,8 +69,6 @@ type PipelineConfig struct {
 	// synced to remote workers via the dispatcher's input_files mechanism.
 	// Leave empty to use the worker's default (~/.config/subfinder/provider-config.yaml).
 	SubfinderProviderConfig string `json:"subfinder_provider_config,omitempty"`
-	// ScanMode is the scan mode preset: "external" | "internal"
-	ScanMode string `json:"scan_mode,omitempty"`
 }
 
 
@@ -151,8 +148,6 @@ func DefaultExternalPipelineConfig() PipelineConfig {
 // DefaultExternalLowNoisePipelineConfig returns a low-noise external config.
 func DefaultExternalLowNoisePipelineConfig() PipelineConfig {
 	cfg := DefaultExternalPipelineConfig()
-	cfg.ScanMode = "external"
-	cfg.NoiseLevel = "low"
 	cfg.PortRange = "top100"
 	cfg.NaabuRate = 100
 	cfg.NaabuThreads = 20
@@ -173,33 +168,6 @@ func DefaultExternalLowNoisePipelineConfig() PipelineConfig {
 	cfg.PassiveSearchResultLimit = 300
 	cfg.PassiveSearchConcurrency = 2
 	return cfg
-}
-
-// NormalizeScanMode normalizes the scan mode and noise level.
-// Legacy mode values "external_low", "external_standard", "src_low_noise", and "watch"
-// are mapped to "external" with the appropriate noise level.
-func NormalizeScanMode(mode, noise string) (string, string) {
-	switch mode {
-	case "external", "standard", "external_low", "src_low_noise":
-		if noise == "" {
-			if mode == "external_low" || mode == "src_low_noise" {
-				noise = "low"
-			} else {
-				noise = "standard"
-			}
-		}
-		return "external", noise
-	case "internal":
-		return "internal", noise
-	case "watch":
-		// legacy watch mode → external
-		if noise == "" {
-			noise = "standard"
-		}
-		return "external", noise
-	default:
-		return "external", noise
-	}
 }
 
 // DefaultExternalStandardPipelineConfig returns a standard external config.

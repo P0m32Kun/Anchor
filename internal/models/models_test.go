@@ -122,8 +122,6 @@ func TestDefaultExternalLowNoisePipelineConfig(t *testing.T) {
 		got  interface{}
 		want interface{}
 	}{
-		{"ScanMode", cfg.ScanMode, "external"},
-		{"NoiseLevel", cfg.NoiseLevel, "low"},
 		{"PortRange", cfg.PortRange, "top100"},
 		{"NaabuRate", cfg.NaabuRate, 100},
 		{"NaabuThreads", cfg.NaabuThreads, 20},
@@ -165,53 +163,6 @@ func TestDefaultExternalStandardPipelineConfig(t *testing.T) {
 	}
 	if cfg.NucleiRateLimit != ext.NucleiRateLimit {
 		t.Errorf("Standard NucleiRateLimit = %d, want %d", cfg.NucleiRateLimit, ext.NucleiRateLimit)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// engine.go — NormalizeScanMode
-// ---------------------------------------------------------------------------
-
-func TestNormalizeScanMode(t *testing.T) {
-	tests := []struct {
-		name       string
-		mode       string
-		noise      string
-		wantMode   string
-		wantNoise  string
-	}{
-		// external passthrough
-		{"external with noise", "external", "low", "external", "low"},
-		{"external empty noise", "external", "", "external", "standard"},
-		// standard → external, default noise
-		{"standard empty noise", "standard", "", "external", "standard"},
-		{"standard with noise", "standard", "high", "external", "high"},
-		// external_low → external, low noise default
-		{"external_low empty noise", "external_low", "", "external", "low"},
-		{"external_low with noise", "external_low", "high", "external", "high"},
-		// src_low_noise → external, low noise default
-		{"src_low_noise empty noise", "src_low_noise", "", "external", "low"},
-		{"src_low_noise with noise", "src_low_noise", "standard", "external", "standard"},
-		// internal passthrough
-		{"internal no noise", "internal", "", "internal", ""},
-		{"internal with noise", "internal", "low", "internal", "low"},
-		// watch → external
-		{"watch empty noise", "watch", "", "external", "standard"},
-		{"watch with noise", "watch", "low", "external", "low"},
-		// unknown → external
-		{"unknown mode", "something", "", "external", ""},
-		{"unknown with noise", "random", "high", "external", "high"},
-		// empty mode
-		{"empty mode", "", "", "external", ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotMode, gotNoise := NormalizeScanMode(tt.mode, tt.noise)
-			if gotMode != tt.wantMode || gotNoise != tt.wantNoise {
-				t.Errorf("NormalizeScanMode(%q, %q) = (%q, %q), want (%q, %q)",
-					tt.mode, tt.noise, gotMode, gotNoise, tt.wantMode, tt.wantNoise)
-			}
-		})
 	}
 }
 

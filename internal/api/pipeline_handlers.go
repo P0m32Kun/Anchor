@@ -436,13 +436,7 @@ func (s *Server) handleGetPipelineRunStages(w http.ResponseWriter, r *http.Reque
 // frontend controls these via the ScanModal tool section, and the backend respects
 // whatever the user submitted.
 func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineConfig {
-	// Normalize legacy mode values.
-	nMode, nNoise := models.NormalizeScanMode(mode, cfg.NoiseLevel)
-	cfg.ScanMode = nMode
-	if nNoise != "" {
-		cfg.NoiseLevel = nNoise
-	}
-	defaults := presetDefaults(nMode, nNoise)
+	defaults := presetDefaults(mode)
 	if cfg.PortRange == "" {
 		cfg.PortRange = defaults.PortRange
 	}
@@ -498,7 +492,7 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 		cfg.FofaConcurrency = defaults.FofaConcurrency
 	}
 
-	switch nMode {
+	switch mode {
 	case "external":
 		cfg.EnableFOFA = true
 		cfg.EnableSubfinder = true
@@ -538,8 +532,7 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 }
 
 // presetDefaults returns the default PipelineConfig for the given mode.
-// It normalizes legacy mode values before lookup.
-func presetDefaults(mode, noiseLevel string) models.PipelineConfig {
+func presetDefaults(mode string) models.PipelineConfig {
 	if sc := scanconfig.Get(); sc != nil {
 		return sc.Preset(mode)
 	}

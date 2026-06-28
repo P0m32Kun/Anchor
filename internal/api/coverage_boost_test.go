@@ -388,18 +388,16 @@ func TestPresetDefaults_AllModes(t *testing.T) {
 	tests := []struct {
 		name        string
 		mode        string
-		noiseLevel  string
 		expectTools bool
 	}{
-		{"external", "external", "", true},
-		{"external with low noise", "external", "low", true},
-		{"internal", "internal", "", false},
-		{"default", "", "", false},
-		{"unknown", "unknown", "", false},
+		{"external", "external", true},
+		{"internal", "internal", false},
+		{"default", "", false},
+		{"unknown", "unknown", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := presetDefaults(tt.mode, tt.noiseLevel)
+			cfg := presetDefaults(tt.mode)
 			if tt.expectTools && !cfg.EnableSubfinder {
 				t.Error("expected EnableSubfinder=true for external mode")
 			}

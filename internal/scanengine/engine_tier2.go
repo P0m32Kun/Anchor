@@ -175,8 +175,7 @@ func (e *ScanEngine) enqueueNucleiAsset(a *core.DiscoveryAsset, assetID, lineage
 	if url == "" {
 		return
 	}
-	noiseLevel := e.config.Pipeline.NoiseLevel
-	bucket, _, skip := e.nucleiRouter.Resolve(a.Attrs.Technologies, noiseLevel)
+	bucket, _, skip := e.nucleiRouter.Resolve(a.Attrs.Technologies)
 	if skip {
 		return
 	}

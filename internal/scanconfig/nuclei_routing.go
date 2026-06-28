@@ -1,8 +1,6 @@
 package scanconfig
 
-import (
-	"strings"
-)
+import "strings"
 
 // NucleiRouteEntry describes one tech→template-set mapping.
 type NucleiRouteEntry struct {
@@ -77,19 +75,15 @@ func DefaultNucleiRouter() *NucleiRouter {
 	}
 }
 
-// Resolve picks a nuclei bucket for the given technologies and noise level.
+// Resolve picks a nuclei bucket for the given technologies.
 // Returns bucket key (without "nuclei:" prefix), tags, and skip=true when no scan should run.
-func (r *NucleiRouter) Resolve(technologies []string, noiseLevel string) (bucket string, tags []string, skip bool) {
+func (r *NucleiRouter) Resolve(technologies []string) (bucket string, tags []string, skip bool) {
 	if r == nil {
 		r = DefaultNucleiRouter()
 	}
-	noiseLevel = strings.ToLower(strings.TrimSpace(noiseLevel))
-	if noiseLevel == "" {
-		noiseLevel = "low"
-	}
 
 	if len(technologies) == 0 {
-		if noiseLevel == "low" || r.defaultR.Action == "skip" {
+		if r.defaultR.Action == "skip" {
 			return "", nil, true
 		}
 		if len(r.defaultR.Tags) > 0 {
@@ -108,12 +102,6 @@ func (r *NucleiRouter) Resolve(technologies []string, noiseLevel string) (bucket
 		}
 	}
 
-	if noiseLevel == "low" {
-		if len(r.fallback.Tags) > 0 {
-			return "_fallback", append([]string(nil), r.fallback.Tags...), false
-		}
-		return "", nil, true
-	}
 	if len(r.fallback.Tags) > 0 {
 		return "_fallback", append([]string(nil), r.fallback.Tags...), false
 	}

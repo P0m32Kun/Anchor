@@ -4,7 +4,7 @@ import "testing"
 
 func TestNucleiRouter_ResolveKnownTech(t *testing.T) {
 	r := DefaultNucleiRouter()
-	bucket, tags, skip := r.Resolve([]string{"Nginx/1.18"}, "low")
+	bucket, tags, skip := r.Resolve([]string{"Nginx/1.18"})
 	if skip || bucket != "nginx" || len(tags) == 0 {
 		t.Fatalf("bucket=%q tags=%v skip=%v", bucket, tags, skip)
 	}
@@ -12,15 +12,15 @@ func TestNucleiRouter_ResolveKnownTech(t *testing.T) {
 
 func TestNucleiRouter_SkipNoTechLowNoise(t *testing.T) {
 	r := DefaultNucleiRouter()
-	_, _, skip := r.Resolve(nil, "low")
+	_, _, skip := r.Resolve(nil)
 	if !skip {
-		t.Fatal("expected skip for no tech at low noise")
+		t.Fatal("expected skip for no tech")
 	}
 }
 
 func TestNucleiRouter_FallbackUnknownTech(t *testing.T) {
 	r := DefaultNucleiRouter()
-	bucket, tags, skip := r.Resolve([]string{"unknown-widget"}, "low")
+	bucket, tags, skip := r.Resolve([]string{"unknown-widget"})
 	if skip || bucket != "_fallback" || len(tags) == 0 {
 		t.Fatalf("bucket=%q tags=%v skip=%v", bucket, tags, skip)
 	}
