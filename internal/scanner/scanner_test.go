@@ -3,13 +3,12 @@ package scanner
 import (
 	"context"
 	"errors"
-	"strings"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
-	"github.com/P0m32Kun/Anchor/internal/scanengine/executor"
 	"github.com/P0m32Kun/Anchor/internal/toolregistry"
 )
 
@@ -102,9 +101,8 @@ func TestScanner_EmptyTargets(t *testing.T) {
 		Action:         core.ActionPortScan,
 		Targets:        nil,
 		PortRange:      "top1000",
-		Budgets:        Budgets{Rate: 100, Threads: 10, Timeout: 1000},
-		ProjectID:      "proj-1",
-		RunID:          "run-1",
+		Budgets:        Budgets{Rate: 100, Threads: 10, TimeoutMs: 1000},
+		Authorization:  Authorization{ProjectID: "proj-1", RunID: "run-1"},
 		IdempotencyKey: "work-1",
 	}
 	_, err := s.Execute(context.Background(), req)
@@ -163,9 +161,8 @@ func TestScanner_Cancellation(t *testing.T) {
 		Action:         core.ActionPortScan,
 		Targets:        []string{"10.0.0.1"},
 		PortRange:      "top1000",
-		Budgets:        Budgets{Rate: 100, Threads: 10, Timeout: 1000},
-		ProjectID:      "proj-1",
-		RunID:          "run-1",
+		Budgets:        Budgets{Rate: 100, Threads: 10, TimeoutMs: 1000},
+		Authorization:  Authorization{ProjectID: "proj-1", RunID: "run-1"},
 		IdempotencyKey: "work-cancel-1",
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -207,9 +204,8 @@ func TestScanner_ScopeDenial(t *testing.T) {
 		Action:         core.ActionPortScan,
 		Targets:        []string{"10.0.0.99"},
 		PortRange:      "high-risk",
-		Budgets:        Budgets{Rate: 300, Threads: 50, Timeout: 2000},
-		ProjectID:      "proj-1",
-		RunID:          "run-1",
+		Budgets:        Budgets{Rate: 300, Threads: 50, TimeoutMs: 2000},
+		Authorization:  Authorization{ProjectID: "proj-1", RunID: "run-1"},
 		IdempotencyKey: "work-scope-1",
 	}
 	_, err := s.Execute(context.Background(), req)
@@ -230,101 +226,85 @@ func TestScanner_ScopeDenial(t *testing.T) {
 	}
 }
 
-// Parity with existing RenderParams seam: the guarded process adapter must produce identical argv.
+// Parity with existing RenderParams seam: the guarded process adapter must
+// produce the same argv as the legacy engine path (engine.go buildParams →
+// toolregistry.Render), given the same semantic values.
 func TestScanner_NaabuParity(t *testing.T) {
 	reg := testRegistry(t)
+	s := New(reg, &fakeRunner{}, newFakeDB(), t.TempDir())
 
 	cases := []struct {
 		name      string
 		portRange string
 		rate      int
 		threads   int
+		timeoutMs int
 	}{
-		{"high-risk", "high-risk", 300, 50},
-		{"top1000", "top1000", 1000, 100},
+		{"high-risk", "high-risk", 300, 50, 1000},
+		{"top1000", "top1000", 1000, 100, 0},
 	}
+
+	const hostFile = "/tmp/hosts.txt" // deterministic host file for both paths
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			hostFile, cleanup, err := executor.WriteHostFile(tmpDir, []string{"10.0.0.1"})
-			if err != nil {
-				t.Fatalf("write host file: %v", err)
-			}
-			defer cleanup()
-
-			classicParams := toolregistry.RenderParams{
-				"host_file":  hostFile,
-				"port_range": tc.portRange,
-				"rate":       tc.rate,
-				"threads":    tc.threads,
-			}
-			wantArgv, err := reg.Render("naabu", classicParams)
-			if err != nil {
-				t.Fatalf("classic Render: %v", err)
-			}
-
-			db := newFakeDB()
-			runner := &fakeRunner{}
-			s := New(reg, runner, db, tmpDir)
 			req := ScanRequest{
 				Action:         core.ActionPortScan,
 				Targets:        []string{"10.0.0.1"},
 				PortRange:      tc.portRange,
-				Budgets:        Budgets{Rate: tc.rate, Threads: tc.threads},
-				ProjectID:      "proj-1",
-				RunID:          "run-1",
+				Budgets:        Budgets{Rate: tc.rate, Threads: tc.threads, TimeoutMs: tc.timeoutMs},
+				Authorization:  Authorization{ProjectID: "proj-1", RunID: "run-1"},
 				IdempotencyKey: "work-parity-" + tc.name,
 			}
-			_, err = s.Execute(context.Background(), req)
+
+			got, err := s.renderArgs("naabu", req, hostFile)
 			if err != nil {
-				t.Fatalf("scanner Execute: %v", err)
+				t.Fatalf("scanner renderArgs: %v", err)
 			}
 
-			taskID := "work-parity-" + tc.name
-			task, ok := db.tasks[taskID]
-			if !ok {
-				t.Fatalf("task not found")
-			}
-			cmd := task.CommandTemplate
-			if tc.portRange == "high-risk" {
-				if !strings.Contains(cmd, "21,22") {
-					t.Fatalf("high-risk port list not in command %q", cmd)
-				}
-				if !strings.Contains(cmd, "-p") {
-					t.Fatalf("-p flag missing in %q", cmd)
-				}
-			}
-			if tc.portRange == "top1000" {
-				if !strings.Contains(cmd, "-tp") || !strings.Contains(cmd, "1000") {
-					t.Fatalf("top1000 preset not in %q", cmd)
-				}
-			}
-			for _, flag := range []string{"-rate", "-c"} {
-				if !strings.Contains(cmd, flag) {
-					t.Fatalf("flag %s missing in scanner command %q vs classic %v", flag, cmd, wantArgv)
-				}
-			}
-
-			// Deterministic parity: same RenderParams with fixed host_file must produce identical argv (sorted)
-			deterministicHost := "/tmp/hosts.txt"
-			classic2 := toolregistry.RenderParams{
-				"host_file":  deterministicHost,
+			// Independent source of truth: the legacy engine builds exactly
+			// these RenderParams for ActionPortScan (see engine.go buildParams).
+			legacy := toolregistry.RenderParams{
+				"host_file":  hostFile,
 				"port_range": tc.portRange,
 				"rate":       tc.rate,
 				"threads":    tc.threads,
+				"timeout":    tc.timeoutMs,
 			}
-			want2, _ := reg.Render("naabu", classic2)
-			got2, _ := reg.Render("naabu", classic2)
-			if !equalArgvSorted(want2, got2) {
-				t.Fatalf("parity mismatch: got %v want %v", got2, want2)
+			want, err := reg.Render("naabu", legacy)
+			if err != nil {
+				t.Fatalf("legacy Render: %v", err)
 			}
-			_ = wantArgv
+			// Compare as token sets: registry.Render iterates a map, so argv order
+			// is non-deterministic (its own golden tests use ArgvSetMinus).
+			if !equalArgvSet(got, want) {
+				t.Fatalf("parity mismatch:\ngot:  %v\nwant: %v", got, want)
+			}
+
+			// Absolute anchor: the adapter must keep the naabu CLI shape stable —
+			// key tokens from the registry golden fixtures must be present.
+			gotSet := toolregistry.ArgvSetMinus(got, nil)
+			if tc.portRange == "high-risk" {
+				if !slices.Contains(gotSet, "-p") {
+					t.Fatalf("high-risk preset missing -p in %v", got)
+				}
+			}
+			if tc.portRange == "top1000" {
+				if !slices.Contains(gotSet, "-tp") || !slices.Contains(gotSet, "1000") {
+					t.Fatalf("top1000 preset missing in %v", got)
+				}
+			}
+			for _, flag := range []string{"-rate", "-c", "-json", "-list"} {
+				if !slices.Contains(gotSet, flag) {
+					t.Fatalf("flag %s missing in scanner argv %v", flag, got)
+				}
+			}
 		})
 	}
 }
 
-func equalArgvSorted(a, b []string) bool {
+// equalArgvSet compares two argv slices as unordered token sets.
+func equalArgvSet(a, b []string) bool {
 	aa := toolregistry.ArgvSetMinus(a, nil)
 	bb := toolregistry.ArgvSetMinus(b, nil)
 	if len(aa) != len(bb) {

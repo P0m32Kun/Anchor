@@ -1196,9 +1196,8 @@ func (e *ScanEngine) executePortScanViaScanner(ctx context.Context, w *models.Sc
 		Action:         core.ActionPortScan,
 		Targets:        []string{host},
 		PortRange:      cfg.PortRange,
-		Budgets:        scanner.Budgets{Rate: cfg.NaabuRate, Threads: cfg.NaabuThreads, Timeout: cfg.NaabuTimeout},
-		ProjectID:      e.projectID,
-		RunID:          e.runID,
+		Budgets:        scanner.Budgets{Rate: cfg.NaabuRate, Threads: cfg.NaabuThreads, TimeoutMs: cfg.NaabuTimeout},
+		Authorization:  scanner.Authorization{ProjectID: e.projectID, RunID: e.runID},
 		IdempotencyKey: w.ID,
 	}
 	return e.scanner.Execute(ctx, req)

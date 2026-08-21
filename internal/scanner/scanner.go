@@ -87,7 +87,7 @@ func (s *Scanner) Execute(ctx context.Context, req ScanRequest) (*ScanResult, er
 	}
 	if s.scopeChecker != nil {
 		for _, t := range req.Targets {
-			excluded, err := s.scopeChecker.IsExcluded(req.ProjectID, t)
+			excluded, err := s.scopeChecker.IsExcluded(req.Authorization.ProjectID, t)
 			if err != nil {
 				return nil, fmt.Errorf("scope check: %w", err)
 			}
@@ -100,10 +100,36 @@ func (s *Scanner) Execute(ctx context.Context, req ScanRequest) (*ScanResult, er
 		return nil, err
 	}
 
-	if req.Action != core.ActionPortScan {
-		return nil, fmt.Errorf("%w: unsupported action %s", ErrInvalidRequest, req.Action)
-	}
 	return s.executePortScan(ctx, req)
+}
+
+// mapNaabuParams maps a ScanRequest to the registry's RenderParams for the
+// naabu tool. This is the guarded process adapter's contract seam: the CLI
+// shape is owned here, in native tool units, so the engine never learns flags.
+// hostFile is provided by the caller (WriteHostFile) and passed through verbatim.
+func mapNaabuParams(req ScanRequest, hostFile string) toolregistry.RenderParams {
+	return toolregistry.RenderParams{
+		"host_file":  hostFile,
+		"port_range": req.PortRange,
+		"rate":       req.Budgets.Rate,
+		"threads":    req.Budgets.Threads,
+		"timeout":    req.Budgets.TimeoutMs,
+	}
+}
+
+// renderArgs renders and allowlist-validates argv for a request.
+// It is the testable seam for process-adapter parity with toolregistry.Render.
+func (s *Scanner) renderArgs(toolID string, req ScanRequest, hostFile string) ([]string, error) {
+	params := mapNaabuParams(req, hostFile)
+	argv, err := s.registry.Render(toolID, params)
+	if err != nil {
+		return nil, fmt.Errorf("render %s: %w", toolID, err)
+	}
+	allowlist := toolguard.NewAllowlistFromBinaries(s.registry.Binaries())
+	if err := allowlist.Validate(argv[0], argv[1:]); err != nil {
+		return nil, fmt.Errorf("allowlist: %w", err)
+	}
+	return argv, nil
 }
 
 func (s *Scanner) executePortScan(ctx context.Context, req ScanRequest) (*ScanResult, error) {
@@ -117,23 +143,13 @@ func (s *Scanner) executePortScan(ctx context.Context, req ScanRequest) (*ScanRe
 	}
 	defer cleanup()
 
-	params := toolregistry.RenderParams{
-		"host_file":  hostFile,
-		"port_range": req.PortRange,
-		"rate":       req.Budgets.Rate,
-		"threads":    req.Budgets.Threads,
-		"timeout":    req.Budgets.Timeout,
-	}
+	params := mapNaabuParams(req, hostFile)
 
-	// Guarded process adapter path: render → allowlist → invoke
+	// Guarded process adapter path: render → allowlist. toolrun.Invoke re-renders
+	// and re-validates at the final boundary; this pre-check is defense in depth.
 	toolID := core.ActionToTool[core.ActionPortScan]
-	argv, err := s.registry.Render(toolID, params)
-	if err != nil {
-		return nil, fmt.Errorf("render %s: %w", toolID, err)
-	}
-	allowlist := toolguard.NewAllowlistFromBinaries(s.registry.Binaries())
-	if err := allowlist.Validate(argv[0], argv[1:]); err != nil {
-		return nil, fmt.Errorf("allowlist: %w", err)
+	if _, err := s.renderArgs(toolID, req, hostFile); err != nil {
+		return nil, err
 	}
 
 	// Provenance: ToolCallLog
@@ -148,7 +164,7 @@ func (s *Scanner) executePortScan(ctx context.Context, req ScanRequest) (*ScanRe
 		}
 		callLog := &models.ToolCallLog{
 			ID:         logID,
-			RunID:      req.RunID,
+			RunID:      req.Authorization.RunID,
 			WorkItemID: &req.IdempotencyKey,
 			Tool:       toolID,
 			Action:     string(req.Action),
@@ -169,8 +185,8 @@ func (s *Scanner) executePortScan(ctx context.Context, req ScanRequest) (*ScanRe
 		taskID = util.GenerateID()
 	}
 	res := toolrun.Invoke(ctx, s.db, s.runner, s.registry, toolrun.InvokeInput{
-		ProjectID: req.ProjectID,
-		RunID:     &req.RunID,
+		ProjectID: req.Authorization.ProjectID,
+		RunID:     &req.Authorization.RunID,
 		TaskID:    taskID,
 		ToolID:    toolID,
 		Params:    params,
