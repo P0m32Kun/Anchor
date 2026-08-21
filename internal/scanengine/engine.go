@@ -19,6 +19,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/parser"
 	"github.com/P0m32Kun/Anchor/internal/scanconfig"
+	"github.com/P0m32Kun/Anchor/internal/scanner"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/dedup"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/domainpool"
@@ -65,6 +66,7 @@ type ScanEngine struct {
 	merger           *asset.Merger
 	store            *work.Store
 	exec             executor.Executor
+	scanner          *scanner.Scanner
 	agg              *stageagg.Aggregator
 	dedup            *dedup.RunDedup
 	pq               *queue.PriorityQueue
@@ -128,7 +130,27 @@ func New(
 	stageCallback stageagg.StageEventCallback,
 ) *ScanEngine {
 	exec := executor.NewToolExecutor(queries, runner, tools, merger, dataDir)
-	return NewWithExecutor(queries, merger, profile, excludeMgr, scopeEng, dataDir, runID, projectID, config, stageCallback, exec)
+	sc := scanner.New(tools, runner, queries, dataDir).WithProvenance(queries)
+	if scopeEng != nil {
+		sc = sc.WithScopeChecker(&scopeAdapter{eng: scopeEng})
+	}
+	e := NewWithExecutor(queries, merger, profile, excludeMgr, scopeEng, dataDir, runID, projectID, config, stageCallback, exec)
+	e.scanner = sc
+	return e
+}
+
+// scopeAdapter adapts scope.Engine to scanner.ScopeChecker.
+type scopeAdapter struct {
+	eng *scope.Engine
+}
+
+func (a *scopeAdapter) IsExcluded(projectID string, target string) (bool, error) {
+	t := &models.Target{Type: models.TargetTypeDomain, Value: target}
+	if net.ParseIP(target) != nil {
+		t.Type = models.TargetTypeIP
+	}
+	// Use the engine's project-scoped check helper if available.
+	return a.eng.IsExcludedForProject(projectID, t)
 }
 
 // NewWithExecutor creates a ScanEngine with an injected Executor (for testing).
@@ -695,7 +717,35 @@ func (e *ScanEngine) executeWork(ctx context.Context, item queue.Item) {
 			}
 		}
 
-		// Build params based on action
+		// Semantic scanner path for port scan (P2-1 tracer): use typed ScanRequest when available
+		if e.scanner != nil && core.TaskAction(w.Action) == core.ActionPortScan && !w.BatchMode {
+			if scannerRes, scannerErr := e.executePortScanViaScanner(ctx, w); scannerErr == nil {
+				if scannerRes != nil {
+					_ = e.store.SetTaskID(w.ID, scannerRes.Receipt.TaskID)
+					w.TaskID = &scannerRes.Receipt.TaskID
+				}
+				if markErr := e.store.MarkDone(w.ID); markErr != nil {
+					log.Printf("[scanengine] MarkDone failed for %s: %v", w.ID, markErr)
+				}
+				e.onWorkComplete(ctx, w, scannerRes.Stdout)
+				e.agg.OnWorkCompleted(core.TaskAction(w.Action))
+				return
+			} else {
+				// Scanner errors: cancellation is not retryable, others fall through to retry logic
+				if ctx.Err() != nil || scannerErr == context.Canceled || scannerErr == context.DeadlineExceeded {
+					e.store.MarkFailed(w.ID, scannerErr.Error())
+					e.agg.OnWorkFailed(core.TaskAction(w.Action))
+					return
+				}
+				lastErr = scannerErr
+				if ctx.Err() != nil {
+					break
+				}
+				continue
+			}
+		}
+
+		// Build params based on action (legacy path)
 		params, cleanup, buildErr := e.buildParams(ctx, w)
 		if buildErr != nil {
 			// Build errors are not retryable (wrong config, etc.)
@@ -1128,6 +1178,30 @@ func (e *ScanEngine) assetHostValue(assetID string) (string, error) {
 		return "", fmt.Errorf("asset not found: %s", assetID)
 	}
 	return a.Value, nil
+}
+
+// SetScanner injects a scanner for testing.
+func (e *ScanEngine) SetScanner(s *scanner.Scanner) {
+	e.scanner = s
+}
+
+// executePortScanViaScanner executes a port-scan work item via the semantic scanner.
+func (e *ScanEngine) executePortScanViaScanner(ctx context.Context, w *models.ScanWorkItem) (*scanner.ScanResult, error) {
+	host, err := e.assetHostValue(w.AssetID)
+	if err != nil {
+		return nil, err
+	}
+	cfg := e.config.Pipeline
+	req := scanner.ScanRequest{
+		Action:         core.ActionPortScan,
+		Targets:        []string{host},
+		PortRange:      cfg.PortRange,
+		Budgets:        scanner.Budgets{Rate: cfg.NaabuRate, Threads: cfg.NaabuThreads, Timeout: cfg.NaabuTimeout},
+		ProjectID:      e.projectID,
+		RunID:          e.runID,
+		IdempotencyKey: w.ID,
+	}
+	return e.scanner.Execute(ctx, req)
 }
 
 func hostWithoutPort(host string) string {
