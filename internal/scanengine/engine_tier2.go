@@ -324,8 +324,13 @@ func (e *ScanEngine) processHTTPXOutput(ctx context.Context, parentForInput func
 			log.Printf("[scanengine] save web endpoint %s: %v", ep.URL, err)
 		} else if created && e.screenshotMgr != nil && !e.skipScreenshots() {
 			endpoint := ep
+			e.wg.Add(1)
 			go func() {
-				bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer e.wg.Done()
+				// Derive the capture timeout from the engine lifecycle ctx so
+				// cancellation propagates and the goroutine is awaited by
+				// waitForWorkers instead of racing dataDir teardown.
+				bgCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 				defer cancel()
 				if _, err := e.screenshotMgr.CaptureForEndpoint(bgCtx, endpoint, 30*time.Second); err != nil {
 					log.Printf("[scanengine] screenshot %s: %v", endpoint.URL, err)
