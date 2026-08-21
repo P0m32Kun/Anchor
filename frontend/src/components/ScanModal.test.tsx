@@ -116,7 +116,7 @@ describe("ScanModal — ffuf toggle", () => {
     render(<ScanModal open onClose={() => {}} onStart={onStart} projectId="proj-1" />);
 
     await waitFor(() => expect(api.getScanDefaults).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole("button", { name: "内网扫描" }));
+    fireEvent.click(screen.getByRole("button", { name: /内网扫描/ }));
     fireEvent.click(screen.getByRole("button", { name: "快速启动" }));
 
     expect(onStart).toHaveBeenCalledWith(

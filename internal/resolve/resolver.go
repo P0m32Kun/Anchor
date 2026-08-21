@@ -99,6 +99,19 @@ func (r *Resolver) resolveOne(ctx context.Context, domain string) (models.DNSRec
 		CNAMEs: []string{},
 	}
 
+	// Local validation: reject inputs that should never reach public DNS.
+	if strings.TrimSpace(domain) == "" {
+		return record, fmt.Errorf("empty domain")
+	}
+	if net.ParseIP(domain) != nil {
+		return record, fmt.Errorf("IP address, not a domain: %s", domain)
+	}
+	// RFC 2606 reserves .invalid, .example, .localhost, .test, .local
+	lower := strings.ToLower(domain)
+	if strings.HasSuffix(lower, ".invalid") {
+		return record, fmt.Errorf("reserved domain suffix: %s", domain)
+	}
+
 	// Use the first available resolver
 	resolver := r.servers[0]
 	record.Resolver = resolver

@@ -112,7 +112,7 @@ func isWebEntry(a *DiscoveryAsset, _ Profile) bool {
 // isHTTPXCandidate covers assets that should be probed by httpx before becoming HTTP services.
 func isHTTPXCandidate(a *DiscoveryAsset, _ Profile) bool {
 	switch a.Type {
-	case AssetSubdomain, AssetIPPort:
+	case AssetSubdomain, AssetIPPort, AssetCIDR:
 		return true
 	case AssetIP:
 		return a.Attrs.Alive != nil && *a.Attrs.Alive
