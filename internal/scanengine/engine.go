@@ -18,8 +18,7 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/finding"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/parser"
-	"github.com/P0m32Kun/Anchor/internal/scope"
-	"github.com/P0m32Kun/Anchor/internal/screenshot"
+	"github.com/P0m32Kun/Anchor/internal/scanconfig"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/core"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/dedup"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/domainpool"
@@ -30,7 +29,8 @@ import (
 	"github.com/P0m32Kun/Anchor/internal/scanengine/seed"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/stageagg"
 	"github.com/P0m32Kun/Anchor/internal/scanengine/work"
-	"github.com/P0m32Kun/Anchor/internal/scanconfig"
+	"github.com/P0m32Kun/Anchor/internal/scope"
+	"github.com/P0m32Kun/Anchor/internal/screenshot"
 	"github.com/P0m32Kun/Anchor/internal/toolregistry"
 	"github.com/P0m32Kun/Anchor/internal/util"
 	"github.com/P0m32Kun/Anchor/internal/worker"
@@ -38,13 +38,13 @@ import (
 
 // EngineConfig holds configuration for the ScanEngine.
 type EngineConfig struct {
-	IdleTimeout          time.Duration // how long to wait for new assets before wind_down
-	AbsoluteTimeout      time.Duration // hard limit on run duration; 0 disables
-	SchedulerTick        time.Duration // how often the scheduler checks for pending work
-	BatchSize            int           // deprecated: kept for tests; use SchedulerConcurrency
-	SchedulerConcurrency int           // if > 0, caps global concurrency instead of ComputeLimits
-	Tier1FlushTimeout    time.Duration // Tier-1 pool flush timeout; 0 = default (10s)
-	Tier2FlushTimeout    time.Duration // Tier-2 pool flush timeout; 0 = use Tier1/default
+	IdleTimeout          time.Duration         // how long to wait for new assets before wind_down
+	AbsoluteTimeout      time.Duration         // hard limit on run duration; 0 disables
+	SchedulerTick        time.Duration         // how often the scheduler checks for pending work
+	BatchSize            int                   // deprecated: kept for tests; use SchedulerConcurrency
+	SchedulerConcurrency int                   // if > 0, caps global concurrency instead of ComputeLimits
+	Tier1FlushTimeout    time.Duration         // Tier-1 pool flush timeout; 0 = default (10s)
+	Tier2FlushTimeout    time.Duration         // Tier-2 pool flush timeout; 0 = use Tier1/default
 	Pipeline             models.PipelineConfig // tool-specific settings (rate, threads, timeout, port_range, etc.)
 }
 
@@ -61,53 +61,54 @@ func DefaultEngineConfig() EngineConfig {
 
 // ScanEngine is the asset-driven scan engine.
 type ScanEngine struct {
-	queries    *db.Queries
-	merger     *asset.Merger
-	store      *work.Store
-	exec       executor.Executor
-	agg        *stageagg.Aggregator
-	dedup      *dedup.RunDedup
-	pq         *queue.PriorityQueue
-	config     EngineConfig
-	profile    core.Profile
-	excludeMgr     *exclude.Manager
-	scopeEng       *scope.Engine
-	nucleiPersist  *finding.NucleiPersister
-	screenshotMgr  *screenshot.Manager
-	dataDir        string
-	runID          string
-	projectID      string
-	assetDepth     sync.Map // assetID -> int discovery depth
-	assetBuckets   sync.Map // assetID -> bucket key string
-	seedValueBucket map[string]string
-	seedTargetCount int
-	bucketInflight  map[string]int
+	queries          *db.Queries
+	merger           *asset.Merger
+	store            *work.Store
+	exec             executor.Executor
+	agg              *stageagg.Aggregator
+	dedup            *dedup.RunDedup
+	pq               *queue.PriorityQueue
+	config           EngineConfig
+	profile          core.Profile
+	excludeMgr       *exclude.Manager
+	scopeEng         *scope.Engine
+	nucleiPersist    *finding.NucleiPersister
+	screenshotMgr    *screenshot.Manager
+	dataDir          string
+	runID            string
+	projectID        string
+	assetDepth       sync.Map // assetID -> int discovery depth
+	assetBuckets     sync.Map // assetID -> bucket key string
+	seedValueBucket  map[string]string
+	seedTargetCount  int
+	bucketInflight   map[string]int
 	bucketInflightMu sync.Mutex
 	ipThrottler      *scheduler.IPThrottler
-		hostPool         *pool.Pool
-		cdnPool          *pool.Pool
-		portPool         *pool.Pool
-		domainPool       *domainpool.Pool
-		httpPool         *pool.Pool
-		ipPortAgg        *pool.IPPortAggregator
-		nucleiBuckets    *pool.NucleiTagBuckets
-		nucleiRouter     *scanconfig.NucleiRouter
-		tier1Scheduled   map[string]struct{}
-		tier1Mu          sync.Mutex
-		tier1Stopped     sync.Once
-		tier2Scheduled   map[string]struct{}
-		tier2Mu          sync.Mutex
-		tier2Stopped     sync.Once
+	alivePool        *pool.Pool
+	hostPool         *pool.Pool
+	cdnPool          *pool.Pool
+	portPool         *pool.Pool
+	domainPool       *domainpool.Pool
+	httpPool         *pool.Pool
+	ipPortAgg        *pool.IPPortAggregator
+	nucleiBuckets    *pool.NucleiTagBuckets
+	nucleiRouter     *scanconfig.NucleiRouter
+	tier1Scheduled   map[string]struct{}
+	tier1Mu          sync.Mutex
+	tier1Stopped     sync.Once
+	tier2Scheduled   map[string]struct{}
+	tier2Mu          sync.Mutex
+	tier2Stopped     sync.Once
 
 	mu             sync.Mutex
 	engineState    string
-	startedAt      time.Time     // when the engine started (for absolute timeout)
-	lastNewAssetAt time.Time     // last time a new asset was discovered (for idle timeout)
+	startedAt      time.Time // when the engine started (for absolute timeout)
+	lastNewAssetAt time.Time // last time a new asset was discovered (for idle timeout)
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
 	inFlight       int32
-	sem            chan struct{} // concurrency limiter
-	maxRetries     int          // max retries for failed work items
+	sem            chan struct{}                          // concurrency limiter
+	maxRetries     int                                    // max retries for failed work items
 	onNewAsset     func(assetID, value, assetType string) // callback for new asset discovery
 }
 
@@ -176,8 +177,6 @@ func NewWithExecutor(
 	}
 }
 
-
-
 // SetOnNewAsset sets the callback for new asset discovery.
 func (e *ScanEngine) SetOnNewAsset(fn func(assetID, value, assetType string)) {
 	e.onNewAsset = fn
@@ -193,8 +192,8 @@ func (e *ScanEngine) Run(ctx context.Context, targets []string) error {
 		return err
 	}
 
-		e.initTier1Pools(ctx)
-		e.initTier2Pools(ctx)
+	e.initTier1Pools(ctx)
+	e.initTier2Pools(ctx)
 
 	// Seed initial targets as assets
 	if e.seedTargetCount < 1 {
@@ -256,9 +255,13 @@ func (e *ScanEngine) Run(ctx context.Context, targets []string) error {
 }
 
 func (e *ScanEngine) finalizeRun(ctx context.Context) {
+	// Drain first, while the pool loops are still running: completion
+	// callbacks can still add pool members, and those members must be
+	// flushed and scheduled before the pools are stopped. By the time the
+	// pools stop they are empty, so their final flush creates no new work.
+	e.drainUntilQuiescent(ctx)
 	e.stopTier1PoolsOnce()
 	e.stopTier2PoolsOnce()
-	e.drainUntilQuiescent(ctx)
 	e.waitForWorkers()
 }
 
@@ -272,7 +275,7 @@ func (e *ScanEngine) drainUntilQuiescent(ctx context.Context) {
 		if err != nil {
 			return
 		}
-		if allTerminal && e.pq.IsEmpty() && atomic.LoadInt32(&e.inFlight) == 0 {
+		if allTerminal && e.pq.IsEmpty() && atomic.LoadInt32(&e.inFlight) == 0 && !e.poolsHavePendingMembers() {
 			return
 		}
 		select {
@@ -280,6 +283,65 @@ func (e *ScanEngine) drainUntilQuiescent(ctx context.Context) {
 			return
 		case <-time.After(e.config.SchedulerTick):
 		}
+	}
+}
+
+// poolsHavePendingMembers reports whether any batching pool still holds
+// members that have not been turned into work items yet.
+func (e *ScanEngine) poolsHavePendingMembers() bool {
+	if e.hostPool != nil && e.hostPool.Len() > 0 {
+		return true
+	}
+	if e.alivePool != nil && e.alivePool.Len() > 0 {
+		return true
+	}
+	if e.cdnPool != nil && e.cdnPool.Len() > 0 {
+		return true
+	}
+	if e.portPool != nil && e.portPool.Len() > 0 {
+		return true
+	}
+	if e.domainPool != nil && e.domainPool.Len() > 0 {
+		return true
+	}
+	if e.httpPool != nil && e.httpPool.Len() > 0 {
+		return true
+	}
+	if e.ipPortAgg != nil && e.ipPortAgg.Len() > 0 {
+		return true
+	}
+	if e.nucleiBuckets != nil && e.nucleiBuckets.Len() > 0 {
+		return true
+	}
+	return false
+}
+
+// flushAllPools forces every pool that holds members to flush them into work
+// items immediately instead of waiting for the flush timeout.
+func (e *ScanEngine) flushAllPools() {
+	if e.hostPool != nil {
+		e.hostPool.FlushNow()
+	}
+	if e.alivePool != nil {
+		e.alivePool.FlushNow()
+	}
+	if e.cdnPool != nil {
+		e.cdnPool.FlushNow()
+	}
+	if e.portPool != nil {
+		e.portPool.FlushNow()
+	}
+	if e.domainPool != nil {
+		e.domainPool.FlushNow()
+	}
+	if e.httpPool != nil {
+		e.httpPool.FlushNow()
+	}
+	if e.ipPortAgg != nil {
+		e.ipPortAgg.FlushAll()
+	}
+	if e.nucleiBuckets != nil {
+		e.nucleiBuckets.FlushAll()
 	}
 }
 
@@ -306,7 +368,6 @@ func (e *ScanEngine) RunWithSeeds(ctx context.Context, seeds []seed.SeedAsset) e
 	}
 	return e.Run(ctx, targets)
 }
-
 
 const workerDrainTimeout = 2 * time.Minute
 
@@ -378,20 +439,29 @@ func (e *ScanEngine) processNewAsset(ctx context.Context, a *core.DiscoveryAsset
 	}
 	e.assetDepth.Store(a.ID, a.DiscoveryDepth)
 	e.assetBuckets.Store(a.ID, e.resolveBucketKey(a))
+	if assetType != "" && a.ID != "" {
+		if err := asset.MergeAndSaveState(e.queries, a.ID, a.Attrs); err != nil {
+			log.Printf("[scanengine] save asset state %s: %v", a.ID, err)
+		}
+	}
 
+	e.enqueueDerivedWorks(ctx, a)
+}
+
+func (e *ScanEngine) enqueueDerivedWorks(ctx context.Context, a *core.DiscoveryAsset) {
 	// Derive eligible works
 	works := core.DeriveEligibleWorks(a, e.profile)
 	bucketKey := e.bucketForAssetID(a.ID)
 	for _, dw := range works {
 		dw.AssetID = a.ID
-			if e.isTier1Action(dw.Action) {
-				e.enqueueTier1Asset(ctx, a, dw, bucketKey)
-				continue
-			}
-			if e.isTier2PooledAction(dw.Action) {
-				e.enqueueTier2Asset(ctx, a, dw, bucketKey)
-				continue
-			}
+		if e.isTier1Action(dw.Action) {
+			e.enqueueTier1Asset(ctx, a, dw, bucketKey)
+			continue
+		}
+		if e.isTier2PooledAction(dw.Action) {
+			e.enqueueTier2Asset(ctx, a, dw, bucketKey)
+			continue
+		}
 		exists, _ := e.store.Exists(e.runID, a.ID, string(dw.Action))
 		if exists {
 			continue
@@ -411,6 +481,51 @@ func (e *ScanEngine) processNewAsset(ctx context.Context, a *core.DiscoveryAsset
 			BucketKey: bucketKey,
 		})
 	}
+}
+
+func (e *ScanEngine) mergeAssetStateAndReenqueue(ctx context.Context, assetID string, delta core.AssetAttrs) {
+	if assetID == "" {
+		return
+	}
+	if err := asset.MergeAndSaveState(e.queries, assetID, delta); err != nil {
+		log.Printf("[scanengine] merge asset state %s: %v", assetID, err)
+		return
+	}
+	dbAsset, err := e.queries.GetAssetByID(assetID)
+	if err != nil {
+		log.Printf("[scanengine] reload asset %s: %v", assetID, err)
+		return
+	}
+	if dbAsset == nil {
+		return
+	}
+	attrs, err := asset.LoadAttrsForEngine(e.queries, assetID)
+	if err != nil {
+		log.Printf("[scanengine] load asset state %s: %v", assetID, err)
+		return
+	}
+	a := &core.DiscoveryAsset{
+		ID:              dbAsset.ID,
+		Type:            modelAssetTypeToDiscoveryType(dbAsset.Type),
+		Value:           dbAsset.Value,
+		NormalizedValue: dbAsset.NormalizedValue,
+		DiscoveryDepth:  e.discoveryDepthForAssetID(assetID),
+		Attrs:           attrs,
+	}
+	if _, ok := e.assetBuckets.Load(assetID); !ok {
+		e.assetBuckets.Store(assetID, "asset:"+assetID)
+	}
+	core.ReconcileDiscoveryAsset(a)
+	e.enqueueDerivedWorks(ctx, a)
+}
+
+func (e *ScanEngine) discoveryDepthForAssetID(assetID string) int {
+	if v, ok := e.assetDepth.Load(assetID); ok {
+		if depth, ok := v.(int); ok {
+			return depth
+		}
+	}
+	return 0
 }
 
 // tick is called on each scheduler cycle.
@@ -436,6 +551,14 @@ func (e *ScanEngine) tick(ctx context.Context) error {
 	}
 	queueEmpty := e.pq.IsEmpty()
 	inFlight := atomic.LoadInt32(&e.inFlight)
+
+	// Members still buffered in a pool are work that has not reached the DB
+	// yet. Flush them into work items now and let the next tick schedule
+	// them; the engine must not stop while any pool still holds members.
+	if allTerminal && queueEmpty && inFlight == 0 && e.poolsHavePendingMembers() {
+		e.flushAllPools()
+		return nil
+	}
 
 	// Early completion: all work done, nothing queued or running
 	if state == "running" && allTerminal && queueEmpty && inFlight == 0 {
@@ -758,7 +881,6 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 		for _, pe := range parseErrs {
 			log.Printf("[scanengine] parse dnsx line %d: %s", pe.Line, pe.Message)
 		}
-		alive := true
 		for _, rec := range results {
 			for _, ip := range parser.ExtractDNSxIPs(rec) {
 				a := &core.DiscoveryAsset{
@@ -768,7 +890,6 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 					NormalizedValue: ip,
 					ParentID:        w.AssetID,
 					SourceTool:      "dnsx",
-					Attrs:           core.AssetAttrs{Alive: &alive},
 				}
 				e.prepareChildAsset(a, w.AssetID)
 				e.processNewAsset(ctx, a)
@@ -787,6 +908,21 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 			}
 		}
 
+	case core.ActionAliveCheck:
+		if w.BatchMode {
+			e.onBatchAliveComplete(ctx, w, stdout)
+			break
+		}
+		host, err := e.assetHostValue(w.AssetID)
+		if err != nil {
+			log.Printf("[scanengine] alive asset: %v", err)
+			return
+		}
+		membersJSON, _ := json.Marshal([]models.WorkBatchMember{{AssetID: w.AssetID, Value: host}})
+		single := *w
+		single.MemberAssetIDs = string(membersJSON)
+		e.onBatchAliveComplete(ctx, &single, stdout)
+
 	case core.ActionCDNCheck:
 		if w.BatchMode {
 			e.onBatchCDNComplete(ctx, w, stdout)
@@ -802,13 +938,23 @@ func (e *ScanEngine) onWorkComplete(ctx context.Context, w *models.ScanWorkItem,
 			// cdncheck expects IPs; domain-level check is best-effort via resolved child IPs
 			return
 		}
-		_, cdnResults, err := cdn.ParseJSONLOutput(stdout, ips)
+		nonCDNIPs, cdnResults, err := cdn.ParseJSONLOutput(stdout, ips)
 		if err != nil {
 			log.Printf("[scanengine] parse cdncheck: %v", err)
 			return
 		}
+		isNotCDN := false
+		for _, ip := range nonCDNIPs {
+			if strings.EqualFold(ip, host) {
+				e.mergeAssetStateAndReenqueue(ctx, w.AssetID, core.AssetAttrs{IsCDN: &isNotCDN})
+			}
+		}
 		isCDN := true
 		for _, r := range cdnResults {
+			if strings.EqualFold(r.IP, host) {
+				e.mergeAssetStateAndReenqueue(ctx, w.AssetID, core.AssetAttrs{IsCDN: &isCDN})
+				continue
+			}
 			a := &core.DiscoveryAsset{
 				ID:              util.GenerateID(),
 				Type:            core.AssetIP,
@@ -873,10 +1019,10 @@ func (e *ScanEngine) buildParams(ctx context.Context, w *models.ScanWorkItem) (t
 			profile = "deep"
 		}
 		params := toolregistry.RenderParams{
-			"host_file":  hostFile,
-			"profile":    profile,
-			"scan_depth": cfg.NucleiScanDepth,
-			"rate_limit": cfg.NucleiRateLimit,
+			"host_file":   hostFile,
+			"profile":     profile,
+			"scan_depth":  cfg.NucleiScanDepth,
+			"rate_limit":  cfg.NucleiRateLimit,
 			"concurrency": cfg.NucleiConcurrency,
 		}
 		if cfg.NucleiRateLimitPerMinute > 0 {
@@ -895,6 +1041,15 @@ func (e *ScanEngine) buildParams(ctx context.Context, w *models.ScanWorkItem) (t
 			"rate":       cfg.NaabuRate,
 			"threads":    cfg.NaabuThreads,
 			"timeout":    cfg.NaabuTimeout,
+		}, cleanup, nil
+
+	case core.ActionAliveCheck:
+		hostFile, cleanup, err := executor.WriteHostFile(e.dataDir, []string{host})
+		if err != nil {
+			return nil, nil, err
+		}
+		return toolregistry.RenderParams{
+			"host_file": hostFile,
 		}, cleanup, nil
 
 	case core.ActionServiceFingerprint:
@@ -1184,5 +1339,20 @@ func assetTypeToString(t core.AssetType) string {
 		return "url"
 	default:
 		return ""
+	}
+}
+
+func modelAssetTypeToDiscoveryType(t models.AssetType) core.AssetType {
+	switch t {
+	case models.AssetTypeIP:
+		return core.AssetIP
+	case models.AssetTypeCIDR:
+		return core.AssetCIDR
+	case models.AssetTypeURL:
+		return core.AssetHTTPService
+	case models.AssetTypeDomain:
+		return core.AssetSubdomain
+	default:
+		return core.AssetSubdomain
 	}
 }

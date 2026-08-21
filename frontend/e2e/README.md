@@ -2,10 +2,12 @@
 
 基于 **Playwright** 的自动化端到端测试，覆盖全部页面和核心用户流程。
 
-> **Docker 栈与 compose 说明**：见 [`docs/current/e2e-testing.md`](../../docs/current/e2e-testing.md)（与客户部署 [`deployment.md`](../../docs/current/deployment.md) 分离）。
+> **Docker 栈与 Compose 说明**：见 [`docs/runbooks/e2e-testing.md`](../../docs/runbooks/e2e-testing.md)，客户部署见 [`docs/runbooks/deployment.md`](../../docs/runbooks/deployment.md)。仓库级测试规则以 [`docs/conventions/testing.md`](../../docs/conventions/testing.md) 为准。
 >
 > 旧的 `.e2e.md` 手工测试计划文档仍保留在 `tests/` 目录中作为参考，但不再维护。
 > 所有新的测试用例应编写为 `.spec.ts` 文件。
+
+产品验收只覆盖授权互联网攻击面测绘。任何仍依赖 `internal` scan mode 的用例属于遗留兼容测试，不得作为新功能范例；它们将在独立的内网模式退出变更中删除或改写。
 
 ## Prerequisites
 

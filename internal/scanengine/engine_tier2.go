@@ -186,6 +186,12 @@ func (e *ScanEngine) onTier2PoolFlush(ctx context.Context, action core.TaskActio
 	if len(ev.Members) == 0 {
 		return
 	}
+	if ctx.Err() != nil {
+		// Run is cancelled: discard members instead of creating work that
+		// would be dispatched with a dead context.
+		log.Printf("[scanengine] discard tier2 pool flush %s gen %d: run cancelled", action, ev.Generation)
+		return
+	}
 	w, err := e.store.CreatePooledBatch(work.PooledBatchInput{
 		RunID:      e.runID,
 		ProjectID:  e.projectID,
@@ -216,9 +222,9 @@ func (e *ScanEngine) buildTier2BatchParams(w *models.ScanWorkItem) (toolregistry
 	switch core.TaskAction(w.Action) {
 	case core.ActionHTTPXFingerprint:
 		return toolregistry.RenderParams{
-			"host_file":  w.InputFile,
-			"rate":       cfg.HttpxRateLimit,
-			"threads":    cfg.HttpxThreads,
+			"host_file": w.InputFile,
+			"rate":      cfg.HttpxRateLimit,
+			"threads":   cfg.HttpxThreads,
 		}, nil, nil
 	case core.ActionServiceFingerprint:
 		members := parseBatchMembers(w)

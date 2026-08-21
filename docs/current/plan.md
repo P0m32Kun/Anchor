@@ -1,111 +1,152 @@
----
-status: active
-source_of_truth: true
-owner: kun
-last_updated: 2026-06-03
-scope: repository-wide
----
+# Current plan
 
-# Current Plan
+- Status: current
+- Updated: 2026-08-20
+- Theme: restore a trustworthy base, then evolve Anchor into a deterministic distributed internet attack-surface mapping platform
 
-This is the only repository-wide implementation plan that agents should treat as current by default.
+This is the only active repository-wide plan. Each ticket below is a bounded implementation entry point; its executor still enters the normal change-gate workflow. No ticket is complete from compilation alone: the listed acceptance evidence is required.
 
-## Current Baseline
+## Baseline evidence at restart
 
-- The last clearly completed milestone is `v0.4` ("smart scan pipeline + multi-target-type + Nuclei layered scanning").
-- Post-v0.4 increments (v2.1 selective ingestion PR1-3) merged to main 2026-05-16: batch finding buffer, resource governor, tool execution allowlist.
-- v0.4 acceptance criteria and test mapping live in [`../active/review/v0.4-acceptance.md`](../active/review/v0.4-acceptance.md).
-- If a document conflicts with this file, treat this file as the planning baseline unless the task explicitly says otherwise.
+The working tree contains substantial uncommitted user changes; they are preserved. The following read-only checks were observed before this plan was accepted:
 
-## Active Workstreams
+- `go vet ./...`: passed.
+- `go test ./...`: 2492 passed, 9 failed, 10 skipped. Failures cover CIDR asset schema/model agreement, resolver invalid-domain behavior, and liveness/port-scan eligibility semantics.
+- `make check-docs`: passed.
+- Frontend `tsc --noEmit`: passed.
+- Frontend unit tests: could not start because the installed Vitest 4.1.9 package expects a Vite export absent from the installed Vite 5.0.0 package.
 
-| Workstream | Status | Source of truth? | Notes |
-| --- | --- | --- | --- |
-| Code health audit | Accepted | Yes | Superseded by Slimdown 2026 audit; see [`slimdown-2026-summary.md`](../active/review/slimdown-2026-summary.md) for delta |
-| Documentation governance | Active | Yes | Consolidate navigation, mark document lifecycle, reduce agent confusion |
-| Current architecture baseline | Active | Yes | Defined in [`architecture.md`](architecture.md); synced 2026-06-01: added Evaluator module, Nuclei code templates |
-| Slimdown 2026 | Active | Yes | Repository-wide slimdown audit in [`slimdown-2026-handoff-for-implementer.md`](../active/review/slimdown-2026-handoff-for-implementer.md); T0-T6 reports at `docs/active/review/slimdown-*.md` |
-| v0.4 scan pipeline | Accepted | Yes | Verified by `docs/active/review/v0.4-acceptance.md`; design doc archived at `docs/archived/v0.4/scan-pipeline.md` (superseded 2026-05-12, see `architecture.md` for current baseline) |
-| Database migration notes for v0.4 | Accepted | Yes | Tied to v0.4; superseded plans now archived |
-| Asset-driven scan engine | Active | Yes | `internal/scanengine/` — 资产图 + Work + 属性门控 + 收敛；主路径 `POST /projects/{id}/scan`；基线见 [`architecture.md`](architecture.md) |
-| Asset-driven remediation (2026-06-03) | Accepted | Yes | 排除-only scope、Nuclei 入库、HTTP 链路、CI 门禁、发布对齐；设计 [`asset-driven-remediation-design.md`](asset-driven-remediation-design.md) |
-| Large-scale refactoring | Backlog | No | See [`../refactoring-plan.md`](../refactoring-plan.md) as an idea pool, not an approved release plan |
-| Design v2.1 selective ingestion | Active | Yes | PR1-3 merged to main (batch buffer, governor, allowlist); PR4 (asset_relations) remains backlog |
+These are restart evidence, not completion claims. P0 exits only after the full checks are green or an unavailable environment is explicitly recorded as acceptance debt.
 
-## Rules For New Work
+## Phase 0: restore a trustworthy base
 
-1. Promote only one repository-wide plan at a time.
-2. Keep proposal documents in `docs/design/` until they are accepted and verified.
-3. Move completed milestone plans to `docs/archived/`.
-4. If a task needs a short-lived task plan, keep it scoped to that task and link back here instead of creating another competing top-level roadmap.
-5. **改代码前先查执行流,不要手翻文件**:
-   - 修改 `internal/api/` 下的 handler 前,先看 [`internal/api/README.md`](../../internal/api/README.md) 的「字段反向索引」和「Handler 文件总览」,定位需要读的最小代码集。
-   - 修改任意 Go 符号前,先用 `gitnexus_query`(找执行流)或 `gitnexus_context`(看某个符号的 360° 视图)查清楚 blast radius,而不是 grep 或读全文件。
-   - 详细执行约束见项目根目录 `CLAUDE.md` 的「Always Do」与「文档同步约束」。
+### P0-1 — Go data and eligibility baseline
 
-## Exit Criteria For Promoting A Proposal
+- Goal: make CIDR persistence, DNS resolver error semantics, liveness, and port-scan eligibility agree across schema, models, code, and fixtures.
+- Owned paths: `internal/db/`, `internal/models/`, `internal/resolve/`, `internal/scanengine/core/`, `internal/scanengine/`, and their focused tests.
+- Entry condition: current nine Go test failures are reproduced on the ticket revision.
+- Acceptance: temporary SQLite migrations accept the supported internet asset types; invalid resolver inputs fail deterministically without public-DNS dependence; empty, cancelled, and mixed-validity cases are covered; CDN/HTTPX eligibility tests pass.
+- Verification: focused package tests, `go test ./...`, then `go vet ./...`.
+- Unlocks: P0-3 and all feature tickets.
 
-A proposal can replace this plan only when all of the following are true:
+### P0-2 — Deterministic frontend toolchain
 
-- its scope is approved,
-- its implementation status is clear,
-- the related E2E acceptance path is defined,
-- superseded plans are explicitly marked.
+- Goal: select one package manager and one lockfile, remove the Vitest/Vite incompatibility, and make install, typecheck, unit tests, and build reproducible.
+- Owned paths: `frontend/package.json`, the selected `frontend/*lock.yaml` or `frontend/*lock.json`, `frontend/pnpm-workspace.yaml` when applicable, `.github/workflows/`, `Makefile`, and `scripts/pre-merge-check.sh`.
+- Entry condition: P0-1 is green and the existing frontend dependency state is captured.
+- Acceptance: clean dependency installation from the selected lockfile; `typecheck`, unit tests, and production build all run in CI and locally using the same command.
+- Verification: frozen install, `npm run typecheck`, `npm run test:unit`, and `npm run build` (or the equivalent selected package-manager commands).
+- Unlocks: P0-3 and UI tickets.
 
-## Design v2.1 Selective Ingestion
+### P0-3 — Named internet-mapping smoke evidence
 
-来源:外部 PRD `pentest-arsenal v2.1`(Python+Vue 重写型 4 周 MVP)。整体不吸收(技术栈不兼容、相对当前 Anchor 是功能子集)。仅吸收下列 4 项真正补齐 Anchor 现有缺口的点。每一项交付都要落到 E2E 实测,build/typecheck 不算完成。
+- Goal: prove one bounded server/worker internet-mapping campaign with scope denial, worker health, cancellation, asset output, finding/evidence lineage, and cleanup.
+- Owned paths: `docker-compose.e2e*.yml`, `frontend/e2e/`, `docs/functional-test.md`, and the smallest required test fixtures.
+- Entry condition: P0-1 and P0-2 pass.
+- Acceptance: the named Docker-backed scenario runs against controlled fixtures; if Docker or a required fixture is unavailable, the exact debt and environment are recorded without claiming success.
+- Verification: the named Playwright/E2E smoke command plus artifact and database inspection.
+- Unlocks: Phase 1 and Phase 2.
 
-| # | 吸收项 | 优先级 | Anchor 现状 | 落点 (相对路径) | 验收信号 |
-|---|---|---|---|---|---|
-| 1 | Findings 批量写入缓冲 | P0 | 单条 INSERT,无 buffer | `internal/db/queries_finding.go` 增加 BatchInsert;`internal/workflow/pipeline_result.go` 改走 buffer | 高产出场景写入吞吐显著提升;进程异常退出时缓冲已 flush(注册关停钩子),无 finding 丢失 |
-| 2 | 资源治理(内存/CPU 阈值降级) | P1 | 无系统级资源保护,长扫易把笔记本拖死 | 新增 `internal/worker/resource_governor.go`;接入 `dispatcher.go` | 内存超阈值时新任务排队、CPU 超阈值时入队速率减半;阈值参数与上游工具单位一致(参考 [`feedback_no_unit_conversion`]) |
-| 3 | 工具二进制 allowlist + 参数白名单 | P1 | `exec.Command(bin, args...)` 已天然规避 shell 注入;但二进制路径与参数缺少集中白名单 | 复核 `internal/health/health.go`、`internal/worker/worker.go`、`internal/worker/server.go`、`internal/cdn/detector.go`、`internal/nuclei/custom/git.go` 五个 `exec.Command` 调用点;统一通过 allowlist 解析 | 任一非白名单二进制/参数调用被拒;新增工具时强制走注册流程 |
-| 4 | 资产关联图结构 (asset_relations) | P2 | 资产表扁平,无 (source, target, relation_type) 三元组 | 新增 `internal/db/v24.go` 迁移;模型 `internal/models/asset_relation.go`;查询 `internal/db/queries_asset_relation.go` | 至少能表达 domain→ip(belongs_to)、port→service(runs)、cidr→ip(contains);报告聚合时能挂载关联;先做后端,前端图谱可视化是 P3 再议 |
+## Phase 1: retire the dedicated internal scenario
 
-不吸收(已对照过、不必再做):
-- **Canonical Finding Schema**:`internal/models/finding.go` 的 Finding 模型已含 `source_tool` / `source_rule_id` / `dedup_key` / `severity` / `confidence` / `raw_request` 等,字段覆盖优于 PRD 提案,无需重做。
-- **Adapter/Pipeline/SSE/扫描模板/报告引擎**:`internal/workflow/pipeline*.go` 与 `stageemitter.go` 已实现且更完整,设计文档的版本是退步。
-- **Phase 0-3 路线图、技术栈替换、PyInstaller、单机启动密码**:与 Anchor 现有架构方向不一致,不采纳。
+### P1-1 — Explicit internal-mode compatibility exit
 
-每项完成时,把验收信号写进 `docs/active/review/`,并把对应行从本节移到 "Active Workstreams" 表的 `Accepted` 状态。
+- Goal: reject new `internal` requests, provide explicit handling for saved configurations, remove the dedicated UI choice and specialized branches, and retain only reusable internet primitives.
+- Owned paths: `internal/api/`, `internal/models/`, `internal/db/`, `internal/scanengine/`, `frontend/src/`, `frontend/e2e/`, migrations, and compatibility tests.
+- Entry condition: P0-3 is accepted and all legacy `internal` references are inventoried.
+- Acceptance: new requests receive a documented compatibility error; saved configurations are rejected or explicitly migrated without silently widening scope; UI, API, migration, unit, and E2E behavior agree.
+- Verification: focused API/database/frontend tests, migration test with an old configuration, and the named E2E path.
+- Unlocks: new internet-only capability work.
 
-### PR 进度（v2.1 selective ingestion）
+## Phase 2: semantic execution and distributed contract
 
-| PR | 吸收项 | 状态 | 提交 |
-|----|--------|------|------|
-| PR1 | Findings 批量写入缓冲 | Merged to main | `709bfff` |
-| PR2 | 资源治理（静态阈值） | Merged to main | `410738a` |
-| PR3 | 工具二进制 allowlist + 参数白名单 | Merged to main | `f2818be` |
+### P2-1 — Deep semantic execution module
 
-PR2 的实现细节:
-- `internal/worker/resource_governor.go`:`Acquire(ctx)` 检查系统内存/CPU,内存超阈值轮询阻塞、CPU 超阈值 sleep 固定延迟。
-- 接入点:`Runner.Run`(API 服务器任务入口)与 `WorkerServer.executeTask`(远端 worker 任务执行)。
-- 采样实现:`github.com/shirou/gopsutil/v3`,通过 `ResourceSampler` 接口在测试中注入 fake。
-- 阈值通过 `ANCHOR_GOVERNOR_*` 环境变量配置,详见 `docs/current/architecture.md` 的「资源治理」章节。
+- Goal: replace the CLI-shaped `RenderParams` seam with a small `ScanRequest` interface containing action, normalized targets, policy, budgets, template/rule selection, and idempotency context.
+- Owned paths: new `internal/scanner/` or equivalent execution module, `internal/scanengine/executor/`, `internal/toolrun/`, `internal/toolregistry/`, `internal/models/`, and focused tests.
+- Entry condition: P0-1 and P1-1 are complete.
+- Acceptance: the scan engine submits semantic requests; process execution remains behaviorally compatible; parsing, redaction, invocation provenance, cancellation, and scope checks are hidden behind the module interface.
+- Verification: adapter contract fixtures, cancellation and empty-input tests, process-adapter parity tests, and focused Go tests.
+- Unlocks: P2-2 and P2-3.
 
-PR3 的实现细节:
-- `internal/toolguard/allowlist.go`:`Allowlist` 结构提供二进制白名单 + 参数 shell 元字符检查。
-- `Validate(binary, args)` 基于 `filepath.Base` 检查二进制名，拒绝任何含 shell 元字符的参数。
-- 接入点:全部 5 个 `exec.Command` 调用文件（`worker.go`, `server.go`, `health.go`, `cdn/detector.go`, `nuclei/custom/git.go`）。
-- `Allowlist.Allow(name)` 支持运行时扩展，新增工具强制走注册流程。
+### P2-2 — Naabu SDK adapter pilot
 
-## GSTACK REVIEW REPORT
+- Goal: add a Naabu SDK adapter while retaining the process adapter as a fallback selected by worker capability and policy.
+- Owned paths: `internal/scanner/`, `internal/scanengine/executor/`, `internal/worker/`, `go.mod`, `go.sum`, tool capability metadata, and adapter tests.
+- Entry condition: P2-1 contract is accepted.
+- Acceptance: SDK and process adapters produce equivalent normalized ports/services on the same fixtures; context cancellation, rate limits, resource accounting, IPv4/IPv6 behavior, privilege requirements, and worker restart behavior are observable.
+- Verification: local adapter parity suite, controlled network fixtures, race test, and worker integration test. No promotion based on compile success alone.
+- Unlocks: Subfinder SDK evaluation and semantic remote requests.
 
-| Review | Trigger | Why | Runs | Status | Findings |
-|--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR (PLAN) | 8 proposals, 3 accepted, 5 deferred |
-| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found | 27 missed problems |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | CLEAR | 16 issues resolved, 2 critical gaps fixed |
-| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL) | score: 4/10 → 8/10, 6 decisions |
-| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+### P2-3 — Semantic worker protocol and leases
 
-- **CODEX:** 27 missed problems including buffer durability (SIGKILL/OOM), SQLite write contention, resource governance overbuilt, allowlist environment attack surface, asset relation taxonomy issues
-- **CROSS-MODEL:** Buffer persistence — review recommended shutdown hook, Codex argued for durable staging (pipeline boundary flush accepted). Resource governance — review recommended dynamic thresholds, Codex argued for static limits (accepted).
-- **CRITICAL GAPS FIXED (2026-05-18):**
-  1. **buffer flush silent loss** — `FindingBuffer.flushLocked()` now clears `b.buf` only after successful `BatchInsertFindings`; on failure, findings are retained and retried via timer (`flushTimerCallback` restarts timer on error). Tests: `TestFindingBuffer_FlushFailureRetainsData`, `TestFindingBuffer_TimerRetryAfterFailure`.
-  2. **SIGKILL finding loss** — Reduced flush interval from 5s to 2s in `Pipeline.Run()`, shrinking the unflushed data window. SIGKILL itself remains uncatchable; mitigation is shorter flush interval + pipeline boundary flush (already in place).
-- **UNRESOLVED:** 0
-- **VERDICT:** Eng Review CLEARED — all critical gaps fixed, 16 architecture/code-quality/test/performance issues addressed, scope held at 3 PRs.
+- Goal: make worker tasks carry semantic requests and establish durable ownership, lease expiry, idempotent result submission, retry, cancellation, drain, and offline recovery.
+- Owned paths: `internal/api/worker_handlers.go`, `internal/api/server.go`, `internal/worker/remote_client.go`, `internal/worker/dispatcher.go`, `internal/db/queries_scan.go`, `internal/scanengine/work/`, models, and new migrations.
+- Entry condition: P2-1 is accepted; P2-2 supplies one production adapter and one fallback adapter.
+- Acceptance: a task can be claimed once, renewed, safely retried after lease expiry, submitted more than once without duplicate findings, cancelled, drained, and recovered after worker or server restart.
+- Verification: temporary SQLite integration tests, multi-worker Docker scenario, fault injection for lost heartbeat/result replay, and read-only review of scope enforcement.
+- Unlocks: horizontal worker scaling and Phase 3 capability packs.
 
-*Last reviewed: 2026-05-18*
+## Phase 3: internet mapping depth and two-high-one-weak coverage
+
+### P3-1 — Nuclei and RBKD policy enforcement
+
+- Goal: route weak-auth checks through Nuclei tags and approved RBKD templates; exclude official `default-login` for high lockout-risk services such as SSH; make template inputs versioned and provenance-bearing.
+- Owned paths: `internal/nuclei/`, `internal/scanengine/`, `internal/worker/commands.go`, `tools/nuclei.yaml`, `internal/builtin/`, `internal/models/nuclei_custom.go`, `internal/db/queries_nuclei.go`, worker Dockerfiles, and related UI/tests.
+- Entry condition: P2-3 semantic request and lease contract are accepted.
+- Acceptance: standard campaigns run safe anonymous/no-auth checks; protected services never receive excluded tags; RBKD revision/digest and activation state are stored with task provenance; account-locking checks require explicit policy and stop on lockout signals; plaintext credentials never enter logs or findings.
+- Verification: tag-routing fixtures, policy denial tests, bundle revision tests, Docker worker smoke, and redaction tests.
+- Unlocks: complete two-high-one-weak coverage claim.
+
+### P3-2 — High-risk vulnerability prioritization
+
+- Goal: combine high-risk service exposure, Nuclei evidence, asset criticality, confidence, and a versioned KEV input into deterministic work and reporting priority.
+- Owned paths: `internal/finding/`, `internal/models/finding.go`, database queries/migrations, scan profiles, and report/UI projections.
+- Entry condition: P3-1 provides stable template provenance and findings.
+- Acceptance: priority is reproducible from stored inputs; KEV refresh failure is visible; high-risk findings retain evidence lineage and do not bypass scope or deduplication.
+- Verification: fixture corpus, persistence round trips, ranking property tests, and report/API acceptance.
+- Unlocks: operator triage views and scheduled remeasurement.
+
+### P3-3 — Modern passive/API/cloud asset expansion
+
+- Goal: add high-signal 2026 internet techniques behind existing asset/work seams: passive source provenance, cloud/ASN discovery, IPv6-aware probing, OpenAPI/GraphQL/API documentation discovery, JavaScript endpoint/secret extraction, WebSocket/gRPC evidence, takeover, URL-security, and fingerprint rule packs.
+- Owned paths: `internal/search/`, `internal/passive/`, `internal/scanengine/seed/`, `internal/parser/`, `tools/`, asset models/migrations, and focused fixtures.
+- Entry condition: P2-3 and P3-2 are accepted.
+- Acceptance: every source has scope, rate, provenance, license, noise budget, failure isolation, and normalized output; active follow-up is policy-gated and visible in invocation records.
+- Verification: deterministic source fixtures, scope-denial tests, parser corpus, persistence tests, and one user-visible campaign acceptance.
+- Unlocks: Phase 4 information architecture.
+
+## Phase 4: operator information architecture
+
+### P4-1 — Campaign, worker, asset, change, finding, and evidence views
+
+- Goal: present the ScopeSentry-inspired information architecture through Anchor's React/API/SSE seams without reintroducing a fixed pipeline.
+- Owned paths: `frontend/src/pages/`, `frontend/src/components/`, `frontend/src/lib/api.ts`, server read models and routes, and Playwright fixtures.
+- Entry condition: P2-3 and the first P3 capability are accepted.
+- Acceptance: loading, empty, error, authorization, cancellation, live-update, long-running, and coverage-gap states are visible; pages link findings to assets, changes, evidence, worker, task, and tool provenance.
+- Verification: focused unit tests, typecheck/build, and Docker-backed Playwright scenarios.
+- Unlocks: user acceptance of the campaign workflow.
+
+## Phase 5: measured scale and resilience
+
+### P5-1 — Storage, queue, identity, and multi-server promotion
+
+- Goal: choose and implement durable infrastructure only after lease/load/failure evidence justifies it.
+- Owned paths: `internal/db/`, task transport adapters, deployment manifests, migrations, observability, and recovery tests.
+- Entry condition: P2-3, P3-3, and measured load/failure data are accepted.
+- Acceptance: horizontal workers, backpressure, metrics, migration/rollback, identity scope, and multi-server consistency are verified in a disposable environment.
+- Verification: staged load test, restart/failure matrix, migration rehearsal, security review, and human operational acceptance.
+- Unlocks: production-grade distributed claim.
+
+## Scheduling rules
+
+- Do not reintroduce a dedicated internal-network product scenario.
+- Do not add a fixed pipeline where asset/work derivation can express the behavior.
+- Do not add an interpreted plugin runtime, MCP/skill runtime, LLM integration, or autonomous agent planner.
+- Do not import ScopeSentry source code or data without separate license approval.
+- Do not label target architecture as implemented without observed code, focused tests, and failure/restart evidence.
+- Do not enable high lockout-risk authentication templates through a generic default tag; route them through the approved custom-source policy.
+- Do not promote an SDK adapter until it proves parity, cancellation, budgets, resource behavior, provenance, and recovery against the process adapter.
+- Each phase or cross-layer increment requires its own change card and, for direction changes, an ADR.
+
+Detailed design input is in [`../proposals/scopesentry-capabilities.md`](../proposals/scopesentry-capabilities.md); durable direction is in [`../decisions/0003-distributed-internet-asm-baseline.md`](../decisions/0003-distributed-internet-asm-baseline.md), [`../decisions/0004-deterministic-non-agent-product.md`](../decisions/0004-deterministic-non-agent-product.md), [`../decisions/0005-semantic-scan-execution-adapters.md`](../decisions/0005-semantic-scan-execution-adapters.md), and [`../decisions/0006-nuclei-weak-auth-policy.md`](../decisions/0006-nuclei-weak-auth-policy.md).

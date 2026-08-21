@@ -56,6 +56,71 @@ func TestOnBatchDNSComplete(t *testing.T) {
 	t.Logf("assets after DNS batch: %d", len(assets))
 }
 
+func TestOnBatchAliveComplete_UpdatesExactIPState(t *testing.T) {
+	fake := &fakeExecutor{}
+	cfg := DefaultEngineConfig()
+	engine, _ := setupTestEngine(t, fake, cfg)
+
+	if err := engine.queries.CreateAsset(&models.Asset{
+		ID: "a1", ProjectID: "proj1", Type: "ip", Value: "10.0.0.1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	engine.assetDepth.Store("a1", 0)
+	engine.assetBuckets.Store("a1", "seed:10.0.0.1")
+
+	w := makeBatchWork(string(core.ActionAliveCheck), []models.WorkBatchMember{
+		{AssetID: "a1", Value: "10.0.0.1"},
+	})
+
+	stdout := []byte("Host: 10.0.0.1 ()\tStatus: Up\n")
+	engine.onBatchAliveComplete(context.Background(), w, stdout)
+
+	attrs, err := engine.queries.GetAssetState("a1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if attrs.Alive == nil || !*attrs.Alive {
+		t.Fatalf("expected alive state to be true, got %#v", attrs.Alive)
+	}
+}
+
+func TestOnBatchAliveComplete_CIDRCreatesChildIP(t *testing.T) {
+	fake := &fakeExecutor{}
+	cfg := DefaultEngineConfig()
+	engine, _ := setupTestEngine(t, fake, cfg)
+
+	if err := engine.queries.CreateAsset(&models.Asset{
+		ID: "cidr1", ProjectID: "proj1", Type: "cidr", Value: "10.0.0.0/24",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	engine.assetDepth.Store("cidr1", 0)
+	engine.assetBuckets.Store("cidr1", "seed:10.0.0.0/24")
+
+	w := makeBatchWork(string(core.ActionAliveCheck), []models.WorkBatchMember{
+		{AssetID: "cidr1", Value: "10.0.0.0/24"},
+	})
+
+	stdout := []byte("Host: 10.0.0.5 ()\tStatus: Up\n")
+	engine.onBatchAliveComplete(context.Background(), w, stdout)
+
+	child, err := engine.queries.GetAssetByNormalizedValue("proj1", "10.0.0.5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if child == nil {
+		t.Fatal("expected alive child IP asset to be created for CIDR member")
+	}
+	attrs, err := engine.queries.GetAssetState(child.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if attrs.Alive == nil || !*attrs.Alive {
+		t.Fatalf("expected child alive state to be true, got %#v", attrs.Alive)
+	}
+}
+
 func TestOnBatchPortScanComplete(t *testing.T) {
 	fake := &fakeExecutor{}
 	cfg := DefaultEngineConfig()
@@ -1048,9 +1113,9 @@ func TestBuildTier2BatchParams(t *testing.T) {
 
 	t.Run("Nuclei batch", func(t *testing.T) {
 		w := &models.ScanWorkItem{
-			Action:     string(core.ActionNucleiScan),
-			InputFile:  "/tmp/nuclei-input.txt",
-			BucketKey:  "nuclei:high",
+			Action:    string(core.ActionNucleiScan),
+			InputFile: "/tmp/nuclei-input.txt",
+			BucketKey: "nuclei:high",
 		}
 		params, cleanup, err := engine.buildTier2BatchParams(w)
 		if err != nil {

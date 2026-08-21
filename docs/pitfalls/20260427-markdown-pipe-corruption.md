@@ -1,5 +1,7 @@
 # Markdown 表格中用户数据含 `|` 破坏表格结构
 
+> 历史经验，非当前规范；路径和修复状态可能已过时。
+
 ## 现象
 Markdown 报告中表格列错位、渲染异常。Finding title、Asset value、Evidence excerpt 等用户可控数据包含管道符 `|`。
 

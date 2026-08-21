@@ -31,11 +31,11 @@ type Executor interface {
 
 // ToolExecutor executes individual work items via toolrun.Invoke.
 type ToolExecutor struct {
-	queries  *db.Queries
-	runner   *worker.Runner
-	tools    *toolregistry.Registry
-	merger   *asset.Merger
-	dataDir  string
+	queries *db.Queries
+	runner  *worker.Runner
+	tools   *toolregistry.Registry
+	merger  *asset.Merger
+	dataDir string
 }
 
 // NewToolExecutor creates a new ToolExecutor.
@@ -145,6 +145,8 @@ func actionToToolID(action string) string {
 		return "subfinder"
 	case string(core.ActionDNSResolve):
 		return "dnsx"
+	case string(core.ActionAliveCheck):
+		return "nmap_alive"
 	case string(core.ActionCDNCheck):
 		return "cdncheck"
 	case string(core.ActionSpoorScan):
@@ -277,7 +279,7 @@ type nucleiEntry struct {
 		Name     string `json:"name"`
 		Severity string `json:"severity"`
 	} `json:"info"`
-	Host string `json:"host"`
-	IP   string `json:"ip"`
+	Host    string `json:"host"`
+	IP      string `json:"ip"`
 	Matched string `json:"matched-at"`
 }

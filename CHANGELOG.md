@@ -1,5 +1,7 @@
 # Changelog
 
+This is Anchor's only active changelog. Historical duplicate changelogs are retained under `docs/archived/` and must not receive new entries.
+
 ## [0.0.3.0] - 2026-05-16
 
 ### Added

@@ -24,17 +24,23 @@ func (p *ExternalProfile) Rules() []ActionRule {
 		// Active actions
 		{Action: ActionSubdomainEnum, Enabled: true, MaxDepth: 0, Precondition: isSubdomain},
 		{Action: ActionDNSResolve, Enabled: true, MaxDepth: 1, Precondition: isSubdomainOrIP},
-		{Action: ActionCDNCheck, Enabled: true, MaxDepth: -1, Precondition: isIP},
+		{Action: ActionAliveCheck, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPOrCIDR},
+		{Action: ActionCDNCheck, Enabled: true, MaxDepth: -1, Precondition: isIPAndAlive},
 		{Action: ActionPortScan, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: func(a *DiscoveryAsset, _ Profile) bool {
 			if a.Type != AssetIP {
 				return false
 			}
-			// CDN skip
-			if p.SkipPortscanOnCDN && a.Attrs.IsCDN != nil && *a.Attrs.IsCDN {
+			if a.Attrs.Alive == nil || !*a.Attrs.Alive {
 				return false
 			}
-			if a.Attrs.Alive != nil && !*a.Attrs.Alive {
-				return false
+			// CDN skip
+			if p.SkipPortscanOnCDN {
+				if a.Attrs.IsCDN == nil {
+					return false
+				}
+				if *a.Attrs.IsCDN {
+					return false
+				}
 			}
 			return true
 		}},

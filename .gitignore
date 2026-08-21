@@ -58,6 +58,7 @@ bin/
 
 # Agent caches (local runtime state — never commit)
 tasks/
+.worktrees/
 .codegraph/
 .deepseek/
 .playwright-mcp/
@@ -91,9 +92,6 @@ tmp-tag-test/
 /qa.md
 /plan.md
 
-# Superpowers design docs (internal, not for end users)
-docs/superpowers/
-
 # Local scratch
 .gitnexus
 内网渗透测试手册_v2.md
@@ -107,7 +105,7 @@ docs/superpowers/
 # Agent workspace outputs
 dev_team.tar.gz
 dev_team_inspect/
-inbox/
+/inbox/
 
 # Python test cache
 .pytest_cache/

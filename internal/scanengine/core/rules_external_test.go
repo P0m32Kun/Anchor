@@ -38,6 +38,32 @@ func TestPortScan_AllowedOnNonCDN_External(t *testing.T) {
 	}
 }
 
+func TestAliveCheck_BeforePortScan_External(t *testing.T) {
+	profile := DefaultExternalProfile()
+
+	a := &DiscoveryAsset{
+		ID: "ip-1", Type: AssetIP, DiscoveryDepth: 0,
+		Attrs: AssetAttrs{},
+	}
+	works := DeriveEligibleWorks(a, profile)
+
+	var hasAliveCheck bool
+	for _, w := range works {
+		if w.Action == ActionAliveCheck {
+			hasAliveCheck = true
+		}
+		if w.Action == ActionPortScan {
+			t.Fatal("port scan should wait for alive check in external profile")
+		}
+		if w.Action == ActionHTTPXFingerprint {
+			t.Fatal("httpx should wait for alive check on raw IP assets in external profile")
+		}
+	}
+	if !hasAliveCheck {
+		t.Fatal("expected alive check for raw IP assets in external profile")
+	}
+}
+
 func TestFFUF_DisabledByDefault_External(t *testing.T) {
 	profile := DefaultExternalProfile()
 

@@ -464,6 +464,16 @@ func migrate(db *sql.DB) error {
 		version = 44
 	}
 
+	if version < 45 {
+		if err := migrateV45(db); err != nil {
+			return fmt.Errorf("migrate v45 (assets cidr check): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 45"); err != nil {
+			return fmt.Errorf("set user_version 45: %w", err)
+		}
+		version = 45
+	}
+
 	if err := ensureProjectsColumns(db); err != nil {
 		return fmt.Errorf("ensure projects columns: %w", err)
 	}

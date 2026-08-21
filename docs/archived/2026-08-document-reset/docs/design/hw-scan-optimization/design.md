@@ -140,8 +140,6 @@ Preset 写入 `enable_spoor` 等字段；**展示与决策权在前端 Toggle**�
 
 | 字段 | 工具 | 单位 |
 |------|------|------|
-| `subfinder_rate_limit` / `subfinder_threads` | subfinder | rps / 并发 |
-| `dnsx_rate_limit` / `dnsx_threads` | dnsx | rps / 并发 |
 | `naabu_rate` / `naabu_threads` | naabu | pps / 并发 |
 | `httpx_rate_limit` / `httpx_threads` | httpx | rps / 并发 |
 | `nuclei_rate_limit` / `nuclei_rate_limit_per_min` / `nuclei_concurrency` | nuclei | rps / rpm / 并发 |

@@ -2,7 +2,7 @@
 status: active
 source_of_truth: false
 owner: kun
-last_updated: 2026-06-17
+last_updated: 2026-08-20
 scope: proposal-directory
 ---
 
@@ -12,6 +12,7 @@ This directory stores in-review design material for upcoming or partial changes.
 
 ## Current Contents
 
+- `scopesentry-integration/` — **draft** ScopeSentry 整合与分布式演进：Postgres 迁移、通信单通道、断点续扫、扫描广度模块重实现、UI 重做（2026-08-20）
 - `batch-scan-scheduling/` — **draft** 批量扫描调度：资产池、Stage 调度接线、nuclei tech 分桶、分页与 orphan 恢复（2026-06-17）
 - `scan-engine-convergence/` — **in-review** 扫描引擎收敛：统一 ScanEngine、移除旧 pipeline（2026-06-07）
 - `hw-scan-optimization/` — **draft** 硬件扫描优化设计

@@ -115,6 +115,32 @@ func TestDeriveEligibleWorks_PortScanSkippedOnDeadHost(t *testing.T) {
 	}
 }
 
+func TestDeriveEligibleWorks_AliveCheckBeforePortScan(t *testing.T) {
+	profile := DefaultInternalProfile()
+
+	a := &DiscoveryAsset{
+		ID: "ip-unknown", Type: AssetIP, DiscoveryDepth: 0,
+		Attrs: AssetAttrs{},
+	}
+	works := DeriveEligibleWorks(a, profile)
+
+	var hasAliveCheck bool
+	for _, w := range works {
+		if w.Action == ActionAliveCheck {
+			hasAliveCheck = true
+		}
+		if w.Action == ActionPortScan {
+			t.Fatal("port scan should not run before alive status is confirmed")
+		}
+		if w.Action == ActionHTTPXFingerprint {
+			t.Fatal("httpx should not run on IP assets before alive status is confirmed")
+		}
+	}
+	if !hasAliveCheck {
+		t.Fatal("expected alive check to be eligible for IP assets with unknown alive status")
+	}
+}
+
 func TestDeriveEligibleWorks_SubdomainOnlyAtDepth01(t *testing.T) {
 	profile := DefaultInternalProfile()
 

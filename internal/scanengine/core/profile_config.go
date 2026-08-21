@@ -45,6 +45,8 @@ func actionEnabledByConfig(cfg models.PipelineConfig, action TaskAction) bool {
 		return cfg.EnableSubfinder
 	case ActionDNSResolve:
 		return cfg.EnableDNSx
+	case ActionAliveCheck:
+		return true
 	case ActionCDNCheck:
 		return cfg.EnableCDNFilter
 	case ActionPortScan:

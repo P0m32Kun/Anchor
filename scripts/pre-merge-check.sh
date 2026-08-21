@@ -3,29 +3,34 @@ set -e
 
 echo "=== Pre-Merge Check ==="
 
-# 1. Go 编译
-echo "[1/6] Go build..."
+# 1. 文档一致性
+echo "[1/7] Documentation..."
+node --test scripts/check-docs.test.mjs
+node scripts/check-docs.mjs
+
+# 2. Go 编译
+echo "[2/7] Go build..."
 go build ./...
 
-# 2. Go 测试
-echo "[2/6] Go test..."
+# 3. Go 测试
+echo "[3/7] Go test..."
 go test ./...
 
-# 3. Go vet
-echo "[3/6] Go vet..."
+# 4. Go vet
+echo "[4/7] Go vet..."
 go vet ./...
 
-# 4. 前端类型检查
-echo "[4/6] Frontend typecheck..."
+# 5. 前端类型检查
+echo "[5/7] Frontend typecheck..."
 cd frontend
 npm run typecheck
 
-# 5. 前端构建
-echo "[5/6] Frontend build..."
+# 6. 前端构建
+echo "[6/7] Frontend build..."
 npm run build
 
-# 6. E2E 测试（可选，需要 Docker + Chromium + running dev server）
-echo "[6/6] E2E tests (optional)..."
+# 7. E2E 测试（可选，需要 Docker + Chromium + running dev server）
+echo "[7/7] E2E tests (optional)..."
 # already in frontend/
 
 # 检查 localhost:1420 是否有 dev server 在运行（否则 Playwright webServer 会因没有 Go backend 而超时）

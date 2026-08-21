@@ -7,7 +7,7 @@ const MaxDiscoveryDepth = 2
 type ActionRule struct {
 	Action       TaskAction
 	Enabled      bool
-	MaxDepth     int          // -1 means no depth limit
+	MaxDepth     int // -1 means no depth limit
 	Precondition func(a *DiscoveryAsset, profile Profile) bool
 }
 
@@ -32,6 +32,7 @@ func (p *internalProfile) Rules() []ActionRule {
 	return []ActionRule{
 		{Action: ActionSubdomainEnum, Enabled: true, MaxDepth: 0, Precondition: isSubdomain},
 		{Action: ActionDNSResolve, Enabled: true, MaxDepth: -1, Precondition: isSubdomainOrIP},
+		{Action: ActionAliveCheck, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPOrCIDR},
 		// 内网模式不做 CDN 过滤（Fix 1: internal 不上报 cdn_filter stage）
 		{Action: ActionPortScan, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPAndAlive},
 		{Action: ActionServiceFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPPort},
@@ -81,6 +82,10 @@ func isIP(a *DiscoveryAsset, _ Profile) bool {
 	return a.Type == AssetIP
 }
 
+func isIPOrCIDR(a *DiscoveryAsset, _ Profile) bool {
+	return a.Type == AssetIP || a.Type == AssetCIDR
+}
+
 func isIPAndAlive(a *DiscoveryAsset, _ Profile) bool {
 	if a.Type != AssetIP {
 		return false
@@ -89,8 +94,8 @@ func isIPAndAlive(a *DiscoveryAsset, _ Profile) bool {
 	if a.Attrs.IsCDN != nil && *a.Attrs.IsCDN {
 		return false
 	}
-	// Must be alive (or alive status unknown — allow it)
-	if a.Attrs.Alive != nil && !*a.Attrs.Alive {
+	// Must be explicitly alive.
+	if a.Attrs.Alive == nil || !*a.Attrs.Alive {
 		return false
 	}
 	return true
@@ -107,8 +112,10 @@ func isWebEntry(a *DiscoveryAsset, _ Profile) bool {
 // isHTTPXCandidate covers assets that should be probed by httpx before becoming HTTP services.
 func isHTTPXCandidate(a *DiscoveryAsset, _ Profile) bool {
 	switch a.Type {
-	case AssetSubdomain, AssetIP, AssetCIDR, AssetIPPort:
+	case AssetSubdomain, AssetIPPort:
 		return true
+	case AssetIP:
+		return a.Attrs.Alive != nil && *a.Attrs.Alive
 	default:
 		return false
 	}

@@ -10,6 +10,7 @@ const (
 	ActionPassiveURL         TaskAction = "PASSIVE_URL"
 	ActionSubdomainEnum      TaskAction = "SUBDOMAIN_ENUM"
 	ActionDNSResolve         TaskAction = "DNS_RESOLVE"
+	ActionAliveCheck         TaskAction = "ALIVE_CHECK"
 	ActionCDNCheck           TaskAction = "CDN_CHECK"
 	ActionPortScan           TaskAction = "PORT_SCAN"
 	ActionServiceFingerprint TaskAction = "SERVICE_FINGERPRINT"
@@ -27,6 +28,7 @@ var ActionToTool = map[TaskAction]string{
 	ActionPassiveURL:         "gau",
 	ActionSubdomainEnum:      "subfinder",
 	ActionDNSResolve:         "dnsx",
+	ActionAliveCheck:         "nmap_alive",
 	ActionCDNCheck:           "cdncheck",
 	ActionPortScan:           "naabu",
 	ActionServiceFingerprint: "nmap_service",
@@ -44,6 +46,7 @@ var ActionToStage = map[TaskAction]string{
 	ActionPassiveURL:         "passive_url",
 	ActionSubdomainEnum:      "subdomain",
 	ActionDNSResolve:         "resolve",
+	ActionAliveCheck:         "alive",
 	ActionCDNCheck:           "cdn_filter",
 	ActionPortScan:           "portscan",
 	ActionServiceFingerprint: "fingerprint",

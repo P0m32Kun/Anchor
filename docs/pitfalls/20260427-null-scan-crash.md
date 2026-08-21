@@ -1,5 +1,7 @@
 # NULL `created_by` 导致 sql.Scan 崩溃
 
+> 历史经验，非当前规范；路径和修复状态可能已过时。
+
 ## 现象
 报告生成时 `ListEvidenceByFinding` 查询崩溃：`sql: Scan error on column index 5, name "created_by": converting NULL to string is unsupported`。
 

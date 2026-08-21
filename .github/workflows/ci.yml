@@ -10,6 +10,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Test documentation validator
+        run: node --test scripts/check-docs.test.mjs
+
+      - name: Validate documentation
+        run: node scripts/check-docs.mjs
+
   backend:
     runs-on: ubuntu-latest
     steps:

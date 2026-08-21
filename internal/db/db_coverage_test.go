@@ -33,8 +33,8 @@ func TestOpen_CreatesDirAndDB(t *testing.T) {
 	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		t.Fatalf("read user_version: %v", err)
 	}
-	if version != 44 {
-		t.Errorf("user_version = %d, want 44", version)
+	if version != 45 {
+		t.Errorf("user_version = %d, want 45", version)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestOpen_CreatesDirAndDB(t *testing.T) {
 func TestMigrate_Idempotent(t *testing.T) {
 	rawDB := openTestDB(t)
 
-	// Migrate again — should be a no-op since version is already 44
+	// Migrate again — should be a no-op since version is already 45
 	if err := Migrate(rawDB); err != nil {
 		t.Fatalf("second Migrate: %v", err)
 	}
@@ -52,8 +52,8 @@ func TestMigrate_Idempotent(t *testing.T) {
 	if err := rawDB.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		t.Fatalf("read user_version: %v", err)
 	}
-	if version != 44 {
-		t.Errorf("user_version = %d, want 44", version)
+	if version != 45 {
+		t.Errorf("user_version = %d, want 45", version)
 	}
 }
 

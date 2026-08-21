@@ -7,15 +7,16 @@ package queue
 type StageRank int
 
 const (
-	StageDiscovery StageRank = 10 // PASSIVE_*
-	StageSubdomain StageRank = 20 // SUBDOMAIN_ENUM
-	StageResolve   StageRank = 30 // DNS_RESOLVE
-	StageCDN       StageRank = 40 // CDN_CHECK
-	StagePort      StageRank = 50 // PORT_SCAN
-	StageService   StageRank = 60 // SERVICE_FINGERPRINT
-	StageWeb       StageRank = 70 // HTTPX_FINGERPRINT
-	StageCrawl     StageRank = 80 // KATANA_CRAWL, SPOOR_SCAN
-	StageBrute     StageRank = 90 // FFUF_BRUTE
+	StageDiscovery StageRank = 10  // PASSIVE_*
+	StageSubdomain StageRank = 20  // SUBDOMAIN_ENUM
+	StageResolve   StageRank = 30  // DNS_RESOLVE
+	StageAlive     StageRank = 35  // ALIVE_CHECK
+	StageCDN       StageRank = 40  // CDN_CHECK
+	StagePort      StageRank = 50  // PORT_SCAN
+	StageService   StageRank = 60  // SERVICE_FINGERPRINT
+	StageWeb       StageRank = 70  // HTTPX_FINGERPRINT
+	StageCrawl     StageRank = 80  // KATANA_CRAWL, SPOOR_SCAN
+	StageBrute     StageRank = 90  // FFUF_BRUTE
 	StageVuln      StageRank = 100 // NUCLEI_SCAN
 )
 
@@ -29,6 +30,8 @@ func ActionToStageRank(action string) StageRank {
 		return StageSubdomain
 	case "DNS_RESOLVE":
 		return StageResolve
+	case "ALIVE_CHECK":
+		return StageAlive
 	case "CDN_CHECK":
 		return StageCDN
 	case "PORT_SCAN":

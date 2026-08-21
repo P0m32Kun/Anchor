@@ -3,8 +3,8 @@
 
 FROM debian:bookworm-slim
 
-RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
-    && apt-get update \
+RUN (sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true) \
+    && (apt-get update || (sed -i 's|http://mirrors.aliyun.com|http://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true; apt-get update)) \
     && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
     ca-certificates libsqlite3-0 curl \
     && rm -rf /var/lib/apt/lists/*

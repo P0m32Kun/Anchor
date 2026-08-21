@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 
 	"github.com/P0m32Kun/Anchor/internal/cdn"
@@ -42,6 +43,12 @@ func (e *ScanEngine) initTier1Pools(ctx context.Context) {
 		flush(core.ActionDNSResolve, ev)
 	})
 
+	aliveCfg := pool.DefaultIPPoolConfig(e.dataDir, "alive_batch", "alivepool", 100)
+	aliveCfg.FlushTimeout = flushTimeout
+	e.alivePool = pool.New(aliveCfg, func(ev pool.FlushEvent) {
+		flush(core.ActionAliveCheck, ev)
+	})
+
 	cdnCfg := pool.DefaultIPPoolConfig(e.dataDir, "cdn_batch", "cdnpool", 100)
 	cdnCfg.FlushTimeout = flushTimeout
 	e.cdnPool = pool.New(cdnCfg, func(ev pool.FlushEvent) {
@@ -54,6 +61,7 @@ func (e *ScanEngine) initTier1Pools(ctx context.Context) {
 		flush(core.ActionPortScan, ev)
 	})
 	e.hostPool.Start()
+	e.alivePool.Start()
 	e.cdnPool.Start()
 	e.portPool.Start()
 
@@ -84,6 +92,9 @@ func (e *ScanEngine) stopTier1Pools() {
 	if e.hostPool != nil {
 		e.hostPool.Stop()
 	}
+	if e.alivePool != nil {
+		e.alivePool.Stop()
+	}
 	if e.cdnPool != nil {
 		e.cdnPool.Stop()
 	}
@@ -107,6 +118,9 @@ func (e *ScanEngine) flushTier1IfBlockingHigherStages() {
 	}
 	if e.hostPool != nil && e.hostPool.Len() > 0 {
 		e.hostPool.FlushNow()
+	}
+	if e.alivePool != nil && e.alivePool.Len() > 0 {
+		e.alivePool.FlushNow()
 	}
 	if e.cdnPool != nil && e.cdnPool.Len() > 0 {
 		e.cdnPool.FlushNow()
@@ -134,7 +148,7 @@ func (e *ScanEngine) pqIsEmptyOrOnlyDiscovery() bool {
 
 func (e *ScanEngine) isTier1Action(action core.TaskAction) bool {
 	switch action {
-	case core.ActionSubdomainEnum, core.ActionDNSResolve, core.ActionCDNCheck, core.ActionPortScan:
+	case core.ActionSubdomainEnum, core.ActionDNSResolve, core.ActionAliveCheck, core.ActionCDNCheck, core.ActionPortScan:
 		return true
 	default:
 		return false
@@ -174,6 +188,11 @@ func (e *ScanEngine) enqueueTier1Asset(ctx context.Context, a *core.DiscoveryAss
 			return
 		}
 		e.hostPool.Add(pool.Member{Value: hostValue, AssetID: dw.AssetID, BucketKey: bucketKey})
+	case core.ActionAliveCheck:
+		if e.alivePool == nil {
+			return
+		}
+		e.alivePool.Add(pool.Member{Value: hostValue, AssetID: dw.AssetID, BucketKey: bucketKey})
 	case core.ActionCDNCheck:
 		if e.cdnPool == nil {
 			return
@@ -194,6 +213,12 @@ func (e *ScanEngine) enqueueTier1Asset(ctx context.Context, a *core.DiscoveryAss
 
 func (e *ScanEngine) onTier1PoolFlush(ctx context.Context, action core.TaskAction, ev pool.FlushEvent) {
 	if len(ev.Members) == 0 {
+		return
+	}
+	if ctx.Err() != nil {
+		// Run is cancelled: discard members instead of creating work that
+		// would be dispatched with a dead context.
+		log.Printf("[scanengine] discard tier1 pool flush %s gen %d: run cancelled", action, ev.Generation)
 		return
 	}
 	bucketKey := "tier1:" + string(action)
@@ -276,6 +301,10 @@ func (e *ScanEngine) buildBatchParams(w *models.ScanWorkItem) (toolregistry.Rend
 		return toolregistry.RenderParams{
 			"host_file": w.InputFile,
 		}, nil, nil
+	case core.ActionAliveCheck:
+		return toolregistry.RenderParams{
+			"host_file": w.InputFile,
+		}, nil, nil
 	case core.ActionPortScan:
 		return toolregistry.RenderParams{
 			"host_file":  w.InputFile,
@@ -325,7 +354,6 @@ func (e *ScanEngine) onBatchDNSComplete(ctx context.Context, w *models.ScanWorkI
 	for _, pe := range parseErrs {
 		log.Printf("[scanengine] parse dnsx line %d: %s", pe.Line, pe.Message)
 	}
-	alive := true
 	for _, rec := range results {
 		parentID := w.AssetID
 		if m, ok := byHost[strings.ToLower(rec.Host)]; ok {
@@ -339,7 +367,6 @@ func (e *ScanEngine) onBatchDNSComplete(ctx context.Context, w *models.ScanWorkI
 				NormalizedValue: ip,
 				ParentID:        parentID,
 				SourceTool:      "dnsx",
-				Attrs:           core.AssetAttrs{Alive: &alive},
 			}
 			e.prepareChildAsset(a, parentID)
 			e.processNewAsset(ctx, a)
@@ -356,6 +383,61 @@ func (e *ScanEngine) onBatchDNSComplete(ctx context.Context, w *models.ScanWorkI
 			e.prepareChildAsset(a, parentID)
 			e.processNewAsset(ctx, a)
 		}
+	}
+}
+
+func (e *ScanEngine) onBatchAliveComplete(ctx context.Context, w *models.ScanWorkItem, stdout []byte) {
+	members := parseBatchMembers(w)
+	byIP := batchMemberByIP(members)
+	aliveIPs := parser.ParseNmapAlive(strings.NewReader(string(stdout)))
+	aliveSet := make(map[string]struct{}, len(aliveIPs))
+
+	for _, ip := range aliveIPs {
+		key := strings.ToLower(strings.TrimSpace(ip))
+		if key == "" {
+			continue
+		}
+		aliveSet[key] = struct{}{}
+		if member, ok := byIP[key]; ok && net.ParseIP(strings.TrimSpace(member.Value)) != nil {
+			alive := true
+			e.mergeAssetStateAndReenqueue(ctx, member.AssetID, core.AssetAttrs{Alive: &alive})
+			continue
+		}
+		for _, member := range members {
+			ipAddr := net.ParseIP(strings.TrimSpace(ip))
+			if ipAddr == nil {
+				continue
+			}
+			if _, ipNet, err := net.ParseCIDR(strings.TrimSpace(member.Value)); err == nil && ipNet.Contains(ipAddr) {
+				alive := true
+				a := &core.DiscoveryAsset{
+					ID:              util.GenerateID(),
+					Type:            core.AssetIP,
+					Value:           ip,
+					NormalizedValue: ip,
+					ParentID:        member.AssetID,
+					SourceTool:      "nmap_alive",
+					Attrs:           core.AssetAttrs{Alive: &alive},
+				}
+				e.prepareChildAsset(a, member.AssetID)
+				e.processNewAsset(ctx, a)
+				break
+			}
+		}
+	}
+
+	alive := true
+	dead := false
+	for _, member := range members {
+		ip := strings.ToLower(strings.TrimSpace(hostWithoutPort(member.Value)))
+		if ip == "" || net.ParseIP(ip) == nil {
+			continue
+		}
+		if _, ok := aliveSet[ip]; ok {
+			e.mergeAssetStateAndReenqueue(ctx, member.AssetID, core.AssetAttrs{Alive: &alive})
+			continue
+		}
+		e.mergeAssetStateAndReenqueue(ctx, member.AssetID, core.AssetAttrs{Alive: &dead})
 	}
 }
 
@@ -425,16 +507,26 @@ func (e *ScanEngine) onBatchCDNComplete(ctx context.Context, w *models.ScanWorkI
 	for _, m := range members {
 		ips = append(ips, hostWithoutPort(m.Value))
 	}
-	_, cdnResults, err := cdn.ParseJSONLOutput(stdout, ips)
+	nonCDNIPs, cdnResults, err := cdn.ParseJSONLOutput(stdout, ips)
 	if err != nil {
 		log.Printf("[scanengine] parse cdncheck batch: %v", err)
 		return
+	}
+	isNotCDN := false
+	for _, ip := range nonCDNIPs {
+		if member, ok := byIP[strings.ToLower(ip)]; ok {
+			e.mergeAssetStateAndReenqueue(ctx, member.AssetID, core.AssetAttrs{IsCDN: &isNotCDN})
+		}
 	}
 	isCDN := true
 	for _, r := range cdnResults {
 		parentID := w.AssetID
 		if m, ok := byIP[strings.ToLower(r.IP)]; ok {
 			parentID = m.AssetID
+		}
+		if m, ok := byIP[strings.ToLower(r.IP)]; ok {
+			e.mergeAssetStateAndReenqueue(ctx, m.AssetID, core.AssetAttrs{IsCDN: &isCDN})
+			continue
 		}
 		a := &core.DiscoveryAsset{
 			ID:              util.GenerateID(),

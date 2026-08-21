@@ -1,5 +1,7 @@
 # 发现的资产未经过 Scope Check
 
+> 历史经验，非当前规范；路径和修复状态可能已过时。当前安全不变量见 [`../current/architecture.md`](../current/architecture.md)。
+
 ## 现象
 Subfinder 发现的子域名、httpx 发现的 URL、Naabu 发现的 IP 可能包含未授权资产，被直接写入数据库。
 

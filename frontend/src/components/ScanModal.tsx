@@ -4,6 +4,7 @@ import { Button } from "./Button";
 import { Input } from "./Input";
 import {
   PipelineConfig,
+  ScanDefaultsResponse,
   DEFAULT_PIPELINE_CONFIG,
   DEFAULT_EXTERNAL_PIPELINE_CONFIG,
   DEFAULT_HIGH_RISK_PORTS,
@@ -20,9 +21,15 @@ export type ScanMode = "external" | "internal";
 const SCAN_CONFIG_STORAGE_KEY = "anchor.scanModal.config";
 const SCAN_MODE_STORAGE_KEY = "anchor.scanModal.mode";
 
-function loadStoredConfig(mode: ScanMode): PipelineConfig {
+function modeDefaults(mode: ScanMode, scanDefaults?: ScanDefaultsResponse | null): PipelineConfig {
   const base =
     mode === "external" ? DEFAULT_EXTERNAL_PIPELINE_CONFIG : DEFAULT_PIPELINE_CONFIG;
+  const preset = scanDefaults?.presets?.[mode];
+  return { ...base, ...preset };
+}
+
+function loadStoredConfig(mode: ScanMode, scanDefaults?: ScanDefaultsResponse | null): PipelineConfig {
+  const base = modeDefaults(mode, scanDefaults);
   try {
     const raw = localStorage.getItem(SCAN_CONFIG_STORAGE_KEY);
     if (!raw) return { ...base };
@@ -37,12 +44,6 @@ function loadStoredMode(): ScanMode {
   const raw = localStorage.getItem(SCAN_MODE_STORAGE_KEY);
   if (raw === "internal") return "internal";
   return "external";
-}
-
-function modeDefaults(m: ScanMode): PipelineConfig {
-  return m === "external"
-    ? { ...DEFAULT_EXTERNAL_PIPELINE_CONFIG }
-    : { ...DEFAULT_PIPELINE_CONFIG };
 }
 
 interface ScanModalProps {
@@ -151,7 +152,10 @@ const SCAN_DEPTH_OPTIONS: {
 
 type PortMode = "tp" | "p";
 
-function decodePortRange(raw: string): {
+function decodePortRange(
+  raw: string,
+  highRiskPorts: string = DEFAULT_HIGH_RISK_PORTS
+): {
   mode: PortMode;
   tpValue: TpPresetValue;
   pValue: string;
@@ -162,20 +166,20 @@ function decodePortRange(raw: string): {
     case "top100":
     case "tp100":
     case "top-100":
-      return { mode: "tp", tpValue: "top100", pValue: DEFAULT_HIGH_RISK_PORTS };
+      return { mode: "tp", tpValue: "top100", pValue: highRiskPorts };
     case "top1000":
     case "tp1000":
     case "top-1000":
-      return { mode: "tp", tpValue: "top1000", pValue: DEFAULT_HIGH_RISK_PORTS };
+      return { mode: "tp", tpValue: "top1000", pValue: highRiskPorts };
     case "full":
     case "tpfull":
     case "topfull":
     case "top-full":
-      return { mode: "tp", tpValue: "full", pValue: DEFAULT_HIGH_RISK_PORTS };
+      return { mode: "tp", tpValue: "full", pValue: highRiskPorts };
     case "high-risk":
     case "highrisk":
     case "hr":
-      return { mode: "p", tpValue: "top1000", pValue: DEFAULT_HIGH_RISK_PORTS };
+      return { mode: "p", tpValue: "top1000", pValue: highRiskPorts };
     default:
       return { mode: "p", tpValue: "top1000", pValue: raw };
   }
@@ -185,27 +189,56 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   const [step, setStep] = useState<1 | 2>(1);
   const [mode, setMode] = useState<ScanMode>(() => loadStoredMode());
   const [config, setConfig] = useState<PipelineConfig>(() => loadStoredConfig(loadStoredMode()));
+  const [scanDefaults, setScanDefaults] = useState<ScanDefaultsResponse | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-
-  useEffect(() => {
-    if (!projectId || !open) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const projectCfg = await api.getPipelineConfig(projectId);
-        if (cancelled) return;
-        setConfig((prev) => ({ ...prev, ...projectCfg }));
-      } catch {
-        // Project has no saved config — keep localStorage baseline.
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [projectId, open]);
-
-  const initialPort = decodePortRange(config.port_range);
+  const highRiskPorts = scanDefaults?.high_risk_ports || DEFAULT_HIGH_RISK_PORTS;
+  const initialPort = decodePortRange(config.port_range, highRiskPorts);
   const [portMode, setPortMode] = useState<PortMode>(initialPort.mode);
   const [tpValue, setTpValue] = useState<TpPresetValue>(initialPort.tpValue);
   const [pValue, setPValue] = useState<string>(initialPort.pValue);
+
+  const applyConfig = (
+    next: PipelineConfig,
+    nextHighRiskPorts: string = highRiskPorts
+  ) => {
+    setConfig(next);
+    const decoded = decodePortRange(next.port_range, nextHighRiskPorts);
+    setPortMode(decoded.mode);
+    setTpValue(decoded.tpValue);
+    setPValue(decoded.pValue);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      let defaults: ScanDefaultsResponse | null = null;
+      try {
+        defaults = await api.getScanDefaults();
+        if (cancelled) return;
+        setScanDefaults(defaults);
+      } catch {
+        // Keep bundled defaults when deployment config is unavailable.
+      }
+
+      let nextConfig = loadStoredConfig(mode, defaults);
+      if (projectId) {
+        try {
+          const projectCfg = await api.getPipelineConfig(projectId);
+          if (cancelled) return;
+          nextConfig = { ...nextConfig, ...projectCfg };
+        } catch {
+          // Project has no saved config — keep deployment/local baseline.
+        }
+      }
+      if (!cancelled) {
+        applyConfig(nextConfig, defaults?.high_risk_ports || DEFAULT_HIGH_RISK_PORTS);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, open, projectId]);
 
   const handlePortModeSwitch = (next: PortMode) => {
     setPortMode(next);
@@ -226,7 +259,7 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   };
 
   const handleResetHighRiskPorts = () => {
-    handlePChange(DEFAULT_HIGH_RISK_PORTS);
+    handlePChange(highRiskPorts);
   };
 
   const handleReset = () => {
@@ -243,7 +276,7 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
     setMode(m);
     localStorage.setItem(SCAN_MODE_STORAGE_KEY, m);
     // When switching mode, reload config from the mode-appropriate defaults.
-    setConfig(loadStoredConfig(m));
+    applyConfig(loadStoredConfig(m, scanDefaults));
   };
 
   const handleNext = () => {
@@ -251,7 +284,7 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   };
 
   const handleQuickStart = () => {
-    const cfg = modeDefaults(mode);
+    const cfg = modeDefaults(mode, scanDefaults);
     localStorage.setItem(SCAN_MODE_STORAGE_KEY, mode);
     onStart(mode, cfg);
   };
@@ -263,12 +296,8 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
   };
 
   const handleResetDefaults = () => {
-    const base = modeDefaults(mode);
-    setConfig({ ...base });
-    const reset = decodePortRange(base.port_range);
-    setPortMode(reset.mode);
-    setTpValue(reset.tpValue);
-    setPValue(reset.pValue);
+    const base = modeDefaults(mode, scanDefaults);
+    applyConfig({ ...base });
     localStorage.removeItem(SCAN_CONFIG_STORAGE_KEY);
   };
 

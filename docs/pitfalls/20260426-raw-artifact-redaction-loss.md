@@ -1,5 +1,7 @@
 # RawArtifact 保存脱敏后数据，原始证据永久丢失
 
+> 历史经验，非当前规范；路径和修复状态可能已过时。
+
 ## 现象
 审计时无法追溯原始 request/response，因为 `saveEvidenceArtifact` 先调用 `SanitizeHTTPHeaders` 再写入文件，原始数据已被覆盖。
 

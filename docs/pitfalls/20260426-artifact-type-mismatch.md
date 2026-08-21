@@ -1,5 +1,7 @@
 # Worker 与工作流之间的 Artifact 类型不匹配
 
+> 历史经验，非当前规范；路径和修复状态可能已过时。
+
 ## 现象
 资产发现工作流无法运行。`worker.Run` 保存的 Artifact 类型为 `ArtifactStdout`，但工作流解析器查找 `ArtifactJSONL` 会找不到。
 

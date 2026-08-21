@@ -5,7 +5,7 @@
 .PHONY: dev-rebuild e2e-local e2e-local-down e2e-local-logs
 .PHONY: logs logs-server logs-worker status shell-server shell-worker
 .PHONY: build-server-runtime-base push-server-runtime-base pull-server-runtime-base
-.PHONY: test test-unit test-e2e test-e2e-smoke test-e2e-scan test-e2e-full test-e2e-multi-worker-up test-e2e-multi-worker-down test-e2e-multi-worker-scan
+.PHONY: test test-unit check-docs test-e2e test-e2e-smoke test-e2e-scan test-e2e-full test-e2e-multi-worker-up test-e2e-multi-worker-down test-e2e-multi-worker-scan
 .PHONY: release-verify release-verify-build release-verify-down
 .PHONY: range-up range-down range-status range-logs
 .PHONY: dev-web
@@ -185,6 +185,10 @@ test:
 	go test ./...
 
 test-unit: test
+
+check-docs:
+	node --test scripts/check-docs.test.mjs
+	node scripts/check-docs.mjs
 
 E2E_TOKEN ?= test-e2e-token
 E2E_PLAYWRIGHT_ENV = ANCHOR_API_TOKEN=$(E2E_TOKEN) ANCHOR_E2E_SKIP_DOCKER=1
