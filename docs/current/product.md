@@ -47,7 +47,7 @@ ScopeSentry's fixed pipeline, interpreted plugin runtime, MCP/skill integration,
 
 ## Product boundaries
 
-- Dedicated internal-network scanning is not a product scenario. Any current `internal` preset, API value, tests, or specialized execution path is legacy behavior scheduled for removal and must not receive new features.
+- Dedicated internal-network scanning is not a product scenario. The legacy `internal` preset, API value, UI choice, and specialized execution path were retired by the P1-1 compatibility exit: new `internal` scan requests receive `410 INTERNAL_MODE_REMOVED`, saved internal configurations are rejected or explicitly migrated (never silently widened), and the UI exposes the internet scan mode only.
 - All internet targets require explicit authorization and scope/exclusion enforcement.
 - External tools remain reviewed implementations behind a semantic execution module and registry/guard. A tool may use an in-process SDK or a guarded process adapter; callers do not depend on CLI arguments.
 - The first-class exposure triad is high-risk service/port exposure, high-risk vulnerability evidence, and weak authentication. Weak authentication is discovered through Nuclei routing and approved custom template sources, not an unbounded password engine.
@@ -58,4 +58,4 @@ ScopeSentry's fixed pipeline, interpreted plugin runtime, MCP/skill integration,
 - SQLite, task transport, identity, and multi-server consistency are implementation decisions under evaluation, not permanent constraints.
 - RBAC, tenant isolation, notification integrations, and continuous scheduling semantics require explicit product acceptance and ADRs; they are not inferred automatically from “distributed.”
 
-See [`../proposals/scopesentry-capabilities.md`](../proposals/scopesentry-capabilities.md) for capability design input and [`../decisions/0003-distributed-internet-asm-baseline.md`](../decisions/0003-distributed-internet-asm-baseline.md), [`../decisions/0004-deterministic-non-agent-product.md`](../decisions/0004-deterministic-non-agent-product.md), [`../decisions/0005-semantic-scan-execution-adapters.md`](../decisions/0005-semantic-scan-execution-adapters.md), and [`../decisions/0006-nuclei-weak-auth-policy.md`](../decisions/0006-nuclei-weak-auth-policy.md) for durable direction.
+See [`../proposals/scopesentry-capabilities.md`](../proposals/scopesentry-capabilities.md) for capability design input and [`../decisions/0003-distributed-internet-asm-baseline.md`](../decisions/0003-distributed-internet-asm-baseline.md), [`../decisions/0004-deterministic-non-agent-product.md`](../decisions/0004-deterministic-non-agent-product.md), [`../decisions/0005-semantic-scan-execution-adapters.md`](../decisions/0005-semantic-scan-execution-adapters.md), [`../decisions/0006-nuclei-weak-auth-policy.md`](../decisions/0006-nuclei-weak-auth-policy.md), and [`../decisions/0007-internal-mode-exit.md`](../decisions/0007-internal-mode-exit.md) for durable direction.

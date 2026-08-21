@@ -362,11 +362,18 @@ func (s *Server) handleGetPipelineConfig(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	cfg := models.DefaultPipelineConfig()
+	cfg := models.DefaultExternalPipelineConfig()
 	if project.PipelineConfig != nil && *project.PipelineConfig != "" {
 		if err := json.Unmarshal([]byte(*project.PipelineConfig), &cfg); err != nil {
 			log.Printf("parse pipeline config: %v", err)
 		}
+	}
+
+	// P1-1: surface a compatibility note (header only) so clients know a stored
+	// config predates the internal→internet exit. The payload is returned as-is;
+	// the server never silently rewrites scope.
+	if scanconfig.IsLegacyInternalConfig(cfg) {
+		w.Header().Set("X-Anchor-Compatibility", "internal-mode-migrated")
 	}
 
 	writeJSON(w, http.StatusOK, cfg)
@@ -383,6 +390,16 @@ func (s *Server) handleUpdatePipelineConfig(w http.ResponseWriter, r *http.Reque
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 		writeError(w, http.StatusBadRequest, errors.New("INVALID_BODY", err.Error()))
 		return
+	}
+
+	// P1-1: saving a legacy internal-shaped config would silently widen scope on a
+	// later scan. Require an explicit migration flag; otherwise reject.
+	if scanconfig.IsLegacyInternalConfig(cfg) && r.URL.Query().Get("migrate") != "external" {
+		writeError(w, http.StatusGone, scanconfig.InternalModeError())
+		return
+	}
+	if scanconfig.IsLegacyInternalConfig(cfg) {
+		cfg = scanconfig.MigrateInternalConfigToExternal(cfg)
 	}
 
 	cfgJSON, err := json.Marshal(cfg)
@@ -430,7 +447,12 @@ func (s *Server) handleGetPipelineRunStages(w http.ResponseWriter, r *http.Reque
 
 // --- Unified Scan ---
 
+// Compatibility helpers for the retired internal scan mode live in
+// internal/scanconfig/compat.go (IsInternalMode, IsLegacyInternalConfig,
+// MigrateInternalConfigToExternal, ErrInternalModeRemoved), not in the handler.
+
 // buildConfigForMode returns a PipelineConfig for the given scan mode.
+// Only the internet scan mode is supported; "internal" is rejected upstream.
 // Speed parameters are loaded from the request body; defaults are applied for zero values.
 // Tool toggles (enable_spoor, enable_katana, enable_ffuf) are NOT overridden — the
 // frontend controls these via the ScanModal tool section, and the backend respects
@@ -468,32 +490,23 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 		cfg.NucleiScanDepth = defaults.NucleiScanDepth
 	}
 
-	switch mode {
-	case "external":
-		cfg.EnableSubfinder = true
-		cfg.EnableDNSx = true
-		cfg.EnableCDNFilter = true
-		cfg.EnableNmapService = true
-		cfg.EnableHttpx = true
-		cfg.EnableNuclei = true
-		cfg.EnablePassiveSearch = defaults.EnablePassiveSearch
-		if cfg.PassiveSearchResultLimit == 0 {
-			cfg.PassiveSearchResultLimit = defaults.PassiveSearchResultLimit
-		}
-		if cfg.PassiveSearchConcurrency == 0 {
-			cfg.PassiveSearchConcurrency = defaults.PassiveSearchConcurrency
-		}
-		cfg.EnablePassiveJunkFilter = defaults.EnablePassiveJunkFilter
-		cfg.SkipPortscanOnCDNHost = defaults.SkipPortscanOnCDNHost
-		cfg.NucleiRequireFingerprint = defaults.NucleiRequireFingerprint
-	case "internal":
-		cfg.EnableSubfinder = false
-		cfg.EnableDNSx = false
-		cfg.EnableCDNFilter = false
-		cfg.EnableNmapService = true
-		cfg.EnableHttpx = true
-		cfg.EnableNuclei = true
+	// Internet mode: enable the standard mapping toolset with external defaults.
+	cfg.EnableSubfinder = true
+	cfg.EnableDNSx = true
+	cfg.EnableCDNFilter = true
+	cfg.EnableNmapService = true
+	cfg.EnableHttpx = true
+	cfg.EnableNuclei = true
+	cfg.EnablePassiveSearch = defaults.EnablePassiveSearch
+	if cfg.PassiveSearchResultLimit == 0 {
+		cfg.PassiveSearchResultLimit = defaults.PassiveSearchResultLimit
 	}
+	if cfg.PassiveSearchConcurrency == 0 {
+		cfg.PassiveSearchConcurrency = defaults.PassiveSearchConcurrency
+	}
+	cfg.EnablePassiveJunkFilter = defaults.EnablePassiveJunkFilter
+	cfg.SkipPortscanOnCDNHost = defaults.SkipPortscanOnCDNHost
+	cfg.NucleiRequireFingerprint = defaults.NucleiRequireFingerprint
 	// Tool toggles (enable_spoor, enable_katana, enable_ffuf) are NOT forced here.
 	// The frontend controls these via the ScanModal tool section; defaults are
 	// provided by the preset, but the user's explicit choice is always respected.
@@ -501,16 +514,12 @@ func buildConfigForMode(mode string, cfg models.PipelineConfig) models.PipelineC
 }
 
 // presetDefaults returns the default PipelineConfig for the given mode.
+// Only the internet ("external") preset is available.
 func presetDefaults(mode string) models.PipelineConfig {
 	if sc := scanconfig.Get(); sc != nil {
 		return sc.Preset(mode)
 	}
-	switch mode {
-	case "external":
-		return models.DefaultExternalPipelineConfig()
-	default:
-		return models.DefaultPipelineConfig()
-	}
+	return models.DefaultExternalPipelineConfig()
 }
 
 func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
@@ -533,6 +542,18 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 		req.Mode = "external"
 	}
 
+	// P1-1: reject the retired internal mode. A saved internal-shaped config may be
+	// explicitly migrated only when the caller passes ?migrate=external.
+	if scanconfig.IsInternalMode(req.Mode) {
+		if r.URL.Query().Get("migrate") != "external" {
+			writeError(w, http.StatusGone, scanconfig.InternalModeError())
+			return
+		}
+		// Explicit migration request.
+		req.Mode = "external"
+		req.Config = scanconfig.MigrateInternalConfigToExternal(req.Config)
+	}
+
 	project, err := s.queries.GetProject(projectID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errors.New("DB_ERROR", err.Error()))
@@ -543,13 +564,30 @@ func (s *Server) handleCreateScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The run always uses the validated internet profile, regardless of any saved
+	// legacy internal config. P1-1: never silently overwrite a saved legacy
+	// internal config with the internet baseline unless the caller explicitly
+	// requested migration (?migrate=external) — that would widen scope without an
+	// explicit act.
 	cfg := buildConfigForMode(req.Mode, req.Config)
 
+	persist := true
+	if project.PipelineConfig != nil && *project.PipelineConfig != "" {
+		var saved models.PipelineConfig
+		if json.Unmarshal([]byte(*project.PipelineConfig), &saved) == nil && scanconfig.IsLegacyInternalConfig(saved) {
+			if r.URL.Query().Get("migrate") != "external" {
+				persist = false
+				log.Printf("[scan] preserved saved legacy internal config for project %s; pass ?migrate=external to persist the internet baseline", projectID)
+			}
+		}
+	}
 	// Persist config to project so the ScanModal can reload it next time.
 	// Side effects (save failure) are non-fatal — the pipeline still runs.
-	if cfgJSON, err := json.Marshal(cfg); err == nil {
-		if err := s.queries.UpdateProjectPipelineConfig(projectID, string(cfgJSON)); err != nil {
-			log.Printf("[scan] persist pipeline config for project %s: %v", projectID, err)
+	if persist {
+		if cfgJSON, err := json.Marshal(cfg); err == nil {
+			if err := s.queries.UpdateProjectPipelineConfig(projectID, string(cfgJSON)); err != nil {
+				log.Printf("[scan] persist pipeline config for project %s: %v", projectID, err)
+			}
 		}
 	}
 

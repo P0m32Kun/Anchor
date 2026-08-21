@@ -77,7 +77,7 @@ describe("ScanModal — ffuf toggle", () => {
       high_risk_ports: "80,443",
       ffuf_dictionary_default: "",
       presets: {
-        internal: {
+        external: {
           enable_cdn_filter: true,
           port_range: "full",
           naabu_rate: 321,
@@ -116,16 +116,48 @@ describe("ScanModal — ffuf toggle", () => {
     render(<ScanModal open onClose={() => {}} onStart={onStart} projectId="proj-1" />);
 
     await waitFor(() => expect(api.getScanDefaults).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole("button", { name: /内网扫描/ }));
+    fireEvent.click(screen.getByRole("button", { name: /外网扫描/ }));
     fireEvent.click(screen.getByRole("button", { name: "快速启动" }));
 
     expect(onStart).toHaveBeenCalledWith(
-      "internal",
+      "external",
       expect.objectContaining({
         port_range: "full",
         naabu_rate: 321,
         naabu_threads: 88,
       })
     );
+  });
+
+  it("migrates a stored 'internal' scan mode to 'external' (P1-1)", async () => {
+    // The shared test setup stubs globalThis.localStorage as a no-op (because
+    // api.ts reads it at module load). Install an in-memory store so the modal's
+    // mode persistence is actually observable.
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, "localStorage", {
+      value: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => {
+          store.set(k, v);
+        },
+        removeItem: (k: string) => {
+          store.delete(k);
+        },
+        clear: () => store.clear(),
+      },
+      writable: true,
+    });
+    store.set("anchor.scanModal.mode", "internal");
+
+    const onStart = vi.fn();
+    render(<ScanModal open onClose={() => {}} onStart={onStart} />);
+
+    // The retired internal card must not be offered.
+    expect(screen.queryByRole("button", { name: /内网扫描/ })).toBeNull();
+    // Stored mode was rewritten to external on mount.
+    expect(store.get("anchor.scanModal.mode")).toBe("external");
+
+    fireEvent.click(screen.getByRole("button", { name: "快速启动" }));
+    expect(onStart).toHaveBeenCalledWith("external", expect.any(Object));
   });
 });

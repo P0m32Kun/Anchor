@@ -46,7 +46,7 @@ test.describe("Scan Cancel E2E", () => {
 	test("启动扫描后可取消", async () => {
 		// 启动扫描
 		const run = await createScanRun(projectId, {
-			profile: "internal",
+			profile: "external",
 		});
 		expect(run).toBeTruthy();
 		expect(run.id).toBeTruthy();
@@ -75,7 +75,7 @@ test.describe("Scan Cancel E2E", () => {
 	test("取消后的扫描不再产生新 work", async () => {
 		// 启动扫描
 		const run = await createScanRun(projectId, {
-			profile: "internal",
+			profile: "external",
 		});
 
 		// 等待开始

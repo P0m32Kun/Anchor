@@ -11,37 +11,12 @@ type ActionRule struct {
 	Precondition func(a *DiscoveryAsset, profile Profile) bool
 }
 
-// Profile is the interface for scan profile rules (internal, external, url_only).
+// Profile is the interface for scan profile rules (external, url_only).
 type Profile interface {
 	// Rules returns the action rules for this profile.
 	Rules() []ActionRule
 	// RequireFingerprint returns whether Nuclei requires a fingerprint first.
 	RequireFingerprint() bool
-}
-
-// DefaultInternalProfile returns the default internal scan profile.
-func DefaultInternalProfile() Profile {
-	return &internalProfile{}
-}
-
-type internalProfile struct{}
-
-func (p *internalProfile) RequireFingerprint() bool { return true }
-
-func (p *internalProfile) Rules() []ActionRule {
-	return []ActionRule{
-		{Action: ActionSubdomainEnum, Enabled: true, MaxDepth: 0, Precondition: isSubdomain},
-		{Action: ActionDNSResolve, Enabled: true, MaxDepth: -1, Precondition: isSubdomainOrIP},
-		{Action: ActionAliveCheck, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPOrCIDR},
-		// 内网模式不做 CDN 过滤（Fix 1: internal 不上报 cdn_filter stage）
-		{Action: ActionPortScan, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPAndAlive},
-		{Action: ActionServiceFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isIPPort},
-		{Action: ActionHTTPXFingerprint, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isWebEntryOrHTTPXCandidate},
-		{Action: ActionKatanaCrawl, Enabled: true, MaxDepth: 1, Precondition: isHTTPServiceOrPath},
-		{Action: ActionSpoorScan, Enabled: true, MaxDepth: 1, Precondition: isHTTPServiceOrPath},
-		{Action: ActionFFUFBrute, Enabled: true, MaxDepth: 1, Precondition: isHTTPService},
-		{Action: ActionNucleiScan, Enabled: true, MaxDepth: MaxDiscoveryDepth, Precondition: isHTTPAndFingerprinted},
-	}
 }
 
 // DeriveEligibleWorks returns the list of works that should be enqueued for

@@ -43,7 +43,7 @@ test.describe("Finding Verification Queue E2E", () => {
 		});
 
 		const run = await createScanRun(projectId, {
-			profile: "internal",
+			profile: "external",
 		});
 		runId = run.id;
 

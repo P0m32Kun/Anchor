@@ -6,8 +6,19 @@ import (
 
 func boolPtr(b bool) *bool { return &b }
 
+func intPtr(i int) *int { return &i }
+
+// highValueHTTPService returns an HTTP service that external high-value gating
+// (katana/ffuf/spoor) accepts: status code in the 2xx-3xx range.
+func highValueHTTPService(id string, depth int) *DiscoveryAsset {
+	return &DiscoveryAsset{
+		ID: id, Type: AssetHTTPService, DiscoveryDepth: depth,
+		Attrs: AssetAttrs{StatusCode: intPtr(200)},
+	}
+}
+
 func TestDeriveEligibleWorks_NucleiRequiresFingerprint(t *testing.T) {
-	profile := DefaultInternalProfile()
+	profile := DefaultExternalProfile()
 
 	a := &DiscoveryAsset{
 		ID: "asset-1", Type: AssetHTTPService, DiscoveryDepth: 0,
@@ -34,10 +45,10 @@ func TestDeriveEligibleWorks_NucleiRequiresFingerprint(t *testing.T) {
 }
 
 func TestDeriveEligibleWorks_KatanaMaxDepth1(t *testing.T) {
-	profile := DefaultInternalProfile()
+	profile := DefaultExternalProfile()
 
-	// Depth 0: katana eligible
-	a := &DiscoveryAsset{ID: "a1", Type: AssetHTTPService, DiscoveryDepth: 0}
+	// Depth 0: katana eligible on a high-value HTTP service
+	a := highValueHTTPService("a1", 0)
 	works := DeriveEligibleWorks(a, profile)
 	var hasKatana bool
 	for _, w := range works {
@@ -46,7 +57,7 @@ func TestDeriveEligibleWorks_KatanaMaxDepth1(t *testing.T) {
 		}
 	}
 	if !hasKatana {
-		t.Fatal("katana should be eligible at depth 0")
+		t.Fatal("katana should be eligible at depth 0 for high-value HTTP")
 	}
 
 	// Depth 1: katana still eligible (max_depth=1 means depth<=1)
@@ -73,7 +84,7 @@ func TestDeriveEligibleWorks_KatanaMaxDepth1(t *testing.T) {
 }
 
 func TestDeriveEligibleWorks_PortScanSkippedOnCDN(t *testing.T) {
-	profile := DefaultInternalProfile()
+	profile := DefaultExternalProfile()
 
 	a := &DiscoveryAsset{
 		ID: "ip-1", Type: AssetIP, DiscoveryDepth: 0,
@@ -101,7 +112,7 @@ func TestDeriveEligibleWorks_PortScanSkippedOnCDN(t *testing.T) {
 }
 
 func TestDeriveEligibleWorks_PortScanSkippedOnDeadHost(t *testing.T) {
-	profile := DefaultInternalProfile()
+	profile := DefaultExternalProfile()
 
 	a := &DiscoveryAsset{
 		ID: "ip-1", Type: AssetIP, DiscoveryDepth: 0,
@@ -116,7 +127,7 @@ func TestDeriveEligibleWorks_PortScanSkippedOnDeadHost(t *testing.T) {
 }
 
 func TestDeriveEligibleWorks_AliveCheckBeforePortScan(t *testing.T) {
-	profile := DefaultInternalProfile()
+	profile := DefaultExternalProfile()
 
 	a := &DiscoveryAsset{
 		ID: "ip-unknown", Type: AssetIP, DiscoveryDepth: 0,
@@ -142,7 +153,7 @@ func TestDeriveEligibleWorks_AliveCheckBeforePortScan(t *testing.T) {
 }
 
 func TestDeriveEligibleWorks_SubdomainOnlyAtDepth01(t *testing.T) {
-	profile := DefaultInternalProfile()
+	profile := DefaultExternalProfile()
 
 	// Depth 0: subdomain enum eligible
 	a := &DiscoveryAsset{ID: "sub-1", Type: AssetSubdomain, DiscoveryDepth: 0}
@@ -180,28 +191,15 @@ func TestDeriveEligibleWorks_SubdomainOnlyAtDepth01(t *testing.T) {
 	}
 }
 
-func TestDeriveEligibleWorks_FFUFMaxDepth1(t *testing.T) {
-	profile := DefaultInternalProfile()
-
-	// Depth 0: ffuf eligible
-	a := &DiscoveryAsset{ID: "a1", Type: AssetHTTPService, DiscoveryDepth: 0}
+func TestDeriveEligibleWorks_FFUFDisabledByDefaultExternal(t *testing.T) {
+	// The external internet profile keeps directory brute-force (ffuf) disabled by
+	// default. It is only derived when explicitly enabled via config/profiling.
+	profile := DefaultExternalProfile()
+	a := highValueHTTPService("a1", 0)
 	works := DeriveEligibleWorks(a, profile)
-	var hasFFUF bool
 	for _, w := range works {
 		if w.Action == ActionFFUFBrute {
-			hasFFUF = true
-		}
-	}
-	if !hasFFUF {
-		t.Fatal("ffuf should be eligible at depth 0")
-	}
-
-	// Depth 2: ffuf NOT eligible
-	a.DiscoveryDepth = 2
-	works = DeriveEligibleWorks(a, profile)
-	for _, w := range works {
-		if w.Action == ActionFFUFBrute {
-			t.Fatal("ffuf should not be eligible at depth 2")
+			t.Fatal("ffuf should be disabled by default on the external profile")
 		}
 	}
 }
@@ -233,7 +231,7 @@ func TestDeriveEligibleWorks_CDNCheckOnlyOnIP(t *testing.T) {
 }
 
 func TestDeriveEligibleWorks_HTTPXOnHTTPService(t *testing.T) {
-	profile := DefaultInternalProfile()
+	profile := DefaultExternalProfile()
 
 	a := &DiscoveryAsset{ID: "http-1", Type: AssetHTTPService, DiscoveryDepth: 0}
 	works := DeriveEligibleWorks(a, profile)

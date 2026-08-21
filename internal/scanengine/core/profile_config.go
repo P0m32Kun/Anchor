@@ -3,18 +3,13 @@ package core
 import "github.com/P0m32Kun/Anchor/internal/models"
 
 // ProfileFromConfig builds a scan profile for the given mode with PipelineConfig
-// toggles applied to each action rule.
+// toggles applied to each action rule. Only the internet scan mode is supported;
+// the retired "internal" mode is rejected upstream in the API and never reaches
+// profile construction.
 func ProfileFromConfig(mode string, cfg models.PipelineConfig) Profile {
-	var base Profile
-	switch mode {
-	case "external":
-		ext := DefaultExternalProfile()
-		ext.SkipPortscanOnCDN = cfg.SkipPortscanOnCDNHost
-		base = ext
-	default:
-		base = DefaultInternalProfile()
-	}
-	return &pipelineProfile{base: base, cfg: cfg}
+	ext := DefaultExternalProfile()
+	ext.SkipPortscanOnCDN = cfg.SkipPortscanOnCDNHost
+	return &pipelineProfile{base: ext, cfg: cfg}
 }
 
 type pipelineProfile struct {

@@ -119,10 +119,10 @@ func (w *Watcher) isDue(p *models.WatchProject, now time.Time) bool {
 func (w *Watcher) startScan(ctx context.Context, p *models.WatchProject) {
 	w.running[p.ID] = true
 	mode := "external"
-	cfg := models.DefaultPipelineConfig()
+	cfg := models.DefaultExternalPipelineConfig()
 	if p.WatchPassiveOnly {
-		// In passive-only mode, use internal mode (passive search is injected during seed expansion).
-		// The scan engine determines mode behavior via profile.
+		// In passive-only mode, passive search is injected during seed expansion;
+		// the scan engine profile remains the internet profile.
 	}
 	_ = mode // For future per-project mode override
 

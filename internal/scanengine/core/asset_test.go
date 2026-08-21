@@ -18,7 +18,7 @@ func TestReconcileDiscoveryAsset_IPNotSubdomain(t *testing.T) {
 	if a.Type != AssetIP {
 		t.Fatalf("type = %s, want IP", a.Type)
 	}
-	works := DeriveEligibleWorks(a, DefaultInternalProfile())
+	works := DeriveEligibleWorks(a, DefaultExternalProfile())
 	for _, w := range works {
 		if w.Action == ActionSubdomainEnum {
 			t.Fatal("IP asset must not derive SUBDOMAIN_ENUM")

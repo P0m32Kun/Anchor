@@ -7,8 +7,8 @@
  * 问题 1 (端口范围卡片溢出) 已随 ScanModal 端口 UI 重构(-tp 下拉 + -p 自定义 textarea)
  * 失效:新 UI 没有带长描述的卡片,溢出风险消失。
  *
- * 问题 2/3 由 internal/db/migrate_v12_test.go (FK 修复) +
- * internal-scan-live.spec.ts (整流水线) 覆盖。
+ * 问题 2/3 由 internal/db/migrate_v12_test.go (FK 修复) 覆盖。
+ * (旧的 internal-scan-live.spec.ts 已随 P1-1 内网模式退役而移除。)
  *
  * 前置条件:
  *   - anchor-server 已运行 (localhost:17421, token=$ANCHOR_API_TOKEN)
@@ -62,7 +62,7 @@ async function openScanModalToStep2(page: any, projectId: string) {
 	await expect(
 		page.getByRole("heading", { name: /新建扫描流水线/ }),
 	).toBeVisible();
-	await page.getByRole("button", { name: /内网扫描/ }).first().click();
+	await page.getByRole("button", { name: /外网扫描/ }).first().click();
 	await page.getByRole("button", { name: /高级配置/ }).click();
 	await expect(page.getByText("端口探测范围")).toBeVisible();
 }
@@ -76,15 +76,15 @@ test.describe("QA 回归 — qa.md 修复验证", () => {
 		);
 		await setCurrentProject(page, project.id);
 
-		// 第一次打开:选 internal + 切到 -p 自定义,改成一个独特端口列表
+		// 第一次打开:选外部(互联网)模式 + 切到 -p 自定义,改成一个独特端口列表
 		await openScanModalToStep2(page, project.id);
 
-		// 选 mode 后 SCAN_MODE_STORAGE_KEY 应立即写 localStorage
+		// 选 mode 后 SCAN_MODE_STORAGE_KEY 应立即写 localStorage(P1-1 后仅 external)
 		const storedModeAfterModeSelect = await page.evaluate(() =>
 			localStorage.getItem("anchor.scanModal.mode"),
 		);
 		expect(storedModeAfterModeSelect, "选 mode 后应当立即写 localStorage").toBe(
-			"internal",
+			"external",
 		);
 
 		// 切到 -p 自定义模式,改 textarea 成可识别的端口列表
@@ -104,7 +104,7 @@ test.describe("QA 回归 — qa.md 修复验证", () => {
 			await route.fulfill({
 				status: 202,
 				contentType: "application/json",
-				body: JSON.stringify({ run_id: "stub", status: "accepted", mode: "internal" }),
+				body: JSON.stringify({ run_id: "stub", status: "accepted", mode: "external" }),
 			});
 		});
 		await page.getByRole("button", { name: /立即启动扫描/ }).click();

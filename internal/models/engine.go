@@ -54,6 +54,10 @@ type PipelineConfig struct {
 
 
 const DefaultFfufDictionaryID = "builtin:path/top100.txt"
+// DefaultPipelineConfig is LEGACY: it carries the retired internal-mode baseline
+// (high naabu rate/threads, no CDN skip, broad depth). It is retained only as the
+// structural base for the external variants and for reading saved internal-shaped
+// configs. New code must use DefaultExternalPipelineConfig for an internet scan.
 func DefaultPipelineConfig() PipelineConfig {
 	return PipelineConfig{
 		EnableSubfinder:          true,
@@ -84,9 +88,10 @@ func DefaultPipelineConfig() PipelineConfig {
 	}
 }
 
-// DefaultExternalPipelineConfig returns the baseline configuration for
-// external-mode scans — deliberately more conservative on port range,
-// rate-limiting, and scan depth than the internal default.
+// DefaultExternalPipelineConfig returns the baseline configuration for an
+// internet-mode scan — deliberately more conservative on port range,
+// rate-limiting, and scan depth. This is the canonical internet scan default
+// since P1-1; the retired "internal" mode must not fall back to it implicitly.
 func DefaultExternalPipelineConfig() PipelineConfig {
 	cfg := DefaultPipelineConfig()
 	cfg.PortRange = "top100"

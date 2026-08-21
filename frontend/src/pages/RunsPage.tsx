@@ -56,6 +56,10 @@ const modeVariants: Record<string, any> = {
   standard: "info",
   deep: "purple",
   custom: "secondary",
+  external: "primary",
+  // P1-1: historical runs that used the retired internal mode are rendered as a
+  // legacy badge; they are kept as immutable audit rows and never rerun as internal.
+  internal: "outline",
 };
 
 const canCancel = (status: string) =>
@@ -640,7 +644,11 @@ export default function RunsPage() {
                                         <span className="font-bold text-foreground truncate max-w-[200px]">
                                             {run.id.slice(-8).toUpperCase()}
                                         </span>
-                                        <Badge variant={modeVariants[run.mode] || 'secondary'} className="h-5 px-1.5 text-[10px] uppercase">
+                                        <Badge
+                                          variant={modeVariants[run.mode] || 'secondary'}
+                                          className="h-5 px-1.5 text-[10px] uppercase"
+                                          title={run.mode === "internal" ? "legacy internal mode — retired in P1-1; rerun as external" : undefined}
+                                        >
                                             {run.mode}
                                         </Badge>
                                     </div>

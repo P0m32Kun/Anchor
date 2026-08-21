@@ -5,7 +5,6 @@ import { Input } from "./Input";
 import {
   PipelineConfig,
   ScanDefaultsResponse,
-  DEFAULT_PIPELINE_CONFIG,
   DEFAULT_EXTERNAL_PIPELINE_CONFIG,
   DEFAULT_HIGH_RISK_PORTS,
   TP_PRESET_VALUES,
@@ -16,15 +15,14 @@ import {
 import { cn } from "../lib/utils";
 import { Zap, Globe, Shield, Gauge, Cpu, CheckCircle2, RotateCcw, ChevronRight, ChevronDown } from "lucide-react";
 
-export type ScanMode = "external" | "internal";
+export type ScanMode = "external";
 
 const SCAN_CONFIG_STORAGE_KEY = "anchor.scanModal.config";
 const SCAN_MODE_STORAGE_KEY = "anchor.scanModal.mode";
 
-function modeDefaults(mode: ScanMode, scanDefaults?: ScanDefaultsResponse | null): PipelineConfig {
-  const base =
-    mode === "external" ? DEFAULT_EXTERNAL_PIPELINE_CONFIG : DEFAULT_PIPELINE_CONFIG;
-  const preset = scanDefaults?.presets?.[mode];
+function modeDefaults(_mode: ScanMode, scanDefaults?: ScanDefaultsResponse | null): PipelineConfig {
+  const base = DEFAULT_EXTERNAL_PIPELINE_CONFIG;
+  const preset = scanDefaults?.presets?.["external"];
   return { ...base, ...preset };
 }
 
@@ -40,9 +38,12 @@ function loadStoredConfig(mode: ScanMode, scanDefaults?: ScanDefaultsResponse | 
   }
 }
 
+// P1-1: the dedicated internal scan mode was retired. Any previously stored mode
+// is migrated to the internet scan mode (explicit user-facing shift, never silent).
 function loadStoredMode(): ScanMode {
-  const raw = localStorage.getItem(SCAN_MODE_STORAGE_KEY);
-  if (raw === "internal") return "internal";
+  if (localStorage.getItem(SCAN_MODE_STORAGE_KEY) === "internal") {
+    localStorage.setItem(SCAN_MODE_STORAGE_KEY, "external");
+  }
   return "external";
 }
 
@@ -69,14 +70,6 @@ const MODE_OPTIONS: {
     tools: ["FOFA", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Katana", "Ffuf"],
     icon: Globe,
     color: "text-blue-400",
-  },
-  {
-    mode: "internal",
-    label: "内网扫描",
-    description: "内网资产端口、服务与漏洞检测",
-    tools: ["nmap alive", "Naabu", "nmap -sV", "HTTPX", "Nuclei", "Katana", "Ffuf"],
-    icon: Shield,
-    color: "text-emerald-400",
   },
 ];
 
@@ -125,8 +118,7 @@ const BASE_TOOL_FIELDS: { group: string; fields: ToolField[]; icon: any }[] = [
   },
 ];
 
-const EXTERNAL_TOOL_FIELDS = BASE_TOOL_FIELDS;
-const INTERNAL_TOOL_FIELDS = BASE_TOOL_FIELDS;
+const TOOL_FIELDS = BASE_TOOL_FIELDS;
 
 const SCAN_DEPTH_OPTIONS: {
   value: string;
@@ -307,7 +299,7 @@ export default function ScanModal({ open, onClose, onStart, loading, projectId }
     setConfig((prev) => ({ ...prev, [key]: num }));
   };
 
-  const toolFields = mode === "external" ? EXTERNAL_TOOL_FIELDS : INTERNAL_TOOL_FIELDS;
+  const toolFields = TOOL_FIELDS;
 
   return (
     <Modal open={open} onClose={handleClose} title="新建扫描流水线" size="lg">

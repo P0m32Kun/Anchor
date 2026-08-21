@@ -51,6 +51,7 @@ These are restart evidence, not completion claims. P0 exits only after the full 
 
 ### P1-1 — Explicit internal-mode compatibility exit
 
+- Status: implemented (accepted 2026-08-21)
 - Goal: reject new `internal` requests, provide explicit handling for saved configurations, remove the dedicated UI choice and specialized branches, and retain only reusable internet primitives.
 - Owned paths: `internal/api/`, `internal/models/`, `internal/db/`, `internal/scanengine/`, `frontend/src/`, `frontend/e2e/`, migrations, and compatibility tests.
 - Entry condition: P0-3 is accepted and all legacy `internal` references are inventoried.
@@ -149,4 +150,4 @@ These are restart evidence, not completion claims. P0 exits only after the full 
 - Do not promote an SDK adapter until it proves parity, cancellation, budgets, resource behavior, provenance, and recovery against the process adapter.
 - Each phase or cross-layer increment requires its own change card and, for direction changes, an ADR.
 
-Detailed design input is in [`../proposals/scopesentry-capabilities.md`](../proposals/scopesentry-capabilities.md); durable direction is in [`../decisions/0003-distributed-internet-asm-baseline.md`](../decisions/0003-distributed-internet-asm-baseline.md), [`../decisions/0004-deterministic-non-agent-product.md`](../decisions/0004-deterministic-non-agent-product.md), [`../decisions/0005-semantic-scan-execution-adapters.md`](../decisions/0005-semantic-scan-execution-adapters.md), and [`../decisions/0006-nuclei-weak-auth-policy.md`](../decisions/0006-nuclei-weak-auth-policy.md).
+Detailed design input is in [`../proposals/scopesentry-capabilities.md`](../proposals/scopesentry-capabilities.md); durable direction is in [`../decisions/0003-distributed-internet-asm-baseline.md`](../decisions/0003-distributed-internet-asm-baseline.md), [`../decisions/0004-deterministic-non-agent-product.md`](../decisions/0004-deterministic-non-agent-product.md), [`../decisions/0005-semantic-scan-execution-adapters.md`](../decisions/0005-semantic-scan-execution-adapters.md), [`../decisions/0006-nuclei-weak-auth-policy.md`](../decisions/0006-nuclei-weak-auth-policy.md), and [`../decisions/0007-internal-mode-exit.md`](../decisions/0007-internal-mode-exit.md).

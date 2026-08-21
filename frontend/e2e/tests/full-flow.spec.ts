@@ -1,7 +1,7 @@
 /**
  * 测试层级: E2E
  * 覆盖流程: TokenAuth → 验证 Worker → UI 创建项目 → API 注入 IP 目标(§3.3 例外,scope confirm 产品 bug) →
- *           ScanModal 启动内网扫描 → 等待完成 → AssetPage/FindingsPage/ReportsPage UI 验证
+ *           ScanModal 启动外网扫描 → 等待完成 → AssetPage/FindingsPage/ReportsPage UI 验证
  * 前置依赖: docker compose -f docker-compose.e2e.yml 已经启动 anchor-server / anchor-worker / anchor-rangefield
  * UI 断言点:
  *   - 欢迎页登录 → 进入 Dashboard 后能看到"安全工作台"标题
@@ -39,7 +39,7 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 		await cleanupTestData();
 	});
 
-	test("UI: 认证 → 项目 → 目标 → 内网扫描 → 资产/Finding/报告", async ({
+	test("UI: 认证 → 项目 → 目标 → 外网扫描 → 资产/Finding/报告", async ({
 		browser,
 	}) => {
 		const context = await browser.newContext({ storageState: undefined });
@@ -126,8 +126,8 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 			page.getByRole("cell", { name: TARGET_IP }).first(),
 		).toBeVisible({ timeout: 10_000 });
 
-		// ── Step 5: ScanModal 启动内网扫描 ──
-		log("Step 5: Trigger internal scan via ScanModal");
+		// ── Step 5: ScanModal 启动外网扫描 ──
+		log("Step 5: Trigger internet scan via ScanModal");
 		await page.goto(`/projects/${projectId}/runs`);
 		await expect(
 			page.getByRole("heading", { name: "扫描执行" }),
@@ -138,8 +138,8 @@ test.describe.serial("Full Flow E2E — UI 主导的完整使用场景", () => {
 			page.getByRole("heading", { name: /新建扫描流水线/ }),
 		).toBeVisible();
 
-		// step 1: 选内网扫描
-		await page.locator("button", { hasText: "内网扫描" }).first().click();
+		// step 1: 选外网扫描
+		await page.locator("button", { hasText: "外网扫描" }).first().click();
 		await page.getByRole("button", { name: /高级配置/ }).click();
 
 		// step 2: 选 Top 100 端口(最快)

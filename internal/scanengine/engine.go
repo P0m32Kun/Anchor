@@ -55,7 +55,7 @@ func DefaultEngineConfig() EngineConfig {
 		AbsoluteTimeout: 0,
 		SchedulerTick:   2 * time.Second,
 		BatchSize:       0,
-		Pipeline:        models.DefaultPipelineConfig(),
+		Pipeline:        models.DefaultExternalPipelineConfig(),
 	}
 }
 

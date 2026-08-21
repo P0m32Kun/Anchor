@@ -13,6 +13,7 @@ import (
 	apperrors "github.com/P0m32Kun/Anchor/internal/errors"
 	"github.com/P0m32Kun/Anchor/internal/models"
 	"github.com/P0m32Kun/Anchor/internal/nuclei/custom"
+	"github.com/P0m32Kun/Anchor/internal/scanconfig"
 	"github.com/P0m32Kun/Anchor/internal/util"
 )
 
@@ -391,21 +392,142 @@ func TestPresetDefaults_AllModes(t *testing.T) {
 		expectTools bool
 	}{
 		{"external", "external", true},
-		{"internal", "internal", false},
-		{"default", "", false},
-		{"unknown", "unknown", false},
+		{"default", "", true},
+		{"unknown", "unknown", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := presetDefaults(tt.mode)
 			if tt.expectTools && !cfg.EnableSubfinder {
-				t.Error("expected EnableSubfinder=true for external mode")
+				t.Error("expected EnableSubfinder=true for internet mode")
 			}
 			// Verify it returns a reasonable config
 			if cfg.NucleiConcurrency < 0 {
 				t.Errorf("NucleiConcurrency = %d, want >= 0", cfg.NucleiConcurrency)
 			}
 		})
+	}
+}
+
+func TestHandleCreateScan_InternalModeRejected(t *testing.T) {
+	server, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	body, _ := json.Marshal(map[string]interface{}{"mode": "internal"})
+	req := httptest.NewRequest(http.MethodPost, "/projects/p1/scan", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetPathValue("id", "p1")
+	w := httptest.NewRecorder()
+
+	server.handleCreateScan(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusGone {
+		t.Fatalf("status = %d, want 410 Gone for internal mode", resp.StatusCode)
+	}
+	var appErr struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&appErr); err != nil {
+		t.Fatalf("decode error body: %v", err)
+	}
+	if appErr.Error.Code != string(scanconfig.ErrInternalModeRemoved) {
+		t.Errorf("error code = %q, want %q", appErr.Error.Code, scanconfig.ErrInternalModeRemoved)
+	}
+}
+
+func TestHandleCreateScan_InternalModeMigrateExternalAccepted(t *testing.T) {
+	server, rawDB, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	queries := db.New(rawDB)
+	p := createTestProject(t, queries)
+
+	legacy := map[string]interface{}{
+		"mode": "internal",
+		"config": map[string]interface{}{
+			"enable_subfinder":  false,
+			"enable_cdn_filter": false,
+			"naabu_rate":        1000,
+			"port_range":        "high-risk",
+		},
+	}
+	body, _ := json.Marshal(legacy)
+	req := httptest.NewRequest(http.MethodPost, "/projects/"+p.ID+"/scan?migrate=external", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetPathValue("id", p.ID)
+	w := httptest.NewRecorder()
+
+	server.handleCreateScan(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202 Accepted after explicit migration", resp.StatusCode)
+	}
+}
+
+func TestHandleUpdatePipelineConfig_InternalShapeRejected(t *testing.T) {
+	server, rawDB, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	queries := db.New(rawDB)
+	p := createTestProject(t, queries)
+
+	legacy := map[string]interface{}{
+		"enable_subfinder":  false,
+		"enable_cdn_filter": false,
+		"naabu_rate":        1000,
+		"port_range":        "high-risk",
+	}
+	body, _ := json.Marshal(legacy)
+	req := httptest.NewRequest(http.MethodPost, "/projects/"+p.ID+"/pipeline/config", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetPathValue("id", p.ID)
+	w := httptest.NewRecorder()
+
+	server.handleUpdatePipelineConfig(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusGone {
+		t.Fatalf("status = %d, want 410 Gone for internal-shaped config save", resp.StatusCode)
+	}
+}
+
+func TestHandleGetPipelineConfig_CompatibilityHeader(t *testing.T) {
+	server, rawDB, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	queries := db.New(rawDB)
+	p := createTestProject(t, queries)
+
+	legacyJSON := `{"enable_subfinder":false,"enable_cdn_filter":false,"naabu_rate":1000,"port_range":"high-risk"}`
+	if err := queries.UpdateProjectPipelineConfig(p.ID, legacyJSON); err != nil {
+		t.Fatalf("update project pipeline config: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/projects/"+p.ID+"/pipeline/config", nil)
+	req.SetPathValue("id", p.ID)
+	w := httptest.NewRecorder()
+
+	server.handleGetPipelineConfig(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if got := resp.Header.Get("X-Anchor-Compatibility"); got != "internal-mode-migrated" {
+		t.Errorf("compatibility header = %q, want internal-mode-migrated", got)
 	}
 }
 

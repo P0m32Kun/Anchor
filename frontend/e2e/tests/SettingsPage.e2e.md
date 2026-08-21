@@ -22,7 +22,7 @@ agent-browser screenshot
 
 > 端口扫描配置已下沉到 ScanModal 内部(-tp 预设 / -p 自定义),不再出现在 Settings 页;
 > ScanModal 端口 UI 的 E2E 覆盖见 `qa-regression.spec.ts`、`full-flow.spec.ts`、
-> `high-risk-pipeline.spec.ts`、`internal-scan-live.spec.ts`。
+> `high-risk-pipeline.spec.ts`。(`internal-scan-live.spec.ts` 已随 P1-1 内网模式退役而移除)
 
 ## Test 2: Server URL save/reset
 

@@ -9,6 +9,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// latestMigrationVersion is the newest schema version produced by migrate().
+// Tests assert against it so version bumps do not require updating literals.
+const latestMigrationVersion = 46
+
 func Open(dataDir string) (*sql.DB, error) {
 	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
@@ -472,6 +476,16 @@ func migrate(db *sql.DB) error {
 			return fmt.Errorf("set user_version 45: %w", err)
 		}
 		version = 45
+	}
+
+	if version < 46 {
+		if err := migrateV46(db); err != nil {
+			return fmt.Errorf("migrate v46 (internal-mode exit): %w", err)
+		}
+		if _, err := db.Exec("PRAGMA user_version = 46"); err != nil {
+			return fmt.Errorf("set user_version 46: %w", err)
+		}
+		version = 46
 	}
 
 	if err := ensureProjectsColumns(db); err != nil {

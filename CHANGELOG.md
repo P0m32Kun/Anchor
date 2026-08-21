@@ -2,6 +2,15 @@
 
 This is Anchor's only active changelog. Historical duplicate changelogs are retained under `docs/archived/` and must not receive new entries.
 
+## [Unreleased]
+
+### Changed — P1-1 internal-mode compatibility exit
+- Retired the dedicated `internal` scan mode: `POST /projects/{id}/scan` with `mode=internal` returns `410 INTERNAL_MODE_REMOVED`.
+- Saved internal-shaped project configs are rejected or explicitly migrated (`?migrate=external`), never silently widened.
+- Frontend scan modal offers internet (`external`) mode only and migrates a stored internal mode to external.
+- DB migration v46 migrates legacy `internal` tool templates to `external`; historical `internal` pipeline runs are retained as audit rows.
+- Removed the internal scan profile (`DefaultInternalProfile`) and internal preset; only the internet profile remains.
+
 ## [0.0.3.0] - 2026-05-16
 
 ### Added

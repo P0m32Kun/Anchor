@@ -187,10 +187,10 @@ test.describe.serial("FT-IM-01 Bounded internet-mapping smoke (P0-3)", () => {
 			timeout: 10_000,
 		});
 
-		// API scan start (internal profile, targets already in project)
+		// API scan start (internet profile, targets already in project)
 		const scanRes = await apiFetch(`/projects/${projectId}/scan`, {
 			method: "POST",
-			body: JSON.stringify({ mode: "internal" }),
+			body: JSON.stringify({ mode: "external" }),
 		});
 		// scan returns { run_id } on success; fallback: poll for newest run id
 		let runId = "";
@@ -338,7 +338,7 @@ test.describe.serial("FT-IM-01 Bounded internet-mapping smoke (P0-3)", () => {
 		// Start a bounded run on the fresh project via API
 		const startRes = await apiFetch(`/projects/${cancelProjectId}/scan`, {
 			method: "POST",
-			body: JSON.stringify({ mode: "internal" }),
+			body: JSON.stringify({ mode: "external" }),
 		});
 		let runId = "";
 		if (startRes.ok) {
@@ -350,7 +350,7 @@ test.describe.serial("FT-IM-01 Bounded internet-mapping smoke (P0-3)", () => {
 		if (!runId) {
 			const r = await apiFetch(`/projects/${cancelProjectId}/runs`, {
 				method: "POST",
-				body: JSON.stringify({ profile: "internal" }),
+				body: JSON.stringify({ profile: "external" }),
 			});
 			if (r.ok) {
 				const b = await r.json();

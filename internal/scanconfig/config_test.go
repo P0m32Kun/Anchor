@@ -69,8 +69,8 @@ func TestDefaultsAPIIncludesPresets(t *testing.T) {
 	if _, ok := resp.Presets["external"]; !ok {
 		t.Fatal("missing external preset")
 	}
-	if _, ok := resp.Presets["internal"]; !ok {
-		t.Fatal("missing internal preset")
+	if _, ok := resp.Presets["internal"]; ok {
+		t.Fatal("internal preset must not be exposed (internal mode retired in P1-1)")
 	}
 }
 

@@ -13,7 +13,7 @@ Content-Type: application/json
 
 The supported product mode is `external`. The request may provide a nested `config` object. Configuration fields belong inside `config`; exact fields, defaults, enum values, and validation live in `internal/scanconfig/`, `internal/api/pipeline_handlers.go`, the frontend scan modal, and their tests.
 
-The current source may still accept `internal`. It is a legacy compatibility value scheduled for removal, not a product mode for new clients. Do not add fields, UI, documentation, or tests that expand it. Its final rejection or migration behavior requires the dedicated compatibility change listed in the current plan.
+The retired `internal` mode is rejected (P1-1): `POST` with `mode=internal` returns `410 INTERNAL_MODE_REMOVED` unless `?migrate=external` is supplied, in which case a saved internal-shaped config is explicitly migrated to the internet baseline. New clients must use `external`.
 
 An accepted response identifies the run. It does not mean tools finished successfully.
 

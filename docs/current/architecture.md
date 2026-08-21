@@ -55,9 +55,18 @@ Do not maintain route counts, handler dependency tables, migration counts, or pa
 
 Liveness and port-scan eligibility are under active stabilization. Derive exact semantics from `internal/scanengine/core/` and focused tests until that work is green.
 
-## Legacy internal mode
+## Legacy internal mode — retired (P1-1)
 
-The source tree still contains an `internal` scan preset and related UI, configuration, rules, and tests. It is an observed compatibility path, not part of the product target. Do not add features to it. Removal requires a separate change covering API compatibility, saved configuration, frontend behavior, tests, and migration/rejection semantics.
+The dedicated internal-network scan preset was removed by the P1-1 compatibility
+exit. `POST /projects/{id}/scan` rejects `mode=internal` with `410
+INTERNAL_MODE_REMOVED`; the frontend offers internet scan only; a saved
+internal-shaped project `pipeline_config` is either rejected or explicitly
+migrated (`?migrate=external`) rather than silently widened; legacy `internal`
+tool templates were migrated to `external` in migration 46. Historical
+`pipeline_runs` with `mode='internal'` are retained as immutable audit rows and
+rendered with a legacy badge. The internals that remain (external profile,
+asset/work derivation, scoped tool execution) are the reusable internet
+primitives and are not feature additions to a retired scenario.
 
 ## Distributed internet target
 

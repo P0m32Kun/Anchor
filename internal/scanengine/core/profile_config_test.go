@@ -7,9 +7,9 @@ import (
 )
 
 func TestProfileFromConfig_DisablesNuclei(t *testing.T) {
-	cfg := models.DefaultPipelineConfig()
+	cfg := models.DefaultExternalPipelineConfig()
 	cfg.EnableNuclei = false
-	p := ProfileFromConfig("internal", cfg)
+	p := ProfileFromConfig("external", cfg)
 	works := DeriveEligibleWorks(&DiscoveryAsset{
 		ID: "a1", Type: AssetHTTPService, DiscoveryDepth: 0,
 		Attrs: AssetAttrs{Fingerprinted: true},
@@ -36,8 +36,8 @@ func TestProfileFromConfig_PassiveNotEnqueued(t *testing.T) {
 }
 
 func TestProfileFromConfig_HTTPXCandidateSubdomain(t *testing.T) {
-	cfg := models.DefaultPipelineConfig()
-	p := ProfileFromConfig("internal", cfg)
+	cfg := models.DefaultExternalPipelineConfig()
+	p := ProfileFromConfig("external", cfg)
 	works := DeriveEligibleWorks(&DiscoveryAsset{
 		ID: "s1", Type: AssetSubdomain, Value: "sub.example.com", DiscoveryDepth: 0,
 	}, p)

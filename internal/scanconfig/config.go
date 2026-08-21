@@ -189,14 +189,10 @@ func (c *Config) resolveFiles(dataDir string) error {
 }
 
 // Preset returns a PipelineConfig for the named preset merged onto models defaults.
+// Only the "external" internet preset is supported; the retired "internal" preset
+// returns the external value rather than widening scope.
 func (c *Config) Preset(name string) models.PipelineConfig {
-	base := models.DefaultPipelineConfig()
-	switch name {
-	case "external":
-		base = models.DefaultExternalPipelineConfig()
-	case "internal":
-		// base already internal default
-	}
+	base := models.DefaultExternalPipelineConfig()
 	if c == nil || len(c.PresetOverrides) == 0 {
 		return base
 	}
@@ -231,7 +227,7 @@ func (c *Config) DefaultsAPI() DefaultsResponse {
 		ExcludeDomainCount:    len(c.ExcludeDomains),
 		ConfigPath:            LoadPath(),
 	}
-	names := map[string]bool{"external": true, "internal": true}
+	names := map[string]bool{"external": true}
 	// Add any extra presets from YAML
 	for name := range c.PresetOverrides {
 		names[name] = true

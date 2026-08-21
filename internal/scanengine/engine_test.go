@@ -89,7 +89,7 @@ func setupTestEngine(t *testing.T, fakeExec *fakeExecutor, config EngineConfig) 
 	}
 
 	merger := asset.NewMerger(queries)
-	profile := core.DefaultInternalProfile()
+	profile := core.DefaultExternalProfile()
 	engine := NewWithExecutor(queries, merger, profile, nil, nil, t.TempDir(), "run1", "proj1", config, nil, fakeExec)
 	// Initialize tier pools maps so processNewAsset → claimTier1/Tier2 doesn't nil-map panic
 	engine.tier1Scheduled = make(map[string]struct{})

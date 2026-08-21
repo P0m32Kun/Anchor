@@ -1,6 +1,6 @@
 /**
  * 测试层级: E2E
- * 覆盖流程: RunsPage SSE 连接 → UI 显示「SSE 实时连接」→ UI 启动内网扫描 → 扫描完成后 UI 状态更新
+ * 覆盖流程: RunsPage SSE 连接 → UI 显示「SSE 实时连接」→ UI 启动外网扫描 → 扫描完成后 UI 状态更新
  * 前置依赖: docker-compose.e2e.yml（anchor-server / anchor-worker / rangefield）
  * UI 断言点:
  *   - RunsPage 右上角显示「SSE 实时连接」（非「轮询模式」）
@@ -89,13 +89,13 @@ test.describe.serial("SSE 实时连接 E2E", () => {
 		});
 		await expect(page.getByText("轮询模式")).not.toBeVisible();
 
-		// ── Step 4: UI 启动内网扫描 ──
-		log("Step 4: Start internal scan via ScanModal");
+		// ── Step 4: UI 启动外网扫描 ──
+		log("Step 4: Start internet scan via ScanModal");
 		await page.getByRole("button", { name: /启动扫描/ }).first().click();
 		await expect(
 			page.getByRole("heading", { name: /新建扫描流水线/ }),
 		).toBeVisible();
-		await page.locator("button", { hasText: "内网扫描" }).first().click();
+		await page.locator("button", { hasText: "外网扫描" }).first().click();
 		await page.getByRole("button", { name: /高级配置/ }).click();
 		await page.getByLabel("端口模式 -tp 预设").click();
 		await page.getByLabel("Top-N 端口预设").selectOption("top100");

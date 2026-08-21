@@ -1165,6 +1165,10 @@ export interface DashboardStats {
 
 export const DEFAULT_FFUF_DICTIONARY_ID = "builtin:path/top100.txt";
 
+// LEGACY (P1-1): this baseline carries retired internal-mode defaults (high naabu
+// rate/threads, aggressive depth). It is retained only as the structural base for
+// DEFAULT_EXTERNAL_PIPELINE_CONFIG and for reading saved internal-shaped configs.
+// New scan code must use DEFAULT_EXTERNAL_PIPELINE_CONFIG.
 export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   enable_cdn_filter: true,
   port_range: "top1000",
@@ -1233,7 +1237,8 @@ export const DEFAULT_HIGH_RISK_PORTS =
 export interface ScanDefaultsResponse {
   high_risk_ports: string;
   ffuf_dictionary_default: string;
-  presets: Partial<Record<"external" | "internal", PipelineConfig>>;
+  // P1-1: the dedicated "internal" preset was retired; only the internet preset is exposed.
+  presets: Partial<Record<"external", PipelineConfig>>;
   junk_keyword_count: number;
   exclude_domain_count: number;
   config_path?: string;
