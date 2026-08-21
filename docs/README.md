@@ -45,4 +45,4 @@ Do not create a second roadmap, architecture baseline, agent guide, changelog, o
 - Store reasons and stable contracts, not inventories that can be read cheaply from source.
 - Link to the owning document instead of copying its rule.
 - Move replaced material to `archived/`; do not leave contradictory siblings live.
-- Run `make check-docs` after changing Markdown, `AGENTS.md`, or `CLAUDE.md`.
+- Run `make check-docs` after changing Markdown or `AGENTS.md`.

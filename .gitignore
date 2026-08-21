@@ -57,6 +57,7 @@ Thumbs.db
 bin/
 
 # Agent caches (local runtime state — never commit)
+.dsh/
 tasks/
 .worktrees/
 .codegraph/

@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 
 const REQUIRED = [
   "AGENTS.md",
-  "CLAUDE.md",
   "README.md",
   "CHANGELOG.md",
   "docs/README.md",
@@ -191,11 +190,6 @@ export function checkDocs(rootPath) {
         fail(file, `broken local link: ${rawTarget}`);
       }
     }
-  }
-
-  const claude = path.join(root, "CLAUDE.md");
-  if (fs.existsSync(claude) && !fs.readFileSync(claude, "utf8").includes("@AGENTS.md")) {
-    fail("CLAUDE.md", "must remain a thin pointer containing @AGENTS.md");
   }
 
   return errors;

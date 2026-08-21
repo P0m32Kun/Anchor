@@ -1,6 +1,6 @@
 # 0001. Use one documentation authority chain
 
-- Status: accepted
+- Status: superseded by 0008
 - Date: 2026-08-20
 
 ## Context

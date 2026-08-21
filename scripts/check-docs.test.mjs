@@ -16,7 +16,6 @@ function fixture(t) {
   };
 
   write("AGENTS.md", "# Agent contract\n\ndistributed internet attack-surface mapping platform\n");
-  write("CLAUDE.md", "@AGENTS.md\n");
   write("README.md", "distributed internet attack-surface mapping platform\n[Docs](docs/README.md)\n");
   write("CHANGELOG.md", "# Changelog\n");
   write("docs/README.md", "[Product](current/product.md)\n");
@@ -59,13 +58,11 @@ test("rejects broken links but ignores archived snapshots", (t) => {
   assert.ok(issues.every((issue) => !issue.file.startsWith("docs/archived/")));
 });
 
-test("rejects missing lifecycle status and a duplicated Claude contract", (t) => {
+test("rejects missing lifecycle status", (t) => {
   const { root, write } = fixture(t);
   write("docs/proposals/idea.md", "# Idea without status\n");
-  write("CLAUDE.md", "# Separate rules\n");
   const issues = checkDocs(root);
   assert.ok(issues.some((issue) => issue.message.includes("missing legal status")));
-  assert.ok(issues.some((issue) => issue.file === "CLAUDE.md" && issue.message.includes("thin pointer")));
 });
 
 test("rejects loss of the internet-only product boundary", (t) => {
